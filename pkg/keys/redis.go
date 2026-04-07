@@ -206,3 +206,49 @@ const RoundClosedTTL = 30 * time.Second
 func TryCloseRound(ctx context.Context, rdb *redis.Client, roomID string, round int) (bool, error) {
 	return rdb.SetNX(ctx, RoundClosed(roomID, round), "1", RoundClosedTTL).Result()
 }
+
+// --- Email verification codes ---
+
+const (
+	EmailCodeTTL      = 10 * time.Minute
+	EmailRateLimitTTL = 60 * time.Second
+	MaxCodeAttempts   = 3
+)
+
+// StoreEmailCode saves a verification code in Redis with 10min TTL.
+func StoreEmailCode(ctx context.Context, rdb *redis.Client, email, purpose, code string) error {
+	return rdb.Set(ctx, EmailCodeKey(email, purpose), code, EmailCodeTTL).Err()
+}
+
+// CheckEmailCode verifies a code matches what's stored. Returns true if valid.
+// Deletes the code after successful verification or after max attempts.
+func CheckEmailCode(ctx context.Context, rdb *redis.Client, email, purpose, code string) (bool, error) {
+	key := EmailCodeKey(email, purpose)
+	stored, err := rdb.Get(ctx, key).Result()
+	if err == redis.Nil {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+
+	if stored == code {
+		rdb.Del(ctx, key) // one-time use
+		return true, nil
+	}
+
+	// Track failed attempts
+	attemptsKey := key + ":attempts"
+	attempts, _ := rdb.Incr(ctx, attemptsKey).Result()
+	rdb.Expire(ctx, attemptsKey, EmailCodeTTL)
+	if attempts >= MaxCodeAttempts {
+		rdb.Del(ctx, key)         // invalidate code
+		rdb.Del(ctx, attemptsKey) // cleanup
+	}
+	return false, nil
+}
+
+// CheckEmailRateLimit returns true if a code can be sent (not rate limited).
+func CheckEmailRateLimit(ctx context.Context, rdb *redis.Client, email string) (bool, error) {
+	return rdb.SetNX(ctx, EmailRateLimitKey(email), "1", EmailRateLimitTTL).Result()
+}

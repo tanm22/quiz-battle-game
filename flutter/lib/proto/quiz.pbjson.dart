@@ -448,13 +448,14 @@ const RegisterRequest$json = {
   '2': [
     {'1': 'username', '3': 1, '4': 1, '5': 9, '10': 'username'},
     {'1': 'password', '3': 2, '4': 1, '5': 9, '10': 'password'},
+    {'1': 'email', '3': 3, '4': 1, '5': 9, '10': 'email'},
   ],
 };
 
 /// Descriptor for `RegisterRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List registerRequestDescriptor = $convert.base64Decode(
     'Cg9SZWdpc3RlclJlcXVlc3QSGgoIdXNlcm5hbWUYASABKAlSCHVzZXJuYW1lEhoKCHBhc3N3b3'
-    'JkGAIgASgJUghwYXNzd29yZA==');
+    'JkGAIgASgJUghwYXNzd29yZBIUCgVlbWFpbBgDIAEoCVIFZW1haWw=');
 
 @$core.Deprecated('Use loginRequestDescriptor instead')
 const LoginRequest$json = {
@@ -480,6 +481,8 @@ const AuthResponse$json = {
     {'1': 'rating', '3': 4, '4': 1, '5': 5, '10': 'rating'},
     {'1': 'matches_played', '3': 5, '4': 1, '5': 5, '10': 'matchesPlayed'},
     {'1': 'wins', '3': 6, '4': 1, '5': 5, '10': 'wins'},
+    {'1': 'email', '3': 7, '4': 1, '5': 9, '10': 'email'},
+    {'1': 'is_guest', '3': 8, '4': 1, '5': 8, '10': 'isGuest'},
   ],
 };
 
@@ -488,7 +491,7 @@ final $typed_data.Uint8List authResponseDescriptor = $convert.base64Decode(
     'CgxBdXRoUmVzcG9uc2USFwoHdXNlcl9pZBgBIAEoCVIGdXNlcklkEhoKCHVzZXJuYW1lGAIgAS'
     'gJUgh1c2VybmFtZRIUCgV0b2tlbhgDIAEoCVIFdG9rZW4SFgoGcmF0aW5nGAQgASgFUgZyYXRp'
     'bmcSJQoObWF0Y2hlc19wbGF5ZWQYBSABKAVSDW1hdGNoZXNQbGF5ZWQSEgoEd2lucxgGIAEoBV'
-    'IEd2lucw==');
+    'IEd2lucxIUCgVlbWFpbBgHIAEoCVIFZW1haWwSGQoIaXNfZ3Vlc3QYCCABKAhSB2lzR3Vlc3Q=');
 
 @$core.Deprecated('Use getProfileRequestDescriptor instead')
 const GetProfileRequest$json = {
@@ -508,6 +511,8 @@ const ProfileResponse$json = {
     {'1': 'rating', '3': 3, '4': 1, '5': 5, '10': 'rating'},
     {'1': 'matches_played', '3': 4, '4': 1, '5': 5, '10': 'matchesPlayed'},
     {'1': 'wins', '3': 5, '4': 1, '5': 5, '10': 'wins'},
+    {'1': 'email', '3': 6, '4': 1, '5': 9, '10': 'email'},
+    {'1': 'is_guest', '3': 7, '4': 1, '5': 8, '10': 'isGuest'},
   ],
 };
 
@@ -515,7 +520,166 @@ const ProfileResponse$json = {
 final $typed_data.Uint8List profileResponseDescriptor = $convert.base64Decode(
     'Cg9Qcm9maWxlUmVzcG9uc2USFwoHdXNlcl9pZBgBIAEoCVIGdXNlcklkEhoKCHVzZXJuYW1lGA'
     'IgASgJUgh1c2VybmFtZRIWCgZyYXRpbmcYAyABKAVSBnJhdGluZxIlCg5tYXRjaGVzX3BsYXll'
-    'ZBgEIAEoBVINbWF0Y2hlc1BsYXllZBISCgR3aW5zGAUgASgFUgR3aW5z');
+    'ZBgEIAEoBVINbWF0Y2hlc1BsYXllZBISCgR3aW5zGAUgASgFUgR3aW5zEhQKBWVtYWlsGAYgAS'
+    'gJUgVlbWFpbBIZCghpc19ndWVzdBgHIAEoCFIHaXNHdWVzdA==');
+
+@$core.Deprecated('Use guestLoginRequestDescriptor instead')
+const GuestLoginRequest$json = {
+  '1': 'GuestLoginRequest',
+};
+
+/// Descriptor for `GuestLoginRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List guestLoginRequestDescriptor =
+    $convert.base64Decode('ChFHdWVzdExvZ2luUmVxdWVzdA==');
+
+@$core.Deprecated('Use emailLoginRequestDescriptor instead')
+const EmailLoginRequest$json = {
+  '1': 'EmailLoginRequest',
+  '2': [
+    {'1': 'email', '3': 1, '4': 1, '5': 9, '10': 'email'},
+  ],
+};
+
+/// Descriptor for `EmailLoginRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List emailLoginRequestDescriptor = $convert
+    .base64Decode('ChFFbWFpbExvZ2luUmVxdWVzdBIUCgVlbWFpbBgBIAEoCVIFZW1haWw=');
+
+@$core.Deprecated('Use sendEmailCodeRequestDescriptor instead')
+const SendEmailCodeRequest$json = {
+  '1': 'SendEmailCodeRequest',
+  '2': [
+    {'1': 'email', '3': 1, '4': 1, '5': 9, '10': 'email'},
+    {'1': 'purpose', '3': 2, '4': 1, '5': 9, '10': 'purpose'},
+  ],
+};
+
+/// Descriptor for `SendEmailCodeRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sendEmailCodeRequestDescriptor = $convert.base64Decode(
+    'ChRTZW5kRW1haWxDb2RlUmVxdWVzdBIUCgVlbWFpbBgBIAEoCVIFZW1haWwSGAoHcHVycG9zZR'
+    'gCIAEoCVIHcHVycG9zZQ==');
+
+@$core.Deprecated('Use sendEmailCodeResponseDescriptor instead')
+const SendEmailCodeResponse$json = {
+  '1': 'SendEmailCodeResponse',
+  '2': [
+    {'1': 'sent', '3': 1, '4': 1, '5': 8, '10': 'sent'},
+  ],
+};
+
+/// Descriptor for `SendEmailCodeResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sendEmailCodeResponseDescriptor =
+    $convert.base64Decode(
+        'ChVTZW5kRW1haWxDb2RlUmVzcG9uc2USEgoEc2VudBgBIAEoCFIEc2VudA==');
+
+@$core.Deprecated('Use verifyEmailCodeRequestDescriptor instead')
+const VerifyEmailCodeRequest$json = {
+  '1': 'VerifyEmailCodeRequest',
+  '2': [
+    {'1': 'email', '3': 1, '4': 1, '5': 9, '10': 'email'},
+    {'1': 'code', '3': 2, '4': 1, '5': 9, '10': 'code'},
+  ],
+};
+
+/// Descriptor for `VerifyEmailCodeRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List verifyEmailCodeRequestDescriptor =
+    $convert.base64Decode(
+        'ChZWZXJpZnlFbWFpbENvZGVSZXF1ZXN0EhQKBWVtYWlsGAEgASgJUgVlbWFpbBISCgRjb2RlGA'
+        'IgASgJUgRjb2Rl');
+
+@$core.Deprecated('Use verifyEmailCodeResponseDescriptor instead')
+const VerifyEmailCodeResponse$json = {
+  '1': 'VerifyEmailCodeResponse',
+  '2': [
+    {'1': 'verified', '3': 1, '4': 1, '5': 8, '10': 'verified'},
+    {'1': 'token', '3': 2, '4': 1, '5': 9, '10': 'token'},
+    {'1': 'user_id', '3': 3, '4': 1, '5': 9, '10': 'userId'},
+  ],
+};
+
+/// Descriptor for `VerifyEmailCodeResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List verifyEmailCodeResponseDescriptor =
+    $convert.base64Decode(
+        'ChdWZXJpZnlFbWFpbENvZGVSZXNwb25zZRIaCgh2ZXJpZmllZBgBIAEoCFIIdmVyaWZpZWQSFA'
+        'oFdG9rZW4YAiABKAlSBXRva2VuEhcKB3VzZXJfaWQYAyABKAlSBnVzZXJJZA==');
+
+@$core.Deprecated('Use linkEmailRequestDescriptor instead')
+const LinkEmailRequest$json = {
+  '1': 'LinkEmailRequest',
+  '2': [
+    {'1': 'email', '3': 1, '4': 1, '5': 9, '10': 'email'},
+    {'1': 'code', '3': 2, '4': 1, '5': 9, '10': 'code'},
+  ],
+};
+
+/// Descriptor for `LinkEmailRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List linkEmailRequestDescriptor = $convert.base64Decode(
+    'ChBMaW5rRW1haWxSZXF1ZXN0EhQKBWVtYWlsGAEgASgJUgVlbWFpbBISCgRjb2RlGAIgASgJUg'
+    'Rjb2Rl');
+
+@$core.Deprecated('Use linkEmailResponseDescriptor instead')
+const LinkEmailResponse$json = {
+  '1': 'LinkEmailResponse',
+  '2': [
+    {'1': 'linked', '3': 1, '4': 1, '5': 8, '10': 'linked'},
+  ],
+};
+
+/// Descriptor for `LinkEmailResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List linkEmailResponseDescriptor = $convert.base64Decode(
+    'ChFMaW5rRW1haWxSZXNwb25zZRIWCgZsaW5rZWQYASABKAhSBmxpbmtlZA==');
+
+@$core.Deprecated('Use resetPasswordRequestDescriptor instead')
+const ResetPasswordRequest$json = {
+  '1': 'ResetPasswordRequest',
+  '2': [
+    {'1': 'email', '3': 1, '4': 1, '5': 9, '10': 'email'},
+    {'1': 'code', '3': 2, '4': 1, '5': 9, '10': 'code'},
+    {'1': 'new_password', '3': 3, '4': 1, '5': 9, '10': 'newPassword'},
+  ],
+};
+
+/// Descriptor for `ResetPasswordRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List resetPasswordRequestDescriptor = $convert.base64Decode(
+    'ChRSZXNldFBhc3N3b3JkUmVxdWVzdBIUCgVlbWFpbBgBIAEoCVIFZW1haWwSEgoEY29kZRgCIA'
+    'EoCVIEY29kZRIhCgxuZXdfcGFzc3dvcmQYAyABKAlSC25ld1Bhc3N3b3Jk');
+
+@$core.Deprecated('Use resetPasswordResponseDescriptor instead')
+const ResetPasswordResponse$json = {
+  '1': 'ResetPasswordResponse',
+  '2': [
+    {'1': 'success', '3': 1, '4': 1, '5': 8, '10': 'success'},
+  ],
+};
+
+/// Descriptor for `ResetPasswordResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List resetPasswordResponseDescriptor =
+    $convert.base64Decode(
+        'ChVSZXNldFBhc3N3b3JkUmVzcG9uc2USGAoHc3VjY2VzcxgBIAEoCFIHc3VjY2Vzcw==');
+
+@$core.Deprecated('Use checkUsernameRequestDescriptor instead')
+const CheckUsernameRequest$json = {
+  '1': 'CheckUsernameRequest',
+  '2': [
+    {'1': 'username', '3': 1, '4': 1, '5': 9, '10': 'username'},
+  ],
+};
+
+/// Descriptor for `CheckUsernameRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List checkUsernameRequestDescriptor =
+    $convert.base64Decode(
+        'ChRDaGVja1VzZXJuYW1lUmVxdWVzdBIaCgh1c2VybmFtZRgBIAEoCVIIdXNlcm5hbWU=');
+
+@$core.Deprecated('Use checkUsernameResponseDescriptor instead')
+const CheckUsernameResponse$json = {
+  '1': 'CheckUsernameResponse',
+  '2': [
+    {'1': 'available', '3': 1, '4': 1, '5': 8, '10': 'available'},
+  ],
+};
+
+/// Descriptor for `CheckUsernameResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List checkUsernameResponseDescriptor = $convert.base64Decode(
+    'ChVDaGVja1VzZXJuYW1lUmVzcG9uc2USHAoJYXZhaWxhYmxlGAEgASgIUglhdmFpbGFibGU=');
 
 @$core.Deprecated('Use calculateScoreRequestDescriptor instead')
 const CalculateScoreRequest$json = {

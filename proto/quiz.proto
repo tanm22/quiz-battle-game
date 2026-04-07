@@ -175,11 +175,19 @@ service AuthService {
   rpc Register(RegisterRequest) returns (AuthResponse);
   rpc Login(LoginRequest) returns (AuthResponse);
   rpc GetProfile(GetProfileRequest) returns (ProfileResponse);
+  rpc GuestLogin(GuestLoginRequest) returns (AuthResponse);
+  rpc LoginWithEmail(EmailLoginRequest) returns (SendEmailCodeResponse);
+  rpc SendEmailCode(SendEmailCodeRequest) returns (SendEmailCodeResponse);
+  rpc VerifyEmailCode(VerifyEmailCodeRequest) returns (VerifyEmailCodeResponse);
+  rpc LinkEmail(LinkEmailRequest) returns (LinkEmailResponse);
+  rpc ResetPassword(ResetPasswordRequest) returns (ResetPasswordResponse);
+  rpc CheckUsername(CheckUsernameRequest) returns (CheckUsernameResponse);
 }
 
 message RegisterRequest {
   string username = 1;
   string password = 2;
+  string email    = 3; // optional at registration
 }
 
 message LoginRequest {
@@ -194,6 +202,8 @@ message AuthResponse {
   int32  rating         = 4;
   int32  matches_played = 5;
   int32  wins           = 6;
+  string email          = 7;
+  bool   is_guest       = 8;
 }
 
 message GetProfileRequest {}
@@ -204,6 +214,61 @@ message ProfileResponse {
   int32  rating         = 3;
   int32  matches_played = 4;
   int32  wins           = 5;
+  string email          = 6;
+  bool   is_guest       = 7;
+}
+
+message GuestLoginRequest {}
+
+message EmailLoginRequest {
+  string email = 1;
+}
+
+message SendEmailCodeRequest {
+  string email   = 1;
+  string purpose = 2; // "login", "reset", "link"
+}
+
+message SendEmailCodeResponse {
+  bool sent = 1;
+}
+
+message VerifyEmailCodeRequest {
+  string email = 1;
+  string code  = 2;
+}
+
+message VerifyEmailCodeResponse {
+  bool   verified = 1;
+  string token    = 2; // JWT returned for login flow
+  string user_id  = 3;
+}
+
+message LinkEmailRequest {
+  string email = 1;
+  string code  = 2;
+}
+
+message LinkEmailResponse {
+  bool linked = 1;
+}
+
+message ResetPasswordRequest {
+  string email        = 1;
+  string code         = 2;
+  string new_password = 3;
+}
+
+message ResetPasswordResponse {
+  bool success = 1;
+}
+
+message CheckUsernameRequest {
+  string username = 1;
+}
+
+message CheckUsernameResponse {
+  bool available = 1;
 }
 
 message CalculateScoreRequest {

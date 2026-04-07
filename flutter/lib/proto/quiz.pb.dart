@@ -1639,10 +1639,12 @@ class RegisterRequest extends $pb.GeneratedMessage {
   factory RegisterRequest({
     $core.String? username,
     $core.String? password,
+    $core.String? email,
   }) {
     final result = create();
     if (username != null) result.username = username;
     if (password != null) result.password = password;
+    if (email != null) result.email = email;
     return result;
   }
 
@@ -1661,6 +1663,7 @@ class RegisterRequest extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'username')
     ..aOS(2, _omitFieldNames ? '' : 'password')
+    ..aOS(3, _omitFieldNames ? '' : 'email')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1699,6 +1702,15 @@ class RegisterRequest extends $pb.GeneratedMessage {
   $core.bool hasPassword() => $_has(1);
   @$pb.TagNumber(2)
   void clearPassword() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get email => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set email($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasEmail() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearEmail() => $_clearField(3);
 }
 
 class LoginRequest extends $pb.GeneratedMessage {
@@ -1775,6 +1787,8 @@ class AuthResponse extends $pb.GeneratedMessage {
     $core.int? rating,
     $core.int? matchesPlayed,
     $core.int? wins,
+    $core.String? email,
+    $core.bool? isGuest,
   }) {
     final result = create();
     if (userId != null) result.userId = userId;
@@ -1783,6 +1797,8 @@ class AuthResponse extends $pb.GeneratedMessage {
     if (rating != null) result.rating = rating;
     if (matchesPlayed != null) result.matchesPlayed = matchesPlayed;
     if (wins != null) result.wins = wins;
+    if (email != null) result.email = email;
+    if (isGuest != null) result.isGuest = isGuest;
     return result;
   }
 
@@ -1805,6 +1821,8 @@ class AuthResponse extends $pb.GeneratedMessage {
     ..aI(4, _omitFieldNames ? '' : 'rating')
     ..aI(5, _omitFieldNames ? '' : 'matchesPlayed')
     ..aI(6, _omitFieldNames ? '' : 'wins')
+    ..aOS(7, _omitFieldNames ? '' : 'email')
+    ..aOB(8, _omitFieldNames ? '' : 'isGuest')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1879,6 +1897,24 @@ class AuthResponse extends $pb.GeneratedMessage {
   $core.bool hasWins() => $_has(5);
   @$pb.TagNumber(6)
   void clearWins() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.String get email => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set email($core.String value) => $_setString(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasEmail() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearEmail() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.bool get isGuest => $_getBF(7);
+  @$pb.TagNumber(8)
+  set isGuest($core.bool value) => $_setBool(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasIsGuest() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearIsGuest() => $_clearField(8);
 }
 
 class GetProfileRequest extends $pb.GeneratedMessage {
@@ -1926,6 +1962,8 @@ class ProfileResponse extends $pb.GeneratedMessage {
     $core.int? rating,
     $core.int? matchesPlayed,
     $core.int? wins,
+    $core.String? email,
+    $core.bool? isGuest,
   }) {
     final result = create();
     if (userId != null) result.userId = userId;
@@ -1933,6 +1971,8 @@ class ProfileResponse extends $pb.GeneratedMessage {
     if (rating != null) result.rating = rating;
     if (matchesPlayed != null) result.matchesPlayed = matchesPlayed;
     if (wins != null) result.wins = wins;
+    if (email != null) result.email = email;
+    if (isGuest != null) result.isGuest = isGuest;
     return result;
   }
 
@@ -1954,6 +1994,8 @@ class ProfileResponse extends $pb.GeneratedMessage {
     ..aI(3, _omitFieldNames ? '' : 'rating')
     ..aI(4, _omitFieldNames ? '' : 'matchesPlayed')
     ..aI(5, _omitFieldNames ? '' : 'wins')
+    ..aOS(6, _omitFieldNames ? '' : 'email')
+    ..aOB(7, _omitFieldNames ? '' : 'isGuest')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2019,6 +2061,745 @@ class ProfileResponse extends $pb.GeneratedMessage {
   $core.bool hasWins() => $_has(4);
   @$pb.TagNumber(5)
   void clearWins() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get email => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set email($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasEmail() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearEmail() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.bool get isGuest => $_getBF(6);
+  @$pb.TagNumber(7)
+  set isGuest($core.bool value) => $_setBool(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasIsGuest() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearIsGuest() => $_clearField(7);
+}
+
+class GuestLoginRequest extends $pb.GeneratedMessage {
+  factory GuestLoginRequest() => create();
+
+  GuestLoginRequest._();
+
+  factory GuestLoginRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GuestLoginRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GuestLoginRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GuestLoginRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GuestLoginRequest copyWith(void Function(GuestLoginRequest) updates) =>
+      super.copyWith((message) => updates(message as GuestLoginRequest))
+          as GuestLoginRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GuestLoginRequest create() => GuestLoginRequest._();
+  @$core.override
+  GuestLoginRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GuestLoginRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GuestLoginRequest>(create);
+  static GuestLoginRequest? _defaultInstance;
+}
+
+class EmailLoginRequest extends $pb.GeneratedMessage {
+  factory EmailLoginRequest({
+    $core.String? email,
+  }) {
+    final result = create();
+    if (email != null) result.email = email;
+    return result;
+  }
+
+  EmailLoginRequest._();
+
+  factory EmailLoginRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory EmailLoginRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'EmailLoginRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'email')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EmailLoginRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EmailLoginRequest copyWith(void Function(EmailLoginRequest) updates) =>
+      super.copyWith((message) => updates(message as EmailLoginRequest))
+          as EmailLoginRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static EmailLoginRequest create() => EmailLoginRequest._();
+  @$core.override
+  EmailLoginRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static EmailLoginRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<EmailLoginRequest>(create);
+  static EmailLoginRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get email => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set email($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasEmail() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearEmail() => $_clearField(1);
+}
+
+class SendEmailCodeRequest extends $pb.GeneratedMessage {
+  factory SendEmailCodeRequest({
+    $core.String? email,
+    $core.String? purpose,
+  }) {
+    final result = create();
+    if (email != null) result.email = email;
+    if (purpose != null) result.purpose = purpose;
+    return result;
+  }
+
+  SendEmailCodeRequest._();
+
+  factory SendEmailCodeRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory SendEmailCodeRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SendEmailCodeRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'email')
+    ..aOS(2, _omitFieldNames ? '' : 'purpose')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SendEmailCodeRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SendEmailCodeRequest copyWith(void Function(SendEmailCodeRequest) updates) =>
+      super.copyWith((message) => updates(message as SendEmailCodeRequest))
+          as SendEmailCodeRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static SendEmailCodeRequest create() => SendEmailCodeRequest._();
+  @$core.override
+  SendEmailCodeRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static SendEmailCodeRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SendEmailCodeRequest>(create);
+  static SendEmailCodeRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get email => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set email($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasEmail() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearEmail() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get purpose => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set purpose($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPurpose() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPurpose() => $_clearField(2);
+}
+
+class SendEmailCodeResponse extends $pb.GeneratedMessage {
+  factory SendEmailCodeResponse({
+    $core.bool? sent,
+  }) {
+    final result = create();
+    if (sent != null) result.sent = sent;
+    return result;
+  }
+
+  SendEmailCodeResponse._();
+
+  factory SendEmailCodeResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory SendEmailCodeResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SendEmailCodeResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'sent')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SendEmailCodeResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SendEmailCodeResponse copyWith(
+          void Function(SendEmailCodeResponse) updates) =>
+      super.copyWith((message) => updates(message as SendEmailCodeResponse))
+          as SendEmailCodeResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static SendEmailCodeResponse create() => SendEmailCodeResponse._();
+  @$core.override
+  SendEmailCodeResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static SendEmailCodeResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SendEmailCodeResponse>(create);
+  static SendEmailCodeResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get sent => $_getBF(0);
+  @$pb.TagNumber(1)
+  set sent($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSent() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSent() => $_clearField(1);
+}
+
+class VerifyEmailCodeRequest extends $pb.GeneratedMessage {
+  factory VerifyEmailCodeRequest({
+    $core.String? email,
+    $core.String? code,
+  }) {
+    final result = create();
+    if (email != null) result.email = email;
+    if (code != null) result.code = code;
+    return result;
+  }
+
+  VerifyEmailCodeRequest._();
+
+  factory VerifyEmailCodeRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory VerifyEmailCodeRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'VerifyEmailCodeRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'email')
+    ..aOS(2, _omitFieldNames ? '' : 'code')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  VerifyEmailCodeRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  VerifyEmailCodeRequest copyWith(
+          void Function(VerifyEmailCodeRequest) updates) =>
+      super.copyWith((message) => updates(message as VerifyEmailCodeRequest))
+          as VerifyEmailCodeRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static VerifyEmailCodeRequest create() => VerifyEmailCodeRequest._();
+  @$core.override
+  VerifyEmailCodeRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static VerifyEmailCodeRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<VerifyEmailCodeRequest>(create);
+  static VerifyEmailCodeRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get email => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set email($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasEmail() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearEmail() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get code => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set code($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasCode() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearCode() => $_clearField(2);
+}
+
+class VerifyEmailCodeResponse extends $pb.GeneratedMessage {
+  factory VerifyEmailCodeResponse({
+    $core.bool? verified,
+    $core.String? token,
+    $core.String? userId,
+  }) {
+    final result = create();
+    if (verified != null) result.verified = verified;
+    if (token != null) result.token = token;
+    if (userId != null) result.userId = userId;
+    return result;
+  }
+
+  VerifyEmailCodeResponse._();
+
+  factory VerifyEmailCodeResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory VerifyEmailCodeResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'VerifyEmailCodeResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'verified')
+    ..aOS(2, _omitFieldNames ? '' : 'token')
+    ..aOS(3, _omitFieldNames ? '' : 'userId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  VerifyEmailCodeResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  VerifyEmailCodeResponse copyWith(
+          void Function(VerifyEmailCodeResponse) updates) =>
+      super.copyWith((message) => updates(message as VerifyEmailCodeResponse))
+          as VerifyEmailCodeResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static VerifyEmailCodeResponse create() => VerifyEmailCodeResponse._();
+  @$core.override
+  VerifyEmailCodeResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static VerifyEmailCodeResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<VerifyEmailCodeResponse>(create);
+  static VerifyEmailCodeResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get verified => $_getBF(0);
+  @$pb.TagNumber(1)
+  set verified($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasVerified() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearVerified() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get token => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set token($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasToken() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearToken() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get userId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set userId($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasUserId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearUserId() => $_clearField(3);
+}
+
+class LinkEmailRequest extends $pb.GeneratedMessage {
+  factory LinkEmailRequest({
+    $core.String? email,
+    $core.String? code,
+  }) {
+    final result = create();
+    if (email != null) result.email = email;
+    if (code != null) result.code = code;
+    return result;
+  }
+
+  LinkEmailRequest._();
+
+  factory LinkEmailRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory LinkEmailRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'LinkEmailRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'email')
+    ..aOS(2, _omitFieldNames ? '' : 'code')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LinkEmailRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LinkEmailRequest copyWith(void Function(LinkEmailRequest) updates) =>
+      super.copyWith((message) => updates(message as LinkEmailRequest))
+          as LinkEmailRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static LinkEmailRequest create() => LinkEmailRequest._();
+  @$core.override
+  LinkEmailRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static LinkEmailRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<LinkEmailRequest>(create);
+  static LinkEmailRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get email => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set email($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasEmail() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearEmail() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get code => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set code($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasCode() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearCode() => $_clearField(2);
+}
+
+class LinkEmailResponse extends $pb.GeneratedMessage {
+  factory LinkEmailResponse({
+    $core.bool? linked,
+  }) {
+    final result = create();
+    if (linked != null) result.linked = linked;
+    return result;
+  }
+
+  LinkEmailResponse._();
+
+  factory LinkEmailResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory LinkEmailResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'LinkEmailResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'linked')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LinkEmailResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LinkEmailResponse copyWith(void Function(LinkEmailResponse) updates) =>
+      super.copyWith((message) => updates(message as LinkEmailResponse))
+          as LinkEmailResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static LinkEmailResponse create() => LinkEmailResponse._();
+  @$core.override
+  LinkEmailResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static LinkEmailResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<LinkEmailResponse>(create);
+  static LinkEmailResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get linked => $_getBF(0);
+  @$pb.TagNumber(1)
+  set linked($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasLinked() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearLinked() => $_clearField(1);
+}
+
+class ResetPasswordRequest extends $pb.GeneratedMessage {
+  factory ResetPasswordRequest({
+    $core.String? email,
+    $core.String? code,
+    $core.String? newPassword,
+  }) {
+    final result = create();
+    if (email != null) result.email = email;
+    if (code != null) result.code = code;
+    if (newPassword != null) result.newPassword = newPassword;
+    return result;
+  }
+
+  ResetPasswordRequest._();
+
+  factory ResetPasswordRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ResetPasswordRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ResetPasswordRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'email')
+    ..aOS(2, _omitFieldNames ? '' : 'code')
+    ..aOS(3, _omitFieldNames ? '' : 'newPassword')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ResetPasswordRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ResetPasswordRequest copyWith(void Function(ResetPasswordRequest) updates) =>
+      super.copyWith((message) => updates(message as ResetPasswordRequest))
+          as ResetPasswordRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ResetPasswordRequest create() => ResetPasswordRequest._();
+  @$core.override
+  ResetPasswordRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ResetPasswordRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ResetPasswordRequest>(create);
+  static ResetPasswordRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get email => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set email($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasEmail() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearEmail() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get code => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set code($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasCode() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearCode() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get newPassword => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set newPassword($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasNewPassword() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearNewPassword() => $_clearField(3);
+}
+
+class ResetPasswordResponse extends $pb.GeneratedMessage {
+  factory ResetPasswordResponse({
+    $core.bool? success,
+  }) {
+    final result = create();
+    if (success != null) result.success = success;
+    return result;
+  }
+
+  ResetPasswordResponse._();
+
+  factory ResetPasswordResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ResetPasswordResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ResetPasswordResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'success')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ResetPasswordResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ResetPasswordResponse copyWith(
+          void Function(ResetPasswordResponse) updates) =>
+      super.copyWith((message) => updates(message as ResetPasswordResponse))
+          as ResetPasswordResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ResetPasswordResponse create() => ResetPasswordResponse._();
+  @$core.override
+  ResetPasswordResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ResetPasswordResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ResetPasswordResponse>(create);
+  static ResetPasswordResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get success => $_getBF(0);
+  @$pb.TagNumber(1)
+  set success($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSuccess() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSuccess() => $_clearField(1);
+}
+
+class CheckUsernameRequest extends $pb.GeneratedMessage {
+  factory CheckUsernameRequest({
+    $core.String? username,
+  }) {
+    final result = create();
+    if (username != null) result.username = username;
+    return result;
+  }
+
+  CheckUsernameRequest._();
+
+  factory CheckUsernameRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory CheckUsernameRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CheckUsernameRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'username')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CheckUsernameRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CheckUsernameRequest copyWith(void Function(CheckUsernameRequest) updates) =>
+      super.copyWith((message) => updates(message as CheckUsernameRequest))
+          as CheckUsernameRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static CheckUsernameRequest create() => CheckUsernameRequest._();
+  @$core.override
+  CheckUsernameRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static CheckUsernameRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CheckUsernameRequest>(create);
+  static CheckUsernameRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get username => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set username($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasUsername() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearUsername() => $_clearField(1);
+}
+
+class CheckUsernameResponse extends $pb.GeneratedMessage {
+  factory CheckUsernameResponse({
+    $core.bool? available,
+  }) {
+    final result = create();
+    if (available != null) result.available = available;
+    return result;
+  }
+
+  CheckUsernameResponse._();
+
+  factory CheckUsernameResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory CheckUsernameResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CheckUsernameResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'available')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CheckUsernameResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CheckUsernameResponse copyWith(
+          void Function(CheckUsernameResponse) updates) =>
+      super.copyWith((message) => updates(message as CheckUsernameResponse))
+          as CheckUsernameResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static CheckUsernameResponse create() => CheckUsernameResponse._();
+  @$core.override
+  CheckUsernameResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static CheckUsernameResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CheckUsernameResponse>(create);
+  static CheckUsernameResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get available => $_getBF(0);
+  @$pb.TagNumber(1)
+  set available($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasAvailable() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearAvailable() => $_clearField(1);
 }
 
 class CalculateScoreRequest extends $pb.GeneratedMessage {

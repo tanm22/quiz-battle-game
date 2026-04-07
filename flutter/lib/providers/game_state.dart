@@ -25,6 +25,8 @@ class GameState {
   final int rating;
   final bool isReconnecting;
   final int lastSequenceNumber;
+  final bool isGuest;
+  final String? email;
 
   const GameState({
     this.currentScreen = GameScreen.login,
@@ -42,6 +44,8 @@ class GameState {
     this.leaderboard = const [],
     this.isReconnecting = false,
     this.lastSequenceNumber = 0,
+    this.isGuest = false,
+    this.email,
   });
 
   GameState copyWith({
@@ -60,6 +64,8 @@ class GameState {
     List<LeaderboardEntry>? leaderboard,
     bool? isReconnecting,
     int? lastSequenceNumber,
+    bool? isGuest,
+    String? email,
     bool clearSelectedIndex = false,
     bool clearCorrectIndex = false,
   }) {
@@ -79,6 +85,8 @@ class GameState {
       leaderboard: leaderboard ?? this.leaderboard,
       isReconnecting: isReconnecting ?? this.isReconnecting,
       lastSequenceNumber: lastSequenceNumber ?? this.lastSequenceNumber,
+      isGuest: isGuest ?? this.isGuest,
+      email: email ?? this.email,
     );
   }
 }
@@ -109,13 +117,19 @@ class GameStateNotifier extends Notifier<GameState> {
 
   // --- Auth ---
 
-  void setAuth(String userId, String token, int rating) {
+  void setAuth(String userId, String token, int rating, {bool isGuest = false, String? email}) {
     state = state.copyWith(
       userId: userId,
       token: token,
       rating: rating,
+      isGuest: isGuest,
+      email: email,
       currentScreen: GameScreen.matchmaking,
     );
+  }
+
+  void linkEmailSuccess(String email) {
+    state = state.copyWith(isGuest: false, email: email);
   }
 
   // --- Matchmaking ---
@@ -265,6 +279,8 @@ class GameStateNotifier extends Notifier<GameState> {
       userId: state.userId,
       token: state.token,
       rating: state.rating,
+      email: state.email,
+      isGuest: state.isGuest,
     );
   }
 
@@ -286,6 +302,8 @@ class GameStateNotifier extends Notifier<GameState> {
       userId: state.userId,
       token: state.token,
       rating: state.rating,
+      email: state.email,
+      isGuest: state.isGuest,
     );
   }
 

@@ -14,6 +14,8 @@ const (
 	RoomAnswers     = "room:%s:answers:%d"
 	RoomLock        = "room:lock:%s"
 	RoomRoundClosed = "room:%s:round:%d:closed"
+	EmailCode       = "emailcode:%s:%s" // email, purpose
+	EmailRateLimit  = "emailrate:%s"    // email
 )
 
 // Key helper functions — one function per key to prevent fmt.Sprintf typos.
@@ -48,4 +50,12 @@ func Lock(roomID string) string {
 
 func RoundClosed(roomID string, round int) string {
 	return fmt.Sprintf(RoomRoundClosed, roomID, round)
+}
+
+func EmailCodeKey(email, purpose string) string {
+	return fmt.Sprintf(EmailCode, email, purpose)
+}
+
+func EmailRateLimitKey(email string) string {
+	return fmt.Sprintf(EmailRateLimit, email)
 }

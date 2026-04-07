@@ -29,6 +29,8 @@ type User struct {
 	ID            string `bson:"_id"`
 	Username      string `bson:"username"`
 	PasswordHash  string `bson:"passwordHash"`
+	Email         string `bson:"email,omitempty"`
+	IsGuest       bool   `bson:"isGuest"`
 	Rating        int32  `bson:"rating"`
 	MatchesPlayed int32  `bson:"matchesPlayed"`
 	Wins          int32  `bson:"wins"`

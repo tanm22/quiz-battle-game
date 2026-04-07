@@ -365,6 +365,55 @@ class AuthServiceClient extends $grpc.Client {
     return $createUnaryCall(_$getProfile, request, options: options);
   }
 
+  $grpc.ResponseFuture<$0.AuthResponse> guestLogin(
+    $0.GuestLoginRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$guestLogin, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.SendEmailCodeResponse> loginWithEmail(
+    $0.EmailLoginRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$loginWithEmail, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.SendEmailCodeResponse> sendEmailCode(
+    $0.SendEmailCodeRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$sendEmailCode, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.VerifyEmailCodeResponse> verifyEmailCode(
+    $0.VerifyEmailCodeRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$verifyEmailCode, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.LinkEmailResponse> linkEmail(
+    $0.LinkEmailRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$linkEmail, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.ResetPasswordResponse> resetPassword(
+    $0.ResetPasswordRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$resetPassword, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.CheckUsernameResponse> checkUsername(
+    $0.CheckUsernameRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$checkUsername, request, options: options);
+  }
+
   // method descriptors
 
   static final _$register =
@@ -381,6 +430,41 @@ class AuthServiceClient extends $grpc.Client {
           '/quiz.AuthService/GetProfile',
           ($0.GetProfileRequest value) => value.writeToBuffer(),
           $0.ProfileResponse.fromBuffer);
+  static final _$guestLogin =
+      $grpc.ClientMethod<$0.GuestLoginRequest, $0.AuthResponse>(
+          '/quiz.AuthService/GuestLogin',
+          ($0.GuestLoginRequest value) => value.writeToBuffer(),
+          $0.AuthResponse.fromBuffer);
+  static final _$loginWithEmail =
+      $grpc.ClientMethod<$0.EmailLoginRequest, $0.SendEmailCodeResponse>(
+          '/quiz.AuthService/LoginWithEmail',
+          ($0.EmailLoginRequest value) => value.writeToBuffer(),
+          $0.SendEmailCodeResponse.fromBuffer);
+  static final _$sendEmailCode =
+      $grpc.ClientMethod<$0.SendEmailCodeRequest, $0.SendEmailCodeResponse>(
+          '/quiz.AuthService/SendEmailCode',
+          ($0.SendEmailCodeRequest value) => value.writeToBuffer(),
+          $0.SendEmailCodeResponse.fromBuffer);
+  static final _$verifyEmailCode =
+      $grpc.ClientMethod<$0.VerifyEmailCodeRequest, $0.VerifyEmailCodeResponse>(
+          '/quiz.AuthService/VerifyEmailCode',
+          ($0.VerifyEmailCodeRequest value) => value.writeToBuffer(),
+          $0.VerifyEmailCodeResponse.fromBuffer);
+  static final _$linkEmail =
+      $grpc.ClientMethod<$0.LinkEmailRequest, $0.LinkEmailResponse>(
+          '/quiz.AuthService/LinkEmail',
+          ($0.LinkEmailRequest value) => value.writeToBuffer(),
+          $0.LinkEmailResponse.fromBuffer);
+  static final _$resetPassword =
+      $grpc.ClientMethod<$0.ResetPasswordRequest, $0.ResetPasswordResponse>(
+          '/quiz.AuthService/ResetPassword',
+          ($0.ResetPasswordRequest value) => value.writeToBuffer(),
+          $0.ResetPasswordResponse.fromBuffer);
+  static final _$checkUsername =
+      $grpc.ClientMethod<$0.CheckUsernameRequest, $0.CheckUsernameResponse>(
+          '/quiz.AuthService/CheckUsername',
+          ($0.CheckUsernameRequest value) => value.writeToBuffer(),
+          $0.CheckUsernameResponse.fromBuffer);
 }
 
 @$pb.GrpcServiceName('quiz.AuthService')
@@ -409,6 +493,65 @@ abstract class AuthServiceBase extends $grpc.Service {
         false,
         ($core.List<$core.int> value) => $0.GetProfileRequest.fromBuffer(value),
         ($0.ProfileResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.GuestLoginRequest, $0.AuthResponse>(
+        'GuestLogin',
+        guestLogin_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.GuestLoginRequest.fromBuffer(value),
+        ($0.AuthResponse value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.EmailLoginRequest, $0.SendEmailCodeResponse>(
+            'LoginWithEmail',
+            loginWithEmail_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.EmailLoginRequest.fromBuffer(value),
+            ($0.SendEmailCodeResponse value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.SendEmailCodeRequest, $0.SendEmailCodeResponse>(
+            'SendEmailCode',
+            sendEmailCode_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.SendEmailCodeRequest.fromBuffer(value),
+            ($0.SendEmailCodeResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.VerifyEmailCodeRequest,
+            $0.VerifyEmailCodeResponse>(
+        'VerifyEmailCode',
+        verifyEmailCode_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.VerifyEmailCodeRequest.fromBuffer(value),
+        ($0.VerifyEmailCodeResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.LinkEmailRequest, $0.LinkEmailResponse>(
+        'LinkEmail',
+        linkEmail_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.LinkEmailRequest.fromBuffer(value),
+        ($0.LinkEmailResponse value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.ResetPasswordRequest, $0.ResetPasswordResponse>(
+            'ResetPassword',
+            resetPassword_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.ResetPasswordRequest.fromBuffer(value),
+            ($0.ResetPasswordResponse value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.CheckUsernameRequest, $0.CheckUsernameResponse>(
+            'CheckUsername',
+            checkUsername_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.CheckUsernameRequest.fromBuffer(value),
+            ($0.CheckUsernameResponse value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.AuthResponse> register_Pre($grpc.ServiceCall $call,
@@ -434,4 +577,65 @@ abstract class AuthServiceBase extends $grpc.Service {
 
   $async.Future<$0.ProfileResponse> getProfile(
       $grpc.ServiceCall call, $0.GetProfileRequest request);
+
+  $async.Future<$0.AuthResponse> guestLogin_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.GuestLoginRequest> $request) async {
+    return guestLogin($call, await $request);
+  }
+
+  $async.Future<$0.AuthResponse> guestLogin(
+      $grpc.ServiceCall call, $0.GuestLoginRequest request);
+
+  $async.Future<$0.SendEmailCodeResponse> loginWithEmail_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.EmailLoginRequest> $request) async {
+    return loginWithEmail($call, await $request);
+  }
+
+  $async.Future<$0.SendEmailCodeResponse> loginWithEmail(
+      $grpc.ServiceCall call, $0.EmailLoginRequest request);
+
+  $async.Future<$0.SendEmailCodeResponse> sendEmailCode_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.SendEmailCodeRequest> $request) async {
+    return sendEmailCode($call, await $request);
+  }
+
+  $async.Future<$0.SendEmailCodeResponse> sendEmailCode(
+      $grpc.ServiceCall call, $0.SendEmailCodeRequest request);
+
+  $async.Future<$0.VerifyEmailCodeResponse> verifyEmailCode_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.VerifyEmailCodeRequest> $request) async {
+    return verifyEmailCode($call, await $request);
+  }
+
+  $async.Future<$0.VerifyEmailCodeResponse> verifyEmailCode(
+      $grpc.ServiceCall call, $0.VerifyEmailCodeRequest request);
+
+  $async.Future<$0.LinkEmailResponse> linkEmail_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.LinkEmailRequest> $request) async {
+    return linkEmail($call, await $request);
+  }
+
+  $async.Future<$0.LinkEmailResponse> linkEmail(
+      $grpc.ServiceCall call, $0.LinkEmailRequest request);
+
+  $async.Future<$0.ResetPasswordResponse> resetPassword_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.ResetPasswordRequest> $request) async {
+    return resetPassword($call, await $request);
+  }
+
+  $async.Future<$0.ResetPasswordResponse> resetPassword(
+      $grpc.ServiceCall call, $0.ResetPasswordRequest request);
+
+  $async.Future<$0.CheckUsernameResponse> checkUsername_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.CheckUsernameRequest> $request) async {
+    return checkUsername($call, await $request);
+  }
+
+  $async.Future<$0.CheckUsernameResponse> checkUsername(
+      $grpc.ServiceCall call, $0.CheckUsernameRequest request);
 }

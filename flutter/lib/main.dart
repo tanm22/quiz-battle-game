@@ -60,6 +60,8 @@ class _AppShellState extends ConsumerState<AppShell> {
             auth.userId!,
             auth.token!,
             auth.rating,
+            email: auth.email,
+            isGuest: auth.isGuest,
           );
     }
     setState(() => _checkedAuth = true);
