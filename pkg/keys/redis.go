@@ -197,8 +197,12 @@ func HasAnswer(ctx context.Context, rdb *redis.Client, roomID string, round int,
 
 // --- Round close guard ---
 
+// RoundClosedTTL is the safety expiry for the round-closed guard key.
+// Only needs to outlive the round transition (~17s). Spec mandates EX 30.
+const RoundClosedTTL = 30 * time.Second
+
 // TryCloseRound attempts to set the round-closed guard via SETNX.
 // Returns true if this goroutine won the race (first to close the round).
 func TryCloseRound(ctx context.Context, rdb *redis.Client, roomID string, round int) (bool, error) {
-	return rdb.SetNX(ctx, RoundClosed(roomID, round), "1", RoomTTL).Result()
+	return rdb.SetNX(ctx, RoundClosed(roomID, round), "1", RoundClosedTTL).Result()
 }

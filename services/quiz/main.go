@@ -63,8 +63,8 @@ func (s *quizServer) getSeqCounter(roomID string) *atomic.Int64 {
 func (s *quizServer) selectQuestions(ctx context.Context) ([]Question, error) {
 	coll := s.mongoDB.Collection("questions")
 
-	// Weighted distribution: 30% easy (2), 50% medium (2), 20% hard (1) = 5 questions
-	counts := map[string]int{"easy": 2, "medium": 2, "hard": 1}
+	// Weighted distribution: ~30% easy (1), ~50% medium (3), ~20% hard (1) = 5 questions
+	counts := map[string]int{"easy": 1, "medium": 3, "hard": 1}
 
 	var selected []Question
 	var lastTopic string
@@ -520,7 +520,76 @@ func setupRabbitMQ(ch *amqp.Channel) error {
 		return fmt.Errorf("analytics queue bind: %w", err)
 	}
 
+	// leaderboard-broadcast-queue (consumed by quiz service to broadcast updates to game streams)
+	_, err = ch.QueueDeclare("leaderboard-broadcast-queue", true, false, false, false, nil)
+	if err != nil {
+		return fmt.Errorf("leaderboard queue declare: %w", err)
+	}
+	if err := ch.QueueBind("leaderboard-broadcast-queue", "leaderboard.updated", "sx", false, nil); err != nil {
+		return fmt.Errorf("leaderboard queue bind: %w", err)
+	}
+
 	return nil
+}
+
+// ---------------------------------------------------------------------------
+// consumeLeaderboardUpdated — relay scoring leaderboard events to game streams
+// ---------------------------------------------------------------------------
+
+func (s *quizServer) consumeLeaderboardUpdated(ctx context.Context) {
+	msgs, err := s.amqpCh.Consume("leaderboard-broadcast-queue", "", false, false, false, false, nil)
+	if err != nil {
+		log.Fatalf("[quiz] failed to consume leaderboard-broadcast-queue: %v", err)
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case msg, ok := <-msgs:
+			if !ok {
+				return
+			}
+
+			var event struct {
+				RoomID  string `json:"roomId"`
+				Entries []struct {
+					Member interface{} `json:"Member"`
+					Score  float64     `json:"Score"`
+				} `json:"entries"`
+			}
+			if err := json.Unmarshal(msg.Body, &event); err != nil {
+				log.Printf("[quiz] bad leaderboard.updated payload: %v", err)
+				msg.Nack(false, false)
+				continue
+			}
+
+			// Build LeaderboardUpdate GameEvent
+			entries := make([]*pb.LeaderboardEntry, 0, len(event.Entries))
+			for i, e := range event.Entries {
+				userID := fmt.Sprintf("%v", e.Member)
+				entries = append(entries, &pb.LeaderboardEntry{
+					UserId: userID,
+					Score:  e.Score,
+					Rank:   int32(i + 1),
+				})
+			}
+
+			seq := s.getSeqCounter(event.RoomID).Add(1)
+			gameEvent := &pb.GameEvent{
+				SequenceNumber: seq,
+				Event: &pb.GameEvent_Leaderboard{
+					Leaderboard: &pb.LeaderboardUpdate{
+						Entries: entries,
+					},
+				},
+			}
+			s.broadcastToRoom(event.RoomID, gameEvent)
+
+			log.Printf("[quiz] broadcast LeaderboardUpdate for room %s (%d entries)", event.RoomID, len(entries))
+			msg.Ack(false)
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -583,8 +652,9 @@ func main() {
 		mongoDB: mongoClient.Database("quizbattle"),
 	}
 
-	// Start RabbitMQ consumer for match.created
+	// Start RabbitMQ consumers
 	go srv.consumeMatchCreated(ctx)
+	go srv.consumeLeaderboardUpdated(ctx)
 
 	grpcServer := grpc.NewServer()
 	pb.RegisterQuizServiceServer(grpcServer, srv)
