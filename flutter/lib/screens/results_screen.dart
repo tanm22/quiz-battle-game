@@ -24,6 +24,7 @@ class ResultsScreen extends ConsumerWidget {
         .firstOrNull;
 
     final isWinner = match.winner == gameState.userId;
+    final opponentLeft = match.rounds == -1;
 
     return Scaffold(
       backgroundColor: const Color(0xFF1A1A2E),
@@ -36,22 +37,40 @@ class ResultsScreen extends ConsumerWidget {
 
               // Winner announcement
               Icon(
-                isWinner ? Icons.emoji_events : Icons.sports_score,
+                opponentLeft
+                    ? Icons.person_off
+                    : isWinner
+                        ? Icons.emoji_events
+                        : Icons.sports_score,
                 size: 72,
-                color: isWinner ? Colors.amber : Colors.white54,
+                color: opponentLeft
+                    ? Colors.orange
+                    : isWinner
+                        ? Colors.amber
+                        : Colors.white54,
               ),
               const SizedBox(height: 16),
               Text(
-                isWinner ? 'You Won!' : 'Match Over',
+                opponentLeft
+                    ? 'Opponent Left'
+                    : isWinner
+                        ? 'You Won!'
+                        : 'Match Over',
                 style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
-                  color: isWinner ? Colors.amber : Colors.white,
+                  color: opponentLeft
+                      ? Colors.orange
+                      : isWinner
+                          ? Colors.amber
+                          : Colors.white,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
-                'Winner: ${match.winner}',
+                opponentLeft
+                    ? 'You win by default!'
+                    : 'Winner: ${match.winner}',
                 style: const TextStyle(color: Colors.white70, fontSize: 18),
               ),
 

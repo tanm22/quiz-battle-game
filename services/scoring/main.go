@@ -546,7 +546,9 @@ func main() {
 	if mongoURI == "" {
 		mongoURI = "mongodb://localhost:27017/quizbattle"
 	}
-	mongoClient, err := mongo.Connect(options.Client().ApplyURI(mongoURI))
+	mongoClient, err := mongo.Connect(options.Client().ApplyURI(mongoURI).SetBSONOptions(&options.BSONOptions{
+		ObjectIDAsHexString: true,
+	}))
 	if err != nil {
 		log.Fatalf("mongodb connect failed: %v", err)
 	}

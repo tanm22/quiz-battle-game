@@ -66,21 +66,45 @@ class _GameplayScreenState extends ConsumerState<GameplayScreen>
 
     return Scaffold(
       backgroundColor: const Color(0xFF1A1A2E),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        title: Text(
+          'Round ${gameState.round} / 5',
+          style: const TextStyle(color: Colors.white70, fontSize: 16),
+        ),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.close, color: Colors.white54),
+            tooltip: 'Leave match',
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Leave match?'),
+                  content: const Text('You will forfeit this match.'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Stay'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        ref.read(gameStateProvider.notifier).leaveMatch();
+                      },
+                      child: const Text('Leave', style: TextStyle(color: Colors.red)),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           children: [
-            // Round indicator
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                'Round ${gameState.round} / 5',
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
 
             // Step 63: Countdown ring
             SizedBox(

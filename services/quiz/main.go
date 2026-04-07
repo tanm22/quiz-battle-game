@@ -208,6 +208,12 @@ func (s *quizServer) getRoomQuestions(roomID string) ([]Question, bool) {
 // ---------------------------------------------------------------------------
 
 func (s *quizServer) startRound(ctx context.Context, roomID string, round int) {
+	// Section 7.2: abort if no players connected
+	if s.connectedPlayersInRoom(roomID) == 0 {
+		log.Printf("[quiz] room %s skipping round %d — no connected players", roomID, round)
+		return
+	}
+
 	questions, ok := s.getRoomQuestions(roomID)
 	if !ok || round > len(questions) {
 		// All rounds complete — publish match.finished
@@ -357,6 +363,27 @@ func (s *quizServer) finishMatch(ctx context.Context, roomID string, totalRounds
 	s.roomTimers.Delete(roomID)
 }
 
+// connectedPlayersInRoom returns the number of active game streams for a room.
+func (s *quizServer) connectedPlayersInRoom(roomID string) int {
+	prefix := roomID + ":"
+	count := 0
+	s.gameStreams.Range(func(key, _ interface{}) bool {
+		k := key.(string)
+		if len(k) > len(prefix) && k[:len(prefix)] == prefix {
+			count++
+		}
+		return true
+	})
+	return count
+}
+
+// cancelRoomTimer stops the round timer for a room if one is running.
+func (s *quizServer) cancelRoomTimer(roomID string) {
+	if v, ok := s.roomTimers.LoadAndDelete(roomID); ok {
+		v.(*time.Timer).Stop()
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Broadcast helper — send GameEvent to all streams for a room
 // ---------------------------------------------------------------------------
@@ -388,6 +415,27 @@ func (s *quizServer) StreamGameEvents(req *pb.StreamGameEventsRequest, stream pb
 	defer func() {
 		s.gameStreams.Delete(streamKey)
 		close(ch)
+
+		// Section 7.2: handle player disconnect
+		remaining := s.connectedPlayersInRoom(req.RoomId)
+		bgCtx := context.Background()
+
+		if remaining == 0 {
+			log.Printf("[quiz] room %s has zero connected players — ending match", req.RoomId)
+			s.cancelRoomTimer(req.RoomId)
+			if _, ok := s.getRoomQuestions(req.RoomId); ok {
+				s.finishMatch(bgCtx, req.RoomId, 0)
+			}
+		} else if remaining == 1 {
+			log.Printf("[quiz] room %s has one player left — opponent left, ending match", req.RoomId)
+			s.cancelRoomTimer(req.RoomId)
+			if _, ok := s.getRoomQuestions(req.RoomId); ok {
+				s.finishMatch(bgCtx, req.RoomId, -1) // -1 signals opponent abandoned
+			}
+		} else {
+			log.Printf("[quiz] player %s disconnected from room %s (%d remaining)",
+				req.UserId, req.RoomId, remaining)
+		}
 	}()
 
 	log.Printf("[quiz] player %s streaming game events for room %s", req.UserId, req.RoomId)
@@ -638,7 +686,9 @@ func main() {
 	if mongoURI == "" {
 		mongoURI = "mongodb://localhost:27017/quizbattle"
 	}
-	mongoClient, err := mongo.Connect(options.Client().ApplyURI(mongoURI))
+	mongoClient, err := mongo.Connect(options.Client().ApplyURI(mongoURI).SetBSONOptions(&options.BSONOptions{
+		ObjectIDAsHexString: true,
+	}))
 	if err != nil {
 		log.Fatalf("mongodb connect failed: %v", err)
 	}

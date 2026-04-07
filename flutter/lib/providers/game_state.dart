@@ -84,6 +84,7 @@ class GameStateNotifier extends Notifier<GameState> {
   StreamSubscription? _matchSub;
   StreamSubscription? _gameSub;
   int _reconnectAttempt = 0;
+  Map<String, double> _pendingScores = {};
 
   @override
   GameState build() {
@@ -157,13 +158,14 @@ class GameStateNotifier extends Notifier<GameState> {
         );
       case GameEvent_Event.leaderboard:
         final entries = event.leaderboard.entries;
-        final newScores = <String, double>{};
-        for (final e in entries) {
-          newScores[e.userId] = e.score;
-        }
-        state = state.copyWith(scores: newScores, leaderboard: entries);
+        _pendingScores = {for (final e in entries) e.userId: e.score};
+        state = state.copyWith(leaderboard: entries);
       case GameEvent_Event.roundResult:
-        state = state.copyWith(correctIndex: event.roundResult.correctIndex);
+        // Apply buffered scores at round end, then show correct/wrong
+        state = state.copyWith(
+          correctIndex: event.roundResult.correctIndex,
+          scores: _pendingScores.isNotEmpty ? Map.of(_pendingScores) : null,
+        );
         // Auto-reset answer highlight after 1.5s (step 64)
         Future.delayed(const Duration(milliseconds: 1500), () {
           state = state.copyWith(clearSelectedIndex: true, clearCorrectIndex: true);
@@ -227,6 +229,18 @@ class GameStateNotifier extends Notifier<GameState> {
       _gameSub?.cancel();
       _startGameStream();
     });
+  }
+
+  // --- Leave match ---
+
+  Future<void> leaveMatch() async {
+    _matchSub?.cancel();
+    _gameSub?.cancel();
+    _pendingScores = {};
+    if (state.userId != null) {
+      await _service.leaveMatchmaking(state.userId!);
+    }
+    state = const GameState();
   }
 
   // --- Navigation ---
