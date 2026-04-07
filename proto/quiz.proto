@@ -1,0 +1,190 @@
+syntax = "proto3";
+
+package quiz;
+
+option go_package = "quiz-battle/proto";
+
+// ---------------------------------------------------------------------------
+// MatchmakingService
+// ---------------------------------------------------------------------------
+
+service MatchmakingService {
+  rpc JoinMatchmaking(JoinMatchmakingRequest) returns (JoinMatchmakingResponse);
+  rpc LeaveMatchmaking(LeaveMatchmakingRequest) returns (LeaveMatchmakingResponse);
+  rpc SubscribeToMatch(SubscribeToMatchRequest) returns (stream MatchEvent);
+}
+
+message JoinMatchmakingRequest {
+  string user_id = 1;
+  int32  rating  = 2;
+}
+
+message JoinMatchmakingResponse {
+  MatchmakingStatus status = 1;
+}
+
+enum MatchmakingStatus {
+  QUEUED           = 0;
+  ALREADY_IN_QUEUE = 1;
+}
+
+message LeaveMatchmakingRequest {
+  string user_id = 1;
+}
+
+message LeaveMatchmakingResponse {
+  bool removed = 1;
+}
+
+message SubscribeToMatchRequest {
+  string user_id         = 1;
+  int64  sequence_number = 2;
+}
+
+message MatchEvent {
+  string          room_id = 1;
+  repeated string players = 2;
+  int64           sequence_number = 3;
+}
+
+// ---------------------------------------------------------------------------
+// QuizService
+// ---------------------------------------------------------------------------
+
+service QuizService {
+  rpc GetRoomQuestions(GetRoomQuestionsRequest) returns (GetRoomQuestionsResponse);
+  rpc SubmitAnswer(SubmitAnswerRequest) returns (SubmitAnswerResponse);
+  rpc StreamGameEvents(StreamGameEventsRequest) returns (stream GameEvent);
+}
+
+message GetRoomQuestionsRequest {
+  string room_id = 1;
+}
+
+message GetRoomQuestionsResponse {
+  repeated Question questions = 1;
+}
+
+message Question {
+  string          id             = 1;
+  string          text           = 2;
+  repeated string options        = 3;
+  string          difficulty     = 4;
+  string          topic          = 5;
+}
+
+message SubmitAnswerRequest {
+  string room_id          = 1;
+  string user_id          = 2;
+  int32  round            = 3;
+  int32  option_index     = 4;
+  int64  client_timestamp = 5;
+}
+
+message SubmitAnswerResponse {
+  bool accepted = 1;
+}
+
+message StreamGameEventsRequest {
+  string room_id         = 1;
+  string user_id         = 2;
+  int64  sequence_number = 3;
+}
+
+// ---------------------------------------------------------------------------
+// GameEvent — oneof union streamed to Flutter clients
+// ---------------------------------------------------------------------------
+
+message GameEvent {
+  int64 sequence_number = 7;
+
+  oneof event {
+    QuestionBroadcast  question    = 1;
+    LeaderboardUpdate  leaderboard = 2;
+    RoundResult        round_result = 3;
+    MatchEnd           match_end   = 4;
+    PlayerJoined       player_joined = 5;
+    TimerSync          timer_sync  = 6;
+  }
+}
+
+message QuestionBroadcast {
+  string          question_id   = 1;
+  string          text          = 2;
+  repeated string options       = 3;
+  int64           deadline_unix = 4;
+  int32           round         = 5;
+}
+
+message LeaderboardUpdate {
+  repeated LeaderboardEntry entries = 1;
+}
+
+message LeaderboardEntry {
+  string user_id  = 1;
+  string username = 2;
+  double score    = 3;
+  int32  rank     = 4;
+}
+
+message RoundResult {
+  int32 round         = 1;
+  int32 correct_index = 2;
+}
+
+message MatchEnd {
+  string                room_id  = 1;
+  string                winner   = 2;
+  repeated PlayerResult players  = 3;
+  int32                 rounds   = 4;
+  int64                 duration = 5;
+}
+
+message PlayerResult {
+  string user_id              = 1;
+  string username              = 2;
+  double final_score           = 3;
+  int32  rank                  = 4;
+  int32  answers_correct       = 5;
+  double avg_response_time_ms  = 6;
+}
+
+message PlayerJoined {
+  string user_id  = 1;
+  string username = 2;
+}
+
+message TimerSync {
+  int64 deadline_unix = 1;
+}
+
+// ---------------------------------------------------------------------------
+// ScoringService
+// ---------------------------------------------------------------------------
+
+service ScoringService {
+  rpc CalculateScore(CalculateScoreRequest) returns (CalculateScoreResponse);
+  rpc GetLeaderboard(GetLeaderboardRequest) returns (GetLeaderboardResponse);
+}
+
+message CalculateScoreRequest {
+  string room_id        = 1;
+  string user_id        = 2;
+  int32  round          = 3;
+  int32  option_index   = 4;
+  int64  answer_time_ms = 5;
+}
+
+message CalculateScoreResponse {
+  double score            = 1;
+  bool   correct          = 2;
+  double speed_multiplier = 3;
+}
+
+message GetLeaderboardRequest {
+  string room_id = 1;
+}
+
+message GetLeaderboardResponse {
+  repeated LeaderboardEntry entries = 1;
+}

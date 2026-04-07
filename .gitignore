@@ -1,0 +1,15 @@
+# Go
+*.exe
+*.test
+/vendor/
+
+# Flutter
+flutter/.dart_tool/
+flutter/build/
+flutter/.flutter-plugins
+
+# Docker
+.env
+
+# Misc
+.DS_Store
