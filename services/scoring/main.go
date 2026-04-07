@@ -1,0 +1,581 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net"
+	"os"
+	"time"
+
+	amqp "github.com/rabbitmq/amqp091-go"
+	"github.com/redis/go-redis/v9"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
+	"google.golang.org/grpc"
+
+	"quiz-battle/pkg/keys"
+	pb "quiz-battle/proto"
+)
+
+// ---------------------------------------------------------------------------
+// Question document (for looking up correct answers)
+// ---------------------------------------------------------------------------
+
+type Question struct {
+	ID           string   `bson:"_id,omitempty"`
+	Text         string   `bson:"text"`
+	Options      []string `bson:"options"`
+	CorrectIndex int      `bson:"correctIndex"`
+	Topic        string   `bson:"topic"`
+}
+
+// ---------------------------------------------------------------------------
+// Server struct
+// ---------------------------------------------------------------------------
+
+type scoringServer struct {
+	pb.UnimplementedScoringServiceServer
+	rdb      *redis.Client
+	amqpConn *amqp.Connection
+	amqpCh   *amqp.Channel // for publishing only
+	mongoDB  *mongo.Database
+}
+
+// newChannel creates a dedicated AMQP channel per consumer (channels are not thread-safe).
+func (s *scoringServer) newChannel() (*amqp.Channel, error) {
+	return s.amqpConn.Channel()
+}
+
+// ---------------------------------------------------------------------------
+// 47. CalculateScore gRPC
+// ---------------------------------------------------------------------------
+
+func (s *scoringServer) CalculateScore(ctx context.Context, req *pb.CalculateScoreRequest) (*pb.CalculateScoreResponse, error) {
+	// Look up correct answer from MongoDB
+	correct, err := s.isCorrect(ctx, req.RoomId, int(req.Round), int(req.OptionIndex))
+	if err != nil {
+		return nil, fmt.Errorf("failed to check answer: %w", err)
+	}
+
+	// basePoints = 100 * (1 if correct, 0 if wrong)
+	var basePoints float64
+	if correct {
+		basePoints = 100
+	}
+
+	// speedMultiplier: <5000ms → 1.5, >13000ms → 0.8, else 1.0
+	speedMultiplier := 1.0
+	if req.AnswerTimeMs < 5000 {
+		speedMultiplier = 1.5
+	} else if req.AnswerTimeMs > 13000 {
+		speedMultiplier = 0.8
+	}
+
+	score := basePoints * speedMultiplier
+
+	return &pb.CalculateScoreResponse{
+		Score:           score,
+		Correct:         correct,
+		SpeedMultiplier: speedMultiplier,
+	}, nil
+}
+
+// isCorrect looks up the question for a given room+round and checks the answer.
+func (s *scoringServer) isCorrect(ctx context.Context, roomID string, round, optionIndex int) (bool, error) {
+	// Get question ID from Redis list (0-indexed, round is 1-indexed)
+	questionIDs, err := keys.GetQuestions(ctx, s.rdb, roomID)
+	if err != nil || round < 1 || round > len(questionIDs) {
+		return false, fmt.Errorf("question lookup failed: %w", err)
+	}
+
+	qID := questionIDs[round-1]
+
+	// Look up correct index from MongoDB
+	var q Question
+	err = s.mongoDB.Collection("questions").FindOne(ctx, bson.M{"_id": qID}).Decode(&q)
+	if err != nil {
+		// Fallback: try with ObjectID
+		objID, parseErr := bson.ObjectIDFromHex(qID)
+		if parseErr != nil {
+			return false, fmt.Errorf("invalid question ID %s: %w", qID, err)
+		}
+		err = s.mongoDB.Collection("questions").FindOne(ctx, bson.M{"_id": objID}).Decode(&q)
+		if err != nil {
+			return false, fmt.Errorf("question not found %s: %w", qID, err)
+		}
+	}
+
+	return optionIndex == q.CorrectIndex, nil
+}
+
+// ---------------------------------------------------------------------------
+// 51. GetLeaderboard gRPC — ZREVRANGE room:{id}:leaderboard 0 -1 WITHSCORES
+// ---------------------------------------------------------------------------
+
+func (s *scoringServer) GetLeaderboard(ctx context.Context, req *pb.GetLeaderboardRequest) (*pb.GetLeaderboardResponse, error) {
+	entries, err := keys.GetLeaderboardEntries(ctx, s.rdb, req.RoomId)
+	if err != nil {
+		return nil, fmt.Errorf("leaderboard fetch failed: %w", err)
+	}
+
+	pbEntries := make([]*pb.LeaderboardEntry, len(entries))
+	for i, e := range entries {
+		pbEntries[i] = &pb.LeaderboardEntry{
+			UserId:   e.Member.(string),
+			Username: e.Member.(string),
+			Score:    e.Score,
+			Rank:     int32(i + 1),
+		}
+	}
+
+	return &pb.GetLeaderboardResponse{Entries: pbEntries}, nil
+}
+
+// ---------------------------------------------------------------------------
+// 48. RabbitMQ consumer for answer-processing-queue
+// ---------------------------------------------------------------------------
+
+type answerMessage struct {
+	RoomID          string `json:"roomId"`
+	UserID          string `json:"userId"`
+	Round           int    `json:"round"`
+	OptionIndex     int    `json:"optionIndex"`
+	ClientTimestamp int64  `json:"clientTimestamp"`
+	ServerTimestamp int64  `json:"serverTimestamp"`
+}
+
+func (s *scoringServer) consumeAnswers(ctx context.Context) {
+	ch, err := s.newChannel()
+	if err != nil {
+		log.Fatalf("[scoring] failed to open channel: %v", err)
+	}
+	defer ch.Close()
+
+	msgs, err := ch.Consume("answer-processing-queue", "", false, false, false, false, nil)
+	if err != nil {
+		log.Fatalf("[scoring] failed to consume answer-processing-queue: %v", err)
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case msg, ok := <-msgs:
+			if !ok {
+				return
+			}
+			s.processAnswer(ctx, msg)
+		}
+	}
+}
+
+func (s *scoringServer) processAnswer(ctx context.Context, msg amqp.Delivery) {
+	var answer answerMessage
+	if err := json.Unmarshal(msg.Body, &answer); err != nil {
+		log.Printf("[scoring] bad answer payload: %v", err)
+		msg.Nack(false, false) // don't requeue malformed messages
+		return
+	}
+
+	// Step 12/48: Idempotency check — HEXISTS room:{id}:answers:{round} {userId}
+	exists, err := keys.HasAnswer(ctx, s.rdb, answer.RoomID, answer.Round, answer.UserID)
+	if err != nil {
+		log.Printf("[scoring] idempotency check error: %v", err)
+		msg.Nack(false, true) // requeue for transient errors
+		return
+	}
+	if exists {
+		log.Printf("[scoring] duplicate answer from %s for room %s round %d — skipping", answer.UserID, answer.RoomID, answer.Round)
+		msg.Ack(false) // ACK without processing
+		return
+	}
+
+	// Check if answer is correct
+	correct, err := s.isCorrect(ctx, answer.RoomID, answer.Round, answer.OptionIndex)
+	if err != nil {
+		log.Printf("[scoring] correctness check error: %v", err)
+		// Check x-death count for DLQ routing
+		if getDeathCount(msg) >= 3 {
+			msg.Nack(false, false) // route to DLQ
+		} else {
+			msg.Nack(false, true) // requeue
+		}
+		return
+	}
+
+	// Calculate score (step 47 formula)
+	var basePoints float64
+	if correct {
+		basePoints = 100
+	}
+
+	answerTimeMs := answer.ServerTimestamp - answer.ClientTimestamp
+	speedMultiplier := 1.0
+	if answerTimeMs < 5000 {
+		speedMultiplier = 1.5
+	} else if answerTimeMs > 13000 {
+		speedMultiplier = 0.8
+	}
+
+	score := basePoints * speedMultiplier
+
+	// Record answer in Redis (for idempotency on future deliveries)
+	answerJSON, _ := json.Marshal(map[string]interface{}{
+		"optionIndex": answer.OptionIndex,
+		"correct":     correct,
+		"score":       score,
+		"timestamp":   answer.ServerTimestamp,
+	})
+	if err := keys.SetAnswer(ctx, s.rdb, answer.RoomID, answer.Round, answer.UserID, string(answerJSON)); err != nil {
+		log.Printf("[scoring] failed to record answer: %v", err)
+		msg.Nack(false, true)
+		return
+	}
+
+	// Step 49: Update leaderboard via Lua script (atomic read-modify-write)
+	entries, err := keys.UpdateLeaderboard(ctx, s.rdb, answer.RoomID, answer.UserID, score)
+	if err != nil {
+		log.Printf("[scoring] leaderboard update error: %v", err)
+		msg.Nack(false, true)
+		return
+	}
+
+	log.Printf("[scoring] %s scored %.0f in room %s round %d (correct=%v, speed=%.1fx)",
+		answer.UserID, score, answer.RoomID, answer.Round, correct, speedMultiplier)
+
+	// Publish leaderboard.updated to RabbitMQ for real-time broadcast
+	leaderboardEvent, _ := json.Marshal(map[string]interface{}{
+		"roomId":  answer.RoomID,
+		"entries": entries,
+	})
+	s.amqpCh.PublishWithContext(ctx, "sx", "leaderboard.updated", false, false, amqp.Publishing{
+		ContentType: "application/json",
+		Body:        leaderboardEvent,
+	})
+
+	msg.Ack(false)
+}
+
+// getDeathCount extracts the x-death count from message headers for DLQ routing.
+func getDeathCount(msg amqp.Delivery) int {
+	if msg.Headers == nil {
+		return 0
+	}
+	xDeath, ok := msg.Headers["x-death"]
+	if !ok {
+		return 0
+	}
+	deaths, ok := xDeath.([]interface{})
+	if !ok || len(deaths) == 0 {
+		return 0
+	}
+	first, ok := deaths[0].(amqp.Table)
+	if !ok {
+		return 0
+	}
+	count, ok := first["count"]
+	if !ok {
+		return 0
+	}
+	switch v := count.(type) {
+	case int64:
+		return int(v)
+	case int32:
+		return int(v)
+	default:
+		return 0
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 52-54. Persistence Worker — consumes match.finished, writes to MongoDB
+// ---------------------------------------------------------------------------
+
+type matchFinishedEvent struct {
+	RoomID  string              `json:"roomId"`
+	Winner  string              `json:"winner"`
+	Rounds  int                 `json:"rounds"`
+	Players []*pb.PlayerResult  `json:"players"`
+}
+
+func (s *scoringServer) consumeMatchFinished(ctx context.Context) {
+	ch, err := s.newChannel()
+	if err != nil {
+		log.Fatalf("[persistence] failed to open channel: %v", err)
+	}
+	defer ch.Close()
+
+	msgs, err := ch.Consume("match-finished-queue", "", false, false, false, false, nil)
+	if err != nil {
+		log.Fatalf("[persistence] failed to consume match-finished-queue: %v", err)
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case msg, ok := <-msgs:
+			if !ok {
+				return
+			}
+			s.persistMatch(ctx, msg)
+		}
+	}
+}
+
+func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
+	var event matchFinishedEvent
+	if err := json.Unmarshal(msg.Body, &event); err != nil {
+		log.Printf("[persistence] bad match.finished payload: %v", err)
+		msg.Nack(false, false)
+		return
+	}
+
+	log.Printf("[persistence] persisting match %s", event.RoomID)
+
+	// Build match_history document from room:{id}:leaderboard and room metadata
+	entries, _ := keys.GetLeaderboardEntries(ctx, s.rdb, event.RoomID)
+
+	// Compute per-player stats from answer records in Redis
+	players := make([]bson.M, 0, len(entries))
+	var winner string
+	for i, e := range entries {
+		userID := e.Member.(string)
+		if i == 0 {
+			winner = userID
+		}
+
+		// Tally answersCorrect and avgResponseTimeMs from per-round answer records
+		var answersCorrect int
+		var totalResponseMs int64
+		var answeredRounds int
+		for round := 1; round <= event.Rounds; round++ {
+			answerJSON, err := s.rdb.HGet(ctx, keys.Answers(event.RoomID, round), userID).Result()
+			if err != nil {
+				continue
+			}
+			var rec struct {
+				Correct   bool  `json:"correct"`
+				Timestamp int64 `json:"timestamp"`
+			}
+			if json.Unmarshal([]byte(answerJSON), &rec) == nil {
+				answeredRounds++
+				if rec.Correct {
+					answersCorrect++
+				}
+				if rec.Timestamp > 0 {
+					totalResponseMs += rec.Timestamp
+				}
+			}
+		}
+
+		var avgResponseTimeMs float64
+		if answeredRounds > 0 {
+			avgResponseTimeMs = float64(totalResponseMs) / float64(answeredRounds)
+		}
+
+		players = append(players, bson.M{
+			"userId":            userID,
+			"username":          userID,
+			"finalScore":        e.Score,
+			"rank":              i + 1,
+			"answersCorrect":    answersCorrect,
+			"avgResponseTimeMs": avgResponseTimeMs,
+		})
+	}
+	if winner == "" {
+		winner = event.Winner
+	}
+
+	// Compute duration from room state createdAt
+	var duration int64
+	stateJSON, err := keys.GetRoomState(ctx, s.rdb, event.RoomID)
+	if err == nil {
+		var state struct {
+			CreatedAt int64 `json:"createdAt"`
+		}
+		if json.Unmarshal([]byte(stateJSON), &state) == nil && state.CreatedAt > 0 {
+			duration = time.Now().Unix() - state.CreatedAt
+		}
+	}
+
+	matchDoc := bson.M{
+		"roomId":    event.RoomID,
+		"players":   players,
+		"rounds":    event.Rounds,
+		"winner":    winner,
+		"createdAt": time.Now(),
+		"duration":  duration,
+	}
+
+	// Step 53: Upsert with $setOnInsert to prevent double-writes
+	_, err = s.mongoDB.Collection("match_history").UpdateOne(
+		ctx,
+		bson.M{"roomId": event.RoomID},
+		bson.M{"$setOnInsert": matchDoc},
+		options.UpdateOne().SetUpsert(true),
+	)
+	if err != nil {
+		log.Printf("[persistence] match_history upsert failed: %v", err)
+		msg.Nack(false, true)
+		return
+	}
+
+	// Step 54: Bulk write to users collection
+	// Increment matchesPlayed for all players, increment wins for rank-1 player
+	usersColl := s.mongoDB.Collection("users")
+	for i, e := range entries {
+		userID := e.Member.(string)
+		update := bson.M{"$inc": bson.M{"matchesPlayed": 1}}
+		if i == 0 {
+			update["$inc"].(bson.M)["wins"] = 1
+		}
+		_, err := usersColl.UpdateOne(
+			ctx,
+			bson.M{"_id": userID},
+			update,
+			options.UpdateOne().SetUpsert(true),
+		)
+		if err != nil {
+			log.Printf("[persistence] user update failed for %s: %v", userID, err)
+		}
+	}
+
+	log.Printf("[persistence] match %s persisted — winner: %s, %d players", event.RoomID, winner, len(entries))
+	msg.Ack(false)
+}
+
+// ---------------------------------------------------------------------------
+// Analytics Worker — stub that logs match.finished payloads (section 9.6 note)
+// ---------------------------------------------------------------------------
+
+func (s *scoringServer) consumeAnalytics(ctx context.Context) {
+	ch, err := s.newChannel()
+	if err != nil {
+		log.Fatalf("[analytics] failed to open channel: %v", err)
+	}
+	defer ch.Close()
+
+	msgs, err := ch.Consume("match-analytics-queue", "", false, false, false, false, nil)
+	if err != nil {
+		log.Fatalf("[analytics] failed to consume match-analytics-queue: %v", err)
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case msg, ok := <-msgs:
+			if !ok {
+				return
+			}
+			log.Printf("[analytics] match.finished event: %s", string(msg.Body))
+			msg.Ack(false)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// RabbitMQ setup
+// ---------------------------------------------------------------------------
+
+func setupRabbitMQ(ch *amqp.Channel) error {
+	// Ensure sx exchange exists
+	if err := ch.ExchangeDeclare("sx", "topic", true, false, false, false, nil); err != nil {
+		return fmt.Errorf("exchange declare: %w", err)
+	}
+
+	// Bind leaderboard.updated for broadcasting (consumed by quiz service or directly)
+	_, err := ch.QueueDeclare("leaderboard-updated-queue", true, false, false, false, nil)
+	if err != nil {
+		return fmt.Errorf("leaderboard queue declare: %w", err)
+	}
+	if err := ch.QueueBind("leaderboard-updated-queue", "leaderboard.updated", "sx", false, nil); err != nil {
+		return fmt.Errorf("leaderboard queue bind: %w", err)
+	}
+
+	return nil
+}
+
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
+
+func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Redis
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = "localhost:6379"
+	}
+	rdb := redis.NewClient(&redis.Options{Addr: redisAddr})
+	if err := rdb.Ping(ctx).Err(); err != nil {
+		log.Fatalf("redis connect failed: %v", err)
+	}
+	log.Println("[scoring] connected to Redis")
+
+	// RabbitMQ
+	rabbitURL := os.Getenv("RABBITMQ_URL")
+	if rabbitURL == "" {
+		rabbitURL = "amqp://guest:guest@localhost:5672/"
+	}
+	conn, err := amqp.Dial(rabbitURL)
+	if err != nil {
+		log.Fatalf("rabbitmq connect failed: %v", err)
+	}
+	defer conn.Close()
+
+	amqpCh, err := conn.Channel()
+	if err != nil {
+		log.Fatalf("rabbitmq channel failed: %v", err)
+	}
+	defer amqpCh.Close()
+
+	if err := setupRabbitMQ(amqpCh); err != nil {
+		log.Fatalf("rabbitmq setup failed: %v", err)
+	}
+	log.Println("[scoring] connected to RabbitMQ")
+
+	// MongoDB
+	mongoURI := os.Getenv("MONGO_URI")
+	if mongoURI == "" {
+		mongoURI = "mongodb://localhost:27017/quizbattle"
+	}
+	mongoClient, err := mongo.Connect(options.Client().ApplyURI(mongoURI))
+	if err != nil {
+		log.Fatalf("mongodb connect failed: %v", err)
+	}
+	defer mongoClient.Disconnect(ctx)
+	log.Println("[scoring] connected to MongoDB")
+
+	srv := &scoringServer{
+		rdb:      rdb,
+		amqpConn: conn,
+		amqpCh:   amqpCh,
+		mongoDB:  mongoClient.Database("quizbattle"),
+	}
+
+	// Start RabbitMQ consumers (3 goroutines)
+	go srv.consumeAnswers(ctx)       // 9.5: answer scoring
+	go srv.consumeMatchFinished(ctx) // 9.6: persistence worker
+	go srv.consumeAnalytics(ctx)     // 9.6 note: analytics stub
+
+	// gRPC server
+	grpcServer := grpc.NewServer()
+	pb.RegisterScoringServiceServer(grpcServer, srv)
+
+	lis, err := net.Listen("tcp", ":50053")
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+
+	log.Println("[scoring] serving on :50053")
+	if err := grpcServer.Serve(lis); err != nil {
+		log.Fatalf("failed to serve: %v", err)
+	}
+}
