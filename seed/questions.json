@@ -1,0 +1,242 @@
+[
+  {
+    "text": "What planet is known as the Red Planet?",
+    "options": ["Venus", "Mars", "Jupiter", "Saturn"],
+    "correctIndex": 1,
+    "difficulty": "easy",
+    "topic": "science",
+    "avgResponseTimeMs": 4200
+  },
+  {
+    "text": "What is the chemical symbol for water?",
+    "options": ["H2O", "CO2", "NaCl", "O2"],
+    "correctIndex": 0,
+    "difficulty": "easy",
+    "topic": "science",
+    "avgResponseTimeMs": 3800
+  },
+  {
+    "text": "How many legs does a spider have?",
+    "options": ["6", "8", "10", "12"],
+    "correctIndex": 1,
+    "difficulty": "easy",
+    "topic": "science",
+    "avgResponseTimeMs": 3500
+  },
+  {
+    "text": "Who was the first President of the United States?",
+    "options": ["Thomas Jefferson", "Abraham Lincoln", "George Washington", "John Adams"],
+    "correctIndex": 2,
+    "difficulty": "easy",
+    "topic": "history",
+    "avgResponseTimeMs": 4000
+  },
+  {
+    "text": "In which year did World War II end?",
+    "options": ["1943", "1944", "1945", "1946"],
+    "correctIndex": 2,
+    "difficulty": "easy",
+    "topic": "history",
+    "avgResponseTimeMs": 5100
+  },
+  {
+    "text": "What is the largest continent by area?",
+    "options": ["Africa", "North America", "Europe", "Asia"],
+    "correctIndex": 3,
+    "difficulty": "easy",
+    "topic": "geography",
+    "avgResponseTimeMs": 4500
+  },
+  {
+    "text": "Which ocean is the largest?",
+    "options": ["Atlantic", "Indian", "Arctic", "Pacific"],
+    "correctIndex": 3,
+    "difficulty": "easy",
+    "topic": "geography",
+    "avgResponseTimeMs": 4300
+  },
+  {
+    "text": "What is the capital of France?",
+    "options": ["London", "Berlin", "Madrid", "Paris"],
+    "correctIndex": 3,
+    "difficulty": "easy",
+    "topic": "geography",
+    "avgResponseTimeMs": 3200
+  },
+  {
+    "text": "How many players are on a standard soccer team on the field?",
+    "options": ["9", "10", "11", "12"],
+    "correctIndex": 2,
+    "difficulty": "easy",
+    "topic": "sports",
+    "avgResponseTimeMs": 4100
+  },
+  {
+    "text": "In which sport is a shuttlecock used?",
+    "options": ["Tennis", "Badminton", "Squash", "Table Tennis"],
+    "correctIndex": 1,
+    "difficulty": "easy",
+    "topic": "sports",
+    "avgResponseTimeMs": 4600
+  },
+  {
+    "text": "What does CPU stand for?",
+    "options": ["Central Processing Unit", "Computer Personal Unit", "Central Program Utility", "Core Processing Unit"],
+    "correctIndex": 0,
+    "difficulty": "easy",
+    "topic": "tech",
+    "avgResponseTimeMs": 3900
+  },
+  {
+    "text": "What company created the iPhone?",
+    "options": ["Samsung", "Google", "Apple", "Microsoft"],
+    "correctIndex": 2,
+    "difficulty": "easy",
+    "topic": "tech",
+    "avgResponseTimeMs": 3100
+  },
+  {
+    "text": "What gas do plants absorb from the atmosphere during photosynthesis?",
+    "options": ["Oxygen", "Nitrogen", "Carbon Dioxide", "Hydrogen"],
+    "correctIndex": 2,
+    "difficulty": "medium",
+    "topic": "science",
+    "avgResponseTimeMs": 6200
+  },
+  {
+    "text": "What is the powerhouse of the cell?",
+    "options": ["Nucleus", "Ribosome", "Mitochondria", "Golgi Apparatus"],
+    "correctIndex": 2,
+    "difficulty": "medium",
+    "topic": "science",
+    "avgResponseTimeMs": 5500
+  },
+  {
+    "text": "What is the speed of light in a vacuum approximately?",
+    "options": ["300,000 km/s", "150,000 km/s", "500,000 km/s", "1,000,000 km/s"],
+    "correctIndex": 0,
+    "difficulty": "medium",
+    "topic": "science",
+    "avgResponseTimeMs": 7100
+  },
+  {
+    "text": "Which empire was ruled by Genghis Khan?",
+    "options": ["Ottoman Empire", "Roman Empire", "Mongol Empire", "Persian Empire"],
+    "correctIndex": 2,
+    "difficulty": "medium",
+    "topic": "history",
+    "avgResponseTimeMs": 6800
+  },
+  {
+    "text": "The French Revolution began in which year?",
+    "options": ["1776", "1789", "1804", "1815"],
+    "correctIndex": 1,
+    "difficulty": "medium",
+    "topic": "history",
+    "avgResponseTimeMs": 7500
+  },
+  {
+    "text": "Who discovered penicillin?",
+    "options": ["Marie Curie", "Louis Pasteur", "Alexander Fleming", "Joseph Lister"],
+    "correctIndex": 2,
+    "difficulty": "medium",
+    "topic": "history",
+    "avgResponseTimeMs": 7200
+  },
+  {
+    "text": "Which country has the most time zones?",
+    "options": ["Russia", "United States", "France", "China"],
+    "correctIndex": 2,
+    "difficulty": "medium",
+    "topic": "geography",
+    "avgResponseTimeMs": 8100
+  },
+  {
+    "text": "What is the longest river in the world?",
+    "options": ["Amazon", "Nile", "Yangtze", "Mississippi"],
+    "correctIndex": 1,
+    "difficulty": "medium",
+    "topic": "geography",
+    "avgResponseTimeMs": 6500
+  },
+  {
+    "text": "Mount Everest is located on the border of which two countries?",
+    "options": ["India and China", "Nepal and China", "Nepal and India", "Bhutan and China"],
+    "correctIndex": 1,
+    "difficulty": "medium",
+    "topic": "geography",
+    "avgResponseTimeMs": 7800
+  },
+  {
+    "text": "Which country has won the most FIFA World Cup titles?",
+    "options": ["Germany", "Argentina", "Italy", "Brazil"],
+    "correctIndex": 3,
+    "difficulty": "medium",
+    "topic": "sports",
+    "avgResponseTimeMs": 5900
+  },
+  {
+    "text": "In basketball, how many points is a shot from beyond the arc worth?",
+    "options": ["1", "2", "3", "4"],
+    "correctIndex": 2,
+    "difficulty": "medium",
+    "topic": "sports",
+    "avgResponseTimeMs": 5200
+  },
+  {
+    "text": "What is the marathon distance in kilometers?",
+    "options": ["40.195", "42.195", "44.195", "38.195"],
+    "correctIndex": 1,
+    "difficulty": "medium",
+    "topic": "sports",
+    "avgResponseTimeMs": 7600
+  },
+  {
+    "text": "What does HTTP stand for?",
+    "options": ["HyperText Transfer Protocol", "High Transfer Text Protocol", "HyperText Transmission Process", "High Text Transfer Protocol"],
+    "correctIndex": 0,
+    "difficulty": "medium",
+    "topic": "tech",
+    "avgResponseTimeMs": 6100
+  },
+  {
+    "text": "Which programming language was created by James Gosling at Sun Microsystems?",
+    "options": ["Python", "C++", "Java", "Ruby"],
+    "correctIndex": 2,
+    "difficulty": "medium",
+    "topic": "tech",
+    "avgResponseTimeMs": 6900
+  },
+  {
+    "text": "What year was the first version of Linux released?",
+    "options": ["1989", "1991", "1993", "1995"],
+    "correctIndex": 1,
+    "difficulty": "medium",
+    "topic": "tech",
+    "avgResponseTimeMs": 8200
+  },
+  {
+    "text": "What is the Chandrasekhar limit approximately equal to?",
+    "options": ["1.4 solar masses", "2.8 solar masses", "0.7 solar masses", "3.2 solar masses"],
+    "correctIndex": 0,
+    "difficulty": "hard",
+    "topic": "science",
+    "avgResponseTimeMs": 11500
+  },
+  {
+    "text": "The Treaty of Tordesillas in 1494 divided newly discovered lands between which two countries?",
+    "options": ["England and France", "Spain and Portugal", "Spain and England", "Portugal and Netherlands"],
+    "correctIndex": 1,
+    "difficulty": "hard",
+    "topic": "history",
+    "avgResponseTimeMs": 10800
+  },
+  {
+    "text": "In the CAP theorem, what does the 'P' stand for?",
+    "options": ["Performance", "Persistence", "Partition Tolerance", "Parallelism"],
+    "correctIndex": 2,
+    "difficulty": "hard",
+    "topic": "tech",
+    "avgResponseTimeMs": 9500
+  }
+]
