@@ -24,12 +24,14 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
 const (
 	matchmakingAddr = "localhost:50051"
 	quizAddr        = "localhost:50052"
 	scoringAddr     = "localhost:50053"
+	authAddr        = "localhost:50054"
 	mongoURI        = "mongodb://localhost:27017"
 	dbName          = "quizbattle"
 
@@ -43,7 +45,25 @@ const (
 // ---------------------------------------------------------------------------
 
 func uniqueID() string {
-	return fmt.Sprintf("e2e-%d-%d", time.Now().UnixMilli(), rand.Intn(100000))
+	return fmt.Sprintf("e2e_%d_%d", time.Now().UnixMilli(), rand.Intn(100000))
+}
+
+// registerUser creates a new user via the auth service and returns token + userId.
+func registerUser(t *testing.T, ctx context.Context, authClient pb.AuthServiceClient, username string) (token, userID string) {
+	t.Helper()
+	resp, err := authClient.Register(ctx, &pb.RegisterRequest{
+		Username: username,
+		Password: "testpass123",
+	})
+	if err != nil {
+		t.Fatalf("register %s: %v", username, err)
+	}
+	return resp.Token, resp.UserId
+}
+
+// authCtx returns a context with the Bearer token in gRPC metadata.
+func authCtx(ctx context.Context, token string) context.Context {
+	return metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+token)
 }
 
 // recvGameEvent reads the next GameEvent with a timeout.
@@ -152,6 +172,12 @@ func TestFullMatchE2E(t *testing.T) {
 	defer cancel()
 
 	// --- Connect to gRPC services ---
+	authConn, err := grpc.NewClient(authAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		t.Fatalf("dial auth: %v", err)
+	}
+	defer authConn.Close()
+
 	matchConn, err := grpc.NewClient(matchmakingAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.Fatalf("dial matchmaking: %v", err)
@@ -170,6 +196,7 @@ func TestFullMatchE2E(t *testing.T) {
 	}
 	defer scoreConn.Close()
 
+	authClient := pb.NewAuthServiceClient(authConn)
 	matchClient := pb.NewMatchmakingServiceClient(matchConn)
 	quizClient := pb.NewQuizServiceClient(quizConn)
 	scoreClient := pb.NewScoringServiceClient(scoreConn)
@@ -182,10 +209,17 @@ func TestFullMatchE2E(t *testing.T) {
 	defer mongoClient.Disconnect(ctx)
 	db := mongoClient.Database(dbName)
 
-	player1 := uniqueID()
-	player2 := uniqueID()
-	t.Logf("Player 1: %s", player1)
-	t.Logf("Player 2: %s", player2)
+	// --- Register two test users ---
+	p1Name := uniqueID()
+	p2Name := uniqueID()
+	token1, player1 := registerUser(t, ctx, authClient, p1Name)
+	token2, player2 := registerUser(t, ctx, authClient, p2Name)
+	t.Logf("Player 1: %s (%s)", p1Name, player1)
+	t.Logf("Player 2: %s (%s)", p2Name, player2)
+
+	// Authenticated contexts for each player
+	ctx1 := authCtx(ctx, token1)
+	ctx2 := authCtx(ctx, token2)
 
 	// =====================================================================
 	// CHECKLIST 1: Both join matchmaking → both receive match_found < 30s
@@ -193,17 +227,17 @@ func TestFullMatchE2E(t *testing.T) {
 	t.Log("--- Checklist 1: Matchmaking ---")
 
 	// Subscribe BEFORE joining so we don't miss the event
-	matchStream1, err := matchClient.SubscribeToMatch(ctx, &pb.SubscribeToMatchRequest{UserId: player1})
+	matchStream1, err := matchClient.SubscribeToMatch(ctx1, &pb.SubscribeToMatchRequest{UserId: player1})
 	if err != nil {
 		t.Fatalf("subscribe player1: %v", err)
 	}
-	matchStream2, err := matchClient.SubscribeToMatch(ctx, &pb.SubscribeToMatchRequest{UserId: player2})
+	matchStream2, err := matchClient.SubscribeToMatch(ctx2, &pb.SubscribeToMatchRequest{UserId: player2})
 	if err != nil {
 		t.Fatalf("subscribe player2: %v", err)
 	}
 
 	// Join matchmaking
-	resp1, err := matchClient.JoinMatchmaking(ctx, &pb.JoinMatchmakingRequest{UserId: player1, Rating: 1200})
+	resp1, err := matchClient.JoinMatchmaking(ctx1, &pb.JoinMatchmakingRequest{UserId: player1, Rating: 1200})
 	if err != nil {
 		t.Fatalf("join player1: %v", err)
 	}
@@ -211,7 +245,7 @@ func TestFullMatchE2E(t *testing.T) {
 		t.Fatalf("player1 expected QUEUED, got %v", resp1.Status)
 	}
 
-	resp2, err := matchClient.JoinMatchmaking(ctx, &pb.JoinMatchmakingRequest{UserId: player2, Rating: 1100})
+	resp2, err := matchClient.JoinMatchmaking(ctx2, &pb.JoinMatchmakingRequest{UserId: player2, Rating: 1100})
 	if err != nil {
 		t.Fatalf("join player2: %v", err)
 	}
@@ -253,13 +287,13 @@ func TestFullMatchE2E(t *testing.T) {
 	// =====================================================================
 
 	// Open game event streams
-	gameStream1, err := quizClient.StreamGameEvents(ctx, &pb.StreamGameEventsRequest{
+	gameStream1, err := quizClient.StreamGameEvents(ctx1, &pb.StreamGameEventsRequest{
 		RoomId: roomID, UserId: player1,
 	})
 	if err != nil {
 		t.Fatalf("stream game events player1: %v", err)
 	}
-	gameStream2, err := quizClient.StreamGameEvents(ctx, &pb.StreamGameEventsRequest{
+	gameStream2, err := quizClient.StreamGameEvents(ctx2, &pb.StreamGameEventsRequest{
 		RoomId: roomID, UserId: player2,
 	})
 	if err != nil {
@@ -311,7 +345,7 @@ func TestFullMatchE2E(t *testing.T) {
 
 		// Both players submit answers
 		clientTs := time.Now().UnixMilli()
-		_, err := quizClient.SubmitAnswer(ctx, &pb.SubmitAnswerRequest{
+		_, err := quizClient.SubmitAnswer(ctx1, &pb.SubmitAnswerRequest{
 			RoomId:          roomID,
 			UserId:          player1,
 			Round:           int32(round),
@@ -322,7 +356,7 @@ func TestFullMatchE2E(t *testing.T) {
 			t.Fatalf("round %d: submit player1: %v", round, err)
 		}
 
-		_, err = quizClient.SubmitAnswer(ctx, &pb.SubmitAnswerRequest{
+		_, err = quizClient.SubmitAnswer(ctx2, &pb.SubmitAnswerRequest{
 			RoomId:          roomID,
 			UserId:          player2,
 			Round:           int32(round),
@@ -485,7 +519,7 @@ func TestFullMatchE2E(t *testing.T) {
 	// =====================================================================
 	// Verify GetLeaderboard gRPC (supplementary)
 	// =====================================================================
-	lbResp, err := scoreClient.GetLeaderboard(ctx, &pb.GetLeaderboardRequest{RoomId: roomID})
+	lbResp, err := scoreClient.GetLeaderboard(ctx1, &pb.GetLeaderboardRequest{RoomId: roomID})
 	if err != nil {
 		t.Logf("WARN: GetLeaderboard returned error (room may have expired): %v", err)
 	} else if len(lbResp.Entries) < 2 {
@@ -503,6 +537,12 @@ func TestDisconnectReconnect(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 
+	authConn2, err := grpc.NewClient(authAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		t.Fatalf("dial auth: %v", err)
+	}
+	defer authConn2.Close()
+
 	matchConn, err := grpc.NewClient(matchmakingAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.Fatalf("dial matchmaking: %v", err)
@@ -515,18 +555,24 @@ func TestDisconnectReconnect(t *testing.T) {
 	}
 	defer quizConn.Close()
 
+	authClient := pb.NewAuthServiceClient(authConn2)
 	matchClient := pb.NewMatchmakingServiceClient(matchConn)
 	quizClient := pb.NewQuizServiceClient(quizConn)
 
-	player1 := uniqueID()
-	player2 := uniqueID()
-	t.Logf("Players: %s, %s", player1, player2)
+	// Register test users
+	p1Name := uniqueID()
+	p2Name := uniqueID()
+	token1, player1 := registerUser(t, ctx, authClient, p1Name)
+	token2, player2 := registerUser(t, ctx, authClient, p2Name)
+	ctx1 := authCtx(ctx, token1)
+	ctx2 := authCtx(ctx, token2)
+	t.Logf("Players: %s, %s", p1Name, p2Name)
 
 	// Match both players
-	ms1, _ := matchClient.SubscribeToMatch(ctx, &pb.SubscribeToMatchRequest{UserId: player1})
-	ms2, _ := matchClient.SubscribeToMatch(ctx, &pb.SubscribeToMatchRequest{UserId: player2})
-	matchClient.JoinMatchmaking(ctx, &pb.JoinMatchmakingRequest{UserId: player1, Rating: 1000})
-	matchClient.JoinMatchmaking(ctx, &pb.JoinMatchmakingRequest{UserId: player2, Rating: 1000})
+	ms1, _ := matchClient.SubscribeToMatch(ctx1, &pb.SubscribeToMatchRequest{UserId: player1})
+	ms2, _ := matchClient.SubscribeToMatch(ctx2, &pb.SubscribeToMatchRequest{UserId: player2})
+	matchClient.JoinMatchmaking(ctx1, &pb.JoinMatchmakingRequest{UserId: player1, Rating: 1000})
+	matchClient.JoinMatchmaking(ctx2, &pb.JoinMatchmakingRequest{UserId: player2, Rating: 1000})
 
 	me1 := recvMatchEvent(t, ms1, matchTimeout)
 	recvMatchEvent(t, ms2, matchTimeout)
@@ -534,7 +580,7 @@ func TestDisconnectReconnect(t *testing.T) {
 	t.Logf("Matched in room %s", roomID)
 
 	// Player1 opens game stream
-	gameCtx1, gameCancel1 := context.WithCancel(ctx)
+	gameCtx1, gameCancel1 := context.WithCancel(authCtx(ctx, token1))
 	gs1, err := quizClient.StreamGameEvents(gameCtx1, &pb.StreamGameEventsRequest{
 		RoomId: roomID, UserId: player1,
 	})
@@ -543,7 +589,7 @@ func TestDisconnectReconnect(t *testing.T) {
 	}
 
 	// Player2 opens game stream (stays connected throughout)
-	gs2, err := quizClient.StreamGameEvents(ctx, &pb.StreamGameEventsRequest{
+	gs2, err := quizClient.StreamGameEvents(ctx2, &pb.StreamGameEventsRequest{
 		RoomId: roomID, UserId: player2,
 	})
 	if err != nil {
@@ -566,7 +612,7 @@ func TestDisconnectReconnect(t *testing.T) {
 	// Wait briefly then reconnect with last known sequence_number
 	time.Sleep(1 * time.Second)
 
-	gs1Reconnected, err := quizClient.StreamGameEvents(ctx, &pb.StreamGameEventsRequest{
+	gs1Reconnected, err := quizClient.StreamGameEvents(authCtx(ctx, token1), &pb.StreamGameEventsRequest{
 		RoomId:         roomID,
 		UserId:         player1,
 		SequenceNumber: lastSeq,

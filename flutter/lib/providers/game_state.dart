@@ -7,7 +7,7 @@ import '../services/quiz_service.dart';
 // Step 59: GameState — holds all live match state
 // ---------------------------------------------------------------------------
 
-enum GameScreen { matchmaking, gameplay, leaderboard, results }
+enum GameScreen { login, matchmaking, gameplay, leaderboard, results }
 
 class GameState {
   final GameScreen currentScreen;
@@ -21,13 +21,17 @@ class GameState {
   final int? correctIndex;
   final MatchEnd? matchResult;
   final List<LeaderboardEntry> leaderboard;
+  final String? token;
+  final int rating;
   final bool isReconnecting;
   final int lastSequenceNumber;
 
   const GameState({
-    this.currentScreen = GameScreen.matchmaking,
+    this.currentScreen = GameScreen.login,
     this.roomId,
     this.userId,
+    this.token,
+    this.rating = 1200,
     this.currentQuestion,
     this.scores = const {},
     this.round = 0,
@@ -44,6 +48,8 @@ class GameState {
     GameScreen? currentScreen,
     String? roomId,
     String? userId,
+    String? token,
+    int? rating,
     QuestionBroadcast? currentQuestion,
     Map<String, double>? scores,
     int? round,
@@ -61,6 +67,8 @@ class GameState {
       currentScreen: currentScreen ?? this.currentScreen,
       roomId: roomId ?? this.roomId,
       userId: userId ?? this.userId,
+      token: token ?? this.token,
+      rating: rating ?? this.rating,
       currentQuestion: currentQuestion ?? this.currentQuestion,
       scores: scores ?? this.scores,
       round: round ?? this.round,
@@ -99,10 +107,21 @@ class GameStateNotifier extends Notifier<GameState> {
     state = state.copyWith(userId: userId);
   }
 
+  // --- Auth ---
+
+  void setAuth(String userId, String token, int rating) {
+    state = state.copyWith(
+      userId: userId,
+      token: token,
+      rating: rating,
+      currentScreen: GameScreen.matchmaking,
+    );
+  }
+
   // --- Matchmaking ---
 
   Future<void> joinMatchmaking(String userId, int rating) async {
-    state = state.copyWith(userId: userId, currentScreen: GameScreen.matchmaking);
+    state = state.copyWith(currentScreen: GameScreen.matchmaking);
     await _service.joinMatchmaking(userId, rating);
 
     _matchSub?.cancel();
@@ -240,7 +259,13 @@ class GameStateNotifier extends Notifier<GameState> {
     if (state.userId != null) {
       await _service.leaveMatchmaking(state.userId!);
     }
-    state = const GameState();
+    // Preserve auth state, reset game state
+    state = GameState(
+      currentScreen: GameScreen.matchmaking,
+      userId: state.userId,
+      token: state.token,
+      rating: state.rating,
+    );
   }
 
   // --- Navigation ---
@@ -255,6 +280,19 @@ class GameStateNotifier extends Notifier<GameState> {
     if (state.userId != null) {
       await _service.leaveMatchmaking(state.userId!);
     }
+    // Preserve auth state, reset game state
+    state = GameState(
+      currentScreen: GameScreen.matchmaking,
+      userId: state.userId,
+      token: state.token,
+      rating: state.rating,
+    );
+  }
+
+  Future<void> logout() async {
+    _matchSub?.cancel();
+    _gameSub?.cancel();
+    _service.clearAuth();
     state = const GameState();
   }
 }

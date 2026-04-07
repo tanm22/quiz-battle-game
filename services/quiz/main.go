@@ -18,7 +18,10 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
+	"quiz-battle/pkg/auth"
 	"quiz-battle/pkg/keys"
 	pb "quiz-battle/proto"
 )
@@ -46,6 +49,7 @@ type quizServer struct {
 	rdb          *redis.Client
 	amqpCh       *amqp.Channel
 	mongoDB      *mongo.Database
+	jwtSecret    string
 	gameStreams  sync.Map // "roomId:userId" -> chan *pb.GameEvent
 	roomTimers  sync.Map // roomId -> *time.Timer (for round close)
 	seqCounters sync.Map // roomId -> *atomic.Int64
@@ -409,7 +413,12 @@ func (s *quizServer) broadcastToRoom(roomID string, event *pb.GameEvent) {
 // ---------------------------------------------------------------------------
 
 func (s *quizServer) StreamGameEvents(req *pb.StreamGameEventsRequest, stream pb.QuizService_StreamGameEventsServer) error {
-	streamKey := req.RoomId + ":" + req.UserId
+	userID, err := auth.UserIDFromContext(stream.Context())
+	if err != nil {
+		return status.Error(codes.Unauthenticated, "not authenticated")
+	}
+
+	streamKey := req.RoomId + ":" + userID
 	ch := make(chan *pb.GameEvent, 20)
 	s.gameStreams.Store(streamKey, ch)
 	defer func() {
@@ -434,16 +443,16 @@ func (s *quizServer) StreamGameEvents(req *pb.StreamGameEventsRequest, stream pb
 			}
 		} else {
 			log.Printf("[quiz] player %s disconnected from room %s (%d remaining)",
-				req.UserId, req.RoomId, remaining)
+				userID, req.RoomId, remaining)
 		}
 	}()
 
-	log.Printf("[quiz] player %s streaming game events for room %s", req.UserId, req.RoomId)
+	log.Printf("[quiz] player %s streaming game events for room %s", userID, req.RoomId)
 
 	// Send current state snapshot for late joiners / reconnections
 	if req.SequenceNumber > 0 {
 		// Reconnection — replay from ring buffer would go here (section 6.3)
-		log.Printf("[quiz] player %s reconnecting from seq %d", req.UserId, req.SequenceNumber)
+		log.Printf("[quiz] player %s reconnecting from seq %d", userID, req.SequenceNumber)
 	}
 
 	for {
@@ -490,17 +499,22 @@ func (s *quizServer) GetRoomQuestions(ctx context.Context, req *pb.GetRoomQuesti
 // ---------------------------------------------------------------------------
 
 func (s *quizServer) SubmitAnswer(ctx context.Context, req *pb.SubmitAnswerRequest) (*pb.SubmitAnswerResponse, error) {
+	userID, err := auth.UserIDFromContext(ctx)
+	if err != nil {
+		return nil, status.Error(codes.Unauthenticated, "not authenticated")
+	}
+
 	// Publish answer.submitted event to RabbitMQ — do not wait for scoring
 	event, _ := json.Marshal(map[string]interface{}{
 		"roomId":          req.RoomId,
-		"userId":          req.UserId,
+		"userId":          userID,
 		"round":           req.Round,
 		"optionIndex":     req.OptionIndex,
 		"clientTimestamp": req.ClientTimestamp,
 		"serverTimestamp": time.Now().UnixMilli(),
 	})
 
-	err := s.amqpCh.PublishWithContext(ctx, "sx", "answer.submitted", false, false, amqp.Publishing{
+	err = s.amqpCh.PublishWithContext(ctx, "sx", "answer.submitted", false, false, amqp.Publishing{
 		ContentType: "application/json",
 		Body:        event,
 	})
@@ -508,7 +522,7 @@ func (s *quizServer) SubmitAnswer(ctx context.Context, req *pb.SubmitAnswerReque
 		return nil, fmt.Errorf("failed to publish answer: %w", err)
 	}
 
-	log.Printf("[quiz] answer from %s for room %s round %d option %d", req.UserId, req.RoomId, req.Round, req.OptionIndex)
+	log.Printf("[quiz] answer from %s for room %s round %d option %d", userID, req.RoomId, req.Round, req.OptionIndex)
 	return &pb.SubmitAnswerResponse{Accepted: true}, nil
 }
 
@@ -695,18 +709,28 @@ func main() {
 	defer mongoClient.Disconnect(ctx)
 	log.Println("[quiz] connected to MongoDB")
 
+	// JWT
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "quiz-battle-dev-secret"
+	}
+
 	// gRPC server
 	srv := &quizServer{
-		rdb:     rdb,
-		amqpCh:  amqpCh,
-		mongoDB: mongoClient.Database("quizbattle"),
+		rdb:       rdb,
+		amqpCh:    amqpCh,
+		mongoDB:   mongoClient.Database("quizbattle"),
+		jwtSecret: jwtSecret,
 	}
 
 	// Start RabbitMQ consumers
 	go srv.consumeMatchCreated(ctx)
 	go srv.consumeLeaderboardUpdated(ctx)
 
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(
+		grpc.UnaryInterceptor(auth.UnaryInterceptor(jwtSecret, nil)),
+		grpc.StreamInterceptor(auth.StreamInterceptor(jwtSecret, nil)),
+	)
 	pb.RegisterQuizServiceServer(grpcServer, srv)
 
 	lis, err := net.Listen("tcp", ":50052")

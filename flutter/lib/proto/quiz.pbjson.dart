@@ -442,6 +442,81 @@ const TimerSync$json = {
 final $typed_data.Uint8List timerSyncDescriptor = $convert.base64Decode(
     'CglUaW1lclN5bmMSIwoNZGVhZGxpbmVfdW5peBgBIAEoA1IMZGVhZGxpbmVVbml4');
 
+@$core.Deprecated('Use registerRequestDescriptor instead')
+const RegisterRequest$json = {
+  '1': 'RegisterRequest',
+  '2': [
+    {'1': 'username', '3': 1, '4': 1, '5': 9, '10': 'username'},
+    {'1': 'password', '3': 2, '4': 1, '5': 9, '10': 'password'},
+  ],
+};
+
+/// Descriptor for `RegisterRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List registerRequestDescriptor = $convert.base64Decode(
+    'Cg9SZWdpc3RlclJlcXVlc3QSGgoIdXNlcm5hbWUYASABKAlSCHVzZXJuYW1lEhoKCHBhc3N3b3'
+    'JkGAIgASgJUghwYXNzd29yZA==');
+
+@$core.Deprecated('Use loginRequestDescriptor instead')
+const LoginRequest$json = {
+  '1': 'LoginRequest',
+  '2': [
+    {'1': 'username', '3': 1, '4': 1, '5': 9, '10': 'username'},
+    {'1': 'password', '3': 2, '4': 1, '5': 9, '10': 'password'},
+  ],
+};
+
+/// Descriptor for `LoginRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List loginRequestDescriptor = $convert.base64Decode(
+    'CgxMb2dpblJlcXVlc3QSGgoIdXNlcm5hbWUYASABKAlSCHVzZXJuYW1lEhoKCHBhc3N3b3JkGA'
+    'IgASgJUghwYXNzd29yZA==');
+
+@$core.Deprecated('Use authResponseDescriptor instead')
+const AuthResponse$json = {
+  '1': 'AuthResponse',
+  '2': [
+    {'1': 'user_id', '3': 1, '4': 1, '5': 9, '10': 'userId'},
+    {'1': 'username', '3': 2, '4': 1, '5': 9, '10': 'username'},
+    {'1': 'token', '3': 3, '4': 1, '5': 9, '10': 'token'},
+    {'1': 'rating', '3': 4, '4': 1, '5': 5, '10': 'rating'},
+    {'1': 'matches_played', '3': 5, '4': 1, '5': 5, '10': 'matchesPlayed'},
+    {'1': 'wins', '3': 6, '4': 1, '5': 5, '10': 'wins'},
+  ],
+};
+
+/// Descriptor for `AuthResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List authResponseDescriptor = $convert.base64Decode(
+    'CgxBdXRoUmVzcG9uc2USFwoHdXNlcl9pZBgBIAEoCVIGdXNlcklkEhoKCHVzZXJuYW1lGAIgAS'
+    'gJUgh1c2VybmFtZRIUCgV0b2tlbhgDIAEoCVIFdG9rZW4SFgoGcmF0aW5nGAQgASgFUgZyYXRp'
+    'bmcSJQoObWF0Y2hlc19wbGF5ZWQYBSABKAVSDW1hdGNoZXNQbGF5ZWQSEgoEd2lucxgGIAEoBV'
+    'IEd2lucw==');
+
+@$core.Deprecated('Use getProfileRequestDescriptor instead')
+const GetProfileRequest$json = {
+  '1': 'GetProfileRequest',
+};
+
+/// Descriptor for `GetProfileRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getProfileRequestDescriptor =
+    $convert.base64Decode('ChFHZXRQcm9maWxlUmVxdWVzdA==');
+
+@$core.Deprecated('Use profileResponseDescriptor instead')
+const ProfileResponse$json = {
+  '1': 'ProfileResponse',
+  '2': [
+    {'1': 'user_id', '3': 1, '4': 1, '5': 9, '10': 'userId'},
+    {'1': 'username', '3': 2, '4': 1, '5': 9, '10': 'username'},
+    {'1': 'rating', '3': 3, '4': 1, '5': 5, '10': 'rating'},
+    {'1': 'matches_played', '3': 4, '4': 1, '5': 5, '10': 'matchesPlayed'},
+    {'1': 'wins', '3': 5, '4': 1, '5': 5, '10': 'wins'},
+  ],
+};
+
+/// Descriptor for `ProfileResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List profileResponseDescriptor = $convert.base64Decode(
+    'Cg9Qcm9maWxlUmVzcG9uc2USFwoHdXNlcl9pZBgBIAEoCVIGdXNlcklkEhoKCHVzZXJuYW1lGA'
+    'IgASgJUgh1c2VybmFtZRIWCgZyYXRpbmcYAyABKAVSBnJhdGluZxIlCg5tYXRjaGVzX3BsYXll'
+    'ZBgEIAEoBVINbWF0Y2hlc1BsYXllZBISCgR3aW5zGAUgASgFUgR3aW5z');
+
 @$core.Deprecated('Use calculateScoreRequestDescriptor instead')
 const CalculateScoreRequest$json = {
   '1': 'CalculateScoreRequest',

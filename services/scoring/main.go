@@ -16,6 +16,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"google.golang.org/grpc"
 
+	"quiz-battle/pkg/auth"
 	"quiz-battle/pkg/keys"
 	pb "quiz-battle/proto"
 )
@@ -38,10 +39,11 @@ type Question struct {
 
 type scoringServer struct {
 	pb.UnimplementedScoringServiceServer
-	rdb      *redis.Client
-	amqpConn *amqp.Connection
-	amqpCh   *amqp.Channel // for publishing only
-	mongoDB  *mongo.Database
+	rdb       *redis.Client
+	amqpConn  *amqp.Connection
+	amqpCh    *amqp.Channel // for publishing only
+	mongoDB   *mongo.Database
+	jwtSecret string
 }
 
 // newChannel creates a dedicated AMQP channel per consumer (channels are not thread-safe).
@@ -426,10 +428,15 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 
 	// Step 54: Bulk write to users collection
 	// Increment matchesPlayed for all players, increment wins for rank-1 player
+	// Adjust ratings: winner +25, others -25
 	usersColl := s.mongoDB.Collection("users")
 	for i, e := range entries {
 		userID := e.Member.(string)
-		update := bson.M{"$inc": bson.M{"matchesPlayed": 1}}
+		delta := int32(-25)
+		if i == 0 {
+			delta = 25
+		}
+		update := bson.M{"$inc": bson.M{"matchesPlayed": 1, "rating": delta}}
 		if i == 0 {
 			update["$inc"].(bson.M)["wins"] = 1
 		}
@@ -555,11 +562,17 @@ func main() {
 	defer mongoClient.Disconnect(ctx)
 	log.Println("[scoring] connected to MongoDB")
 
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "quiz-battle-dev-secret"
+	}
+
 	srv := &scoringServer{
-		rdb:      rdb,
-		amqpConn: conn,
-		amqpCh:   amqpCh,
-		mongoDB:  mongoClient.Database("quizbattle"),
+		rdb:       rdb,
+		amqpConn:  conn,
+		amqpCh:    amqpCh,
+		mongoDB:   mongoClient.Database("quizbattle"),
+		jwtSecret: jwtSecret,
 	}
 
 	// Start RabbitMQ consumers (3 goroutines)
@@ -568,7 +581,10 @@ func main() {
 	go srv.consumeAnalytics(ctx)     // 9.6 note: analytics stub
 
 	// gRPC server
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(
+		grpc.UnaryInterceptor(auth.UnaryInterceptor(jwtSecret, nil)),
+		grpc.StreamInterceptor(auth.StreamInterceptor(jwtSecret, nil)),
+	)
 	pb.RegisterScoringServiceServer(grpcServer, srv)
 
 	lis, err := net.Listen("tcp", ":50053")

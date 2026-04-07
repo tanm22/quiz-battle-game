@@ -23,3 +23,14 @@ type AnswerRecord struct {
 	ClientTimestamp int64  `json:"clientTimestamp"`
 	ServerTimestamp int64  `json:"serverTimestamp"`
 }
+
+// User is the MongoDB document in the users collection.
+type User struct {
+	ID            string `bson:"_id"`
+	Username      string `bson:"username"`
+	PasswordHash  string `bson:"passwordHash"`
+	Rating        int32  `bson:"rating"`
+	MatchesPlayed int32  `bson:"matchesPlayed"`
+	Wins          int32  `bson:"wins"`
+	CreatedAt     int64  `bson:"createdAt"`
+}

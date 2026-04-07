@@ -167,6 +167,45 @@ service ScoringService {
   rpc GetLeaderboard(GetLeaderboardRequest) returns (GetLeaderboardResponse);
 }
 
+// ---------------------------------------------------------------------------
+// AuthService
+// ---------------------------------------------------------------------------
+
+service AuthService {
+  rpc Register(RegisterRequest) returns (AuthResponse);
+  rpc Login(LoginRequest) returns (AuthResponse);
+  rpc GetProfile(GetProfileRequest) returns (ProfileResponse);
+}
+
+message RegisterRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message LoginRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message AuthResponse {
+  string user_id        = 1;
+  string username       = 2;
+  string token          = 3;
+  int32  rating         = 4;
+  int32  matches_played = 5;
+  int32  wins           = 6;
+}
+
+message GetProfileRequest {}
+
+message ProfileResponse {
+  string user_id        = 1;
+  string username       = 2;
+  int32  rating         = 3;
+  int32  matches_played = 4;
+  int32  wins           = 5;
+}
+
 message CalculateScoreRequest {
   string room_id        = 1;
   string user_id        = 2;

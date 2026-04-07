@@ -14,8 +14,12 @@ import (
 	"github.com/google/uuid"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/redis/go-redis/v9"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"google.golang.org/grpc"
 
+	"quiz-battle/pkg/auth"
 	"quiz-battle/pkg/keys"
 	"quiz-battle/pkg/models"
 	pb "quiz-battle/proto"
@@ -29,6 +33,8 @@ type matchmakingServer struct {
 	pb.UnimplementedMatchmakingServiceServer
 	rdb        *redis.Client
 	amqpCh     *amqp.Channel
+	mongoDB    *mongo.Database
+	jwtSecret  string
 	subscribers sync.Map // userId -> chan *pb.MatchEvent
 	heartbeats  sync.Map // "roomId:userId" -> int64 (unix timestamp)
 	seqCounter  atomic.Int64
@@ -39,8 +45,23 @@ type matchmakingServer struct {
 // ---------------------------------------------------------------------------
 
 func (s *matchmakingServer) JoinMatchmaking(ctx context.Context, req *pb.JoinMatchmakingRequest) (*pb.JoinMatchmakingResponse, error) {
+	userID, err := auth.UserIDFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("auth: %w", err)
+	}
+
+	// Lookup rating from MongoDB
+	var userDoc bson.M
+	err = s.mongoDB.Collection("users").FindOne(ctx, bson.M{"_id": userID}).Decode(&userDoc)
+	rating := float64(1200)
+	if err == nil {
+		if r, ok := userDoc["rating"].(int32); ok {
+			rating = float64(r)
+		}
+	}
+
 	// Duplicate check: ZSCORE returns the score if the member exists
-	inPool, err := keys.IsInPool(ctx, s.rdb, req.UserId)
+	inPool, err := keys.IsInPool(ctx, s.rdb, userID)
 	if err != nil {
 		return nil, fmt.Errorf("redis error: %w", err)
 	}
@@ -49,11 +70,11 @@ func (s *matchmakingServer) JoinMatchmaking(ctx context.Context, req *pb.JoinMat
 	}
 
 	// ZADD to matchmaking:pool with score = rating
-	if err := keys.AddToPool(ctx, s.rdb, req.UserId, float64(req.Rating)); err != nil {
+	if err := keys.AddToPool(ctx, s.rdb, userID, rating); err != nil {
 		return nil, fmt.Errorf("failed to add to pool: %w", err)
 	}
 
-	log.Printf("[matchmaking] player %s joined pool (rating=%d)", req.UserId, req.Rating)
+	log.Printf("[matchmaking] player %s joined pool (rating=%.0f)", userID, rating)
 	return &pb.JoinMatchmakingResponse{Status: pb.MatchmakingStatus_QUEUED}, nil
 }
 
@@ -62,10 +83,15 @@ func (s *matchmakingServer) JoinMatchmaking(ctx context.Context, req *pb.JoinMat
 // ---------------------------------------------------------------------------
 
 func (s *matchmakingServer) LeaveMatchmaking(ctx context.Context, req *pb.LeaveMatchmakingRequest) (*pb.LeaveMatchmakingResponse, error) {
-	if err := keys.RemoveFromPool(ctx, s.rdb, req.UserId); err != nil {
+	userID, err := auth.UserIDFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("auth: %w", err)
+	}
+
+	if err := keys.RemoveFromPool(ctx, s.rdb, userID); err != nil {
 		return nil, fmt.Errorf("failed to remove from pool: %w", err)
 	}
-	log.Printf("[matchmaking] player %s left pool", req.UserId)
+	log.Printf("[matchmaking] player %s left pool", userID)
 	return &pb.LeaveMatchmakingResponse{Removed: true}, nil
 }
 
@@ -74,11 +100,16 @@ func (s *matchmakingServer) LeaveMatchmaking(ctx context.Context, req *pb.LeaveM
 // ---------------------------------------------------------------------------
 
 func (s *matchmakingServer) SubscribeToMatch(req *pb.SubscribeToMatchRequest, stream pb.MatchmakingService_SubscribeToMatchServer) error {
-	ch := make(chan *pb.MatchEvent, 10)
-	s.subscribers.Store(req.UserId, ch)
-	defer s.subscribers.Delete(req.UserId)
+	userID, err := auth.UserIDFromContext(stream.Context())
+	if err != nil {
+		return fmt.Errorf("auth: %w", err)
+	}
 
-	log.Printf("[matchmaking] player %s subscribed to match events", req.UserId)
+	ch := make(chan *pb.MatchEvent, 10)
+	s.subscribers.Store(userID, ch)
+	defer s.subscribers.Delete(userID)
+
+	log.Printf("[matchmaking] player %s subscribed to match events", userID)
 
 	for {
 		select {
@@ -372,17 +403,42 @@ func main() {
 	}
 	log.Println("[matchmaking] connected to RabbitMQ")
 
+	// MongoDB
+	mongoURI := os.Getenv("MONGO_URI")
+	if mongoURI == "" {
+		mongoURI = "mongodb://localhost:27017/quizbattle"
+	}
+	mongoClient, err := mongo.Connect(options.Client().ApplyURI(mongoURI).SetBSONOptions(&options.BSONOptions{
+		ObjectIDAsHexString: true,
+	}))
+	if err != nil {
+		log.Fatalf("mongo connect failed: %v", err)
+	}
+	mongoDB := mongoClient.Database("quizbattle")
+	log.Println("[matchmaking] connected to MongoDB")
+
+	// JWT secret
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "quiz-battle-dev-secret"
+	}
+
 	// gRPC server
 	srv := &matchmakingServer{
-		rdb:    rdb,
-		amqpCh: amqpCh,
+		rdb:       rdb,
+		amqpCh:    amqpCh,
+		mongoDB:   mongoDB,
+		jwtSecret: jwtSecret,
 	}
 
 	// Start background goroutines
 	go srv.startPoller(ctx)
 	go srv.startHeartbeatChecker(ctx)
 
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(
+		grpc.UnaryInterceptor(auth.UnaryInterceptor(jwtSecret, nil)),
+		grpc.StreamInterceptor(auth.StreamInterceptor(jwtSecret, nil)),
+	)
 	pb.RegisterMatchmakingServiceServer(grpcServer, srv)
 
 	lis, err := net.Listen("tcp", ":50051")

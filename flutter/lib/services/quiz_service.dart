@@ -14,6 +14,7 @@ class QuizService {
   late final MatchmakingServiceClient matchmaking;
   late final QuizServiceClient quiz;
   late final ScoringServiceClient scoring;
+  CallOptions? _authOptions;
 
   QuizService._internal() {
     _matchmakingChannel = ClientChannel(
@@ -37,17 +38,27 @@ class QuizService {
     scoring = ScoringServiceClient(_scoringChannel);
   }
 
+  void setAuthToken(String token) {
+    _authOptions = CallOptions(metadata: {'authorization': 'Bearer $token'});
+  }
+
+  void clearAuth() {
+    _authOptions = null;
+  }
+
   Future<JoinMatchmakingResponse> joinMatchmaking(String userId, int rating) {
     return matchmaking.joinMatchmaking(
       JoinMatchmakingRequest()
         ..userId = userId
         ..rating = rating,
+      options: _authOptions,
     );
   }
 
   Future<LeaveMatchmakingResponse> leaveMatchmaking(String userId) {
     return matchmaking.leaveMatchmaking(
       LeaveMatchmakingRequest()..userId = userId,
+      options: _authOptions,
     );
   }
 
@@ -57,12 +68,14 @@ class QuizService {
       SubscribeToMatchRequest()
         ..userId = userId
         ..sequenceNumber = Int64(sequenceNumber),
+      options: _authOptions,
     );
   }
 
   Future<GetRoomQuestionsResponse> getRoomQuestions(String roomId) {
     return quiz.getRoomQuestions(
       GetRoomQuestionsRequest()..roomId = roomId,
+      options: _authOptions,
     );
   }
 
@@ -73,6 +86,7 @@ class QuizService {
         ..roomId = roomId
         ..userId = userId
         ..sequenceNumber = Int64(sequenceNumber),
+      options: _authOptions,
     );
   }
 
@@ -90,12 +104,14 @@ class QuizService {
         ..round = round
         ..optionIndex = optionIndex
         ..clientTimestamp = Int64(clientTimestamp),
+      options: _authOptions,
     );
   }
 
   Future<GetLeaderboardResponse> getLeaderboard(String roomId) {
     return scoring.getLeaderboard(
       GetLeaderboardRequest()..roomId = roomId,
+      options: _authOptions,
     );
   }
 

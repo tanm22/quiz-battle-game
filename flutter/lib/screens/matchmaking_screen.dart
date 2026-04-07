@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/game_state.dart';
+import '../services/auth_service.dart';
 
-/// Step 61: Matchmaking screen — username input, Start Battle button,
+/// Matchmaking screen — shows user profile, Start Battle button,
 /// pulsing ring animation while waiting, navigates on match_found.
 class MatchmakingScreen extends ConsumerStatefulWidget {
   const MatchmakingScreen({super.key});
@@ -13,7 +14,6 @@ class MatchmakingScreen extends ConsumerStatefulWidget {
 
 class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen>
     with SingleTickerProviderStateMixin {
-  final _usernameController = TextEditingController();
   late final AnimationController _pulseController;
   bool _isSearching = false;
 
@@ -28,23 +28,26 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen>
 
   @override
   void dispose() {
-    _usernameController.dispose();
     _pulseController.dispose();
     super.dispose();
   }
 
   void _startBattle() {
-    final username = _usernameController.text.trim();
-    if (username.isEmpty) return;
+    final gameState = ref.read(gameStateProvider);
+    final userId = gameState.userId;
+    if (userId == null) return;
 
     setState(() => _isSearching = true);
     _pulseController.repeat();
 
-    ref.read(gameStateProvider.notifier).joinMatchmaking(username, 1200);
+    ref.read(gameStateProvider.notifier).joinMatchmaking(userId, gameState.rating);
   }
 
   @override
   Widget build(BuildContext context) {
+    final gameState = ref.watch(gameStateProvider);
+    final auth = AuthService();
+
     return Scaffold(
       backgroundColor: const Color(0xFF1A1A2E),
       body: Center(
@@ -59,6 +62,54 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen>
                   fontSize: 36,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // User profile card
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withAlpha(13),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white12),
+                ),
+                child: Row(
+                  children: [
+                    const CircleAvatar(
+                      backgroundColor: Colors.amber,
+                      child: Icon(Icons.person, color: Colors.black),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            auth.username ?? gameState.userId ?? '',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Rating: ${gameState.rating}  |  W: ${auth.wins}  L: ${auth.matchesPlayed - auth.wins}',
+                            style: const TextStyle(color: Colors.white54, fontSize: 14),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.logout, color: Colors.white54),
+                      tooltip: 'Logout',
+                      onPressed: () async {
+                        await auth.logout();
+                        ref.read(gameStateProvider.notifier).logout();
+                      },
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 48),
@@ -96,7 +147,6 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen>
                   style: TextStyle(color: Colors.white70, fontSize: 18),
                 ),
                 const SizedBox(height: 16),
-                // Player count / ETA label
                 const Text(
                   'Waiting for players',
                   style: TextStyle(color: Colors.white38, fontSize: 14),
@@ -107,7 +157,7 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen>
                     setState(() => _isSearching = false);
                     _pulseController.stop();
                     _pulseController.reset();
-                    ref.read(gameStateProvider.notifier).playAgain();
+                    ref.read(gameStateProvider.notifier).leaveMatch();
                   },
                   child: const Text(
                     'Cancel',
@@ -115,25 +165,6 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen>
                   ),
                 ),
               ] else ...[
-                // Username input
-                TextField(
-                  controller: _usernameController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: 'Enter your username',
-                    hintStyle: const TextStyle(color: Colors.white38),
-                    filled: true,
-                    fillColor: Colors.white12,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    prefixIcon:
-                        const Icon(Icons.person, color: Colors.white54),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
                 // Start Battle button
                 SizedBox(
                   width: double.infinity,
@@ -149,8 +180,7 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen>
                     ),
                     child: const Text(
                       'Start Battle',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ),

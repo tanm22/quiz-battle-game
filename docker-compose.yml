@@ -53,6 +53,7 @@ services:
       - REDIS_ADDR=redis:6379
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
       - MONGO_URI=mongodb://mongo:27017/quizbattle
+      - JWT_SECRET=change-me-in-production
 
 volumes:
   redis_data:
