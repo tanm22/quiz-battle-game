@@ -137,6 +137,81 @@ func (s *scoringServer) GetLeaderboard(ctx context.Context, req *pb.GetLeaderboa
 }
 
 // ---------------------------------------------------------------------------
+// GetMatchHistory — returns past matches for the authenticated user
+// ---------------------------------------------------------------------------
+
+func (s *scoringServer) GetMatchHistory(ctx context.Context, req *pb.GetMatchHistoryRequest) (*pb.GetMatchHistoryResponse, error) {
+	userID, err := auth.UserIDFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("auth: %w", err)
+	}
+
+	limit := int64(req.Limit)
+	if limit <= 0 || limit > 50 {
+		limit = 20
+	}
+	skip := int64(req.Offset)
+	if skip < 0 {
+		skip = 0
+	}
+
+	coll := s.mongoDB.Collection("match_history")
+	cursor, err := coll.Find(ctx,
+		bson.M{"players.userId": userID},
+		options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}).SetLimit(limit).SetSkip(skip),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query match_history: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var matches []*pb.MatchHistoryEntry
+	for cursor.Next(ctx) {
+		var doc struct {
+			RoomID    string    `bson:"roomId"`
+			Winner    string    `bson:"winner"`
+			Rounds    int32     `bson:"rounds"`
+			Duration  int64     `bson:"duration"`
+			CreatedAt time.Time `bson:"createdAt"`
+			Players   []struct {
+				UserID            string  `bson:"userId"`
+				Username          string  `bson:"username"`
+				FinalScore        float64 `bson:"finalScore"`
+				Rank              int32   `bson:"rank"`
+				AnswersCorrect    int32   `bson:"answersCorrect"`
+				AvgResponseTimeMs float64 `bson:"avgResponseTimeMs"`
+			} `bson:"players"`
+		}
+		if err := cursor.Decode(&doc); err != nil {
+			continue
+		}
+
+		players := make([]*pb.PlayerResult, len(doc.Players))
+		for i, p := range doc.Players {
+			players[i] = &pb.PlayerResult{
+				UserId:            p.UserID,
+				Username:          p.Username,
+				FinalScore:        p.FinalScore,
+				Rank:              p.Rank,
+				AnswersCorrect:    p.AnswersCorrect,
+				AvgResponseTimeMs: p.AvgResponseTimeMs,
+			}
+		}
+
+		matches = append(matches, &pb.MatchHistoryEntry{
+			RoomId:    doc.RoomID,
+			Winner:    doc.Winner,
+			Players:   players,
+			Rounds:    doc.Rounds,
+			Duration:  doc.Duration,
+			CreatedAt: doc.CreatedAt.Unix(),
+		})
+	}
+
+	return &pb.GetMatchHistoryResponse{Matches: matches}, nil
+}
+
+// ---------------------------------------------------------------------------
 // 48. RabbitMQ consumer for answer-processing-queue
 // ---------------------------------------------------------------------------
 

@@ -115,6 +115,15 @@ class QuizService {
     );
   }
 
+  Future<GetMatchHistoryResponse> getMatchHistory({int limit = 20, int offset = 0}) {
+    return scoring.getMatchHistory(
+      GetMatchHistoryRequest()
+        ..limit = limit
+        ..offset = offset,
+      options: _authOptions,
+    );
+  }
+
   Future<void> shutdown() async {
     await _matchmakingChannel.shutdown();
     await _quizChannel.shutdown();

@@ -383,8 +383,9 @@ var QuizService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	ScoringService_CalculateScore_FullMethodName = "/quiz.ScoringService/CalculateScore"
-	ScoringService_GetLeaderboard_FullMethodName = "/quiz.ScoringService/GetLeaderboard"
+	ScoringService_CalculateScore_FullMethodName  = "/quiz.ScoringService/CalculateScore"
+	ScoringService_GetLeaderboard_FullMethodName  = "/quiz.ScoringService/GetLeaderboard"
+	ScoringService_GetMatchHistory_FullMethodName = "/quiz.ScoringService/GetMatchHistory"
 )
 
 // ScoringServiceClient is the client API for ScoringService service.
@@ -393,6 +394,7 @@ const (
 type ScoringServiceClient interface {
 	CalculateScore(ctx context.Context, in *CalculateScoreRequest, opts ...grpc.CallOption) (*CalculateScoreResponse, error)
 	GetLeaderboard(ctx context.Context, in *GetLeaderboardRequest, opts ...grpc.CallOption) (*GetLeaderboardResponse, error)
+	GetMatchHistory(ctx context.Context, in *GetMatchHistoryRequest, opts ...grpc.CallOption) (*GetMatchHistoryResponse, error)
 }
 
 type scoringServiceClient struct {
@@ -423,12 +425,23 @@ func (c *scoringServiceClient) GetLeaderboard(ctx context.Context, in *GetLeader
 	return out, nil
 }
 
+func (c *scoringServiceClient) GetMatchHistory(ctx context.Context, in *GetMatchHistoryRequest, opts ...grpc.CallOption) (*GetMatchHistoryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetMatchHistoryResponse)
+	err := c.cc.Invoke(ctx, ScoringService_GetMatchHistory_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ScoringServiceServer is the server API for ScoringService service.
 // All implementations must embed UnimplementedScoringServiceServer
 // for forward compatibility.
 type ScoringServiceServer interface {
 	CalculateScore(context.Context, *CalculateScoreRequest) (*CalculateScoreResponse, error)
 	GetLeaderboard(context.Context, *GetLeaderboardRequest) (*GetLeaderboardResponse, error)
+	GetMatchHistory(context.Context, *GetMatchHistoryRequest) (*GetMatchHistoryResponse, error)
 	mustEmbedUnimplementedScoringServiceServer()
 }
 
@@ -444,6 +457,9 @@ func (UnimplementedScoringServiceServer) CalculateScore(context.Context, *Calcul
 }
 func (UnimplementedScoringServiceServer) GetLeaderboard(context.Context, *GetLeaderboardRequest) (*GetLeaderboardResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetLeaderboard not implemented")
+}
+func (UnimplementedScoringServiceServer) GetMatchHistory(context.Context, *GetMatchHistoryRequest) (*GetMatchHistoryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetMatchHistory not implemented")
 }
 func (UnimplementedScoringServiceServer) mustEmbedUnimplementedScoringServiceServer() {}
 func (UnimplementedScoringServiceServer) testEmbeddedByValue()                        {}
@@ -502,6 +518,24 @@ func _ScoringService_GetLeaderboard_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ScoringService_GetMatchHistory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMatchHistoryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScoringServiceServer).GetMatchHistory(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScoringService_GetMatchHistory_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScoringServiceServer).GetMatchHistory(ctx, req.(*GetMatchHistoryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ScoringService_ServiceDesc is the grpc.ServiceDesc for ScoringService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -516,6 +550,10 @@ var ScoringService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetLeaderboard",
 			Handler:    _ScoringService_GetLeaderboard_Handler,
+		},
+		{
+			MethodName: "GetMatchHistory",
+			Handler:    _ScoringService_GetMatchHistory_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/game_state.dart';
 import '../services/auth_service.dart';
 import 'link_email_screen.dart';
+import 'match_history_screen.dart';
 
 class MatchmakingScreen extends ConsumerStatefulWidget {
   const MatchmakingScreen({super.key});
@@ -258,6 +259,28 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen>
                       child: const Text('Cancel', style: TextStyle(color: Colors.redAccent, fontSize: 15)),
                     ),
                   ] else ...[
+                    // Match History button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          final userId = gameState.userId;
+                          if (userId == null) return;
+                          Navigator.push(context, MaterialPageRoute(
+                            builder: (_) => MatchHistoryScreen(currentUserId: userId),
+                          ));
+                        },
+                        icon: const Icon(Icons.history, size: 20),
+                        label: const Text('Match History', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white70,
+                          side: BorderSide(color: Colors.white.withAlpha(30)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
                     // Start Battle button
                     SizedBox(
                       width: double.infinity,

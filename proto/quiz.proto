@@ -165,6 +165,7 @@ message TimerSync {
 service ScoringService {
   rpc CalculateScore(CalculateScoreRequest) returns (CalculateScoreResponse);
   rpc GetLeaderboard(GetLeaderboardRequest) returns (GetLeaderboardResponse);
+  rpc GetMatchHistory(GetMatchHistoryRequest) returns (GetMatchHistoryResponse);
 }
 
 // ---------------------------------------------------------------------------
@@ -298,4 +299,22 @@ message GetLeaderboardRequest {
 
 message GetLeaderboardResponse {
   repeated LeaderboardEntry entries = 1;
+}
+
+message GetMatchHistoryRequest {
+  int32 limit  = 1; // max results, default 20
+  int32 offset = 2; // pagination offset
+}
+
+message GetMatchHistoryResponse {
+  repeated MatchHistoryEntry matches = 1;
+}
+
+message MatchHistoryEntry {
+  string                room_id    = 1;
+  string                winner     = 2;
+  repeated PlayerResult players    = 3;
+  int32                 rounds     = 4;
+  int64                 duration   = 5;
+  int64                 created_at = 6;
 }

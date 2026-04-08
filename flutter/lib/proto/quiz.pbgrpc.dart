@@ -274,6 +274,13 @@ class ScoringServiceClient extends $grpc.Client {
     return $createUnaryCall(_$getLeaderboard, request, options: options);
   }
 
+  $grpc.ResponseFuture<$0.GetMatchHistoryResponse> getMatchHistory(
+    $0.GetMatchHistoryRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$getMatchHistory, request, options: options);
+  }
+
   // method descriptors
 
   static final _$calculateScore =
@@ -286,6 +293,11 @@ class ScoringServiceClient extends $grpc.Client {
           '/quiz.ScoringService/GetLeaderboard',
           ($0.GetLeaderboardRequest value) => value.writeToBuffer(),
           $0.GetLeaderboardResponse.fromBuffer);
+  static final _$getMatchHistory =
+      $grpc.ClientMethod<$0.GetMatchHistoryRequest, $0.GetMatchHistoryResponse>(
+          '/quiz.ScoringService/GetMatchHistory',
+          ($0.GetMatchHistoryRequest value) => value.writeToBuffer(),
+          $0.GetMatchHistoryResponse.fromBuffer);
 }
 
 @$pb.GrpcServiceName('quiz.ScoringService')
@@ -311,6 +323,15 @@ abstract class ScoringServiceBase extends $grpc.Service {
         ($core.List<$core.int> value) =>
             $0.GetLeaderboardRequest.fromBuffer(value),
         ($0.GetLeaderboardResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.GetMatchHistoryRequest,
+            $0.GetMatchHistoryResponse>(
+        'GetMatchHistory',
+        getMatchHistory_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.GetMatchHistoryRequest.fromBuffer(value),
+        ($0.GetMatchHistoryResponse value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.CalculateScoreResponse> calculateScore_Pre(
@@ -330,6 +351,15 @@ abstract class ScoringServiceBase extends $grpc.Service {
 
   $async.Future<$0.GetLeaderboardResponse> getLeaderboard(
       $grpc.ServiceCall call, $0.GetLeaderboardRequest request);
+
+  $async.Future<$0.GetMatchHistoryResponse> getMatchHistory_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.GetMatchHistoryRequest> $request) async {
+    return getMatchHistory($call, await $request);
+  }
+
+  $async.Future<$0.GetMatchHistoryResponse> getMatchHistory(
+      $grpc.ServiceCall call, $0.GetMatchHistoryRequest request);
 }
 
 @$pb.GrpcServiceName('quiz.AuthService')

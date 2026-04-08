@@ -3182,6 +3182,232 @@ class GetLeaderboardResponse extends $pb.GeneratedMessage {
   $pb.PbList<LeaderboardEntry> get entries => $_getList(0);
 }
 
+class GetMatchHistoryRequest extends $pb.GeneratedMessage {
+  factory GetMatchHistoryRequest({
+    $core.int? limit,
+    $core.int? offset,
+  }) {
+    final result = create();
+    if (limit != null) result.limit = limit;
+    if (offset != null) result.offset = offset;
+    return result;
+  }
+
+  GetMatchHistoryRequest._();
+
+  factory GetMatchHistoryRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetMatchHistoryRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetMatchHistoryRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'limit')
+    ..aI(2, _omitFieldNames ? '' : 'offset')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetMatchHistoryRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetMatchHistoryRequest copyWith(
+          void Function(GetMatchHistoryRequest) updates) =>
+      super.copyWith((message) => updates(message as GetMatchHistoryRequest))
+          as GetMatchHistoryRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetMatchHistoryRequest create() => GetMatchHistoryRequest._();
+  @$core.override
+  GetMatchHistoryRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetMatchHistoryRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetMatchHistoryRequest>(create);
+  static GetMatchHistoryRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get limit => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set limit($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasLimit() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearLimit() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get offset => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set offset($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasOffset() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearOffset() => $_clearField(2);
+}
+
+class GetMatchHistoryResponse extends $pb.GeneratedMessage {
+  factory GetMatchHistoryResponse({
+    $core.Iterable<MatchHistoryEntry>? matches,
+  }) {
+    final result = create();
+    if (matches != null) result.matches.addAll(matches);
+    return result;
+  }
+
+  GetMatchHistoryResponse._();
+
+  factory GetMatchHistoryResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetMatchHistoryResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetMatchHistoryResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..pPM<MatchHistoryEntry>(1, _omitFieldNames ? '' : 'matches',
+        subBuilder: MatchHistoryEntry.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetMatchHistoryResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetMatchHistoryResponse copyWith(
+          void Function(GetMatchHistoryResponse) updates) =>
+      super.copyWith((message) => updates(message as GetMatchHistoryResponse))
+          as GetMatchHistoryResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetMatchHistoryResponse create() => GetMatchHistoryResponse._();
+  @$core.override
+  GetMatchHistoryResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetMatchHistoryResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetMatchHistoryResponse>(create);
+  static GetMatchHistoryResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<MatchHistoryEntry> get matches => $_getList(0);
+}
+
+class MatchHistoryEntry extends $pb.GeneratedMessage {
+  factory MatchHistoryEntry({
+    $core.String? roomId,
+    $core.String? winner,
+    $core.Iterable<PlayerResult>? players,
+    $core.int? rounds,
+    $fixnum.Int64? duration,
+    $fixnum.Int64? createdAt,
+  }) {
+    final result = create();
+    if (roomId != null) result.roomId = roomId;
+    if (winner != null) result.winner = winner;
+    if (players != null) result.players.addAll(players);
+    if (rounds != null) result.rounds = rounds;
+    if (duration != null) result.duration = duration;
+    if (createdAt != null) result.createdAt = createdAt;
+    return result;
+  }
+
+  MatchHistoryEntry._();
+
+  factory MatchHistoryEntry.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory MatchHistoryEntry.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'MatchHistoryEntry',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'roomId')
+    ..aOS(2, _omitFieldNames ? '' : 'winner')
+    ..pPM<PlayerResult>(3, _omitFieldNames ? '' : 'players',
+        subBuilder: PlayerResult.create)
+    ..aI(4, _omitFieldNames ? '' : 'rounds')
+    ..aInt64(5, _omitFieldNames ? '' : 'duration')
+    ..aInt64(6, _omitFieldNames ? '' : 'createdAt')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MatchHistoryEntry clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MatchHistoryEntry copyWith(void Function(MatchHistoryEntry) updates) =>
+      super.copyWith((message) => updates(message as MatchHistoryEntry))
+          as MatchHistoryEntry;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static MatchHistoryEntry create() => MatchHistoryEntry._();
+  @$core.override
+  MatchHistoryEntry createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static MatchHistoryEntry getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<MatchHistoryEntry>(create);
+  static MatchHistoryEntry? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get roomId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set roomId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRoomId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRoomId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get winner => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set winner($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasWinner() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearWinner() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $pb.PbList<PlayerResult> get players => $_getList(2);
+
+  @$pb.TagNumber(4)
+  $core.int get rounds => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set rounds($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasRounds() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearRounds() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $fixnum.Int64 get duration => $_getI64(4);
+  @$pb.TagNumber(5)
+  set duration($fixnum.Int64 value) => $_setInt64(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasDuration() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearDuration() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $fixnum.Int64 get createdAt => $_getI64(5);
+  @$pb.TagNumber(6)
+  set createdAt($fixnum.Int64 value) => $_setInt64(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasCreatedAt() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearCreatedAt() => $_clearField(6);
+}
+
 const $core.bool _omitFieldNames =
     $core.bool.fromEnvironment('protobuf.omit_field_names');
 const $core.bool _omitMessageNames =

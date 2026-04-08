@@ -771,3 +771,66 @@ final $typed_data.Uint8List getLeaderboardResponseDescriptor =
     $convert.base64Decode(
         'ChZHZXRMZWFkZXJib2FyZFJlc3BvbnNlEjAKB2VudHJpZXMYASADKAsyFi5xdWl6LkxlYWRlcm'
         'JvYXJkRW50cnlSB2VudHJpZXM=');
+
+@$core.Deprecated('Use getMatchHistoryRequestDescriptor instead')
+const GetMatchHistoryRequest$json = {
+  '1': 'GetMatchHistoryRequest',
+  '2': [
+    {'1': 'limit', '3': 1, '4': 1, '5': 5, '10': 'limit'},
+    {'1': 'offset', '3': 2, '4': 1, '5': 5, '10': 'offset'},
+  ],
+};
+
+/// Descriptor for `GetMatchHistoryRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getMatchHistoryRequestDescriptor =
+    $convert.base64Decode(
+        'ChZHZXRNYXRjaEhpc3RvcnlSZXF1ZXN0EhQKBWxpbWl0GAEgASgFUgVsaW1pdBIWCgZvZmZzZX'
+        'QYAiABKAVSBm9mZnNldA==');
+
+@$core.Deprecated('Use getMatchHistoryResponseDescriptor instead')
+const GetMatchHistoryResponse$json = {
+  '1': 'GetMatchHistoryResponse',
+  '2': [
+    {
+      '1': 'matches',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.quiz.MatchHistoryEntry',
+      '10': 'matches'
+    },
+  ],
+};
+
+/// Descriptor for `GetMatchHistoryResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getMatchHistoryResponseDescriptor =
+    $convert.base64Decode(
+        'ChdHZXRNYXRjaEhpc3RvcnlSZXNwb25zZRIxCgdtYXRjaGVzGAEgAygLMhcucXVpei5NYXRjaE'
+        'hpc3RvcnlFbnRyeVIHbWF0Y2hlcw==');
+
+@$core.Deprecated('Use matchHistoryEntryDescriptor instead')
+const MatchHistoryEntry$json = {
+  '1': 'MatchHistoryEntry',
+  '2': [
+    {'1': 'room_id', '3': 1, '4': 1, '5': 9, '10': 'roomId'},
+    {'1': 'winner', '3': 2, '4': 1, '5': 9, '10': 'winner'},
+    {
+      '1': 'players',
+      '3': 3,
+      '4': 3,
+      '5': 11,
+      '6': '.quiz.PlayerResult',
+      '10': 'players'
+    },
+    {'1': 'rounds', '3': 4, '4': 1, '5': 5, '10': 'rounds'},
+    {'1': 'duration', '3': 5, '4': 1, '5': 3, '10': 'duration'},
+    {'1': 'created_at', '3': 6, '4': 1, '5': 3, '10': 'createdAt'},
+  ],
+};
+
+/// Descriptor for `MatchHistoryEntry`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List matchHistoryEntryDescriptor = $convert.base64Decode(
+    'ChFNYXRjaEhpc3RvcnlFbnRyeRIXCgdyb29tX2lkGAEgASgJUgZyb29tSWQSFgoGd2lubmVyGA'
+    'IgASgJUgZ3aW5uZXISLAoHcGxheWVycxgDIAMoCzISLnF1aXouUGxheWVyUmVzdWx0UgdwbGF5'
+    'ZXJzEhYKBnJvdW5kcxgEIAEoBVIGcm91bmRzEhoKCGR1cmF0aW9uGAUgASgDUghkdXJhdGlvbh'
+    'IdCgpjcmVhdGVkX2F0GAYgASgDUgljcmVhdGVkQXQ=');
