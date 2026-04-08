@@ -220,17 +220,36 @@ class GameStateNotifier extends Notifier<GameState> {
 
   // --- Answer submission ---
 
+  int? _submittedRound; // track which round we already submitted for
+
   void selectAnswer(int optionIndex) {
     if (state.selectedIndex != null) return;
+    toggleAnswer(optionIndex);
+  }
+
+  void toggleAnswer(int optionIndex) {
+    if (state.correctIndex != null) return; // round resolved, no changes
+
+    if (state.selectedIndex == optionIndex) {
+      // Deselect
+      state = state.copyWith(clearSelectedIndex: true);
+      return;
+    }
+
+    // Select new option
     state = state.copyWith(selectedIndex: optionIndex);
 
-    _service.submitAnswer(
-      roomId: state.roomId!,
-      userId: state.userId!,
-      round: state.round,
-      optionIndex: optionIndex,
-      clientTimestamp: DateTime.now().millisecondsSinceEpoch,
-    );
+    // Submit only once per round
+    if (_submittedRound != state.round) {
+      _submittedRound = state.round;
+      _service.submitAnswer(
+        roomId: state.roomId!,
+        userId: state.userId!,
+        round: state.round,
+        optionIndex: optionIndex,
+        clientTimestamp: DateTime.now().millisecondsSinceEpoch,
+      );
+    }
   }
 
   // --- Reconnection (section 6.3) ---

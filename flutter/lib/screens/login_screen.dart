@@ -18,17 +18,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
 
-  // Login tab controllers
   final _loginIdentityController = TextEditingController();
   final _loginPasswordController = TextEditingController();
   bool _showLoginPassword = false;
 
-  // Register tab controllers
   final _regUsernameController = TextEditingController();
   final _regPasswordController = TextEditingController();
   final _regEmailController = TextEditingController();
 
-  // Username availability check state
   bool? _usernameAvailable;
   bool _checkingUsername = false;
   Timer? _usernameDebounce;
@@ -39,7 +36,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-
     _loginIdentityController.addListener(_onLoginIdentityChanged);
     _regUsernameController.addListener(_onRegUsernameChanged);
   }
@@ -68,33 +64,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   void _onRegUsernameChanged() {
     final username = _regUsernameController.text.trim();
     _usernameDebounce?.cancel();
-
     if (username.length < 3) {
-      setState(() {
-        _usernameAvailable = null;
-        _checkingUsername = false;
-      });
+      setState(() { _usernameAvailable = null; _checkingUsername = false; });
       return;
     }
-
     setState(() => _checkingUsername = true);
-
     _usernameDebounce = Timer(const Duration(milliseconds: 500), () async {
       try {
         final available = await AuthService().checkUsername(username);
         if (mounted && _regUsernameController.text.trim() == username) {
-          setState(() {
-            _usernameAvailable = available;
-            _checkingUsername = false;
-          });
+          setState(() { _usernameAvailable = available; _checkingUsername = false; });
         }
       } catch (_) {
-        if (mounted) {
-          setState(() {
-            _usernameAvailable = null;
-            _checkingUsername = false;
-          });
-        }
+        if (mounted) setState(() { _usernameAvailable = null; _checkingUsername = false; });
       }
     });
   }
@@ -102,26 +84,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   void _showError(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.redAccent,
-        behavior: SnackBarBehavior.floating,
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.redAccent, behavior: SnackBarBehavior.floating),
     );
   }
 
   void _navigateToMatchmaking(AuthService auth) {
     QuizService().setAuthToken(auth.token!);
     ref.read(gameStateProvider.notifier).setAuth(
-          auth.userId!,
-          auth.token!,
-          auth.rating,
-          email: auth.email,
-          isGuest: auth.isGuest,
-        );
+      auth.userId!, auth.token!, auth.rating,
+      email: auth.email, isGuest: auth.isGuest,
+    );
   }
-
-  // --- Guest Login ---
 
   Future<void> _guestLogin() async {
     setState(() => _isLoading = true);
@@ -138,19 +111,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     }
   }
 
-  // --- Login Tab ---
-
   Future<void> _submitLogin() async {
     final identity = _loginIdentityController.text.trim();
-    if (identity.isEmpty) {
-      _showError('Enter a username or email');
-      return;
-    }
-
+    if (identity.isEmpty) { _showError('Enter a username or email'); return; }
     final isEmail = identity.contains('@');
 
     if (isEmail) {
-      // Email login: send code, then navigate to code screen
       setState(() => _isLoading = true);
       try {
         final auth = AuthService();
@@ -166,13 +132,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         if (mounted) setState(() => _isLoading = false);
       }
     } else {
-      // Username login: require password
       final password = _loginPasswordController.text;
-      if (password.isEmpty) {
-        _showError('Password required');
-        return;
-      }
-
+      if (password.isEmpty) { _showError('Password required'); return; }
       setState(() => _isLoading = true);
       try {
         final auth = AuthService();
@@ -188,23 +149,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     }
   }
 
-  // --- Register Tab ---
-
   Future<void> _submitRegister() async {
     final username = _regUsernameController.text.trim();
     final password = _regPasswordController.text;
     final email = _regEmailController.text.trim();
-
-    if (username.isEmpty || password.isEmpty) {
-      _showError('Username and password required');
-      return;
-    }
-
-    if (username.length < 3) {
-      _showError('Username must be at least 3 characters');
-      return;
-    }
-
+    if (username.isEmpty || password.isEmpty) { _showError('Username and password required'); return; }
+    if (username.length < 3) { _showError('Username must be at least 3 characters'); return; }
     setState(() => _isLoading = true);
     try {
       final auth = AuthService();
@@ -219,15 +169,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     }
   }
 
-  // --- Forgot Password ---
-
   Future<void> _forgotPassword() async {
     final email = _loginIdentityController.text.trim();
-    if (email.isEmpty || !email.contains('@')) {
-      _showError('Enter your email address above first');
-      return;
-    }
-
+    if (email.isEmpty || !email.contains('@')) { _showError('Enter your email address above first'); return; }
     setState(() => _isLoading = true);
     try {
       await AuthService().sendEmailCode(email, 'reset');
@@ -243,8 +187,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     }
   }
 
-  // --- Email Code Navigation ---
-
   void _openEmailCodeScreen(String email, String purpose) {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -256,37 +198,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               final auth = AuthService();
               QuizService().setAuthToken(auth.token!);
               ref.read(gameStateProvider.notifier).setAuth(
-                    auth.userId!,
-                    auth.token!,
-                    auth.rating,
-                    email: auth.email,
-                    isGuest: auth.isGuest,
-                  );
+                auth.userId!, auth.token!, auth.rating,
+                email: auth.email, isGuest: auth.isGuest,
+              );
             }
-            if (mounted) {
-              Navigator.of(context).popUntil((route) => route.isFirst);
-            }
+            if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
           },
         ),
       ),
     );
   }
 
-  // --- Build Helpers ---
-
   InputDecoration _inputDecoration(String label, IconData icon, {Widget? suffix}) {
     return InputDecoration(
       labelText: label,
-      labelStyle: const TextStyle(color: Colors.white54),
-      prefixIcon: Icon(icon, color: Colors.white54),
+      labelStyle: const TextStyle(color: Colors.white60),
+      prefixIcon: Icon(icon, color: Colors.white60),
       suffixIcon: suffix,
+      filled: true,
+      fillColor: Colors.white.withAlpha(15),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.white24),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: Colors.white.withAlpha(30)),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.amber),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFFFF6B35), width: 2),
       ),
     );
   }
@@ -294,7 +231,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   Widget _buildLoginTab() {
     final identity = _loginIdentityController.text.trim();
     final isEmail = identity.contains('@');
-
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -319,37 +255,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           alignment: Alignment.centerRight,
           child: TextButton(
             onPressed: _isLoading ? null : _forgotPassword,
-            child: const Text(
-              'Forgot password?',
-              style: TextStyle(color: Colors.white38, fontSize: 13),
-            ),
+            child: const Text('Forgot password?', style: TextStyle(color: Colors.white38, fontSize: 13)),
           ),
         ),
         const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: ElevatedButton(
-            onPressed: _isLoading ? null : _submitLogin,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.amber,
-              foregroundColor: Colors.black,
-              disabledBackgroundColor: Colors.amber.withAlpha(100),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: _isLoading
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(
-                    isEmail ? 'Send Login Code' : 'Login',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-          ),
+        _buildActionButton(
+          onPressed: _isLoading ? null : _submitLogin,
+          label: isEmail ? 'Send Login Code' : 'Login',
         ),
       ],
     );
@@ -360,14 +272,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     if (_checkingUsername) {
       usernameSuffix = const Padding(
         padding: EdgeInsets.all(12),
-        child: SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54),
-        ),
+        child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54)),
       );
     } else if (_usernameAvailable == true) {
-      usernameSuffix = const Icon(Icons.check_circle, color: Colors.green);
+      usernameSuffix = const Icon(Icons.check_circle, color: Colors.greenAccent);
     } else if (_usernameAvailable == false) {
       usernameSuffix = const Icon(Icons.cancel, color: Colors.redAccent);
     }
@@ -395,134 +303,141 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           keyboardType: TextInputType.emailAddress,
         ),
         const SizedBox(height: 20),
-        SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: ElevatedButton(
-            onPressed: _isLoading ? null : _submitRegister,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.amber,
-              foregroundColor: Colors.black,
-              disabledBackgroundColor: Colors.amber.withAlpha(100),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: _isLoading
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text(
-                    'Register',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-          ),
+        _buildActionButton(
+          onPressed: _isLoading ? null : _submitRegister,
+          label: 'Register',
         ),
       ],
+    );
+  }
+
+  Widget _buildActionButton({VoidCallback? onPressed, required String label}) {
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(colors: [Color(0xFFFF6B35), Color(0xFFFF8F5E)]),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [BoxShadow(color: const Color(0xFFFF6B35).withAlpha(80), blurRadius: 12, offset: const Offset(0, 4))],
+        ),
+        child: ElevatedButton(
+          onPressed: onPressed,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            shadowColor: Colors.transparent,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          ),
+          child: _isLoading
+              ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        ),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1A1A2E),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.quiz, size: 64, color: Colors.amber),
-                const SizedBox(height: 16),
-                const Text(
-                  'Quiz Battle',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 32),
-
-                // Guest login button
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: OutlinedButton.icon(
-                    onPressed: _isLoading ? null : _guestLogin,
-                    icon: const Icon(Icons.play_arrow),
-                    label: const Text(
-                      'Play as Guest',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF1A1145), Color(0xFF0F0E2E)],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Logo
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(colors: [Color(0xFFFF6B35), Color(0xFFFF8F5E)]),
+                      boxShadow: [BoxShadow(color: const Color(0xFFFF6B35).withAlpha(100), blurRadius: 30)],
                     ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.amber,
-                      side: const BorderSide(color: Colors.amber),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                    child: const Icon(Icons.bolt, size: 48, color: Colors.white),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'QUIZ BATTLE',
+                    style: TextStyle(fontSize: 34, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 2),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Challenge your mind',
+                    style: TextStyle(fontSize: 14, color: Colors.white.withAlpha(120), letterSpacing: 1),
+                  ),
+                  const SizedBox(height: 36),
+
+                  // Guest login
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: OutlinedButton.icon(
+                      onPressed: _isLoading ? null : _guestLogin,
+                      icon: const Icon(Icons.flash_on),
+                      label: const Text('Quick Play', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF00E5FF),
+                        side: const BorderSide(color: Color(0xFF00E5FF), width: 2),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
                     ),
                   ),
-                ),
 
-                const SizedBox(height: 24),
-
-                // Divider
-                Row(
-                  children: [
-                    Expanded(child: Divider(color: Colors.white24)),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16),
-                      child: Text('or', style: TextStyle(color: Colors.white38)),
-                    ),
-                    Expanded(child: Divider(color: Colors.white24)),
-                  ],
-                ),
-
-                const SizedBox(height: 16),
-
-                // Tab bar
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white.withAlpha(13),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: TabBar(
-                    controller: _tabController,
-                    indicatorSize: TabBarIndicatorSize.tab,
-                    indicator: BoxDecoration(
-                      color: Colors.amber.withAlpha(51),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    labelColor: Colors.amber,
-                    unselectedLabelColor: Colors.white54,
-                    dividerColor: Colors.transparent,
-                    tabs: const [
-                      Tab(text: 'Login'),
-                      Tab(text: 'Register'),
+                  const SizedBox(height: 28),
+                  Row(
+                    children: [
+                      Expanded(child: Divider(color: Colors.white.withAlpha(40))),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text('or sign in', style: TextStyle(color: Colors.white.withAlpha(80))),
+                      ),
+                      Expanded(child: Divider(color: Colors.white.withAlpha(40))),
                     ],
                   ),
-                ),
+                  const SizedBox(height: 20),
 
-                const SizedBox(height: 24),
+                  // Tab bar
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withAlpha(10),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: TabBar(
+                      controller: _tabController,
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      indicator: BoxDecoration(
+                        gradient: LinearGradient(colors: [const Color(0xFFFF6B35).withAlpha(80), const Color(0xFFFF6B35).withAlpha(40)]),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      labelColor: const Color(0xFFFF8F5E),
+                      unselectedLabelColor: Colors.white54,
+                      dividerColor: Colors.transparent,
+                      tabs: const [Tab(text: 'Login'), Tab(text: 'Register')],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
 
-                // Tab content
-                ListenableBuilder(
-                  listenable: _tabController,
-                  builder: (context, _) {
-                    return IndexedStack(
-                      index: _tabController.index,
-                      children: [
-                        _buildLoginTab(),
-                        _buildRegisterTab(),
-                      ],
-                    );
-                  },
-                ),
-              ],
+                  ListenableBuilder(
+                    listenable: _tabController,
+                    builder: (context, _) {
+                      return IndexedStack(
+                        index: _tabController.index,
+                        children: [_buildLoginTab(), _buildRegisterTab()],
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
         ),

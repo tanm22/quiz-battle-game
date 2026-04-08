@@ -24,9 +24,11 @@ class QuizBattleApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.amber,
+          seedColor: const Color(0xFFFF6B35),
           brightness: Brightness.dark,
         ),
+        scaffoldBackgroundColor: const Color(0xFF0F0E2E),
+        fontFamily: 'Roboto',
       ),
       home: const AppShell(),
     );
@@ -71,8 +73,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   Widget build(BuildContext context) {
     if (!_checkedAuth) {
       return const Scaffold(
-        backgroundColor: Color(0xFF1A1A2E),
-        body: Center(child: CircularProgressIndicator(color: Colors.amber)),
+        body: Center(child: CircularProgressIndicator(color: Color(0xFFFF6B35))),
       );
     }
 
@@ -105,7 +106,11 @@ class _AppShellState extends ConsumerState<AppShell> {
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                color: Colors.orange.shade900,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFFFF4444), Color(0xFFFF6B35)],
+                  ),
+                ),
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -120,7 +125,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                     SizedBox(width: 8),
                     Text(
                       'Reconnecting...',
-                      style: TextStyle(color: Colors.white, fontSize: 14),
+                      style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
                     ),
                   ],
                 ),
