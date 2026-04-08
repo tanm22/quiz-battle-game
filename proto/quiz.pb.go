@@ -2273,6 +2273,86 @@ func (x *CheckUsernameResponse) GetAvailable() bool {
 	return false
 }
 
+type DeleteAccountRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteAccountRequest) Reset() {
+	*x = DeleteAccountRequest{}
+	mi := &file_proto_quiz_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteAccountRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteAccountRequest) ProtoMessage() {}
+
+func (x *DeleteAccountRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteAccountRequest.ProtoReflect.Descriptor instead.
+func (*DeleteAccountRequest) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{38}
+}
+
+type DeleteAccountResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Deleted       bool                   `protobuf:"varint,1,opt,name=deleted,proto3" json:"deleted,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteAccountResponse) Reset() {
+	*x = DeleteAccountResponse{}
+	mi := &file_proto_quiz_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteAccountResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteAccountResponse) ProtoMessage() {}
+
+func (x *DeleteAccountResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteAccountResponse.ProtoReflect.Descriptor instead.
+func (*DeleteAccountResponse) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *DeleteAccountResponse) GetDeleted() bool {
+	if x != nil {
+		return x.Deleted
+	}
+	return false
+}
+
 type CalculateScoreRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RoomId        string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
@@ -2286,7 +2366,7 @@ type CalculateScoreRequest struct {
 
 func (x *CalculateScoreRequest) Reset() {
 	*x = CalculateScoreRequest{}
-	mi := &file_proto_quiz_proto_msgTypes[38]
+	mi := &file_proto_quiz_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2298,7 +2378,7 @@ func (x *CalculateScoreRequest) String() string {
 func (*CalculateScoreRequest) ProtoMessage() {}
 
 func (x *CalculateScoreRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[38]
+	mi := &file_proto_quiz_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2311,7 +2391,7 @@ func (x *CalculateScoreRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CalculateScoreRequest.ProtoReflect.Descriptor instead.
 func (*CalculateScoreRequest) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{38}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *CalculateScoreRequest) GetRoomId() string {
@@ -2360,7 +2440,7 @@ type CalculateScoreResponse struct {
 
 func (x *CalculateScoreResponse) Reset() {
 	*x = CalculateScoreResponse{}
-	mi := &file_proto_quiz_proto_msgTypes[39]
+	mi := &file_proto_quiz_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2372,7 +2452,7 @@ func (x *CalculateScoreResponse) String() string {
 func (*CalculateScoreResponse) ProtoMessage() {}
 
 func (x *CalculateScoreResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[39]
+	mi := &file_proto_quiz_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2385,7 +2465,7 @@ func (x *CalculateScoreResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CalculateScoreResponse.ProtoReflect.Descriptor instead.
 func (*CalculateScoreResponse) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{39}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *CalculateScoreResponse) GetScore() float64 {
@@ -2418,7 +2498,7 @@ type GetLeaderboardRequest struct {
 
 func (x *GetLeaderboardRequest) Reset() {
 	*x = GetLeaderboardRequest{}
-	mi := &file_proto_quiz_proto_msgTypes[40]
+	mi := &file_proto_quiz_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2430,7 +2510,7 @@ func (x *GetLeaderboardRequest) String() string {
 func (*GetLeaderboardRequest) ProtoMessage() {}
 
 func (x *GetLeaderboardRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[40]
+	mi := &file_proto_quiz_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2443,7 +2523,7 @@ func (x *GetLeaderboardRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetLeaderboardRequest.ProtoReflect.Descriptor instead.
 func (*GetLeaderboardRequest) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{40}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *GetLeaderboardRequest) GetRoomId() string {
@@ -2462,7 +2542,7 @@ type GetLeaderboardResponse struct {
 
 func (x *GetLeaderboardResponse) Reset() {
 	*x = GetLeaderboardResponse{}
-	mi := &file_proto_quiz_proto_msgTypes[41]
+	mi := &file_proto_quiz_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2474,7 +2554,7 @@ func (x *GetLeaderboardResponse) String() string {
 func (*GetLeaderboardResponse) ProtoMessage() {}
 
 func (x *GetLeaderboardResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[41]
+	mi := &file_proto_quiz_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2487,7 +2567,7 @@ func (x *GetLeaderboardResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetLeaderboardResponse.ProtoReflect.Descriptor instead.
 func (*GetLeaderboardResponse) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{41}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *GetLeaderboardResponse) GetEntries() []*LeaderboardEntry {
@@ -2643,7 +2723,10 @@ const file_proto_quiz_proto_rawDesc = "" +
 	"\x14CheckUsernameRequest\x12\x1a\n" +
 	"\busername\x18\x01 \x01(\tR\busername\"5\n" +
 	"\x15CheckUsernameResponse\x12\x1c\n" +
-	"\tavailable\x18\x01 \x01(\bR\tavailable\"\xa8\x01\n" +
+	"\tavailable\x18\x01 \x01(\bR\tavailable\"\x16\n" +
+	"\x14DeleteAccountRequest\"1\n" +
+	"\x15DeleteAccountResponse\x12\x18\n" +
+	"\adeleted\x18\x01 \x01(\bR\adeleted\"\xa8\x01\n" +
 	"\x15CalculateScoreRequest\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x14\n" +
@@ -2672,7 +2755,7 @@ const file_proto_quiz_proto_rawDesc = "" +
 	"\x10StreamGameEvents\x12\x1d.quiz.StreamGameEventsRequest\x1a\x0f.quiz.GameEvent0\x012\xaa\x01\n" +
 	"\x0eScoringService\x12K\n" +
 	"\x0eCalculateScore\x12\x1b.quiz.CalculateScoreRequest\x1a\x1c.quiz.CalculateScoreResponse\x12K\n" +
-	"\x0eGetLeaderboard\x12\x1b.quiz.GetLeaderboardRequest\x1a\x1c.quiz.GetLeaderboardResponse2\xa2\x05\n" +
+	"\x0eGetLeaderboard\x12\x1b.quiz.GetLeaderboardRequest\x1a\x1c.quiz.GetLeaderboardResponse2\xec\x05\n" +
 	"\vAuthService\x125\n" +
 	"\bRegister\x12\x15.quiz.RegisterRequest\x1a\x12.quiz.AuthResponse\x12/\n" +
 	"\x05Login\x12\x12.quiz.LoginRequest\x1a\x12.quiz.AuthResponse\x12<\n" +
@@ -2685,7 +2768,8 @@ const file_proto_quiz_proto_rawDesc = "" +
 	"\x0fVerifyEmailCode\x12\x1c.quiz.VerifyEmailCodeRequest\x1a\x1d.quiz.VerifyEmailCodeResponse\x12<\n" +
 	"\tLinkEmail\x12\x16.quiz.LinkEmailRequest\x1a\x17.quiz.LinkEmailResponse\x12H\n" +
 	"\rResetPassword\x12\x1a.quiz.ResetPasswordRequest\x1a\x1b.quiz.ResetPasswordResponse\x12H\n" +
-	"\rCheckUsername\x12\x1a.quiz.CheckUsernameRequest\x1a\x1b.quiz.CheckUsernameResponseB\x13Z\x11quiz-battle/protob\x06proto3"
+	"\rCheckUsername\x12\x1a.quiz.CheckUsernameRequest\x1a\x1b.quiz.CheckUsernameResponse\x12H\n" +
+	"\rDeleteAccount\x12\x1a.quiz.DeleteAccountRequest\x1a\x1b.quiz.DeleteAccountResponseB\x13Z\x11quiz-battle/protob\x06proto3"
 
 var (
 	file_proto_quiz_proto_rawDescOnce sync.Once
@@ -2700,7 +2784,7 @@ func file_proto_quiz_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_quiz_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_proto_quiz_proto_msgTypes = make([]protoimpl.MessageInfo, 42)
+var file_proto_quiz_proto_msgTypes = make([]protoimpl.MessageInfo, 44)
 var file_proto_quiz_proto_goTypes = []any{
 	(MatchmakingStatus)(0),           // 0: quiz.MatchmakingStatus
 	(*JoinMatchmakingRequest)(nil),   // 1: quiz.JoinMatchmakingRequest
@@ -2741,10 +2825,12 @@ var file_proto_quiz_proto_goTypes = []any{
 	(*ResetPasswordResponse)(nil),    // 36: quiz.ResetPasswordResponse
 	(*CheckUsernameRequest)(nil),     // 37: quiz.CheckUsernameRequest
 	(*CheckUsernameResponse)(nil),    // 38: quiz.CheckUsernameResponse
-	(*CalculateScoreRequest)(nil),    // 39: quiz.CalculateScoreRequest
-	(*CalculateScoreResponse)(nil),   // 40: quiz.CalculateScoreResponse
-	(*GetLeaderboardRequest)(nil),    // 41: quiz.GetLeaderboardRequest
-	(*GetLeaderboardResponse)(nil),   // 42: quiz.GetLeaderboardResponse
+	(*DeleteAccountRequest)(nil),     // 39: quiz.DeleteAccountRequest
+	(*DeleteAccountResponse)(nil),    // 40: quiz.DeleteAccountResponse
+	(*CalculateScoreRequest)(nil),    // 41: quiz.CalculateScoreRequest
+	(*CalculateScoreResponse)(nil),   // 42: quiz.CalculateScoreResponse
+	(*GetLeaderboardRequest)(nil),    // 43: quiz.GetLeaderboardRequest
+	(*GetLeaderboardResponse)(nil),   // 44: quiz.GetLeaderboardResponse
 }
 var file_proto_quiz_proto_depIdxs = []int32{
 	0,  // 0: quiz.JoinMatchmakingResponse.status:type_name -> quiz.MatchmakingStatus
@@ -2764,8 +2850,8 @@ var file_proto_quiz_proto_depIdxs = []int32{
 	7,  // 14: quiz.QuizService.GetRoomQuestions:input_type -> quiz.GetRoomQuestionsRequest
 	10, // 15: quiz.QuizService.SubmitAnswer:input_type -> quiz.SubmitAnswerRequest
 	12, // 16: quiz.QuizService.StreamGameEvents:input_type -> quiz.StreamGameEventsRequest
-	39, // 17: quiz.ScoringService.CalculateScore:input_type -> quiz.CalculateScoreRequest
-	41, // 18: quiz.ScoringService.GetLeaderboard:input_type -> quiz.GetLeaderboardRequest
+	41, // 17: quiz.ScoringService.CalculateScore:input_type -> quiz.CalculateScoreRequest
+	43, // 18: quiz.ScoringService.GetLeaderboard:input_type -> quiz.GetLeaderboardRequest
 	22, // 19: quiz.AuthService.Register:input_type -> quiz.RegisterRequest
 	23, // 20: quiz.AuthService.Login:input_type -> quiz.LoginRequest
 	25, // 21: quiz.AuthService.GetProfile:input_type -> quiz.GetProfileRequest
@@ -2776,26 +2862,28 @@ var file_proto_quiz_proto_depIdxs = []int32{
 	33, // 26: quiz.AuthService.LinkEmail:input_type -> quiz.LinkEmailRequest
 	35, // 27: quiz.AuthService.ResetPassword:input_type -> quiz.ResetPasswordRequest
 	37, // 28: quiz.AuthService.CheckUsername:input_type -> quiz.CheckUsernameRequest
-	2,  // 29: quiz.MatchmakingService.JoinMatchmaking:output_type -> quiz.JoinMatchmakingResponse
-	4,  // 30: quiz.MatchmakingService.LeaveMatchmaking:output_type -> quiz.LeaveMatchmakingResponse
-	6,  // 31: quiz.MatchmakingService.SubscribeToMatch:output_type -> quiz.MatchEvent
-	8,  // 32: quiz.QuizService.GetRoomQuestions:output_type -> quiz.GetRoomQuestionsResponse
-	11, // 33: quiz.QuizService.SubmitAnswer:output_type -> quiz.SubmitAnswerResponse
-	13, // 34: quiz.QuizService.StreamGameEvents:output_type -> quiz.GameEvent
-	40, // 35: quiz.ScoringService.CalculateScore:output_type -> quiz.CalculateScoreResponse
-	42, // 36: quiz.ScoringService.GetLeaderboard:output_type -> quiz.GetLeaderboardResponse
-	24, // 37: quiz.AuthService.Register:output_type -> quiz.AuthResponse
-	24, // 38: quiz.AuthService.Login:output_type -> quiz.AuthResponse
-	26, // 39: quiz.AuthService.GetProfile:output_type -> quiz.ProfileResponse
-	24, // 40: quiz.AuthService.GuestLogin:output_type -> quiz.AuthResponse
-	30, // 41: quiz.AuthService.LoginWithEmail:output_type -> quiz.SendEmailCodeResponse
-	30, // 42: quiz.AuthService.SendEmailCode:output_type -> quiz.SendEmailCodeResponse
-	32, // 43: quiz.AuthService.VerifyEmailCode:output_type -> quiz.VerifyEmailCodeResponse
-	34, // 44: quiz.AuthService.LinkEmail:output_type -> quiz.LinkEmailResponse
-	36, // 45: quiz.AuthService.ResetPassword:output_type -> quiz.ResetPasswordResponse
-	38, // 46: quiz.AuthService.CheckUsername:output_type -> quiz.CheckUsernameResponse
-	29, // [29:47] is the sub-list for method output_type
-	11, // [11:29] is the sub-list for method input_type
+	39, // 29: quiz.AuthService.DeleteAccount:input_type -> quiz.DeleteAccountRequest
+	2,  // 30: quiz.MatchmakingService.JoinMatchmaking:output_type -> quiz.JoinMatchmakingResponse
+	4,  // 31: quiz.MatchmakingService.LeaveMatchmaking:output_type -> quiz.LeaveMatchmakingResponse
+	6,  // 32: quiz.MatchmakingService.SubscribeToMatch:output_type -> quiz.MatchEvent
+	8,  // 33: quiz.QuizService.GetRoomQuestions:output_type -> quiz.GetRoomQuestionsResponse
+	11, // 34: quiz.QuizService.SubmitAnswer:output_type -> quiz.SubmitAnswerResponse
+	13, // 35: quiz.QuizService.StreamGameEvents:output_type -> quiz.GameEvent
+	42, // 36: quiz.ScoringService.CalculateScore:output_type -> quiz.CalculateScoreResponse
+	44, // 37: quiz.ScoringService.GetLeaderboard:output_type -> quiz.GetLeaderboardResponse
+	24, // 38: quiz.AuthService.Register:output_type -> quiz.AuthResponse
+	24, // 39: quiz.AuthService.Login:output_type -> quiz.AuthResponse
+	26, // 40: quiz.AuthService.GetProfile:output_type -> quiz.ProfileResponse
+	24, // 41: quiz.AuthService.GuestLogin:output_type -> quiz.AuthResponse
+	30, // 42: quiz.AuthService.LoginWithEmail:output_type -> quiz.SendEmailCodeResponse
+	30, // 43: quiz.AuthService.SendEmailCode:output_type -> quiz.SendEmailCodeResponse
+	32, // 44: quiz.AuthService.VerifyEmailCode:output_type -> quiz.VerifyEmailCodeResponse
+	34, // 45: quiz.AuthService.LinkEmail:output_type -> quiz.LinkEmailResponse
+	36, // 46: quiz.AuthService.ResetPassword:output_type -> quiz.ResetPasswordResponse
+	38, // 47: quiz.AuthService.CheckUsername:output_type -> quiz.CheckUsernameResponse
+	40, // 48: quiz.AuthService.DeleteAccount:output_type -> quiz.DeleteAccountResponse
+	30, // [30:49] is the sub-list for method output_type
+	11, // [11:30] is the sub-list for method input_type
 	11, // [11:11] is the sub-list for extension type_name
 	11, // [11:11] is the sub-list for extension extendee
 	0,  // [0:11] is the sub-list for field type_name
@@ -2820,7 +2908,7 @@ func file_proto_quiz_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_quiz_proto_rawDesc), len(file_proto_quiz_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   42,
+			NumMessages:   44,
 			NumExtensions: 0,
 			NumServices:   4,
 		},

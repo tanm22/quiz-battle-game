@@ -2802,6 +2802,99 @@ class CheckUsernameResponse extends $pb.GeneratedMessage {
   void clearAvailable() => $_clearField(1);
 }
 
+class DeleteAccountRequest extends $pb.GeneratedMessage {
+  factory DeleteAccountRequest() => create();
+
+  DeleteAccountRequest._();
+
+  factory DeleteAccountRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory DeleteAccountRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DeleteAccountRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteAccountRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteAccountRequest copyWith(void Function(DeleteAccountRequest) updates) =>
+      super.copyWith((message) => updates(message as DeleteAccountRequest))
+          as DeleteAccountRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static DeleteAccountRequest create() => DeleteAccountRequest._();
+  @$core.override
+  DeleteAccountRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static DeleteAccountRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DeleteAccountRequest>(create);
+  static DeleteAccountRequest? _defaultInstance;
+}
+
+class DeleteAccountResponse extends $pb.GeneratedMessage {
+  factory DeleteAccountResponse({
+    $core.bool? deleted,
+  }) {
+    final result = create();
+    if (deleted != null) result.deleted = deleted;
+    return result;
+  }
+
+  DeleteAccountResponse._();
+
+  factory DeleteAccountResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory DeleteAccountResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DeleteAccountResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'deleted')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteAccountResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteAccountResponse copyWith(
+          void Function(DeleteAccountResponse) updates) =>
+      super.copyWith((message) => updates(message as DeleteAccountResponse))
+          as DeleteAccountResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static DeleteAccountResponse create() => DeleteAccountResponse._();
+  @$core.override
+  DeleteAccountResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static DeleteAccountResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DeleteAccountResponse>(create);
+  static DeleteAccountResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get deleted => $_getBF(0);
+  @$pb.TagNumber(1)
+  set deleted($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasDeleted() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearDeleted() => $_clearField(1);
+}
+
 class CalculateScoreRequest extends $pb.GeneratedMessage {
   factory CalculateScoreRequest({
     $core.String? roomId,

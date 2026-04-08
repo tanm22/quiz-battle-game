@@ -376,6 +376,28 @@ func (s *authServer) CheckUsername(ctx context.Context, req *pb.CheckUsernameReq
 }
 
 // ---------------------------------------------------------------------------
+// DeleteAccount — permanently delete user account
+// ---------------------------------------------------------------------------
+
+func (s *authServer) DeleteAccount(ctx context.Context, _ *pb.DeleteAccountRequest) (*pb.DeleteAccountResponse, error) {
+	userID, err := auth.UserIDFromContext(ctx)
+	if err != nil {
+		return nil, status.Error(codes.Unauthenticated, "not authenticated")
+	}
+
+	result, err := s.users().DeleteOne(ctx, bson.M{"_id": userID})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "delete error: %v", err)
+	}
+	if result.DeletedCount == 0 {
+		return nil, status.Error(codes.NotFound, "user not found")
+	}
+
+	log.Printf("[auth] deleted account %s", userID)
+	return &pb.DeleteAccountResponse{Deleted: true}, nil
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 

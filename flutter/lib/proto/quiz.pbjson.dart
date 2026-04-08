@@ -681,6 +681,28 @@ const CheckUsernameResponse$json = {
 final $typed_data.Uint8List checkUsernameResponseDescriptor = $convert.base64Decode(
     'ChVDaGVja1VzZXJuYW1lUmVzcG9uc2USHAoJYXZhaWxhYmxlGAEgASgIUglhdmFpbGFibGU=');
 
+@$core.Deprecated('Use deleteAccountRequestDescriptor instead')
+const DeleteAccountRequest$json = {
+  '1': 'DeleteAccountRequest',
+};
+
+/// Descriptor for `DeleteAccountRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List deleteAccountRequestDescriptor =
+    $convert.base64Decode('ChREZWxldGVBY2NvdW50UmVxdWVzdA==');
+
+@$core.Deprecated('Use deleteAccountResponseDescriptor instead')
+const DeleteAccountResponse$json = {
+  '1': 'DeleteAccountResponse',
+  '2': [
+    {'1': 'deleted', '3': 1, '4': 1, '5': 8, '10': 'deleted'},
+  ],
+};
+
+/// Descriptor for `DeleteAccountResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List deleteAccountResponseDescriptor =
+    $convert.base64Decode(
+        'ChVEZWxldGVBY2NvdW50UmVzcG9uc2USGAoHZGVsZXRlZBgBIAEoCFIHZGVsZXRlZA==');
+
 @$core.Deprecated('Use calculateScoreRequestDescriptor instead')
 const CalculateScoreRequest$json = {
   '1': 'CalculateScoreRequest',

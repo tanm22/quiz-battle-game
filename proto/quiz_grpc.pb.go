@@ -533,6 +533,7 @@ const (
 	AuthService_LinkEmail_FullMethodName       = "/quiz.AuthService/LinkEmail"
 	AuthService_ResetPassword_FullMethodName   = "/quiz.AuthService/ResetPassword"
 	AuthService_CheckUsername_FullMethodName   = "/quiz.AuthService/CheckUsername"
+	AuthService_DeleteAccount_FullMethodName   = "/quiz.AuthService/DeleteAccount"
 )
 
 // AuthServiceClient is the client API for AuthService service.
@@ -549,6 +550,7 @@ type AuthServiceClient interface {
 	LinkEmail(ctx context.Context, in *LinkEmailRequest, opts ...grpc.CallOption) (*LinkEmailResponse, error)
 	ResetPassword(ctx context.Context, in *ResetPasswordRequest, opts ...grpc.CallOption) (*ResetPasswordResponse, error)
 	CheckUsername(ctx context.Context, in *CheckUsernameRequest, opts ...grpc.CallOption) (*CheckUsernameResponse, error)
+	DeleteAccount(ctx context.Context, in *DeleteAccountRequest, opts ...grpc.CallOption) (*DeleteAccountResponse, error)
 }
 
 type authServiceClient struct {
@@ -659,6 +661,16 @@ func (c *authServiceClient) CheckUsername(ctx context.Context, in *CheckUsername
 	return out, nil
 }
 
+func (c *authServiceClient) DeleteAccount(ctx context.Context, in *DeleteAccountRequest, opts ...grpc.CallOption) (*DeleteAccountResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteAccountResponse)
+	err := c.cc.Invoke(ctx, AuthService_DeleteAccount_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServiceServer is the server API for AuthService service.
 // All implementations must embed UnimplementedAuthServiceServer
 // for forward compatibility.
@@ -673,6 +685,7 @@ type AuthServiceServer interface {
 	LinkEmail(context.Context, *LinkEmailRequest) (*LinkEmailResponse, error)
 	ResetPassword(context.Context, *ResetPasswordRequest) (*ResetPasswordResponse, error)
 	CheckUsername(context.Context, *CheckUsernameRequest) (*CheckUsernameResponse, error)
+	DeleteAccount(context.Context, *DeleteAccountRequest) (*DeleteAccountResponse, error)
 	mustEmbedUnimplementedAuthServiceServer()
 }
 
@@ -712,6 +725,9 @@ func (UnimplementedAuthServiceServer) ResetPassword(context.Context, *ResetPassw
 }
 func (UnimplementedAuthServiceServer) CheckUsername(context.Context, *CheckUsernameRequest) (*CheckUsernameResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CheckUsername not implemented")
+}
+func (UnimplementedAuthServiceServer) DeleteAccount(context.Context, *DeleteAccountRequest) (*DeleteAccountResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteAccount not implemented")
 }
 func (UnimplementedAuthServiceServer) mustEmbedUnimplementedAuthServiceServer() {}
 func (UnimplementedAuthServiceServer) testEmbeddedByValue()                     {}
@@ -914,6 +930,24 @@ func _AuthService_CheckUsername_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_DeleteAccount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteAccountRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).DeleteAccount(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_DeleteAccount_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).DeleteAccount(ctx, req.(*DeleteAccountRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuthService_ServiceDesc is the grpc.ServiceDesc for AuthService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -960,6 +994,10 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CheckUsername",
 			Handler:    _AuthService_CheckUsername_Handler,
+		},
+		{
+			MethodName: "DeleteAccount",
+			Handler:    _AuthService_DeleteAccount_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

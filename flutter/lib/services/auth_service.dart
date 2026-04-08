@@ -179,6 +179,35 @@ class AuthService {
     return resp.available;
   }
 
+  /// Refresh profile from server — call after match to get updated rating/stats.
+  Future<void> refreshProfile() async {
+    if (_token == null) return;
+    try {
+      final profile = await _client.getProfile(
+        GetProfileRequest(),
+        options: authOptions,
+      );
+      _rating = profile.rating;
+      _matchesPlayed = profile.matchesPlayed;
+      _wins = profile.wins;
+      if (profile.email.isNotEmpty) _email = profile.email;
+      _isGuest = profile.isGuest;
+      await _saveToPrefs();
+    } catch (_) {
+      // Silently fail — will use cached values
+    }
+  }
+
+  /// Delete account permanently.
+  Future<void> deleteAccount() async {
+    if (_token == null) return;
+    await _client.deleteAccount(
+      DeleteAccountRequest(),
+      options: authOptions,
+    );
+    await logout();
+  }
+
   bool get isLoggedIn => _token != null && _userId != null;
 
   CallOptions get authOptions =>

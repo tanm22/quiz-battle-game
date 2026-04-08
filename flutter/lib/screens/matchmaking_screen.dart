@@ -128,13 +128,63 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen>
                         ],
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.logout, color: Colors.white54),
-                      tooltip: 'Logout',
-                      onPressed: () async {
-                        await auth.logout();
-                        ref.read(gameStateProvider.notifier).logout();
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert, color: Colors.white54),
+                      color: const Color(0xFF2A2A4E),
+                      onSelected: (value) async {
+                        if (value == 'logout') {
+                          await auth.logout();
+                          ref.read(gameStateProvider.notifier).logout();
+                        } else if (value == 'delete') {
+                          final confirmed = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('Delete Account?'),
+                              content: const Text(
+                                'This will permanently delete your account and all progress. This cannot be undone.',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, false),
+                                  child: const Text('Cancel'),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirmed == true) {
+                            await auth.deleteAccount();
+                            if (context.mounted) {
+                              ref.read(gameStateProvider.notifier).logout();
+                            }
+                          }
+                        }
                       },
+                      itemBuilder: (_) => [
+                        const PopupMenuItem(
+                          value: 'logout',
+                          child: Row(
+                            children: [
+                              Icon(Icons.logout, color: Colors.white70, size: 20),
+                              SizedBox(width: 8),
+                              Text('Logout', style: TextStyle(color: Colors.white70)),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete_forever, color: Colors.redAccent, size: 20),
+                              SizedBox(width: 8),
+                              Text('Delete Account', style: TextStyle(color: Colors.redAccent)),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

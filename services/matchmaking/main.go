@@ -106,6 +106,10 @@ func (s *matchmakingServer) SubscribeToMatch(req *pb.SubscribeToMatchRequest, st
 	}
 
 	ch := make(chan *pb.MatchEvent, 10)
+	// Close any existing subscription for this user (e.g. stale reconnect)
+	if old, loaded := s.subscribers.LoadAndDelete(userID); loaded {
+		close(old.(chan *pb.MatchEvent))
+	}
 	s.subscribers.Store(userID, ch)
 	defer s.subscribers.Delete(userID)
 

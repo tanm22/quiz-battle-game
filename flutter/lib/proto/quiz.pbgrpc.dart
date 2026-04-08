@@ -414,6 +414,13 @@ class AuthServiceClient extends $grpc.Client {
     return $createUnaryCall(_$checkUsername, request, options: options);
   }
 
+  $grpc.ResponseFuture<$0.DeleteAccountResponse> deleteAccount(
+    $0.DeleteAccountRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$deleteAccount, request, options: options);
+  }
+
   // method descriptors
 
   static final _$register =
@@ -465,6 +472,11 @@ class AuthServiceClient extends $grpc.Client {
           '/quiz.AuthService/CheckUsername',
           ($0.CheckUsernameRequest value) => value.writeToBuffer(),
           $0.CheckUsernameResponse.fromBuffer);
+  static final _$deleteAccount =
+      $grpc.ClientMethod<$0.DeleteAccountRequest, $0.DeleteAccountResponse>(
+          '/quiz.AuthService/DeleteAccount',
+          ($0.DeleteAccountRequest value) => value.writeToBuffer(),
+          $0.DeleteAccountResponse.fromBuffer);
 }
 
 @$pb.GrpcServiceName('quiz.AuthService')
@@ -552,6 +564,15 @@ abstract class AuthServiceBase extends $grpc.Service {
             ($core.List<$core.int> value) =>
                 $0.CheckUsernameRequest.fromBuffer(value),
             ($0.CheckUsernameResponse value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.DeleteAccountRequest, $0.DeleteAccountResponse>(
+            'DeleteAccount',
+            deleteAccount_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.DeleteAccountRequest.fromBuffer(value),
+            ($0.DeleteAccountResponse value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.AuthResponse> register_Pre($grpc.ServiceCall $call,
@@ -638,4 +659,13 @@ abstract class AuthServiceBase extends $grpc.Service {
 
   $async.Future<$0.CheckUsernameResponse> checkUsername(
       $grpc.ServiceCall call, $0.CheckUsernameRequest request);
+
+  $async.Future<$0.DeleteAccountResponse> deleteAccount_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.DeleteAccountRequest> $request) async {
+    return deleteAccount($call, await $request);
+  }
+
+  $async.Future<$0.DeleteAccountResponse> deleteAccount(
+      $grpc.ServiceCall call, $0.DeleteAccountRequest request);
 }

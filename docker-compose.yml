@@ -36,10 +36,9 @@ services:
       timeout: 5s
       retries: 5
 
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+  matchmaking:
+    build: .
+    command: matchmaking
     ports:
       - "50051:50051"
     depends_on:
@@ -54,6 +53,61 @@ services:
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
       - MONGO_URI=mongodb://mongo:27017/quizbattle
       - JWT_SECRET=change-me-in-production
+
+  quiz:
+    build: .
+    command: quiz
+    ports:
+      - "50052:50052"
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    environment:
+      - REDIS_ADDR=redis:6379
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - MONGO_URI=mongodb://mongo:27017/quizbattle
+      - JWT_SECRET=change-me-in-production
+
+  scoring:
+    build: .
+    command: scoring
+    ports:
+      - "50053:50053"
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    environment:
+      - REDIS_ADDR=redis:6379
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - MONGO_URI=mongodb://mongo:27017/quizbattle
+      - JWT_SECRET=change-me-in-production
+
+  auth:
+    build: .
+    command: auth
+    ports:
+      - "50054:50054"
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    environment:
+      - REDIS_ADDR=redis:6379
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - MONGO_URI=mongodb://mongo:27017/quizbattle
+      - JWT_SECRET=change-me-in-production
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
 
 volumes:
   redis_data:

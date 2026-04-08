@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../proto/quiz.pb.dart';
+import '../services/auth_service.dart';
 import '../services/quiz_service.dart';
 
 // ---------------------------------------------------------------------------
@@ -273,14 +274,16 @@ class GameStateNotifier extends Notifier<GameState> {
     if (state.userId != null) {
       await _service.leaveMatchmaking(state.userId!);
     }
-    // Preserve auth state, reset game state
+    // Refresh profile to get updated rating/stats from server
+    final auth = AuthService();
+    await auth.refreshProfile();
     state = GameState(
       currentScreen: GameScreen.matchmaking,
       userId: state.userId,
       token: state.token,
-      rating: state.rating,
-      email: state.email,
-      isGuest: state.isGuest,
+      rating: auth.rating,
+      email: auth.email,
+      isGuest: auth.isGuest,
     );
   }
 
@@ -296,14 +299,16 @@ class GameStateNotifier extends Notifier<GameState> {
     if (state.userId != null) {
       await _service.leaveMatchmaking(state.userId!);
     }
-    // Preserve auth state, reset game state
+    // Refresh profile to get updated rating/stats from server
+    final auth = AuthService();
+    await auth.refreshProfile();
     state = GameState(
       currentScreen: GameScreen.matchmaking,
       userId: state.userId,
       token: state.token,
-      rating: state.rating,
-      email: state.email,
-      isGuest: state.isGuest,
+      rating: auth.rating,
+      email: auth.email,
+      isGuest: auth.isGuest,
     );
   }
 
