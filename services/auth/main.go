@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -39,6 +41,7 @@ type authServer struct {
 	pb.UnimplementedAuthServiceServer
 	mongoDB   *mongo.Database
 	rdb       *redis.Client
+	amqpCh    *amqp.Channel
 	jwtSecret string
 	mailer    *email.Sender
 }
@@ -669,6 +672,116 @@ func generateCode() string {
 }
 
 // ---------------------------------------------------------------------------
+// Phase 2: Cron goroutines for push notifications
+// ---------------------------------------------------------------------------
+
+// streakWarningCron publishes notif.streak.warning at 20:00 IST daily
+// for users who haven't logged in today but have an active streak.
+func (s *authServer) streakWarningCron(ctx context.Context) {
+	for {
+		ist, _ := time.LoadLocation("Asia/Kolkata")
+		now := time.Now().In(ist)
+		// Next 20:00 IST
+		target := time.Date(now.Year(), now.Month(), now.Day(), 20, 0, 0, 0, ist)
+		if now.After(target) {
+			target = target.Add(24 * time.Hour)
+		}
+		sleepDur := target.Sub(now)
+		log.Printf("[auth-cron] streak warning scheduled in %v", sleepDur.Round(time.Minute))
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(sleepDur):
+		}
+
+		today := time.Now().In(ist).Format("2006-01-02")
+		cursor, err := s.mongoDB.Collection("users").Find(ctx, bson.M{
+			"streak.current":         bson.M{"$gt": 0},
+			"streak.lastClaimedDate": bson.M{"$ne": today},
+		})
+		if err != nil {
+			log.Printf("[auth-cron] streak warning query error: %v", err)
+			continue
+		}
+
+		count := 0
+		for cursor.Next(ctx) {
+			var user bson.M
+			if err := cursor.Decode(&user); err != nil {
+				continue
+			}
+			userID, _ := user["_id"].(string)
+			streak, _ := user["streak"].(bson.M)
+			current, _ := streak["current"].(int32)
+
+			payload, _ := json.Marshal(map[string]interface{}{
+				"event":         "notif.streak.warning",
+				"userId":        userID,
+				"currentStreak": current,
+			})
+			s.amqpCh.PublishWithContext(ctx, "sx", "notif.streak.warning", false, false, amqp.Publishing{
+				ContentType: "application/json",
+				Body:        payload,
+			})
+			count++
+		}
+		cursor.Close(ctx)
+		log.Printf("[auth-cron] streak warning: notified %d users", count)
+	}
+}
+
+// dailyRewardNudgeCron publishes notif.daily.reward at 08:00 IST daily.
+func (s *authServer) dailyRewardNudgeCron(ctx context.Context) {
+	for {
+		ist, _ := time.LoadLocation("Asia/Kolkata")
+		now := time.Now().In(ist)
+		target := time.Date(now.Year(), now.Month(), now.Day(), 8, 0, 0, 0, ist)
+		if now.After(target) {
+			target = target.Add(24 * time.Hour)
+		}
+		sleepDur := target.Sub(now)
+		log.Printf("[auth-cron] daily reward nudge scheduled in %v", sleepDur.Round(time.Minute))
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(sleepDur):
+		}
+
+		today := time.Now().In(ist).Format("2006-01-02")
+		cursor, err := s.mongoDB.Collection("users").Find(ctx, bson.M{
+			"streak.lastClaimedDate": bson.M{"$ne": today},
+			"isGuest":               false,
+		})
+		if err != nil {
+			log.Printf("[auth-cron] daily nudge query error: %v", err)
+			continue
+		}
+
+		count := 0
+		for cursor.Next(ctx) {
+			var user bson.M
+			if err := cursor.Decode(&user); err != nil {
+				continue
+			}
+			userID, _ := user["_id"].(string)
+			payload, _ := json.Marshal(map[string]interface{}{
+				"event":  "notif.daily.reward",
+				"userId": userID,
+			})
+			s.amqpCh.PublishWithContext(ctx, "sx", "notif.daily.reward", false, false, amqp.Publishing{
+				ContentType: "application/json",
+				Body:        payload,
+			})
+			count++
+		}
+		cursor.Close(ctx)
+		log.Printf("[auth-cron] daily reward nudge: notified %d users", count)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -711,6 +824,25 @@ func main() {
 	}
 	log.Println("[auth] connected to Redis")
 
+	// RabbitMQ (Phase 2: for publishing notification events)
+	rabbitURL := os.Getenv("RABBITMQ_URL")
+	if rabbitURL == "" {
+		rabbitURL = "amqp://guest:guest@localhost:5672/"
+	}
+	amqpConn, err := amqp.Dial(rabbitURL)
+	if err != nil {
+		log.Fatalf("rabbitmq connect failed: %v", err)
+	}
+	defer amqpConn.Close()
+	amqpCh, err := amqpConn.Channel()
+	if err != nil {
+		log.Fatalf("rabbitmq channel failed: %v", err)
+	}
+	defer amqpCh.Close()
+	// Ensure exchange exists
+	amqpCh.ExchangeDeclare("sx", "topic", true, false, false, false, nil)
+	log.Println("[auth] connected to RabbitMQ")
+
 	// JWT + Resend
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
@@ -729,9 +861,14 @@ func main() {
 	srv := &authServer{
 		mongoDB:   db,
 		rdb:       rdb,
+		amqpCh:    amqpCh,
 		jwtSecret: jwtSecret,
 		mailer:    email.NewSender(resendKey, resendFrom),
 	}
+
+	// Phase 2: Start notification cron goroutines
+	go srv.streakWarningCron(ctx)
+	go srv.dailyRewardNudgeCron(ctx)
 
 	skipMethods := []string{
 		"/quiz.AuthService/Register",

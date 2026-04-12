@@ -758,6 +758,69 @@ func (s *quizServer) SubmitAnswer(ctx context.Context, req *pb.SubmitAnswerReque
 // RabbitMQ setup — declare queues needed by downstream services
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Phase 2: Tournament reminder ticker (every 5 min, ISSUE-09)
+// ---------------------------------------------------------------------------
+
+func (s *quizServer) tournamentReminderTicker(ctx context.Context) {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			now := time.Now()
+			windowStart := now.Add(25 * time.Minute)
+			windowEnd := now.Add(35 * time.Minute)
+
+			cursor, err := s.mongoDB.Collection("tournaments").Find(ctx, bson.M{
+				"startTime":    bson.M{"$gte": windowStart, "$lte": windowEnd},
+				"reminderSent": false,
+			})
+			if err != nil {
+				continue
+			}
+
+			for cursor.Next(ctx) {
+				var doc bson.M
+				if err := cursor.Decode(&doc); err != nil {
+					continue
+				}
+				tourID := fmt.Sprintf("%v", doc["_id"])
+				tourName, _ := doc["name"].(string)
+				participants, _ := doc["participants"].(bson.A)
+
+				userIDs := make([]string, 0, len(participants))
+				for _, p := range participants {
+					if id, ok := p.(string); ok {
+						userIDs = append(userIDs, id)
+					}
+				}
+
+				payload, _ := json.Marshal(map[string]interface{}{
+					"event":            "notif.tournament.remind",
+					"userIds":          userIDs,
+					"tournamentName":   tourName,
+					"startsInMinutes":  30,
+				})
+				s.amqpCh.PublishWithContext(ctx, "sx", "notif.tournament.remind", false, false, amqp.Publishing{
+					ContentType: "application/json",
+					Body:        payload,
+				})
+
+				s.mongoDB.Collection("tournaments").UpdateOne(ctx,
+					bson.M{"_id": doc["_id"]},
+					bson.M{"$set": bson.M{"reminderSent": true}},
+				)
+				log.Printf("[quiz] tournament reminder sent for %s (%d participants)", tourID, len(userIDs))
+			}
+			cursor.Close(ctx)
+		}
+	}
+}
+
 func setupRabbitMQ(ch *amqp.Channel) error {
 	// Ensure sx exchange exists
 	if err := ch.ExchangeDeclare("sx", "topic", true, false, false, false, nil); err != nil {
@@ -1030,6 +1093,7 @@ func main() {
 	go srv.consumeMatchCreated(ctx)
 	go srv.consumeRoundCompleted(ctx)
 	go srv.consumeLeaderboardUpdated(ctx)
+	go srv.tournamentReminderTicker(ctx)
 
 	grpcServer := grpc.NewServer(
 		grpc.UnaryInterceptor(auth.UnaryInterceptor(jwtSecret, nil)),
