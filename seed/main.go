@@ -149,7 +149,11 @@ func main() {
 	for _, u := range testUsers {
 		hash, _ := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
 		id := fmt.Sprintf("user_%s", u.Username)
-		refCode := fmt.Sprintf("REF%s", u.Username[:4])
+		nameSlice := u.Username
+		if len(nameSlice) > 4 {
+			nameSlice = nameSlice[:4]
+		}
+		refCode := fmt.Sprintf("REF%s", nameSlice)
 		doc := bson.M{
 			"_id":           id,
 			"username":      u.Username,
