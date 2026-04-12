@@ -1152,10 +1152,14 @@ func main() {
 		jwtSecret: jwtSecret,
 	}
 
-	// gRPC server
+	// gRPC server — CalculateScore is called internally by the scoring worker
+	// via loopback, so it must bypass JWT auth
+	skipMethods := []string{
+		"/quiz.ScoringService/CalculateScore",
+	}
 	grpcServer := grpc.NewServer(
-		grpc.UnaryInterceptor(auth.UnaryInterceptor(jwtSecret, nil)),
-		grpc.StreamInterceptor(auth.StreamInterceptor(jwtSecret, nil)),
+		grpc.UnaryInterceptor(auth.UnaryInterceptor(jwtSecret, skipMethods)),
+		grpc.StreamInterceptor(auth.StreamInterceptor(jwtSecret, skipMethods)),
 	)
 	pb.RegisterScoringServiceServer(grpcServer, srv)
 
