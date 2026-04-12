@@ -4,7 +4,7 @@ import '../proto/quiz.pbgrpc.dart';
 
 /// Backend host — use 10.0.2.2 for Android emulator, localhost for desktop/web.
 /// Override via --dart-define=BACKEND_HOST=your.host.ip
-const _backendHost = String.fromEnvironment('BACKEND_HOST', defaultValue: '10.0.2.2');
+const _backendHost = String.fromEnvironment('BACKEND_HOST', defaultValue: 'localhost');
 
 /// Step 58: Singleton gRPC service that wraps all three backend services.
 class QuizService {

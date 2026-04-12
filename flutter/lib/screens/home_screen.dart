@@ -32,8 +32,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         options: QuizService().authCallOptions,
       );
       if (mounted) setState(() { _homeData = resp; _loading = false; });
-    } on GrpcError catch (e) {
-      if (mounted) setState(() { _error = e.message ?? 'Failed to load'; _loading = false; });
+    } catch (e) {
+      if (mounted) setState(() { _error = e is GrpcError ? (e.message ?? 'Failed to load') : e.toString(); _loading = false; });
     }
   }
 

@@ -20,7 +20,7 @@ class AuthService {
   int _matchesPlayed = 0;
   int _wins = 0;
 
-  static const _backendHost = String.fromEnvironment('BACKEND_HOST', defaultValue: '10.0.2.2');
+  static const _backendHost = String.fromEnvironment('BACKEND_HOST', defaultValue: 'localhost');
 
   AuthService._internal() {
     _channel = ClientChannel(
