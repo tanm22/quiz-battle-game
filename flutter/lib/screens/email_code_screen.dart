@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:grpc/grpc.dart';
 import '../services/auth_service.dart';
+import '../widgets/otp_input.dart';
 
 /// Screen for entering 6-digit email verification codes.
 /// Used by email login, email linking, and password reset flows.
@@ -23,9 +23,7 @@ class EmailCodeScreen extends StatefulWidget {
 }
 
 class _EmailCodeScreenState extends State<EmailCodeScreen> {
-  final List<TextEditingController> _digitControllers =
-      List.generate(6, (_) => TextEditingController());
-  final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
+  final _otpKey = GlobalKey<OtpInputState>();
 
   bool _isVerifying = false;
   String? _error;
@@ -45,20 +43,13 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
   void initState() {
     super.initState();
     _startResendCountdown();
-    // Auto-focus first digit
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _focusNodes[0].requestFocus();
+      _otpKey.currentState?.focus();
     });
   }
 
   @override
   void dispose() {
-    for (final c in _digitControllers) {
-      c.dispose();
-    }
-    for (final f in _focusNodes) {
-      f.dispose();
-    }
     _resendTimer?.cancel();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
@@ -82,34 +73,8 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
     });
   }
 
-  String get _code {
-    return _digitControllers.map((c) => c.text).join();
-  }
-
-  void _onDigitChanged(int index, String value) {
-    if (value.length == 1 && index < 5) {
-      // Auto-advance to next field
-      _focusNodes[index + 1].requestFocus();
-    }
-    // If all 6 digits filled, auto-submit
-    if (_code.length == 6) {
-      _verifyCode();
-    }
-  }
-
-  void _onDigitKeyDown(int index, KeyEvent event) {
-    if (event is KeyDownEvent &&
-        event.logicalKey == LogicalKeyboardKey.backspace &&
-        _digitControllers[index].text.isEmpty &&
-        index > 0) {
-      // Move focus back on backspace when current field is empty
-      _digitControllers[index - 1].clear();
-      _focusNodes[index - 1].requestFocus();
-    }
-  }
-
-  Future<void> _verifyCode() async {
-    final code = _code;
+  Future<void> _verifyCode([String? autoCode]) async {
+    final code = autoCode ?? _otpKey.currentState?.code ?? '';
     if (code.length != 6) {
       setState(() => _error = 'Enter all 6 digits');
       return;
@@ -268,45 +233,9 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
         const SizedBox(height: 32),
 
         // 6-digit code input
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(6, (index) {
-            return Container(
-              width: 44,
-              height: 52,
-              margin: EdgeInsets.only(left: index > 0 ? 8 : 0),
-              child: KeyboardListener(
-                focusNode: FocusNode(),
-                onKeyEvent: (event) => _onDigitKeyDown(index, event),
-                child: TextField(
-                  controller: _digitControllers[index],
-                  focusNode: _focusNodes[index],
-                  textAlign: TextAlign.center,
-                  keyboardType: TextInputType.number,
-                  maxLength: 1,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  decoration: InputDecoration(
-                    counterText: '',
-                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Colors.white24),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Colors.amber, width: 2),
-                    ),
-                  ),
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  onChanged: (value) => _onDigitChanged(index, value),
-                ),
-              ),
-            );
-          }),
+        OtpInput(
+          key: _otpKey,
+          onCompleted: _verifyCode,
         ),
 
         const SizedBox(height: 16),

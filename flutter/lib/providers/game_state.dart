@@ -30,6 +30,7 @@ class GameState {
   final bool isGuest;
   final String? email;
   final String? errorMessage;
+  final int totalRounds;
 
   const GameState({
     this.currentScreen = GameScreen.login,
@@ -40,6 +41,7 @@ class GameState {
     this.currentQuestion,
     this.scores = const {},
     this.round = 0,
+    this.totalRounds = 0,
     this.deadlineUnix = 0,
     this.selectedIndex,
     this.correctIndex,
@@ -61,6 +63,7 @@ class GameState {
     QuestionBroadcast? currentQuestion,
     Map<String, double>? scores,
     int? round,
+    int? totalRounds,
     int? deadlineUnix,
     int? selectedIndex,
     int? correctIndex,
@@ -84,6 +87,7 @@ class GameState {
       currentQuestion: currentQuestion ?? this.currentQuestion,
       scores: scores ?? this.scores,
       round: round ?? this.round,
+      totalRounds: totalRounds ?? this.totalRounds,
       deadlineUnix: deadlineUnix ?? this.deadlineUnix,
       selectedIndex: clearSelectedIndex ? null : (selectedIndex ?? this.selectedIndex),
       correctIndex: clearCorrectIndex ? null : (correctIndex ?? this.correctIndex),
@@ -108,12 +112,17 @@ class GameStateNotifier extends Notifier<GameState> {
   StreamSubscription? _gameSub;
   int _reconnectAttempt = 0;
   Map<String, double> _pendingScores = {};
+  Timer? _highlightResetTimer;
+  bool _disposed = false;
 
   @override
   GameState build() {
+    _disposed = false;
     ref.onDispose(() {
+      _disposed = true;
       _matchSub?.cancel();
       _gameSub?.cancel();
+      _highlightResetTimer?.cancel();
     });
     return const GameState();
   }
@@ -165,7 +174,19 @@ class GameStateNotifier extends Notifier<GameState> {
       currentScreen: GameScreen.gameplay,
       lastSequenceNumber: event.sequenceNumber.toInt(),
     );
+    _fetchTotalRounds(event.roomId);
     _startGameStream();
+  }
+
+  Future<void> _fetchTotalRounds(String roomId) async {
+    try {
+      final resp = await _service.getRoomQuestions(roomId);
+      if (resp.questions.isNotEmpty) {
+        state = state.copyWith(totalRounds: resp.questions.length);
+      }
+    } catch (_) {
+      // Non-critical — UI will show "Round X" without total
+    }
   }
 
   // --- Game event stream ---
@@ -211,9 +232,12 @@ class GameStateNotifier extends Notifier<GameState> {
           correctIndex: event.roundResult.correctIndex,
           scores: _pendingScores.isNotEmpty ? Map.of(_pendingScores) : null,
         );
-        // Auto-reset answer highlight after 1.5s (step 64)
-        Future.delayed(const Duration(milliseconds: 1500), () {
-          state = state.copyWith(clearSelectedIndex: true, clearCorrectIndex: true);
+        // Auto-reset answer highlight after 1.5s (cancellable on dispose)
+        _highlightResetTimer?.cancel();
+        _highlightResetTimer = Timer(const Duration(milliseconds: 1500), () {
+          if (!_disposed) {
+            state = state.copyWith(clearSelectedIndex: true, clearCorrectIndex: true);
+          }
         });
       case GameEvent_Event.matchEnd:
         state = state.copyWith(

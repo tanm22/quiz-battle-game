@@ -114,7 +114,18 @@ class _AppShellState extends ConsumerState<AppShell> {
     // Step 68: Reconnection banner overlay
     return Stack(
       children: [
-        screen,
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          transitionBuilder: (child, animation) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+          child: KeyedSubtree(
+            key: ValueKey(gameState.currentScreen),
+            child: screen,
+          ),
+        ),
         if (gameState.isReconnecting)
           Positioned(
             top: 0,

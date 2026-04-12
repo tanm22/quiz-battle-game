@@ -54,7 +54,8 @@ type quizServer struct {
 	gameStreams  sync.Map // "roomId:userId" -> chan *pb.GameEvent
 	roomTimers  sync.Map // roomId -> *time.Timer (for round close)
 	seqCounters sync.Map // roomId -> *atomic.Int64
-	roomDeadlines sync.Map // roomId -> int64 (current round deadline_unix)
+	roomDeadlines  sync.Map // roomId -> int64 (current round deadline_unix)
+	roomQuestions  sync.Map // roomId -> []Question
 }
 
 // newChannel creates a dedicated AMQP channel per consumer (channels are not thread-safe).
@@ -205,15 +206,12 @@ func (s *quizServer) consumeMatchCreated(ctx context.Context) {
 	}
 }
 
-// In-memory question cache per room
-var roomQuestions sync.Map // roomId -> []Question
-
 func (s *quizServer) storeRoomQuestions(roomID string, questions []Question) {
-	roomQuestions.Store(roomID, questions)
+	s.roomQuestions.Store(roomID, questions)
 }
 
 func (s *quizServer) getRoomQuestions(roomID string) ([]Question, bool) {
-	val, ok := roomQuestions.Load(roomID)
+	val, ok := s.roomQuestions.Load(roomID)
 	if !ok {
 		return nil, false
 	}
@@ -418,7 +416,7 @@ func (s *quizServer) finishMatch(ctx context.Context, roomID string, totalRounds
 	}
 
 	// Cleanup in-memory state
-	roomQuestions.Delete(roomID)
+	s.roomQuestions.Delete(roomID)
 	s.seqCounters.Delete(roomID)
 	s.roomTimers.Delete(roomID)
 }

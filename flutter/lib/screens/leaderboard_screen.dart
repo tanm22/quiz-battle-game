@@ -3,17 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/game_state.dart';
 import '../proto/quiz.pb.dart';
 
-class LeaderboardScreen extends ConsumerStatefulWidget {
+class LeaderboardScreen extends ConsumerWidget {
   const LeaderboardScreen({super.key});
-
-  @override
-  ConsumerState<LeaderboardScreen> createState() => _LeaderboardScreenState();
-}
-
-class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
-  final _listKey = GlobalKey<AnimatedListState>();
-  List<LeaderboardEntry> _currentEntries = [];
-  final Map<String, int> _previousRanks = {};
 
   static const _medalColors = [
     Color(0xFFFFD700), // Gold
@@ -22,19 +13,8 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
   ];
 
   @override
-  Widget build(BuildContext context) {
-    ref.listen(
-      gameStateProvider.select((s) => s.leaderboard),
-      (prev, next) => _updateList(prev ?? [], next),
-    );
-
+  Widget build(BuildContext context, WidgetRef ref) {
     final leaderboard = ref.watch(gameStateProvider.select((s) => s.leaderboard));
-    if (_currentEntries.isEmpty && leaderboard.isNotEmpty) {
-      _currentEntries = List.of(leaderboard);
-      for (int i = 0; i < _currentEntries.length; i++) {
-        _previousRanks[_currentEntries[i].userId] = i + 1;
-      }
-    }
 
     return Scaffold(
       body: Container(
@@ -59,24 +39,18 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                 ),
               ),
               Expanded(
-                child: _currentEntries.isEmpty
+                child: leaderboard.isEmpty
                     ? Center(child: Text('No scores yet', style: TextStyle(color: Colors.white.withAlpha(100))))
-                    : AnimatedList(
-                        key: _listKey,
-                        initialItemCount: _currentEntries.length,
+                    : ListView.builder(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemBuilder: (context, index, animation) {
-                          if (index >= _currentEntries.length) return const SizedBox.shrink();
-                          final entry = _currentEntries[index];
-                          final position = index + 1;
-                          final prevRank = _previousRanks[entry.userId];
-                          final rankDelta = prevRank != null ? prevRank - position : 0;
-
-                          return SizeTransition(
-                            sizeFactor: animation,
-                            child: _LeaderboardRow(
-                              entry: entry, position: position, rankDelta: rankDelta, medalColors: _medalColors,
-                            ),
+                        itemCount: leaderboard.length,
+                        itemBuilder: (context, index) {
+                          final entry = leaderboard[index];
+                          return _LeaderboardRow(
+                            key: ValueKey(entry.userId),
+                            entry: entry,
+                            position: index + 1,
+                            medalColors: _medalColors,
                           );
                         },
                       ),
@@ -87,43 +61,22 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
       ),
     );
   }
-
-  void _updateList(List<LeaderboardEntry> oldList, List<LeaderboardEntry> newList) {
-    for (int i = 0; i < _currentEntries.length; i++) {
-      _previousRanks[_currentEntries[i].userId] = i + 1;
-    }
-    for (int i = _currentEntries.length - 1; i >= 0; i--) {
-      _listKey.currentState?.removeItem(
-        i,
-        (context, animation) => SizeTransition(
-          sizeFactor: animation,
-          child: _LeaderboardRow(entry: _currentEntries[i], position: i + 1, rankDelta: 0, medalColors: _medalColors),
-        ),
-        duration: const Duration(milliseconds: 200),
-      );
-    }
-    _currentEntries = List.of(newList);
-    Future.delayed(const Duration(milliseconds: 250), () {
-      for (int i = 0; i < _currentEntries.length; i++) {
-        _listKey.currentState?.insertItem(i, duration: const Duration(milliseconds: 300));
-      }
-    });
-  }
 }
 
 class _LeaderboardRow extends StatelessWidget {
   final LeaderboardEntry entry;
   final int position;
-  final int rankDelta;
   final List<Color> medalColors;
-  const _LeaderboardRow({required this.entry, required this.position, required this.rankDelta, required this.medalColors});
+  const _LeaderboardRow({super.key, required this.entry, required this.position, required this.medalColors});
 
   @override
   Widget build(BuildContext context) {
     final isMedal = position <= 3;
     final medalColor = isMedal ? medalColors[position - 1] : null;
 
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
@@ -146,15 +99,7 @@ class _LeaderboardRow extends StatelessWidget {
                   : Text('#$position', style: TextStyle(color: medalColor ?? Colors.white54, fontSize: 15, fontWeight: FontWeight.bold)),
             ),
           ),
-
-          // Rank delta
-          SizedBox(
-            width: 28,
-            child: rankDelta != 0
-                ? Icon(rankDelta > 0 ? Icons.arrow_upward : Icons.arrow_downward,
-                    color: rankDelta > 0 ? const Color(0xFF4CAF50) : const Color(0xFFFF4444), size: 18)
-                : const SizedBox.shrink(),
-          ),
+          const SizedBox(width: 12),
 
           // Username
           Expanded(
@@ -164,10 +109,15 @@ class _LeaderboardRow extends StatelessWidget {
             ),
           ),
 
-          // Score
-          Text(
-            '${entry.score.toInt()}',
-            style: TextStyle(color: isMedal ? medalColor : Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+          // Animated score
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            transitionBuilder: (child, animation) => ScaleTransition(scale: animation, child: child),
+            child: Text(
+              '${entry.score.toInt()}',
+              key: ValueKey(entry.score.toInt()),
+              style: TextStyle(color: isMedal ? medalColor : Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),

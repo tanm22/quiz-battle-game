@@ -42,6 +42,8 @@ class QuizService {
     scoring = ScoringServiceClient(_scoringChannel);
   }
 
+  static const _defaultTimeout = Duration(seconds: 10);
+
   void setAuthToken(String token) {
     _authOptions = CallOptions(metadata: {'authorization': 'Bearer $token'});
   }
@@ -50,19 +52,27 @@ class QuizService {
     _authOptions = null;
   }
 
+  /// Merges auth metadata with a per-call timeout.
+  CallOptions _opts({Duration timeout = _defaultTimeout}) {
+    return CallOptions(
+      metadata: _authOptions?.metadata ?? {},
+      timeout: timeout,
+    );
+  }
+
   Future<JoinMatchmakingResponse> joinMatchmaking(String userId, int rating) {
     return matchmaking.joinMatchmaking(
       JoinMatchmakingRequest()
         ..userId = userId
         ..rating = rating,
-      options: _authOptions,
+      options: _opts(),
     );
   }
 
   Future<LeaveMatchmakingResponse> leaveMatchmaking(String userId) {
     return matchmaking.leaveMatchmaking(
       LeaveMatchmakingRequest()..userId = userId,
-      options: _authOptions,
+      options: _opts(),
     );
   }
 
@@ -72,14 +82,14 @@ class QuizService {
       SubscribeToMatchRequest()
         ..userId = userId
         ..sequenceNumber = Int64(sequenceNumber),
-      options: _authOptions,
+      options: _opts(timeout: const Duration(minutes: 5)),
     );
   }
 
   Future<GetRoomQuestionsResponse> getRoomQuestions(String roomId) {
     return quiz.getRoomQuestions(
       GetRoomQuestionsRequest()..roomId = roomId,
-      options: _authOptions,
+      options: _opts(),
     );
   }
 
@@ -90,7 +100,7 @@ class QuizService {
         ..roomId = roomId
         ..userId = userId
         ..sequenceNumber = Int64(sequenceNumber),
-      options: _authOptions,
+      options: _opts(timeout: const Duration(minutes: 10)),
     );
   }
 
@@ -108,14 +118,14 @@ class QuizService {
         ..round = round
         ..optionIndex = optionIndex
         ..clientTimestamp = Int64(clientTimestamp),
-      options: _authOptions,
+      options: _opts(timeout: const Duration(seconds: 5)),
     );
   }
 
   Future<GetLeaderboardResponse> getLeaderboard(String roomId) {
     return scoring.getLeaderboard(
       GetLeaderboardRequest()..roomId = roomId,
-      options: _authOptions,
+      options: _opts(),
     );
   }
 
@@ -124,7 +134,7 @@ class QuizService {
       GetMatchHistoryRequest()
         ..limit = limit
         ..offset = offset,
-      options: _authOptions,
+      options: _opts(),
     );
   }
 

@@ -86,7 +86,9 @@ class _GameplayScreenState extends ConsumerState<GameplayScreen>
                         border: Border.all(color: const Color(0xFFFF6B35).withAlpha(80)),
                       ),
                       child: Text(
-                        'Round ${gameState.round}/5',
+                        gameState.totalRounds > 0
+                            ? 'Round ${gameState.round}/${gameState.totalRounds}'
+                            : 'Round ${gameState.round}',
                         style: const TextStyle(color: Color(0xFFFF8F5E), fontSize: 14, fontWeight: FontWeight.bold),
                       ),
                     ),

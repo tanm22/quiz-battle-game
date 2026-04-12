@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"net"
 	"os"
 	"time"
@@ -127,9 +128,20 @@ func (s *scoringServer) GetLeaderboard(ctx context.Context, req *pb.GetLeaderboa
 
 	pbEntries := make([]*pb.LeaderboardEntry, len(entries))
 	for i, e := range entries {
+		userID := e.Member.(string)
+		// Resolve real username from Redis player info
+		username := userID
+		if playerJSON, err := keys.GetPlayer(ctx, s.rdb, req.RoomId, userID); err == nil {
+			var info struct {
+				Username string `json:"username"`
+			}
+			if json.Unmarshal([]byte(playerJSON), &info) == nil && info.Username != "" {
+				username = info.Username
+			}
+		}
 		pbEntries[i] = &pb.LeaderboardEntry{
-			UserId:   e.Member.(string),
-			Username: e.Member.(string),
+			UserId:   userID,
+			Username: username,
 			Score:    e.Score,
 			Rank:     int32(i + 1),
 		}
@@ -513,26 +525,67 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 		return
 	}
 
-	// Step 54: Bulk write to users collection
-	// Increment matchesPlayed for all players, increment wins for rank-1 player
-	// Adjust ratings: winner +25, others -25
+	// Step 54: Update user stats and Elo ratings
+	// Elo formula: K=32, expected = 1/(1+10^((Rb-Ra)/400))
+	// Winner gets +K*(1-expected), loser gets -K*expected
 	usersColl := s.mongoDB.Collection("users")
-	for i, e := range entries {
+
+	// Look up current ratings for Elo calculation
+	ratings := make(map[string]float64)
+	for _, e := range entries {
 		userID := e.Member.(string)
-		delta := int32(-25)
-		if i == 0 {
-			delta = 25
+		var userDoc bson.M
+		if err := usersColl.FindOne(ctx, bson.M{"_id": userID}).Decode(&userDoc); err == nil {
+			if r, ok := userDoc["rating"].(int32); ok {
+				ratings[userID] = float64(r)
+			} else {
+				ratings[userID] = 1200
+			}
+		} else {
+			ratings[userID] = 1200
 		}
+	}
+
+	const K = 32.0
+	winnerID := ""
+	if len(entries) > 0 {
+		winnerID = entries[0].Member.(string)
+	}
+
+	for _, e := range entries {
+		userID := e.Member.(string)
+		ra := ratings[userID]
+		isWinner := userID == winnerID
+
+		// Compute average expected score against all other players
+		var totalExpected float64
+		opponents := 0
+		for _, other := range entries {
+			otherID := other.Member.(string)
+			if otherID == userID {
+				continue
+			}
+			rb := ratings[otherID]
+			expected := 1.0 / (1.0 + math.Pow(10, (rb-ra)/400.0))
+			totalExpected += expected
+			opponents++
+		}
+		if opponents == 0 {
+			continue
+		}
+		avgExpected := totalExpected / float64(opponents)
+
+		var actual float64
+		if isWinner {
+			actual = 1.0
+		}
+		delta := int32(math.Round(K * (actual - avgExpected)))
+
 		update := bson.M{"$inc": bson.M{"matchesPlayed": 1, "rating": delta}}
-		if i == 0 {
+		if isWinner {
 			update["$inc"].(bson.M)["wins"] = 1
 		}
-		_, err := usersColl.UpdateOne(
-			ctx,
-			bson.M{"_id": userID},
-			update,
-			options.UpdateOne().SetUpsert(true),
-		)
+		_, err := usersColl.UpdateOne(ctx, bson.M{"_id": userID}, update, options.UpdateOne().SetUpsert(true))
 		if err != nil {
 			log.Printf("[persistence] user update failed for %s: %v", userID, err)
 		}

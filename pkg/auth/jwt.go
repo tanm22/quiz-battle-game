@@ -2,14 +2,10 @@ package auth
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"strings"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 // TokenTTL is the lifetime of a JWT token.
@@ -19,14 +15,14 @@ const TokenTTL = 24 * time.Hour
 type Claims struct {
 	UserID   string `json:"sub"`
 	Username string `json:"username"`
-	Exp      int64  `json:"exp"`
+	jwt.RegisteredClaims
 }
 
 type contextKey string
 
 const (
-	ctxUserID   contextKey = "auth_user_id"
-	ctxUsername  contextKey = "auth_username"
+	ctxUserID  contextKey = "auth_user_id"
+	ctxUsername contextKey = "auth_username"
 )
 
 // UserIDFromContext extracts the authenticated user ID from the context.
@@ -56,65 +52,36 @@ func ContextWithClaims(ctx context.Context, claims *Claims) context.Context {
 
 // GenerateToken creates an HS256-signed JWT with 24h expiry.
 func GenerateToken(userID, username, secret string) (string, error) {
-	header := base64Encode([]byte(`{"alg":"HS256","typ":"JWT"}`))
-
 	claims := Claims{
 		UserID:   userID,
 		Username: username,
-		Exp:      time.Now().Add(TokenTTL).Unix(),
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   userID,
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(TokenTTL)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
 	}
-	payload, err := json.Marshal(claims)
-	if err != nil {
-		return "", fmt.Errorf("marshal claims: %w", err)
-	}
-	encodedPayload := base64Encode(payload)
 
-	signingInput := header + "." + encodedPayload
-	signature := sign(signingInput, secret)
-
-	return signingInput + "." + signature, nil
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(secret))
 }
 
 // VerifyToken validates an HS256 JWT and returns the claims.
 func VerifyToken(tokenStr, secret string) (*Claims, error) {
-	parts := strings.SplitN(tokenStr, ".", 3)
-	if len(parts) != 3 {
-		return nil, errors.New("malformed token")
-	}
-
-	signingInput := parts[0] + "." + parts[1]
-	expectedSig := sign(signingInput, secret)
-	if !hmac.Equal([]byte(parts[2]), []byte(expectedSig)) {
-		return nil, errors.New("invalid signature")
-	}
-
-	payload, err := base64Decode(parts[1])
+	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("unexpected signing method")
+		}
+		return []byte(secret), nil
+	})
 	if err != nil {
-		return nil, fmt.Errorf("decode payload: %w", err)
+		return nil, err
 	}
 
-	var claims Claims
-	if err := json.Unmarshal(payload, &claims); err != nil {
-		return nil, fmt.Errorf("unmarshal claims: %w", err)
+	claims, ok := token.Claims.(*Claims)
+	if !ok || !token.Valid {
+		return nil, errors.New("invalid token")
 	}
 
-	if time.Now().Unix() > claims.Exp {
-		return nil, errors.New("token expired")
-	}
-
-	return &claims, nil
-}
-
-func sign(input, secret string) string {
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(input))
-	return base64Encode(mac.Sum(nil))
-}
-
-func base64Encode(data []byte) string {
-	return base64.RawURLEncoding.EncodeToString(data)
-}
-
-func base64Decode(s string) ([]byte, error) {
-	return base64.RawURLEncoding.DecodeString(s)
+	return claims, nil
 }

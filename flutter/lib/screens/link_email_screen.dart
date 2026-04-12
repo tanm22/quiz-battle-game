@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:grpc/grpc.dart';
 import '../services/auth_service.dart';
-// ignore: unused_import
-import '../services/quiz_service.dart';
 import '../providers/game_state.dart';
+import '../widgets/otp_input.dart';
 
 /// Bottom-sheet widget allowing guest users to link an email address.
 ///
@@ -19,9 +17,7 @@ class LinkEmailScreen extends ConsumerStatefulWidget {
 
 class _LinkEmailScreenState extends ConsumerState<LinkEmailScreen> {
   final _emailController = TextEditingController();
-  final List<TextEditingController> _codeControllers =
-      List.generate(6, (_) => TextEditingController());
-  final List<FocusNode> _codeFocusNodes = List.generate(6, (_) => FocusNode());
+  final _otpKey = GlobalKey<OtpInputState>();
 
   bool _codeSent = false;
   bool _isSendingCode = false;
@@ -32,17 +28,8 @@ class _LinkEmailScreenState extends ConsumerState<LinkEmailScreen> {
   @override
   void dispose() {
     _emailController.dispose();
-    for (final c in _codeControllers) {
-      c.dispose();
-    }
-    for (final f in _codeFocusNodes) {
-      f.dispose();
-    }
     super.dispose();
   }
-
-  String get _collectedCode =>
-      _codeControllers.map((c) => c.text).join();
 
   Future<void> _sendCode() async {
     final email = _emailController.text.trim();
@@ -62,8 +49,9 @@ class _LinkEmailScreenState extends ConsumerState<LinkEmailScreen> {
         _codeSent = true;
         _isSendingCode = false;
       });
-      // Focus the first code digit field.
-      _codeFocusNodes[0].requestFocus();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _otpKey.currentState?.focus();
+      });
     } on GrpcError catch (e) {
       setState(() {
         _error = e.message ?? 'Failed to send code';
@@ -77,9 +65,9 @@ class _LinkEmailScreenState extends ConsumerState<LinkEmailScreen> {
     }
   }
 
-  Future<void> _verifyAndLink() async {
+  Future<void> _verifyAndLink([String? autoCode]) async {
     final email = _emailController.text.trim();
-    final code = _collectedCode;
+    final code = autoCode ?? _otpKey.currentState?.code ?? '';
 
     if (code.length != 6) {
       setState(() => _error = 'Please enter the full 6-digit code');
@@ -237,49 +225,9 @@ class _LinkEmailScreenState extends ConsumerState<LinkEmailScreen> {
                 const SizedBox(height: 16),
 
                 // 6-digit code input
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: List.generate(6, (index) {
-                    return SizedBox(
-                      width: 44,
-                      height: 52,
-                      child: TextField(
-                        controller: _codeControllers[index],
-                        focusNode: _codeFocusNodes[index],
-                        textAlign: TextAlign.center,
-                        keyboardType: TextInputType.number,
-                        maxLength: 1,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
-                        decoration: InputDecoration(
-                          counterText: '',
-                          contentPadding: EdgeInsets.zero,
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: Colors.white24),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide:
-                                const BorderSide(color: Colors.amber, width: 2),
-                          ),
-                        ),
-                        onChanged: (value) {
-                          if (value.isNotEmpty && index < 5) {
-                            _codeFocusNodes[index + 1].requestFocus();
-                          } else if (value.isEmpty && index > 0) {
-                            _codeFocusNodes[index - 1].requestFocus();
-                          }
-                        },
-                      ),
-                    );
-                  }),
+                OtpInput(
+                  key: _otpKey,
+                  onCompleted: _verifyAndLink,
                 ),
                 const SizedBox(height: 20),
 
