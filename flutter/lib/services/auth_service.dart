@@ -74,12 +74,15 @@ class AuthService {
     }
   }
 
-  Future<void> register(String username, String password, {String? email}) async {
+  Future<void> register(String username, String password, {String? email, String? referralCode}) async {
     final req = RegisterRequest()
       ..username = username
       ..password = password;
     if (email != null && email.isNotEmpty) {
       req.email = email;
+    }
+    if (referralCode != null && referralCode.isNotEmpty) {
+      req.referralCode = referralCode;
     }
     final resp = await _client.register(req, options: _opts());
     _token = resp.token;
@@ -185,6 +188,14 @@ class AuthService {
       options: _opts(timeout: const Duration(seconds: 3)),
     );
     return resp.available;
+  }
+
+  /// Claim daily streak reward.
+  Future<void> claimDailyReward() async {
+    await _client.claimDailyReward(
+      ClaimDailyRewardRequest(),
+      options: _opts(),
+    );
   }
 
   /// Refresh profile from server — call after match to get updated rating/stats.

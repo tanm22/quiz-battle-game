@@ -25,6 +25,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   final _regUsernameController = TextEditingController();
   final _regPasswordController = TextEditingController();
   final _regEmailController = TextEditingController();
+  final _regReferralController = TextEditingController();
 
   bool? _usernameAvailable;
   bool _checkingUsername = false;
@@ -48,6 +49,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     _regUsernameController.dispose();
     _regPasswordController.dispose();
     _regEmailController.dispose();
+    _regReferralController.dispose();
     _usernameDebounce?.cancel();
     super.dispose();
   }
@@ -153,12 +155,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     final username = _regUsernameController.text.trim();
     final password = _regPasswordController.text;
     final email = _regEmailController.text.trim();
+    final referral = _regReferralController.text.trim();
     if (username.isEmpty || password.isEmpty) { _showError('Username and password required'); return; }
     if (username.length < 3) { _showError('Username must be at least 3 characters'); return; }
     setState(() => _isLoading = true);
     try {
       final auth = AuthService();
-      await auth.register(username, password, email: email.isNotEmpty ? email : null);
+      await auth.register(username, password, email: email.isNotEmpty ? email : null, referralCode: referral.isNotEmpty ? referral : null);
       _navigateToMatchmaking(auth);
     } on GrpcError catch (e) {
       _showError(e.message ?? 'Registration failed');
@@ -301,6 +304,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           style: const TextStyle(color: Colors.white),
           decoration: _inputDecoration('Email (optional)', Icons.email),
           keyboardType: TextInputType.emailAddress,
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _regReferralController,
+          style: const TextStyle(color: Colors.white),
+          decoration: _inputDecoration('Referral code (optional)', Icons.card_giftcard),
+          textCapitalization: TextCapitalization.characters,
         ),
         const SizedBox(height: 20),
         _buildActionButton(

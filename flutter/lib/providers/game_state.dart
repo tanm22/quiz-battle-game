@@ -314,7 +314,7 @@ class GameStateNotifier extends Notifier<GameState> {
       // After 3 failed retries, show match abandoned and return to lobby
       _reconnectAttempt = 0;
       state = state.copyWith(
-        currentScreen: GameScreen.matchmaking,
+        currentScreen: GameScreen.home,
         isReconnecting: false,
       );
       return;
