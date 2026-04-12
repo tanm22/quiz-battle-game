@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"net"
@@ -17,6 +18,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"golang.org/x/crypto/bcrypt"
+	"google.golang.org/api/idtoken"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -398,6 +400,264 @@ func (s *authServer) DeleteAccount(ctx context.Context, _ *pb.DeleteAccountReque
 }
 
 // ---------------------------------------------------------------------------
+// GoogleSignIn — verify Google ID token, upsert user, issue JWT (Phase 2)
+// ---------------------------------------------------------------------------
+
+func (s *authServer) GoogleSignIn(ctx context.Context, req *pb.GoogleSignInRequest) (*pb.GoogleSignInResponse, error) {
+	googleClientID := os.Getenv("GOOGLE_CLIENT_ID")
+
+	// Verify Google ID token
+	payload, err := idtoken.Validate(ctx, req.IdToken, googleClientID)
+	if err != nil {
+		return nil, status.Errorf(codes.Unauthenticated, "invalid Google ID token: %v", err)
+	}
+
+	googleID, _ := payload.Claims["sub"].(string)
+	email, _ := payload.Claims["email"].(string)
+	name, _ := payload.Claims["name"].(string)
+	picture, _ := payload.Claims["picture"].(string)
+
+	if googleID == "" {
+		return nil, status.Error(codes.InvalidArgument, "missing Google ID in token")
+	}
+
+	// Upsert by googleId
+	userID := uuid.New().String()
+	now := time.Now()
+	newUserDoc := bson.M{
+		"_id":           userID,
+		"googleId":      googleID,
+		"email":         email,
+		"displayName":   name,
+		"avatarUrl":     picture,
+		"username":      strings.Split(email, "@")[0],
+		"isGuest":       false,
+		"rating":        int32(1200),
+		"matchesPlayed": int32(0),
+		"wins":          int32(0),
+		"plan":          "free",
+		"coins":         int64(0),
+		"streak":        bson.M{"current": 0, "longest": 0, "lastClaimedDate": ""},
+		"createdAt":     now.Unix(),
+	}
+
+	result := s.users().FindOneAndUpdate(ctx,
+		bson.M{"googleId": googleID},
+		bson.M{
+			"$setOnInsert": newUserDoc,
+			"$set":         bson.M{"avatarUrl": picture, "displayName": name},
+		},
+		options.FindOneAndUpdate().SetUpsert(true).SetReturnDocument(options.After),
+	)
+
+	var user models.User
+	if err := result.Decode(&user); err != nil {
+		return nil, status.Errorf(codes.Internal, "upsert failed: %v", err)
+	}
+
+	isNewUser := user.CreatedAt == now.Unix() && user.MatchesPlayed == 0
+
+	// New user only: generate referral code + apply referral if provided (ISSUE-12)
+	if isNewUser {
+		refCode := generateReferralCode()
+		keys.SetRefCode(ctx, s.rdb, refCode, user.ID)
+		s.users().UpdateOne(ctx, bson.M{"_id": user.ID}, bson.M{"$set": bson.M{"referralCode": refCode}})
+		user.ReferralCode = refCode
+
+		if req.ReferralCode != "" {
+			s.applyReferral(ctx, user.ID, req.ReferralCode)
+		}
+	}
+
+	// Process streak
+	streakInfo, reward, streakUpdated := s.processStreak(ctx, &user)
+
+	// Issue JWT
+	token, err := auth.GenerateToken(user.ID, user.Username, s.jwtSecret)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "token generation failed: %v", err)
+	}
+
+	return &pb.GoogleSignInResponse{
+		Token:         token,
+		IsNewUser:     isNewUser,
+		StreakUpdated: streakUpdated,
+		Reward:        reward,
+		UserProfile: &pb.UserProfile{
+			UserId:       user.ID,
+			Username:     user.Username,
+			DisplayName:  user.DisplayName,
+			Email:        user.Email,
+			AvatarUrl:    user.AvatarUrl,
+			Rating:       user.Rating,
+			MatchesPlayed: user.MatchesPlayed,
+			Wins:         user.Wins,
+			Plan:         user.Plan,
+			Coins:        user.Coins,
+			Streak:       streakInfo,
+			ReferralCode: user.ReferralCode,
+			IsGuest:      false,
+		},
+	}, nil
+}
+
+// ---------------------------------------------------------------------------
+// Streak processing — MongoDB only (ISSUE-01), IST dates
+// ---------------------------------------------------------------------------
+
+func (s *authServer) processStreak(ctx context.Context, user *models.User) (*pb.StreakInfo, *pb.RewardGrant, bool) {
+	ist, _ := time.LoadLocation("Asia/Kolkata")
+	today := time.Now().In(ist).Format("2006-01-02")
+	yesterday := time.Now().In(ist).Add(-24 * time.Hour).Format("2006-01-02")
+
+	streak := user.Streak
+
+	switch {
+	case streak.LastClaimedDate == today:
+		// CASE A: already claimed today — idempotent
+		return toStreakInfo(streak), nil, false
+
+	case streak.LastClaimedDate == yesterday:
+		// CASE B: consecutive day
+		streak.Current++
+		if streak.Current > streak.Longest {
+			streak.Longest = streak.Current
+		}
+		streak.LastClaimedDate = today
+
+	default:
+		// CASE C: gap >= 2 days (or first ever login)
+		streak.Current = 1
+		streak.LastClaimedDate = today
+	}
+
+	s.users().UpdateOne(ctx, bson.M{"_id": user.ID}, bson.M{"$set": bson.M{"streak": streak}})
+	user.Streak = streak
+
+	reward := rewardForDay(streak.Current)
+	return toStreakInfo(streak), reward, true
+}
+
+func toStreakInfo(s models.Streak) *pb.StreakInfo {
+	return &pb.StreakInfo{
+		Current:         int32(s.Current),
+		Longest:         int32(s.Longest),
+		LastClaimedDate: s.LastClaimedDate,
+	}
+}
+
+func rewardForDay(day int) *pb.RewardGrant {
+	switch {
+	case day >= 30:
+		return &pb.RewardGrant{Coins: 200}
+	case day >= 14:
+		return &pb.RewardGrant{Coins: 200, BadgeName: "Two Week Streak"}
+	case day >= 7:
+		return &pb.RewardGrant{Coins: 100, BadgeName: "Weekly Warrior"}
+	case day >= 5:
+		return &pb.RewardGrant{Coins: 50, BonusQuizzes: 1}
+	case day >= 3:
+		return &pb.RewardGrant{Coins: 30}
+	case day >= 2:
+		return &pb.RewardGrant{Coins: 20}
+	default:
+		return &pb.RewardGrant{Coins: 10}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// ClaimDailyReward — grants coins/badges for the current streak day
+// ---------------------------------------------------------------------------
+
+func (s *authServer) ClaimDailyReward(ctx context.Context, _ *pb.ClaimDailyRewardRequest) (*pb.ClaimDailyRewardResponse, error) {
+	userID, err := auth.UserIDFromContext(ctx)
+	if err != nil {
+		return nil, status.Error(codes.Unauthenticated, "not authenticated")
+	}
+
+	var user models.User
+	if err := s.users().FindOne(ctx, bson.M{"_id": userID}).Decode(&user); err != nil {
+		return nil, status.Error(codes.NotFound, "user not found")
+	}
+
+	ist, _ := time.LoadLocation("Asia/Kolkata")
+	today := time.Now().In(ist).Format("2006-01-02")
+	if user.Streak.LastClaimedDate != today {
+		return nil, status.Error(codes.FailedPrecondition, "login first to update streak")
+	}
+
+	reward := rewardForDay(user.Streak.Current)
+
+	// Grant coins
+	if reward.Coins > 0 {
+		s.users().UpdateOne(ctx, bson.M{"_id": userID}, bson.M{"$inc": bson.M{"coins": reward.Coins}})
+	}
+
+	return &pb.ClaimDailyRewardResponse{
+		Reward: reward,
+		Streak: toStreakInfo(user.Streak),
+	}, nil
+}
+
+// ---------------------------------------------------------------------------
+// GetStreakInfo
+// ---------------------------------------------------------------------------
+
+func (s *authServer) GetStreakInfo(ctx context.Context, _ *pb.GetStreakInfoRequest) (*pb.GetStreakInfoResponse, error) {
+	userID, err := auth.UserIDFromContext(ctx)
+	if err != nil {
+		return nil, status.Error(codes.Unauthenticated, "not authenticated")
+	}
+
+	var user models.User
+	if err := s.users().FindOne(ctx, bson.M{"_id": userID}).Decode(&user); err != nil {
+		return nil, status.Error(codes.NotFound, "user not found")
+	}
+
+	return &pb.GetStreakInfoResponse{Streak: toStreakInfo(user.Streak)}, nil
+}
+
+// ---------------------------------------------------------------------------
+// Referral helpers
+// ---------------------------------------------------------------------------
+
+func generateReferralCode() string {
+	b := make([]byte, 4) // 8 hex chars
+	rand.Read(b)
+	return "REF" + strings.ToUpper(hex.EncodeToString(b))
+}
+
+func (s *authServer) applyReferral(ctx context.Context, refereeID, code string) {
+	referrerID, err := keys.GetRefCode(ctx, s.rdb, code)
+	if err != nil || referrerID == "" {
+		log.Printf("[auth] invalid referral code %s", code)
+		return
+	}
+
+	// Anti-abuse: max 20 converted referrals per referrer
+	count, _ := s.mongoDB.Collection("referrals").CountDocuments(ctx,
+		bson.M{"referrerId": referrerID, "status": "converted"})
+	if count >= 20 {
+		log.Printf("[auth] referrer %s hit 20-referral cap", referrerID)
+		return
+	}
+
+	// Create referral document
+	s.mongoDB.Collection("referrals").InsertOne(ctx, bson.M{
+		"referrerId":   referrerID,
+		"refereeId":    refereeID,
+		"referralCode": code,
+		"status":       "pending",
+		"rewardGranted": false,
+		"createdAt":    time.Now(),
+	})
+
+	// Set referredBy on the referee
+	s.users().UpdateOne(ctx, bson.M{"_id": refereeID}, bson.M{"$set": bson.M{"referredBy": referrerID}})
+	log.Printf("[auth] applied referral: %s referred by %s (code %s)", refereeID, referrerID, code)
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -482,6 +742,7 @@ func main() {
 		"/quiz.AuthService/ResetPassword",
 		"/quiz.AuthService/LoginWithEmail",
 		"/quiz.AuthService/CheckUsername",
+		"/quiz.AuthService/GoogleSignIn",
 	}
 
 	_ = strings.Join(nil, "") // ensure strings import used
