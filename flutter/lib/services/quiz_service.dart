@@ -14,10 +14,12 @@ class QuizService {
   late final ClientChannel _matchmakingChannel;
   late final ClientChannel _quizChannel;
   late final ClientChannel _scoringChannel;
+  late final ClientChannel _paymentChannel;
 
   late final MatchmakingServiceClient matchmaking;
   late final QuizServiceClient quiz;
   late final ScoringServiceClient scoring;
+  late final PaymentServiceClient payment;
   CallOptions? _authOptions;
 
   QuizService._internal() {
@@ -37,9 +39,16 @@ class QuizService {
       options: const ChannelOptions(credentials: ChannelCredentials.insecure()),
     );
 
+    _paymentChannel = ClientChannel(
+      _backendHost,
+      port: 50055,
+      options: const ChannelOptions(credentials: ChannelCredentials.insecure()),
+    );
+
     matchmaking = MatchmakingServiceClient(_matchmakingChannel);
     quiz = QuizServiceClient(_quizChannel);
     scoring = ScoringServiceClient(_scoringChannel);
+    payment = PaymentServiceClient(_paymentChannel);
   }
 
   static const _defaultTimeout = Duration(seconds: 10);
@@ -145,5 +154,6 @@ class QuizService {
     await _matchmakingChannel.shutdown();
     await _quizChannel.shutdown();
     await _scoringChannel.shutdown();
+    await _paymentChannel.shutdown();
   }
 }

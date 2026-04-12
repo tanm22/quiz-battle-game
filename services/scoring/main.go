@@ -824,6 +824,33 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 	}
 
 	log.Printf("[persistence] match %s persisted — winner: %s, %d players", event.RoomID, winner, len(entries))
+
+	// Phase 2: Detect first quiz completion for referred users → trigger referral reward
+	for _, e := range entries {
+		userID := e.Member.(string)
+		var user models.User
+		if err := s.mongoDB.Collection("users").FindOne(ctx, bson.M{"_id": userID}).Decode(&user); err != nil {
+			continue
+		}
+		if user.ReferredBy == "" {
+			continue
+		}
+		matchCount, _ := s.mongoDB.Collection("match_history").CountDocuments(ctx, bson.M{"players.userId": userID})
+		if matchCount == 1 {
+			refEvent, _ := json.Marshal(map[string]interface{}{
+				"event":       "referral.first_quiz_completed",
+				"referrerId":  user.ReferredBy,
+				"refereeId":   userID,
+				"refereeName": user.Username,
+			})
+			s.amqpCh.PublishWithContext(ctx, "sx", "referral.first_quiz_completed", false, false, amqp.Publishing{
+				ContentType: "application/json",
+				Body:        refEvent,
+			})
+			log.Printf("[persistence] published referral.first_quiz_completed for user %s", userID)
+		}
+	}
+
 	msg.Ack(false)
 }
 
@@ -852,6 +879,160 @@ func (s *scoringServer) consumeAnalytics(ctx context.Context) {
 				return
 			}
 			log.Printf("[analytics] match.finished event: %s", string(msg.Body))
+			msg.Ack(false)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: payment.captured consumer — upgrade user plan (ISSUE-07)
+// ---------------------------------------------------------------------------
+
+func (s *scoringServer) consumePaymentCaptured(ctx context.Context) {
+	ch, err := s.newChannel()
+	if err != nil {
+		log.Fatalf("[payment-consumer] failed to open channel: %v", err)
+	}
+	defer ch.Close()
+
+	msgs, err := ch.Consume("payment-success-queue", "", false, false, false, false, nil)
+	if err != nil {
+		log.Fatalf("[payment-consumer] failed to consume payment-success-queue: %v", err)
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case msg, ok := <-msgs:
+			if !ok {
+				return
+			}
+
+			var event struct {
+				UserID       string `json:"userId"`
+				PlanDuration string `json:"planDuration"`
+			}
+			if err := json.Unmarshal(msg.Body, &event); err != nil {
+				log.Printf("[payment-consumer] bad payload: %v", err)
+				msg.Nack(false, false)
+				continue
+			}
+
+			// Calculate plan expiry
+			var duration time.Duration
+			if event.PlanDuration == "yearly" {
+				duration = 365 * 24 * time.Hour
+			} else {
+				duration = 30 * 24 * time.Hour // monthly
+			}
+			expiresAt := time.Now().Add(duration)
+
+			// Upgrade user plan in MongoDB
+			_, err := s.mongoDB.Collection("users").UpdateOne(ctx,
+				bson.M{"_id": event.UserID},
+				bson.M{"$set": bson.M{"plan": "premium", "planExpiresAt": expiresAt}},
+			)
+			if err != nil {
+				log.Printf("[payment-consumer] plan upgrade failed for %s: %v", event.UserID, err)
+				msg.Nack(false, true)
+				continue
+			}
+
+			// Invalidate Redis plan cache (ISSUE-07)
+			keys.DelPlan(ctx, s.rdb, event.UserID)
+
+			// Publish activation notification
+			notifJSON, _ := json.Marshal(map[string]interface{}{
+				"event":  "notif.premium.activated",
+				"userId": event.UserID,
+			})
+			s.amqpCh.PublishWithContext(ctx, "sx", "notif.premium.activated", false, false, amqp.Publishing{
+				ContentType: "application/json",
+				Body:        notifJSON,
+			})
+
+			log.Printf("[payment-consumer] upgraded user %s to premium (expires %s)", event.UserID, expiresAt.Format("2006-01-02"))
+			msg.Ack(false)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: referral.first_quiz_completed consumer (ISSUE-06 full chain)
+// ---------------------------------------------------------------------------
+
+func (s *scoringServer) consumeReferralEvents(ctx context.Context) {
+	ch, err := s.newChannel()
+	if err != nil {
+		log.Fatalf("[referral-consumer] failed to open channel: %v", err)
+	}
+	defer ch.Close()
+
+	msgs, err := ch.Consume("referral-event-queue", "", false, false, false, false, nil)
+	if err != nil {
+		log.Fatalf("[referral-consumer] failed to consume referral-event-queue: %v", err)
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case msg, ok := <-msgs:
+			if !ok {
+				return
+			}
+
+			var event struct {
+				ReferrerID  string `json:"referrerId"`
+				RefereeID   string `json:"refereeId"`
+				RefereeName string `json:"refereeName"`
+			}
+			if err := json.Unmarshal(msg.Body, &event); err != nil {
+				log.Printf("[referral-consumer] bad payload: %v", err)
+				msg.Nack(false, false)
+				continue
+			}
+
+			// Idempotent: findOneAndUpdate with rewardGranted: false
+			result := s.mongoDB.Collection("referrals").FindOneAndUpdate(ctx,
+				bson.M{"refereeId": event.RefereeID, "rewardGranted": false},
+				bson.M{"$set": bson.M{
+					"status":        "converted",
+					"rewardGranted": true,
+					"convertedAt":   time.Now(),
+				}},
+			)
+			if result.Err() != nil {
+				// No matching doc = already processed or doesn't exist
+				log.Printf("[referral-consumer] skip (already processed or missing): %v", result.Err())
+				msg.Ack(false)
+				continue
+			}
+
+			// Grant coins: referrer +100, referee +50
+			s.mongoDB.Collection("users").UpdateOne(ctx,
+				bson.M{"_id": event.ReferrerID},
+				bson.M{"$inc": bson.M{"coins": int64(100)}},
+			)
+			s.mongoDB.Collection("users").UpdateOne(ctx,
+				bson.M{"_id": event.RefereeID},
+				bson.M{"$inc": bson.M{"coins": int64(50)}},
+			)
+
+			// Publish notification to referrer (ISSUE-06 complete chain)
+			notifJSON, _ := json.Marshal(map[string]interface{}{
+				"event":       "notif.referral.converted",
+				"userId":      event.ReferrerID,
+				"refereeName": event.RefereeName,
+				"coinsEarned": 100,
+			})
+			s.amqpCh.PublishWithContext(ctx, "sx", "notif.referral.converted", false, false, amqp.Publishing{
+				ContentType: "application/json",
+				Body:        notifJSON,
+			})
+
+			log.Printf("[referral-consumer] referral converted: %s referred %s, coins granted", event.ReferrerID, event.RefereeID)
 			msg.Ack(false)
 		}
 	}
@@ -1002,9 +1183,11 @@ func main() {
 	srv.selfClient = pb.NewScoringServiceClient(selfConn)
 
 	// Start RabbitMQ consumers (3 goroutines)
-	go srv.consumeAnswers(ctx)       // 9.5: answer scoring
-	go srv.consumeMatchFinished(ctx) // 9.6: persistence worker
-	go srv.consumeAnalytics(ctx)     // 9.6 note: analytics stub
+	go srv.consumeAnswers(ctx)          // 9.5: answer scoring
+	go srv.consumeMatchFinished(ctx)    // 9.6: persistence worker
+	go srv.consumeAnalytics(ctx)        // 9.6 note: analytics stub
+	go srv.consumePaymentCaptured(ctx)  // Phase 2: plan upgrade on payment
+	go srv.consumeReferralEvents(ctx)   // Phase 2: referral reward chain (ISSUE-06)
 
 	// Block forever (gRPC server runs in background goroutine)
 	select {}
