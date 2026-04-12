@@ -238,5 +238,173 @@
     "difficulty": "hard",
     "topic": "tech",
     "avgResponseTimeMs": 9500
+  },
+  {
+    "text": "What is the smallest bone in the human body?",
+    "options": ["Femur", "Stapes", "Radius", "Patella"],
+    "correctIndex": 1,
+    "difficulty": "medium",
+    "topic": "science",
+    "avgResponseTimeMs": 6800
+  },
+  {
+    "text": "Which element has the atomic number 79?",
+    "options": ["Silver", "Platinum", "Gold", "Copper"],
+    "correctIndex": 2,
+    "difficulty": "medium",
+    "topic": "science",
+    "avgResponseTimeMs": 7200
+  },
+  {
+    "text": "What year did the Berlin Wall fall?",
+    "options": ["1987", "1988", "1989", "1990"],
+    "correctIndex": 2,
+    "difficulty": "medium",
+    "topic": "history",
+    "avgResponseTimeMs": 6500
+  },
+  {
+    "text": "Who painted the ceiling of the Sistine Chapel?",
+    "options": ["Leonardo da Vinci", "Raphael", "Michelangelo", "Donatello"],
+    "correctIndex": 2,
+    "difficulty": "medium",
+    "topic": "history",
+    "avgResponseTimeMs": 5800
+  },
+  {
+    "text": "What is the capital of Australia?",
+    "options": ["Sydney", "Melbourne", "Canberra", "Brisbane"],
+    "correctIndex": 2,
+    "difficulty": "medium",
+    "topic": "geography",
+    "avgResponseTimeMs": 6100
+  },
+  {
+    "text": "Which desert is the largest in the world?",
+    "options": ["Sahara", "Antarctic", "Arabian", "Gobi"],
+    "correctIndex": 1,
+    "difficulty": "medium",
+    "topic": "geography",
+    "avgResponseTimeMs": 7500
+  },
+  {
+    "text": "In tennis, what is a score of 40-40 called?",
+    "options": ["Match point", "Deuce", "Advantage", "Break point"],
+    "correctIndex": 1,
+    "difficulty": "easy",
+    "topic": "sports",
+    "avgResponseTimeMs": 4200
+  },
+  {
+    "text": "How many rings are on the Olympic flag?",
+    "options": ["4", "5", "6", "7"],
+    "correctIndex": 1,
+    "difficulty": "easy",
+    "topic": "sports",
+    "avgResponseTimeMs": 3400
+  },
+  {
+    "text": "What does RAM stand for in computing?",
+    "options": ["Read Access Memory", "Random Access Memory", "Rapid Access Module", "Run Access Memory"],
+    "correctIndex": 1,
+    "difficulty": "easy",
+    "topic": "tech",
+    "avgResponseTimeMs": 4000
+  },
+  {
+    "text": "Who co-founded Microsoft with Bill Gates?",
+    "options": ["Steve Jobs", "Paul Allen", "Steve Wozniak", "Larry Page"],
+    "correctIndex": 1,
+    "difficulty": "medium",
+    "topic": "tech",
+    "avgResponseTimeMs": 6300
+  },
+  {
+    "text": "What is the hardest natural substance on Earth?",
+    "options": ["Titanium", "Quartz", "Diamond", "Sapphire"],
+    "correctIndex": 2,
+    "difficulty": "easy",
+    "topic": "science",
+    "avgResponseTimeMs": 3800
+  },
+  {
+    "text": "Which blood type is known as the universal donor?",
+    "options": ["A+", "B+", "AB+", "O-"],
+    "correctIndex": 3,
+    "difficulty": "medium",
+    "topic": "science",
+    "avgResponseTimeMs": 6700
+  },
+  {
+    "text": "The Magna Carta was signed in which year?",
+    "options": ["1066", "1215", "1492", "1776"],
+    "correctIndex": 1,
+    "difficulty": "hard",
+    "topic": "history",
+    "avgResponseTimeMs": 9800
+  },
+  {
+    "text": "What is the smallest country in the world by area?",
+    "options": ["Monaco", "Vatican City", "San Marino", "Liechtenstein"],
+    "correctIndex": 1,
+    "difficulty": "medium",
+    "topic": "geography",
+    "avgResponseTimeMs": 6200
+  },
+  {
+    "text": "Which planet has the most moons?",
+    "options": ["Jupiter", "Saturn", "Uranus", "Neptune"],
+    "correctIndex": 1,
+    "difficulty": "hard",
+    "topic": "science",
+    "avgResponseTimeMs": 10200
+  },
+  {
+    "text": "What is the currency of Japan?",
+    "options": ["Won", "Yuan", "Yen", "Ringgit"],
+    "correctIndex": 2,
+    "difficulty": "easy",
+    "topic": "geography",
+    "avgResponseTimeMs": 3600
+  },
+  {
+    "text": "In which sport would you perform a slam dunk?",
+    "options": ["Volleyball", "Basketball", "Tennis", "Handball"],
+    "correctIndex": 1,
+    "difficulty": "easy",
+    "topic": "sports",
+    "avgResponseTimeMs": 3200
+  },
+  {
+    "text": "What does SQL stand for?",
+    "options": ["Structured Query Language", "Simple Query Logic", "Standard Query Library", "Sequential Query Language"],
+    "correctIndex": 0,
+    "difficulty": "medium",
+    "topic": "tech",
+    "avgResponseTimeMs": 5500
+  },
+  {
+    "text": "Which ancient wonder was located in Alexandria?",
+    "options": ["Colossus of Rhodes", "Hanging Gardens", "Lighthouse of Alexandria", "Temple of Artemis"],
+    "correctIndex": 2,
+    "difficulty": "hard",
+    "topic": "history",
+    "avgResponseTimeMs": 10500
+  },
+  {
+    "text": "What is the half-life of Carbon-14 approximately?",
+    "options": ["1,730 years", "5,730 years", "11,460 years", "22,920 years"],
+    "correctIndex": 1,
+    "difficulty": "hard",
+    "topic": "science",
+    "avgResponseTimeMs": 11000
+  },
+  {
+    "text": "Which country hosted the 2016 Summer Olympics?",
+    "options": ["China", "UK", "Brazil", "Japan"],
+    "correctIndex": 2,
+    "difficulty": "medium",
+    "topic": "sports",
+    "avgResponseTimeMs": 5900
   }
 ]

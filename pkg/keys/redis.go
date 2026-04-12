@@ -23,7 +23,7 @@ var LeaderboardScript = redis.NewScript(`
 local current = redis.call('ZSCORE', KEYS[1], ARGV[1])
 if not current then current = 0 end
 redis.call('ZADD', KEYS[1], current + ARGV[2], ARGV[1])
-return redis.call('ZRANGE', KEYS[1], 0, -1, 'WITHSCORES')
+return redis.call('ZRANGE', KEYS[1], 0, -1, 'REV', 'WITHSCORES')
 `)
 
 // --- Matchmaking pool operations ---

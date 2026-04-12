@@ -15,6 +15,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"quiz-battle/pkg/auth"
 	"quiz-battle/pkg/keys"
@@ -39,11 +40,12 @@ type Question struct {
 
 type scoringServer struct {
 	pb.UnimplementedScoringServiceServer
-	rdb       *redis.Client
-	amqpConn  *amqp.Connection
-	amqpCh    *amqp.Channel // for publishing only
-	mongoDB   *mongo.Database
-	jwtSecret string
+	rdb          *redis.Client
+	amqpConn     *amqp.Connection
+	amqpCh       *amqp.Channel // for publishing only
+	mongoDB      *mongo.Database
+	jwtSecret    string
+	selfClient   pb.ScoringServiceClient // gRPC loopback client for CalculateScore
 }
 
 // newChannel creates a dedicated AMQP channel per consumer (channels are not thread-safe).
@@ -270,42 +272,41 @@ func (s *scoringServer) processAnswer(ctx context.Context, msg amqp.Delivery) {
 		return
 	}
 
-	// Check if answer is correct
-	correct, err := s.isCorrect(ctx, answer.RoomID, answer.Round, answer.OptionIndex)
+	// Call CalculateScore gRPC to compute the score (spec: must use gRPC, not in-process)
+	answerTimeMs := answer.ServerTimestamp - answer.ClientTimestamp
+	calcResp, err := s.selfClient.CalculateScore(ctx, &pb.CalculateScoreRequest{
+		RoomId:      answer.RoomID,
+		UserId:      answer.UserID,
+		Round:       int32(answer.Round),
+		OptionIndex: int32(answer.OptionIndex),
+		AnswerTimeMs: answerTimeMs,
+	})
 	if err != nil {
-		log.Printf("[scoring] correctness check error: %v", err)
-		// Check x-death count for DLQ routing
+		log.Printf("[scoring] CalculateScore gRPC error: %v", err)
 		if getDeathCount(msg) >= 3 {
-			msg.Nack(false, false) // route to DLQ
+			msg.Nack(false, false)
 		} else {
-			msg.Nack(false, true) // requeue
+			msg.Nack(false, true)
 		}
 		return
 	}
 
-	// Calculate score (step 47 formula)
-	var basePoints float64
-	if correct {
-		basePoints = 100
-	}
-
-	answerTimeMs := answer.ServerTimestamp - answer.ClientTimestamp
-	speedMultiplier := 1.0
-	if answerTimeMs < 5000 {
-		speedMultiplier = 1.5
-	} else if answerTimeMs > 13000 {
-		speedMultiplier = 0.8
-	}
-
-	score := basePoints * speedMultiplier
+	correct := calcResp.Correct
+	score := calcResp.Score
 
 	// Record answer in Redis (for idempotency on future deliveries)
-	answerJSON, _ := json.Marshal(map[string]interface{}{
-		"optionIndex": answer.OptionIndex,
-		"correct":     correct,
-		"score":       score,
-		"timestamp":   answer.ServerTimestamp,
+	answerJSON, err := json.Marshal(map[string]interface{}{
+		"optionIndex":     answer.OptionIndex,
+		"correct":         correct,
+		"score":           score,
+		"timestamp":       answer.ServerTimestamp,
+		"clientTimestamp":  answer.ClientTimestamp,
 	})
+	if err != nil {
+		log.Printf("[scoring] failed to marshal answer record: %v", err)
+		msg.Nack(false, true)
+		return
+	}
 	if err := keys.SetAnswer(ctx, s.rdb, answer.RoomID, answer.Round, answer.UserID, string(answerJSON)); err != nil {
 		log.Printf("[scoring] failed to record answer: %v", err)
 		msg.Nack(false, true)
@@ -321,7 +322,7 @@ func (s *scoringServer) processAnswer(ctx context.Context, msg amqp.Delivery) {
 	}
 
 	log.Printf("[scoring] %s scored %.0f in room %s round %d (correct=%v, speed=%.1fx)",
-		answer.UserID, score, answer.RoomID, answer.Round, correct, speedMultiplier)
+		answer.UserID, score, answer.RoomID, answer.Round, correct, calcResp.SpeedMultiplier)
 
 	// Publish leaderboard.updated to RabbitMQ for real-time broadcast
 	leaderboardEvent, _ := json.Marshal(map[string]interface{}{
@@ -425,6 +426,15 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 			winner = userID
 		}
 
+		// Look up real username from MongoDB
+		username := userID
+		var userDoc bson.M
+		if err := s.mongoDB.Collection("users").FindOne(ctx, bson.M{"_id": userID}).Decode(&userDoc); err == nil {
+			if u, ok := userDoc["username"].(string); ok && u != "" {
+				username = u
+			}
+		}
+
 		// Tally answersCorrect and avgResponseTimeMs from per-round answer records
 		var answersCorrect int
 		var totalResponseMs int64
@@ -435,16 +445,18 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 				continue
 			}
 			var rec struct {
-				Correct   bool  `json:"correct"`
-				Timestamp int64 `json:"timestamp"`
+				Correct         bool  `json:"correct"`
+				Timestamp       int64 `json:"timestamp"`
+				ClientTimestamp int64  `json:"clientTimestamp"`
 			}
 			if json.Unmarshal([]byte(answerJSON), &rec) == nil {
 				answeredRounds++
 				if rec.Correct {
 					answersCorrect++
 				}
-				if rec.Timestamp > 0 {
-					totalResponseMs += rec.Timestamp
+				// responseTime = serverTimestamp - clientTimestamp
+				if rec.Timestamp > 0 && rec.ClientTimestamp > 0 {
+					totalResponseMs += rec.Timestamp - rec.ClientTimestamp
 				}
 			}
 		}
@@ -456,7 +468,7 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 
 		players = append(players, bson.M{
 			"userId":            userID,
-			"username":          userID,
+			"username":          username,
 			"finalScore":        e.Score,
 			"rank":              i + 1,
 			"answersCorrect":    answersCorrect,
@@ -467,15 +479,15 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 		winner = event.Winner
 	}
 
-	// Compute duration from room state createdAt
-	var duration int64
+	// Compute duration in milliseconds from room state createdAt
+	var durationMs int64
 	stateJSON, err := keys.GetRoomState(ctx, s.rdb, event.RoomID)
 	if err == nil {
 		var state struct {
 			CreatedAt int64 `json:"createdAt"`
 		}
 		if json.Unmarshal([]byte(stateJSON), &state) == nil && state.CreatedAt > 0 {
-			duration = time.Now().Unix() - state.CreatedAt
+			durationMs = (time.Now().Unix() - state.CreatedAt) * 1000
 		}
 	}
 
@@ -485,7 +497,7 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 		"rounds":    event.Rounds,
 		"winner":    winner,
 		"createdAt": time.Now(),
-		"duration":  duration,
+		"duration":  durationMs,
 	}
 
 	// Step 53: Upsert with $setOnInsert to prevent double-writes
@@ -650,11 +662,6 @@ func main() {
 		jwtSecret: jwtSecret,
 	}
 
-	// Start RabbitMQ consumers (3 goroutines)
-	go srv.consumeAnswers(ctx)       // 9.5: answer scoring
-	go srv.consumeMatchFinished(ctx) // 9.6: persistence worker
-	go srv.consumeAnalytics(ctx)     // 9.6 note: analytics stub
-
 	// gRPC server
 	grpcServer := grpc.NewServer(
 		grpc.UnaryInterceptor(auth.UnaryInterceptor(jwtSecret, nil)),
@@ -667,8 +674,29 @@ func main() {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
-	log.Println("[scoring] serving on :50053")
-	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+	// Start gRPC server in background, then set up self-client for CalculateScore
+	go func() {
+		log.Println("[scoring] serving on :50053")
+		if err := grpcServer.Serve(lis); err != nil {
+			log.Fatalf("failed to serve: %v", err)
+		}
+	}()
+
+	// Create gRPC loopback client so the scoring worker calls CalculateScore via gRPC
+	selfConn, err := grpc.NewClient("localhost:50053",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		log.Fatalf("failed to create self-client: %v", err)
 	}
+	defer selfConn.Close()
+	srv.selfClient = pb.NewScoringServiceClient(selfConn)
+
+	// Start RabbitMQ consumers (3 goroutines)
+	go srv.consumeAnswers(ctx)       // 9.5: answer scoring
+	go srv.consumeMatchFinished(ctx) // 9.6: persistence worker
+	go srv.consumeAnalytics(ctx)     // 9.6 note: analytics stub
+
+	// Block forever (gRPC server runs in background goroutine)
+	select {}
 }

@@ -18,6 +18,8 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"quiz-battle/pkg/auth"
 	"quiz-battle/pkg/keys"
@@ -36,7 +38,6 @@ type matchmakingServer struct {
 	mongoDB    *mongo.Database
 	jwtSecret  string
 	subscribers sync.Map // userId -> chan *pb.MatchEvent
-	heartbeats  sync.Map // "roomId:userId" -> int64 (unix timestamp)
 	seqCounter  atomic.Int64
 }
 
@@ -47,7 +48,7 @@ type matchmakingServer struct {
 func (s *matchmakingServer) JoinMatchmaking(ctx context.Context, req *pb.JoinMatchmakingRequest) (*pb.JoinMatchmakingResponse, error) {
 	userID, err := auth.UserIDFromContext(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("auth: %w", err)
+		return nil, status.Error(codes.Unauthenticated, "not authenticated")
 	}
 
 	// Lookup rating from MongoDB
@@ -63,7 +64,7 @@ func (s *matchmakingServer) JoinMatchmaking(ctx context.Context, req *pb.JoinMat
 	// Duplicate check: ZSCORE returns the score if the member exists
 	inPool, err := keys.IsInPool(ctx, s.rdb, userID)
 	if err != nil {
-		return nil, fmt.Errorf("redis error: %w", err)
+		return nil, status.Errorf(codes.Internal, "redis error: %v", err)
 	}
 	if inPool {
 		return &pb.JoinMatchmakingResponse{Status: pb.MatchmakingStatus_ALREADY_IN_QUEUE}, nil
@@ -71,7 +72,7 @@ func (s *matchmakingServer) JoinMatchmaking(ctx context.Context, req *pb.JoinMat
 
 	// ZADD to matchmaking:pool with score = rating
 	if err := keys.AddToPool(ctx, s.rdb, userID, rating); err != nil {
-		return nil, fmt.Errorf("failed to add to pool: %w", err)
+		return nil, status.Errorf(codes.Internal, "failed to add to pool: %v", err)
 	}
 
 	log.Printf("[matchmaking] player %s joined pool (rating=%.0f)", userID, rating)
@@ -85,11 +86,11 @@ func (s *matchmakingServer) JoinMatchmaking(ctx context.Context, req *pb.JoinMat
 func (s *matchmakingServer) LeaveMatchmaking(ctx context.Context, req *pb.LeaveMatchmakingRequest) (*pb.LeaveMatchmakingResponse, error) {
 	userID, err := auth.UserIDFromContext(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("auth: %w", err)
+		return nil, status.Error(codes.Unauthenticated, "not authenticated")
 	}
 
 	if err := keys.RemoveFromPool(ctx, s.rdb, userID); err != nil {
-		return nil, fmt.Errorf("failed to remove from pool: %w", err)
+		return nil, status.Errorf(codes.Internal, "failed to remove from pool: %v", err)
 	}
 	log.Printf("[matchmaking] player %s left pool", userID)
 	return &pb.LeaveMatchmakingResponse{Removed: true}, nil
@@ -102,7 +103,7 @@ func (s *matchmakingServer) LeaveMatchmaking(ctx context.Context, req *pb.LeaveM
 func (s *matchmakingServer) SubscribeToMatch(req *pb.SubscribeToMatchRequest, stream pb.MatchmakingService_SubscribeToMatchServer) error {
 	userID, err := auth.UserIDFromContext(stream.Context())
 	if err != nil {
-		return fmt.Errorf("auth: %w", err)
+		return status.Error(codes.Unauthenticated, "not authenticated")
 	}
 
 	ch := make(chan *pb.MatchEvent, 10)
@@ -204,15 +205,26 @@ func (s *matchmakingServer) createRoom(ctx context.Context, players []redis.Z) {
 	pipe := s.rdb.TxPipeline()
 	now := time.Now().Unix()
 
-	// room:{id}:players hash
+	// room:{id}:players hash — resolve real usernames from MongoDB
 	for _, p := range players {
 		userID := p.Member.(string)
+		username := userID
+		var userDoc bson.M
+		if err := s.mongoDB.Collection("users").FindOne(ctx, bson.M{"_id": userID}).Decode(&userDoc); err == nil {
+			if u, ok := userDoc["username"].(string); ok && u != "" {
+				username = u
+			}
+		}
 		info := models.PlayerInfo{
 			UserID:   userID,
-			Username: userID, // username resolved later by client
+			Username: username,
 			Rating:   int32(p.Score),
 		}
-		infoJSON, _ := json.Marshal(info)
+		infoJSON, err := json.Marshal(info)
+		if err != nil {
+			log.Printf("[matchmaking] failed to marshal player info: %v", err)
+			continue
+		}
 		pipe.HSet(ctx, keys.Players(roomID), userID, string(infoJSON))
 	}
 	pipe.Expire(ctx, keys.Players(roomID), keys.RoomTTL)
@@ -225,7 +237,11 @@ func (s *matchmakingServer) createRoom(ctx context.Context, players []redis.Z) {
 		Round:     0,
 		CreatedAt: now,
 	}
-	stateJSON, _ := json.Marshal(state)
+	stateJSON, err := json.Marshal(state)
+	if err != nil {
+		log.Printf("[matchmaking] failed to marshal room state: %v", err)
+		return
+	}
 	pipe.Set(ctx, keys.State(roomID), string(stateJSON), keys.RoomTTL)
 
 	// room:{id}:round
@@ -246,7 +262,11 @@ func (s *matchmakingServer) createRoom(ctx context.Context, players []redis.Z) {
 		"playerIds": playerIDs,
 		"createdAt": now,
 	}
-	eventJSON, _ := json.Marshal(event)
+	eventJSON, err := json.Marshal(event)
+	if err != nil {
+		log.Printf("[matchmaking] failed to marshal match.created event: %v", err)
+		return
+	}
 
 	err = s.amqpCh.PublishWithContext(ctx,
 		"sx",            // exchange
@@ -283,65 +303,9 @@ func (s *matchmakingServer) createRoom(ctx context.Context, players []redis.Z) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Heartbeat tracking (section 7.2)
-// ---------------------------------------------------------------------------
-
-func (s *matchmakingServer) RecordHeartbeat(roomID, userID string) {
-	key := roomID + ":" + userID
-	s.heartbeats.Store(key, time.Now().Unix())
-}
-
-func (s *matchmakingServer) startHeartbeatChecker(ctx context.Context) {
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			now := time.Now().Unix()
-			s.heartbeats.Range(func(key, value interface{}) bool {
-				lastBeat := value.(int64)
-				if now-lastBeat > 15 {
-					k := key.(string)
-					s.heartbeats.Delete(key)
-
-					// Parse roomId:userId
-					var roomID, userID string
-					for i := len(k) - 1; i >= 0; i-- {
-						if k[i] == ':' {
-							roomID = k[:i]
-							userID = k[i+1:]
-							break
-						}
-					}
-					if roomID == "" || userID == "" {
-						return true
-					}
-
-					log.Printf("[heartbeat] player %s disconnected from room %s", userID, roomID)
-
-					// Mark player as disconnected in room:{id}:players hash
-					playerJSON, err := keys.GetPlayer(ctx, s.rdb, roomID, userID)
-					if err == nil && playerJSON != "" {
-						var info models.PlayerInfo
-						if json.Unmarshal([]byte(playerJSON), &info) == nil {
-							info.Username = info.Username + " (disconnected)"
-							updatedJSON, _ := json.Marshal(info)
-							keys.SetPlayer(ctx, s.rdb, roomID, userID, string(updatedJSON))
-						}
-					}
-
-					// Broadcast PlayerLeft GameEvent to remaining subscribers
-					// (This will be consumed by StreamGameEvents in the quiz service)
-				}
-				return true
-			})
-		}
-	}
-}
+// Note: Disconnect detection is handled by the quiz service via gRPC stream
+// closure detection (defer block in StreamGameEvents). When all players
+// disconnect, the match ends. When one player remains, they win by forfeit.
 
 // ---------------------------------------------------------------------------
 // RabbitMQ setup — declare sx exchange and match-created-queue
@@ -437,7 +401,6 @@ func main() {
 
 	// Start background goroutines
 	go srv.startPoller(ctx)
-	go srv.startHeartbeatChecker(ctx)
 
 	grpcServer := grpc.NewServer(
 		grpc.UnaryInterceptor(auth.UnaryInterceptor(jwtSecret, nil)),

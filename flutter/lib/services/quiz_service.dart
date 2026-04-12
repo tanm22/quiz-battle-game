@@ -2,6 +2,10 @@ import 'package:fixnum/fixnum.dart';
 import 'package:grpc/grpc.dart';
 import '../proto/quiz.pbgrpc.dart';
 
+/// Backend host — use 10.0.2.2 for Android emulator, localhost for desktop/web.
+/// Override via --dart-define=BACKEND_HOST=your.host.ip
+const _backendHost = String.fromEnvironment('BACKEND_HOST', defaultValue: '10.0.2.2');
+
 /// Step 58: Singleton gRPC service that wraps all three backend services.
 class QuizService {
   static final QuizService _instance = QuizService._internal();
@@ -18,17 +22,17 @@ class QuizService {
 
   QuizService._internal() {
     _matchmakingChannel = ClientChannel(
-      'localhost',
+      _backendHost,
       port: 50051,
       options: const ChannelOptions(credentials: ChannelCredentials.insecure()),
     );
     _quizChannel = ClientChannel(
-      'localhost',
+      _backendHost,
       port: 50052,
       options: const ChannelOptions(credentials: ChannelCredentials.insecure()),
     );
     _scoringChannel = ClientChannel(
-      'localhost',
+      _backendHost,
       port: 50053,
       options: const ChannelOptions(credentials: ChannelCredentials.insecure()),
     );

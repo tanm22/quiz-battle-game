@@ -20,9 +20,11 @@ class AuthService {
   int _matchesPlayed = 0;
   int _wins = 0;
 
+  static const _backendHost = String.fromEnvironment('BACKEND_HOST', defaultValue: '10.0.2.2');
+
   AuthService._internal() {
     _channel = ClientChannel(
-      'localhost',
+      _backendHost,
       port: 50054,
       options: const ChannelOptions(credentials: ChannelCredentials.insecure()),
     );

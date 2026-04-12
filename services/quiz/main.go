@@ -47,12 +47,19 @@ type Question struct {
 type quizServer struct {
 	pb.UnimplementedQuizServiceServer
 	rdb          *redis.Client
-	amqpCh       *amqp.Channel
+	amqpConn     *amqp.Connection
+	amqpCh       *amqp.Channel // for publishing only
 	mongoDB      *mongo.Database
 	jwtSecret    string
 	gameStreams  sync.Map // "roomId:userId" -> chan *pb.GameEvent
 	roomTimers  sync.Map // roomId -> *time.Timer (for round close)
 	seqCounters sync.Map // roomId -> *atomic.Int64
+	roomDeadlines sync.Map // roomId -> int64 (current round deadline_unix)
+}
+
+// newChannel creates a dedicated AMQP channel per consumer (channels are not thread-safe).
+func (s *quizServer) newChannel() (*amqp.Channel, error) {
+	return s.amqpConn.Channel()
 }
 
 func (s *quizServer) getSeqCounter(roomID string) *atomic.Int64 {
@@ -130,7 +137,13 @@ func (s *quizServer) selectQuestions(ctx context.Context) ([]Question, error) {
 // ---------------------------------------------------------------------------
 
 func (s *quizServer) consumeMatchCreated(ctx context.Context) {
-	msgs, err := s.amqpCh.Consume("match-created-queue", "", false, false, false, false, nil)
+	ch, err := s.newChannel()
+	if err != nil {
+		log.Fatalf("[quiz] failed to open channel for match-created: %v", err)
+	}
+	defer ch.Close()
+
+	msgs, err := ch.Consume("match-created-queue", "", false, false, false, false, nil)
 	if err != nil {
 		log.Fatalf("[quiz] failed to consume match-created-queue: %v", err)
 	}
@@ -230,6 +243,9 @@ func (s *quizServer) startRound(ctx context.Context, roomID string, round int) {
 
 	log.Printf("[quiz] room %s starting round %d — question: %s", roomID, round, q.Text)
 
+	// Store deadline for reconnection snapshots and TimerSync
+	s.roomDeadlines.Store(roomID, deadlineUnix)
+
 	// Update round in Redis
 	keys.SetRoomRound(ctx, s.rdb, roomID, round)
 
@@ -254,6 +270,31 @@ func (s *quizServer) startRound(ctx context.Context, roomID string, round int) {
 		s.closeRound(ctx, roomID, round)
 	})
 	s.roomTimers.Store(roomID, timer)
+
+	// Periodic TimerSync — broadcast every 3 seconds until round ends
+	go func() {
+		ticker := time.NewTicker(3 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			dl, ok := s.roomDeadlines.Load(roomID)
+			if !ok {
+				return
+			}
+			deadline := dl.(int64)
+			if time.Now().Unix() >= deadline {
+				return // round has ended
+			}
+			syncSeq := s.getSeqCounter(roomID).Add(1)
+			s.broadcastToRoom(roomID, &pb.GameEvent{
+				SequenceNumber: syncSeq,
+				Event: &pb.GameEvent_TimerSync{
+					TimerSync: &pb.TimerSync{
+						DeadlineUnix: deadline,
+					},
+				},
+			})
+		}
+	}()
 }
 
 // ---------------------------------------------------------------------------
@@ -290,23 +331,22 @@ func (s *quizServer) closeRound(ctx context.Context, roomID string, round int) {
 	s.broadcastToRoom(roomID, event)
 
 	// Publish round.completed to RabbitMQ
-	roundEvent, _ := json.Marshal(map[string]interface{}{
+	roundEvent, err := json.Marshal(map[string]interface{}{
 		"roomId": roomID,
 		"round":  round,
 	})
-	s.amqpCh.PublishWithContext(ctx, "sx", "round.completed", false, false, amqp.Publishing{
+	if err != nil {
+		log.Printf("[quiz] failed to marshal round.completed: %v", err)
+		return
+	}
+	if err := s.amqpCh.PublishWithContext(ctx, "sx", "round.completed", false, false, amqp.Publishing{
 		ContentType: "application/json",
 		Body:        roundEvent,
-	})
-
-	// Advance to next round after 2s pause, or finish match
-	if round < len(questions) {
-		time.AfterFunc(2*time.Second, func() {
-			s.startRound(ctx, roomID, round+1)
-		})
-	} else {
-		s.finishMatch(ctx, roomID, round)
+	}); err != nil {
+		log.Printf("[quiz] failed to publish round.completed: %v", err)
 	}
+
+	// Round advancement is handled by consumeRoundCompleted via RabbitMQ
 }
 
 // ---------------------------------------------------------------------------
@@ -326,9 +366,21 @@ func (s *quizServer) finishMatch(ctx context.Context, roomID string, totalRounds
 		if i == 0 {
 			winner = userID
 		}
+
+		// Resolve real username from Redis player info or fall back to userId
+		username := userID
+		if playerJSON, err := keys.GetPlayer(ctx, s.rdb, roomID, userID); err == nil {
+			var info struct {
+				Username string `json:"username"`
+			}
+			if json.Unmarshal([]byte(playerJSON), &info) == nil && info.Username != "" {
+				username = info.Username
+			}
+		}
+
 		playerResults = append(playerResults, &pb.PlayerResult{
 			UserId:     userID,
-			Username:   userID,
+			Username:   username,
 			FinalScore: e.Score,
 			Rank:       int32(i + 1),
 		})
@@ -350,16 +402,20 @@ func (s *quizServer) finishMatch(ctx context.Context, roomID string, totalRounds
 	s.broadcastToRoom(roomID, event)
 
 	// Publish match.finished to RabbitMQ (consumed by persistence worker + analytics)
-	finishEvent, _ := json.Marshal(map[string]interface{}{
+	finishEvent, err := json.Marshal(map[string]interface{}{
 		"roomId":    roomID,
 		"winner":    winner,
 		"rounds":    totalRounds,
 		"players":   playerResults,
 	})
-	s.amqpCh.PublishWithContext(ctx, "sx", "match.finished", false, false, amqp.Publishing{
+	if err != nil {
+		log.Printf("[quiz] failed to marshal match.finished: %v", err)
+	} else if err := s.amqpCh.PublishWithContext(ctx, "sx", "match.finished", false, false, amqp.Publishing{
 		ContentType: "application/json",
 		Body:        finishEvent,
-	})
+	}); err != nil {
+		log.Printf("[quiz] failed to publish match.finished: %v", err)
+	}
 
 	// Cleanup in-memory state
 	roomQuestions.Delete(roomID)
@@ -409,6 +465,78 @@ func (s *quizServer) broadcastToRoom(roomID string, event *pb.GameEvent) {
 }
 
 // ---------------------------------------------------------------------------
+// sendStateSnapshot — sends current match state to a newly connected stream
+// Handles both reconnection (missed events) and late joiners
+// ---------------------------------------------------------------------------
+
+func (s *quizServer) sendStateSnapshot(ctx context.Context, roomID string, stream pb.QuizService_StreamGameEventsServer) {
+	// Get current round
+	round, err := keys.GetRoomRound(ctx, s.rdb, roomID)
+	if err != nil || round < 1 {
+		return // match hasn't started yet
+	}
+
+	questions, ok := s.getRoomQuestions(roomID)
+	if !ok {
+		return // match data not loaded
+	}
+
+	// Send current leaderboard state
+	entries, err := keys.GetLeaderboardEntries(ctx, s.rdb, roomID)
+	if err == nil && len(entries) > 0 {
+		lbEntries := make([]*pb.LeaderboardEntry, 0, len(entries))
+		for i, e := range entries {
+			userID := e.Member.(string)
+			username := userID
+			if playerJSON, err := keys.GetPlayer(ctx, s.rdb, roomID, userID); err == nil {
+				var info struct {
+					Username string `json:"username"`
+				}
+				if json.Unmarshal([]byte(playerJSON), &info) == nil && info.Username != "" {
+					username = info.Username
+				}
+			}
+			lbEntries = append(lbEntries, &pb.LeaderboardEntry{
+				UserId:   userID,
+				Username: username,
+				Score:    e.Score,
+				Rank:     int32(i + 1),
+			})
+		}
+		stream.Send(&pb.GameEvent{
+			SequenceNumber: 0, // snapshot, not a sequenced event
+			Event: &pb.GameEvent_Leaderboard{
+				Leaderboard: &pb.LeaderboardUpdate{Entries: lbEntries},
+			},
+		})
+	}
+
+	// Send current question with remaining time if round is still active
+	if round >= 1 && round <= len(questions) {
+		q := questions[round-1]
+		deadlineUnix := int64(0)
+		if dl, ok := s.roomDeadlines.Load(roomID); ok {
+			deadlineUnix = dl.(int64)
+		}
+		// Only send if the round hasn't expired
+		if deadlineUnix > time.Now().Unix() {
+			stream.Send(&pb.GameEvent{
+				SequenceNumber: 0,
+				Event: &pb.GameEvent_Question{
+					Question: &pb.QuestionBroadcast{
+						QuestionId:   q.ID,
+						Text:         q.Text,
+						Options:      q.Options,
+						DeadlineUnix: deadlineUnix,
+						Round:        int32(round),
+					},
+				},
+			})
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
 // StreamGameEvents — server-streaming RPC (section 4.1)
 // ---------------------------------------------------------------------------
 
@@ -449,11 +577,29 @@ func (s *quizServer) StreamGameEvents(req *pb.StreamGameEventsRequest, stream pb
 
 	log.Printf("[quiz] player %s streaming game events for room %s", userID, req.RoomId)
 
-	// Send current state snapshot for late joiners / reconnections
-	if req.SequenceNumber > 0 {
-		// Reconnection — replay from ring buffer would go here (section 6.3)
-		log.Printf("[quiz] player %s reconnecting from seq %d", userID, req.SequenceNumber)
+	// Broadcast PlayerJoined to existing players in the room
+	username := userID
+	if playerJSON, err := keys.GetPlayer(stream.Context(), s.rdb, req.RoomId, userID); err == nil {
+		var info struct {
+			Username string `json:"username"`
+		}
+		if json.Unmarshal([]byte(playerJSON), &info) == nil && info.Username != "" {
+			username = info.Username
+		}
 	}
+	seq := s.getSeqCounter(req.RoomId).Add(1)
+	s.broadcastToRoom(req.RoomId, &pb.GameEvent{
+		SequenceNumber: seq,
+		Event: &pb.GameEvent_PlayerJoined{
+			PlayerJoined: &pb.PlayerJoined{
+				UserId:   userID,
+				Username: username,
+			},
+		},
+	})
+
+	// Send current state snapshot for late joiners and reconnections
+	s.sendStateSnapshot(stream.Context(), req.RoomId, stream)
 
 	for {
 		select {
@@ -505,7 +651,7 @@ func (s *quizServer) SubmitAnswer(ctx context.Context, req *pb.SubmitAnswerReque
 	}
 
 	// Publish answer.submitted event to RabbitMQ — do not wait for scoring
-	event, _ := json.Marshal(map[string]interface{}{
+	eventPayload, err := json.Marshal(map[string]interface{}{
 		"roomId":          req.RoomId,
 		"userId":          userID,
 		"round":           req.Round,
@@ -513,13 +659,15 @@ func (s *quizServer) SubmitAnswer(ctx context.Context, req *pb.SubmitAnswerReque
 		"clientTimestamp": req.ClientTimestamp,
 		"serverTimestamp": time.Now().UnixMilli(),
 	})
-
-	err = s.amqpCh.PublishWithContext(ctx, "sx", "answer.submitted", false, false, amqp.Publishing{
-		ContentType: "application/json",
-		Body:        event,
-	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to publish answer: %w", err)
+		return nil, status.Errorf(codes.Internal, "failed to marshal answer: %v", err)
+	}
+
+	if err := s.amqpCh.PublishWithContext(ctx, "sx", "answer.submitted", false, false, amqp.Publishing{
+		ContentType: "application/json",
+		Body:        eventPayload,
+	}); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to publish answer: %v", err)
 	}
 
 	log.Printf("[quiz] answer from %s for room %s round %d option %d", userID, req.RoomId, req.Round, req.OptionIndex)
@@ -595,11 +743,75 @@ func setupRabbitMQ(ch *amqp.Channel) error {
 }
 
 // ---------------------------------------------------------------------------
+// consumeRoundCompleted — advance to next round or finish match
+// ---------------------------------------------------------------------------
+
+func (s *quizServer) consumeRoundCompleted(ctx context.Context) {
+	ch, err := s.newChannel()
+	if err != nil {
+		log.Fatalf("[quiz] failed to open channel for round-completed: %v", err)
+	}
+	defer ch.Close()
+
+	msgs, err := ch.Consume("round-completed-queue", "", false, false, false, false, nil)
+	if err != nil {
+		log.Fatalf("[quiz] failed to consume round-completed-queue: %v", err)
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case msg, ok := <-msgs:
+			if !ok {
+				return
+			}
+
+			var event struct {
+				RoomID string `json:"roomId"`
+				Round  int    `json:"round"`
+			}
+			if err := json.Unmarshal(msg.Body, &event); err != nil {
+				log.Printf("[quiz] bad round.completed payload: %v", err)
+				msg.Nack(false, false)
+				continue
+			}
+
+			questions, ok := s.getRoomQuestions(event.RoomID)
+			if !ok {
+				log.Printf("[quiz] round.completed for unknown room %s — skipping", event.RoomID)
+				msg.Ack(false)
+				continue
+			}
+
+			msg.Ack(false)
+
+			if event.Round < len(questions) {
+				// Advance to next round after a 2s pause
+				go func(roomID string, nextRound int) {
+					time.Sleep(2 * time.Second)
+					s.startRound(ctx, roomID, nextRound)
+				}(event.RoomID, event.Round+1)
+			} else {
+				// All rounds complete — finish match
+				s.finishMatch(ctx, event.RoomID, event.Round)
+			}
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
 // consumeLeaderboardUpdated — relay scoring leaderboard events to game streams
 // ---------------------------------------------------------------------------
 
 func (s *quizServer) consumeLeaderboardUpdated(ctx context.Context) {
-	msgs, err := s.amqpCh.Consume("leaderboard-broadcast-queue", "", false, false, false, false, nil)
+	ch, err := s.newChannel()
+	if err != nil {
+		log.Fatalf("[quiz] failed to open channel for leaderboard-broadcast: %v", err)
+	}
+	defer ch.Close()
+
+	msgs, err := ch.Consume("leaderboard-broadcast-queue", "", false, false, false, false, nil)
 	if err != nil {
 		log.Fatalf("[quiz] failed to consume leaderboard-broadcast-queue: %v", err)
 	}
@@ -626,14 +838,24 @@ func (s *quizServer) consumeLeaderboardUpdated(ctx context.Context) {
 				continue
 			}
 
-			// Build LeaderboardUpdate GameEvent
+			// Build LeaderboardUpdate GameEvent with resolved usernames
 			entries := make([]*pb.LeaderboardEntry, 0, len(event.Entries))
 			for i, e := range event.Entries {
 				userID := fmt.Sprintf("%v", e.Member)
+				username := userID
+				if playerJSON, err := keys.GetPlayer(ctx, s.rdb, event.RoomID, userID); err == nil {
+					var info struct {
+						Username string `json:"username"`
+					}
+					if json.Unmarshal([]byte(playerJSON), &info) == nil && info.Username != "" {
+						username = info.Username
+					}
+				}
 				entries = append(entries, &pb.LeaderboardEntry{
-					UserId: userID,
-					Score:  e.Score,
-					Rank:   int32(i + 1),
+					UserId:   userID,
+					Username: username,
+					Score:    e.Score,
+					Rank:     int32(i + 1),
 				})
 			}
 
@@ -718,6 +940,7 @@ func main() {
 	// gRPC server
 	srv := &quizServer{
 		rdb:       rdb,
+		amqpConn:  conn,
 		amqpCh:    amqpCh,
 		mongoDB:   mongoClient.Database("quizbattle"),
 		jwtSecret: jwtSecret,
@@ -725,6 +948,7 @@ func main() {
 
 	// Start RabbitMQ consumers
 	go srv.consumeMatchCreated(ctx)
+	go srv.consumeRoundCompleted(ctx)
 	go srv.consumeLeaderboardUpdated(ctx)
 
 	grpcServer := grpc.NewServer(

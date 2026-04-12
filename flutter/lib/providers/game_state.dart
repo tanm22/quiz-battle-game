@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:grpc/grpc.dart';
 import '../proto/quiz.pb.dart';
 import '../services/auth_service.dart';
 import '../services/quiz_service.dart';
@@ -28,6 +29,7 @@ class GameState {
   final int lastSequenceNumber;
   final bool isGuest;
   final String? email;
+  final String? errorMessage;
 
   const GameState({
     this.currentScreen = GameScreen.login,
@@ -47,6 +49,7 @@ class GameState {
     this.lastSequenceNumber = 0,
     this.isGuest = false,
     this.email,
+    this.errorMessage,
   });
 
   GameState copyWith({
@@ -67,8 +70,10 @@ class GameState {
     int? lastSequenceNumber,
     bool? isGuest,
     String? email,
+    String? errorMessage,
     bool clearSelectedIndex = false,
     bool clearCorrectIndex = false,
+    bool clearError = false,
   }) {
     return GameState(
       currentScreen: currentScreen ?? this.currentScreen,
@@ -88,6 +93,7 @@ class GameState {
       lastSequenceNumber: lastSequenceNumber ?? this.lastSequenceNumber,
       isGuest: isGuest ?? this.isGuest,
       email: email ?? this.email,
+      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
     );
   }
 }
@@ -136,8 +142,13 @@ class GameStateNotifier extends Notifier<GameState> {
   // --- Matchmaking ---
 
   Future<void> joinMatchmaking(String userId, int rating) async {
-    state = state.copyWith(currentScreen: GameScreen.matchmaking);
-    await _service.joinMatchmaking(userId, rating);
+    state = state.copyWith(currentScreen: GameScreen.matchmaking, clearError: true);
+    try {
+      await _service.joinMatchmaking(userId, rating);
+    } on GrpcError catch (e) {
+      state = state.copyWith(errorMessage: 'Failed to join matchmaking: ${e.message}');
+      return;
+    }
 
     _matchSub?.cancel();
     final stream = _service.subscribeToMatch(userId);
@@ -242,13 +253,17 @@ class GameStateNotifier extends Notifier<GameState> {
     // Submit only once per round
     if (_submittedRound != state.round) {
       _submittedRound = state.round;
-      _service.submitAnswer(
-        roomId: state.roomId!,
-        userId: state.userId!,
-        round: state.round,
-        optionIndex: optionIndex,
-        clientTimestamp: DateTime.now().millisecondsSinceEpoch,
-      );
+      try {
+        _service.submitAnswer(
+          roomId: state.roomId!,
+          userId: state.userId!,
+          round: state.round,
+          optionIndex: optionIndex,
+          clientTimestamp: DateTime.now().millisecondsSinceEpoch,
+        );
+      } on GrpcError catch (e) {
+        state = state.copyWith(errorMessage: 'Failed to submit answer: ${e.message}');
+      }
     }
   }
 
@@ -282,6 +297,10 @@ class GameStateNotifier extends Notifier<GameState> {
       _gameSub?.cancel();
       _startGameStream();
     });
+  }
+
+  void clearError() {
+    state = state.copyWith(clearError: true);
   }
 
   // --- Leave match ---

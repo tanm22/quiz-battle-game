@@ -79,6 +79,24 @@ class _AppShellState extends ConsumerState<AppShell> {
 
     final gameState = ref.watch(gameStateProvider);
 
+    // Show error messages as SnackBar
+    ref.listen(
+      gameStateProvider.select((s) => s.errorMessage),
+      (prev, next) {
+        if (next != null && next != prev) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(next),
+              backgroundColor: const Color(0xFFFF4444),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+          ref.read(gameStateProvider.notifier).clearError();
+        }
+      },
+    );
+
     Widget screen;
     switch (gameState.currentScreen) {
       case GameScreen.login:

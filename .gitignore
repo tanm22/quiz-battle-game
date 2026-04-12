@@ -2,6 +2,10 @@
 *.exe
 *.test
 /vendor/
+/matchmaking
+/quiz
+/scoring
+/auth
 
 # Flutter
 flutter/.dart_tool/

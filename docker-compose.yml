@@ -1,6 +1,7 @@
 services:
   redis:
     image: redis:7
+    command: redis-server --appendonly yes
     ports:
       - "6379:6379"
     volumes:
@@ -36,6 +37,15 @@ services:
       timeout: 5s
       retries: 5
 
+  seed:
+    build: .
+    command: sh -c "cd /data && seed"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/quizbattle
+
   matchmaking:
     build: .
     command: matchmaking
@@ -48,6 +58,8 @@ services:
         condition: service_healthy
       mongo:
         condition: service_healthy
+      seed:
+        condition: service_completed_successfully
     environment:
       - REDIS_ADDR=redis:6379
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
@@ -66,6 +78,8 @@ services:
         condition: service_healthy
       mongo:
         condition: service_healthy
+      seed:
+        condition: service_completed_successfully
     environment:
       - REDIS_ADDR=redis:6379
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
@@ -84,6 +98,8 @@ services:
         condition: service_healthy
       mongo:
         condition: service_healthy
+      seed:
+        condition: service_completed_successfully
     environment:
       - REDIS_ADDR=redis:6379
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
@@ -102,6 +118,8 @@ services:
         condition: service_healthy
       mongo:
         condition: service_healthy
+      seed:
+        condition: service_completed_successfully
     environment:
       - REDIS_ADDR=redis:6379
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
