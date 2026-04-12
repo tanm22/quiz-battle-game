@@ -54,11 +54,11 @@ class AuthService {
 
     if (_token == null || _userId == null) return false;
 
-    // Verify token is still valid by fetching profile
+    // Verify token is still valid by fetching profile (short timeout to avoid blocking startup)
     try {
       final profile = await _client.getProfile(
         GetProfileRequest(),
-        options: CallOptions(metadata: {'authorization': 'Bearer $_token'}),
+        options: _opts(timeout: const Duration(seconds: 5)),
       );
       _rating = profile.rating;
       _matchesPlayed = profile.matchesPlayed;
@@ -81,7 +81,7 @@ class AuthService {
     if (email != null && email.isNotEmpty) {
       req.email = email;
     }
-    final resp = await _client.register(req);
+    final resp = await _client.register(req, options: _opts());
     _token = resp.token;
     _userId = resp.userId;
     _username = resp.username;
@@ -98,6 +98,7 @@ class AuthService {
       LoginRequest()
         ..username = username
         ..password = password,
+      options: _opts(),
     );
     _token = resp.token;
     _userId = resp.userId;
@@ -111,7 +112,7 @@ class AuthService {
   }
 
   Future<void> guestLogin() async {
-    final resp = await _client.guestLogin(GuestLoginRequest());
+    final resp = await _client.guestLogin(GuestLoginRequest(), options: _opts());
     _token = resp.token;
     _userId = resp.userId;
     _username = resp.username;
@@ -128,6 +129,7 @@ class AuthService {
       SendEmailCodeRequest()
         ..email = email
         ..purpose = purpose,
+      options: _opts(),
     );
   }
 
@@ -136,6 +138,7 @@ class AuthService {
       VerifyEmailCodeRequest()
         ..email = email
         ..code = code,
+      options: _opts(),
     );
     // If a token is returned (e.g. email login flow), store auth state
     if (resp.token.isNotEmpty) {
@@ -165,18 +168,21 @@ class AuthService {
         ..email = email
         ..code = code
         ..newPassword = newPassword,
+      options: _opts(),
     );
   }
 
   Future<void> loginWithEmail(String email) async {
     await _client.loginWithEmail(
       EmailLoginRequest()..email = email,
+      options: _opts(),
     );
   }
 
   Future<bool> checkUsername(String username) async {
     final resp = await _client.checkUsername(
       CheckUsernameRequest()..username = username,
+      options: _opts(timeout: const Duration(seconds: 3)),
     );
     return resp.available;
   }
@@ -187,7 +193,7 @@ class AuthService {
     try {
       final profile = await _client.getProfile(
         GetProfileRequest(),
-        options: authOptions,
+        options: _opts(timeout: const Duration(seconds: 5)),
       );
       _rating = profile.rating;
       _matchesPlayed = profile.matchesPlayed;
@@ -205,15 +211,24 @@ class AuthService {
     if (_token == null) return;
     await _client.deleteAccount(
       DeleteAccountRequest(),
-      options: authOptions,
+      options: _opts(),
     );
     await logout();
   }
 
   bool get isLoggedIn => _token != null && _userId != null;
 
-  CallOptions get authOptions =>
-      CallOptions(metadata: {'authorization': 'Bearer $_token'});
+  static const _defaultTimeout = Duration(seconds: 10);
+
+  CallOptions get authOptions => _opts();
+
+  /// Merges auth metadata with a per-call timeout.
+  CallOptions _opts({Duration timeout = _defaultTimeout}) {
+    return CallOptions(
+      metadata: _token != null ? {'authorization': 'Bearer $_token'} : {},
+      timeout: timeout,
+    );
+  }
 
   Future<void> logout() async {
     _token = null;
