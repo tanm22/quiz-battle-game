@@ -51,13 +51,38 @@ func (s *matchmakingServer) JoinMatchmaking(ctx context.Context, req *pb.JoinMat
 		return nil, status.Error(codes.Unauthenticated, "not authenticated")
 	}
 
-	// Lookup rating from MongoDB
+	// Lookup user from MongoDB (rating + plan)
 	var userDoc bson.M
 	err = s.mongoDB.Collection("users").FindOne(ctx, bson.M{"_id": userID}).Decode(&userDoc)
 	rating := float64(1200)
+	plan := "free"
 	if err == nil {
 		if r, ok := userDoc["rating"].(int32); ok {
 			rating = float64(r)
+		}
+		if p, ok := userDoc["plan"].(string); ok && p != "" {
+			plan = p
+		}
+	}
+
+	// Phase 2: Daily quota gate — free users limited to 1 quiz/day
+	if plan != "premium" {
+		// Check Redis plan cache first, fall back to MongoDB value we already have
+		cachedPlan, _ := keys.GetPlan(ctx, s.rdb, userID)
+		if cachedPlan == "" {
+			keys.SetPlan(ctx, s.rdb, userID, plan)
+		} else {
+			plan = cachedPlan
+		}
+
+		if plan != "premium" {
+			allowed, err := keys.CheckQuota(ctx, s.rdb, userID, 1)
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "quota check failed: %v", err)
+			}
+			if !allowed {
+				return nil, status.Error(codes.ResourceExhausted, "Daily quiz limit reached. Upgrade to Premium.")
+			}
 		}
 	}
 

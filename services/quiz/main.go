@@ -639,6 +639,88 @@ func (s *quizServer) GetRoomQuestions(ctx context.Context, req *pb.GetRoomQuesti
 }
 
 // ---------------------------------------------------------------------------
+// Phase 2: Tournament RPCs
+// ---------------------------------------------------------------------------
+
+func (s *quizServer) GetTournamentList(ctx context.Context, _ *pb.GetTournamentListRequest) (*pb.GetTournamentListResponse, error) {
+	cursor, err := s.mongoDB.Collection("tournaments").Find(ctx, bson.M{
+		"status": bson.M{"$in": []string{"upcoming", "active"}},
+	})
+	if err != nil {
+		return &pb.GetTournamentListResponse{}, nil
+	}
+	defer cursor.Close(ctx)
+
+	var tournaments []*pb.TournamentInfo
+	for cursor.Next(ctx) {
+		var doc bson.M
+		if err := cursor.Decode(&doc); err != nil {
+			continue
+		}
+		t := &pb.TournamentInfo{
+			Id:               fmt.Sprintf("%v", doc["_id"]),
+			Name:             doc["name"].(string),
+			Status:           doc["status"].(string),
+			RequiredPlan:     doc["requiredPlan"].(string),
+			PrizeDescription: doc["prizeDescription"].(string),
+		}
+		if st, ok := doc["startTime"].(time.Time); ok {
+			t.StartTime = st.Unix()
+		}
+		if et, ok := doc["endTime"].(time.Time); ok {
+			t.EndTime = et.Unix()
+		}
+		if p, ok := doc["participants"].(bson.A); ok {
+			t.ParticipantCount = int32(len(p))
+		}
+		tournaments = append(tournaments, t)
+	}
+
+	return &pb.GetTournamentListResponse{Tournaments: tournaments}, nil
+}
+
+func (s *quizServer) JoinTournament(ctx context.Context, req *pb.JoinTournamentRequest) (*pb.JoinTournamentResponse, error) {
+	userID, err := auth.UserIDFromContext(ctx)
+	if err != nil {
+		return nil, status.Error(codes.Unauthenticated, "not authenticated")
+	}
+
+	// Server-side plan check — free users cannot join premium tournaments
+	plan, _ := keys.GetPlan(ctx, s.rdb, userID)
+	if plan == "" {
+		var userDoc bson.M
+		if err := s.mongoDB.Collection("users").FindOne(ctx, bson.M{"_id": userID}).Decode(&userDoc); err == nil {
+			if p, ok := userDoc["plan"].(string); ok {
+				plan = p
+			}
+		}
+		if plan == "" {
+			plan = "free"
+		}
+		keys.SetPlan(ctx, s.rdb, userID, plan)
+	}
+
+	// Check tournament requirements
+	var tournament bson.M
+	if err := s.mongoDB.Collection("tournaments").FindOne(ctx, bson.M{"_id": req.TournamentId}).Decode(&tournament); err != nil {
+		return nil, status.Error(codes.NotFound, "tournament not found")
+	}
+
+	requiredPlan, _ := tournament["requiredPlan"].(string)
+	if requiredPlan == "premium" && plan != "premium" {
+		return nil, status.Error(codes.PermissionDenied, "Tournaments require Premium.")
+	}
+
+	// Add user to participants
+	s.mongoDB.Collection("tournaments").UpdateOne(ctx,
+		bson.M{"_id": req.TournamentId},
+		bson.M{"$addToSet": bson.M{"participants": userID}},
+	)
+
+	return &pb.JoinTournamentResponse{Success: true}, nil
+}
+
+// ---------------------------------------------------------------------------
 // 45. SubmitAnswer — publish to RabbitMQ, return ack immediately
 // ---------------------------------------------------------------------------
 

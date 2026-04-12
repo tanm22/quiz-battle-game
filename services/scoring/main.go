@@ -164,9 +164,23 @@ func (s *scoringServer) GetMatchHistory(ctx context.Context, req *pb.GetMatchHis
 		return nil, fmt.Errorf("auth: %w", err)
 	}
 
+	// Feature gating: free users see last 3, premium sees full history
+	plan, _ := keys.GetPlan(ctx, s.rdb, userID)
+	if plan == "" {
+		var doc bson.M
+		if err := s.mongoDB.Collection("users").FindOne(ctx, bson.M{"_id": userID}).Decode(&doc); err == nil {
+			if p, ok := doc["plan"].(string); ok {
+				plan = p
+			}
+		}
+	}
+
 	limit := int64(req.Limit)
 	if limit <= 0 || limit > 50 {
 		limit = 20
+	}
+	if plan != "premium" && limit > 3 {
+		limit = 3
 	}
 	skip := int64(req.Offset)
 	if skip < 0 {

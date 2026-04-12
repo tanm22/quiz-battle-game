@@ -155,7 +155,11 @@ class GameStateNotifier extends Notifier<GameState> {
     try {
       await _service.joinMatchmaking(userId, rating);
     } on GrpcError catch (e) {
-      state = state.copyWith(errorMessage: 'Failed to join matchmaking: ${e.message}');
+      if (e.code == StatusCode.resourceExhausted) {
+        state = state.copyWith(errorMessage: 'Daily quiz limit reached. Upgrade to Premium for unlimited quizzes!');
+      } else {
+        state = state.copyWith(errorMessage: 'Failed to join matchmaking: ${e.message}');
+      }
       return;
     }
 
