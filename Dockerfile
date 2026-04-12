@@ -18,7 +18,7 @@ RUN CGO_ENABLED=0 go build -o /out/matchmaking    ./services/matchmaking && \
 # Stage 2: Minimal runtime image
 FROM alpine:3.20
 
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache ca-certificates tzdata
 
 COPY --from=builder /out/ /usr/local/bin/
 COPY seed/questions.json /data/questions.json
