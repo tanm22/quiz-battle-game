@@ -253,9 +253,23 @@ func (s *scoringServer) GetHomeScreenData(ctx context.Context, _ *pb.GetHomeScre
 		return nil, status.Error(codes.Unauthenticated, "not authenticated")
 	}
 
+	// Fetch plan first (needed by leaderboard query below)
+	plan, _ := keys.GetPlan(ctx, s.rdb, userID)
+	if plan == "" {
+		var doc bson.M
+		if err := s.mongoDB.Collection("users").FindOne(ctx, bson.M{"_id": userID}).Decode(&doc); err == nil {
+			if p, ok := doc["plan"].(string); ok {
+				plan = p
+			}
+		}
+		if plan == "" {
+			plan = "free"
+		}
+		keys.SetPlan(ctx, s.rdb, userID, plan)
+	}
+
 	var user models.User
 	var quotaUsed int64
-	var plan string
 	var lbPreview []*pb.LeaderboardEntry
 
 	g, gctx := errgroup.WithContext(ctx)
@@ -272,30 +286,7 @@ func (s *scoringServer) GetHomeScreenData(ctx context.Context, _ *pb.GetHomeScre
 		return err
 	})
 
-	// [3] Fetch plan from Redis cache (or MongoDB on miss)
-	g.Go(func() error {
-		var err error
-		plan, err = keys.GetPlan(gctx, s.rdb, userID)
-		if err != nil {
-			return err
-		}
-		if plan == "" {
-			// Cache miss: read from MongoDB
-			var doc bson.M
-			if err := s.mongoDB.Collection("users").FindOne(gctx, bson.M{"_id": userID}).Decode(&doc); err == nil {
-				if p, ok := doc["plan"].(string); ok {
-					plan = p
-				}
-			}
-			if plan == "" {
-				plan = "free"
-			}
-			keys.SetPlan(gctx, s.rdb, userID, plan)
-		}
-		return nil
-	})
-
-	// [4] Fetch leaderboard preview from MongoDB (top users by rating)
+	// [3] Fetch leaderboard preview from MongoDB (top users by rating)
 	g.Go(func() error {
 		limit := int64(3)
 		if plan == "premium" {

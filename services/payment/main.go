@@ -218,14 +218,18 @@ func (s *paymentServer) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	// Step 5: Update payment document
 	orderID := payload.Payload.Payment.Entity.OrderID
 	now := time.Now()
-	s.mongoDB.Collection("payments").UpdateOne(ctx,
+	if _, err := s.mongoDB.Collection("payments").UpdateOne(ctx,
 		bson.M{"razorpayOrderId": orderID},
 		bson.M{"$set": bson.M{
 			"status":            "captured",
 			"razorpayPaymentId": paymentID,
 			"webhookReceivedAt": now,
 		}},
-	)
+	); err != nil {
+		log.Printf("[payment] failed to update payment doc for order %s: %v", orderID, err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 
 	// Step 6: Look up userId from payment doc
 	var payDoc bson.M

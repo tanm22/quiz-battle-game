@@ -41,7 +41,7 @@ type authServer struct {
 	pb.UnimplementedAuthServiceServer
 	mongoDB   *mongo.Database
 	rdb       *redis.Client
-	amqpCh    *amqp.Channel
+	amqpConn  *amqp.Connection
 	jwtSecret string
 	mailer    *email.Sender
 }
@@ -81,6 +81,7 @@ func (s *authServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb
 	}
 
 	userID := uuid.New().String()
+	refCode := generateReferralCode()
 	user := models.User{
 		ID:            userID,
 		Username:      req.Username,
@@ -90,11 +91,26 @@ func (s *authServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb
 		Rating:        1200,
 		MatchesPlayed: 0,
 		Wins:          0,
+		Plan:          "free",
+		Coins:         0,
+		ReferralCode:  refCode,
+		Streak:        models.Streak{Current: 0, Longest: 0, LastClaimedDate: ""},
 		CreatedAt:     time.Now().Unix(),
 	}
 	if _, err := s.users().InsertOne(ctx, user); err != nil {
 		return nil, status.Errorf(codes.Internal, "insert error: %v", err)
 	}
+
+	// Store referral code in Redis
+	keys.SetRefCode(ctx, s.rdb, refCode, userID)
+
+	// Apply referral code if provided
+	if req.ReferralCode != "" {
+		s.applyReferral(ctx, userID, req.ReferralCode)
+	}
+
+	// Process streak (first login = day 1)
+	streakInfo, reward, _ := s.processStreak(ctx, &user)
 
 	token, err := auth.GenerateToken(userID, req.Username, s.jwtSecret)
 	if err != nil {
@@ -105,6 +121,8 @@ func (s *authServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb
 	return &pb.AuthResponse{
 		UserId: userID, Username: req.Username, Token: token,
 		Rating: 1200, MatchesPlayed: 0, Wins: 0, Email: req.Email, IsGuest: false,
+		Plan: "free", ReferralCode: refCode, Streak: streakInfo, Reward: reward,
+		StreakUpdated: true,
 	}, nil
 }
 
@@ -135,11 +153,16 @@ func (s *authServer) Login(ctx context.Context, req *pb.LoginRequest) (*pb.AuthR
 		return nil, status.Errorf(codes.Internal, "token error: %v", err)
 	}
 
+	// Process streak on login
+	streakInfo, reward, streakUpdated := s.processStreak(ctx, &user)
+
 	log.Printf("[auth] login user %s (%s)", user.Username, user.ID)
 	return &pb.AuthResponse{
 		UserId: user.ID, Username: user.Username, Token: token,
 		Rating: user.Rating, MatchesPlayed: user.MatchesPlayed, Wins: user.Wins,
 		Email: user.Email, IsGuest: user.IsGuest,
+		Plan: user.Plan, Coins: user.Coins, Streak: streakInfo,
+		ReferralCode: user.ReferralCode, StreakUpdated: streakUpdated, Reward: reward,
 	}, nil
 }
 
@@ -424,41 +447,43 @@ func (s *authServer) GoogleSignIn(ctx context.Context, req *pb.GoogleSignInReque
 		return nil, status.Error(codes.InvalidArgument, "missing Google ID in token")
 	}
 
-	// Upsert by googleId
-	userID := uuid.New().String()
-	now := time.Now()
-	newUserDoc := bson.M{
-		"_id":           userID,
-		"googleId":      googleID,
-		"email":         email,
-		"displayName":   name,
-		"avatarUrl":     picture,
-		"username":      strings.Split(email, "@")[0],
-		"isGuest":       false,
-		"rating":        int32(1200),
-		"matchesPlayed": int32(0),
-		"wins":          int32(0),
-		"plan":          "free",
-		"coins":         int64(0),
-		"streak":        bson.M{"current": 0, "longest": 0, "lastClaimedDate": ""},
-		"createdAt":     now.Unix(),
-	}
-
-	result := s.users().FindOneAndUpdate(ctx,
-		bson.M{"googleId": googleID},
-		bson.M{
-			"$setOnInsert": newUserDoc,
-			"$set":         bson.M{"avatarUrl": picture, "displayName": name},
-		},
-		options.FindOneAndUpdate().SetUpsert(true).SetReturnDocument(options.After),
-	)
-
+	// Check if user exists by googleId
 	var user models.User
-	if err := result.Decode(&user); err != nil {
-		return nil, status.Errorf(codes.Internal, "upsert failed: %v", err)
+	isNewUser := false
+	err = s.users().FindOne(ctx, bson.M{"googleId": googleID}).Decode(&user)
+	if err == mongo.ErrNoDocuments {
+		// New user — insert
+		isNewUser = true
+		userID := uuid.New().String()
+		user = models.User{
+			ID:            userID,
+			GoogleID:      googleID,
+			Email:         email,
+			DisplayName:   name,
+			AvatarUrl:     picture,
+			Username:      strings.Split(email, "@")[0],
+			IsGuest:       false,
+			Rating:        1200,
+			MatchesPlayed: 0,
+			Wins:          0,
+			Plan:          "free",
+			Coins:         0,
+			Streak:        models.Streak{Current: 0, Longest: 0, LastClaimedDate: ""},
+			CreatedAt:     time.Now().Unix(),
+		}
+		if _, err := s.users().InsertOne(ctx, user); err != nil {
+			return nil, status.Errorf(codes.Internal, "insert failed: %v", err)
+		}
+	} else if err != nil {
+		return nil, status.Errorf(codes.Internal, "lookup failed: %v", err)
+	} else {
+		// Returning user — update avatar/name
+		s.users().UpdateOne(ctx, bson.M{"_id": user.ID}, bson.M{
+			"$set": bson.M{"avatarUrl": picture, "displayName": name},
+		})
+		user.AvatarUrl = picture
+		user.DisplayName = name
 	}
-
-	isNewUser := user.CreatedAt == now.Unix() && user.MatchesPlayed == 0
 
 	// New user only: generate referral code + apply referral if provided (ISSUE-12)
 	if isNewUser {
@@ -678,10 +703,16 @@ func generateCode() string {
 // streakWarningCron publishes notif.streak.warning at 20:00 IST daily
 // for users who haven't logged in today but have an active streak.
 func (s *authServer) streakWarningCron(ctx context.Context) {
+	ch, err := s.amqpConn.Channel()
+	if err != nil {
+		log.Printf("[auth-cron] failed to open channel for streak warning: %v", err)
+		return
+	}
+	defer ch.Close()
+
 	for {
 		ist, _ := time.LoadLocation("Asia/Kolkata")
 		now := time.Now().In(ist)
-		// Next 20:00 IST
 		target := time.Date(now.Year(), now.Month(), now.Day(), 20, 0, 0, 0, ist)
 		if now.After(target) {
 			target = target.Add(24 * time.Hour)
@@ -720,7 +751,7 @@ func (s *authServer) streakWarningCron(ctx context.Context) {
 				"userId":        userID,
 				"currentStreak": current,
 			})
-			s.amqpCh.PublishWithContext(ctx, "sx", "notif.streak.warning", false, false, amqp.Publishing{
+			ch.PublishWithContext(ctx, "sx", "notif.streak.warning", false, false, amqp.Publishing{
 				ContentType: "application/json",
 				Body:        payload,
 			})
@@ -733,6 +764,13 @@ func (s *authServer) streakWarningCron(ctx context.Context) {
 
 // dailyRewardNudgeCron publishes notif.daily.reward at 08:00 IST daily.
 func (s *authServer) dailyRewardNudgeCron(ctx context.Context) {
+	ch, err := s.amqpConn.Channel()
+	if err != nil {
+		log.Printf("[auth-cron] failed to open channel for daily nudge: %v", err)
+		return
+	}
+	defer ch.Close()
+
 	for {
 		ist, _ := time.LoadLocation("Asia/Kolkata")
 		now := time.Now().In(ist)
@@ -770,7 +808,7 @@ func (s *authServer) dailyRewardNudgeCron(ctx context.Context) {
 				"event":  "notif.daily.reward",
 				"userId": userID,
 			})
-			s.amqpCh.PublishWithContext(ctx, "sx", "notif.daily.reward", false, false, amqp.Publishing{
+			ch.PublishWithContext(ctx, "sx", "notif.daily.reward", false, false, amqp.Publishing{
 				ContentType: "application/json",
 				Body:        payload,
 			})
@@ -834,13 +872,13 @@ func main() {
 		log.Fatalf("rabbitmq connect failed: %v", err)
 	}
 	defer amqpConn.Close()
-	amqpCh, err := amqpConn.Channel()
+	// Ensure exchange exists (use a temporary channel)
+	setupCh, err := amqpConn.Channel()
 	if err != nil {
 		log.Fatalf("rabbitmq channel failed: %v", err)
 	}
-	defer amqpCh.Close()
-	// Ensure exchange exists
-	amqpCh.ExchangeDeclare("sx", "topic", true, false, false, false, nil)
+	setupCh.ExchangeDeclare("sx", "topic", true, false, false, false, nil)
+	setupCh.Close()
 	log.Println("[auth] connected to RabbitMQ")
 
 	// JWT + Resend
@@ -861,7 +899,7 @@ func main() {
 	srv := &authServer{
 		mongoDB:   db,
 		rdb:       rdb,
-		amqpCh:    amqpCh,
+		amqpConn:  amqpConn,
 		jwtSecret: jwtSecret,
 		mailer:    email.NewSender(resendKey, resendFrom),
 	}
