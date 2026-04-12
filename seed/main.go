@@ -172,5 +172,42 @@ func main() {
 	userCount, _ := usersColl.CountDocuments(ctx, bson.M{})
 	log.Printf("[seed] %d users in database", userCount)
 
+	// --- Seed tournaments ---
+	tournamentsColl := db.Collection("tournaments")
+	now := time.Now()
+	tournaments := []bson.M{
+		{
+			"name":             "Weekend Warriors",
+			"startTime":        now.Add(2 * 24 * time.Hour),
+			"endTime":          now.Add(3 * 24 * time.Hour),
+			"status":           "upcoming",
+			"participants":     bson.A{},
+			"requiredPlan":     "premium",
+			"prizeDescription": "Top 3 win 500 coins each",
+			"reminderSent":     false,
+			"createdAt":        now,
+		},
+		{
+			"name":             "Open Challenge",
+			"startTime":        now.Add(5 * 24 * time.Hour),
+			"endTime":          now.Add(6 * 24 * time.Hour),
+			"status":           "upcoming",
+			"participants":     bson.A{},
+			"requiredPlan":     "free",
+			"prizeDescription": "Open to all! Winner gets 200 coins",
+			"reminderSent":     false,
+			"createdAt":        now,
+		},
+	}
+	for _, t := range tournaments {
+		tournamentsColl.UpdateOne(ctx,
+			bson.M{"name": t["name"]},
+			bson.M{"$setOnInsert": t},
+			options.UpdateOne().SetUpsert(true),
+		)
+	}
+	tCount, _ := tournamentsColl.CountDocuments(ctx, bson.M{})
+	log.Printf("[seed] %d tournaments in database", tCount)
+
 	log.Println("[seed] done")
 }
