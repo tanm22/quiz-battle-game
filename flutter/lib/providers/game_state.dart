@@ -9,7 +9,7 @@ import '../services/quiz_service.dart';
 // Step 59: GameState — holds all live match state
 // ---------------------------------------------------------------------------
 
-enum GameScreen { login, matchmaking, gameplay, leaderboard, results }
+enum GameScreen { login, home, matchmaking, gameplay, leaderboard, results }
 
 class GameState {
   final GameScreen currentScreen;
@@ -140,7 +140,7 @@ class GameStateNotifier extends Notifier<GameState> {
       rating: rating,
       isGuest: isGuest,
       email: email,
-      currentScreen: GameScreen.matchmaking,
+      currentScreen: GameScreen.home,
     );
   }
 
@@ -340,7 +340,7 @@ class GameStateNotifier extends Notifier<GameState> {
     final auth = AuthService();
     await auth.refreshProfile();
     state = GameState(
-      currentScreen: GameScreen.matchmaking,
+      currentScreen: GameScreen.home,
       userId: state.userId,
       token: state.token,
       rating: auth.rating,
@@ -355,6 +355,19 @@ class GameStateNotifier extends Notifier<GameState> {
     state = state.copyWith(currentScreen: GameScreen.leaderboard);
   }
 
+  void navigateToMatchmaking() {
+    state = state.copyWith(currentScreen: GameScreen.matchmaking);
+  }
+
+  void navigateToMatchHistory() {
+    // Navigate using Navigator.push from the UI — this is a signal method
+    state = state.copyWith(currentScreen: GameScreen.home);
+  }
+
+  void navigateToHome() {
+    state = state.copyWith(currentScreen: GameScreen.home);
+  }
+
   Future<void> playAgain() async {
     _matchSub?.cancel();
     _gameSub?.cancel();
@@ -365,7 +378,7 @@ class GameStateNotifier extends Notifier<GameState> {
     final auth = AuthService();
     await auth.refreshProfile();
     state = GameState(
-      currentScreen: GameScreen.matchmaking,
+      currentScreen: GameScreen.home,
       userId: state.userId,
       token: state.token,
       rating: auth.rating,

@@ -52,6 +52,9 @@ class QuizService {
     _authOptions = null;
   }
 
+  /// Expose auth options for direct client access (e.g. home screen data).
+  CallOptions get authCallOptions => _opts();
+
   /// Merges auth metadata with a per-call timeout.
   CallOptions _opts({Duration timeout = _defaultTimeout}) {
     return CallOptions(

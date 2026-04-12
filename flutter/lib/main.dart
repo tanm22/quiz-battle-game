@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'providers/game_state.dart';
+import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/matchmaking_screen.dart';
 import 'screens/gameplay_screen.dart';
@@ -101,6 +102,8 @@ class _AppShellState extends ConsumerState<AppShell> {
     switch (gameState.currentScreen) {
       case GameScreen.login:
         screen = const LoginScreen();
+      case GameScreen.home:
+        screen = const HomeScreen();
       case GameScreen.matchmaking:
         screen = const MatchmakingScreen();
       case GameScreen.gameplay:

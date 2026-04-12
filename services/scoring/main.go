@@ -15,11 +15,15 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 
 	"quiz-battle/pkg/auth"
 	"quiz-battle/pkg/keys"
+	"quiz-battle/pkg/models"
 	pb "quiz-battle/proto"
 )
 
@@ -223,6 +227,220 @@ func (s *scoringServer) GetMatchHistory(ctx context.Context, req *pb.GetMatchHis
 	}
 
 	return &pb.GetMatchHistoryResponse{Matches: matches}, nil
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: GetHomeScreenData — parallel fan-out (ISSUE-10)
+// ---------------------------------------------------------------------------
+
+func (s *scoringServer) GetHomeScreenData(ctx context.Context, _ *pb.GetHomeScreenDataRequest) (*pb.GetHomeScreenDataResponse, error) {
+	userID, err := auth.UserIDFromContext(ctx)
+	if err != nil {
+		return nil, status.Error(codes.Unauthenticated, "not authenticated")
+	}
+
+	var user models.User
+	var quotaUsed int64
+	var plan string
+	var lbPreview []*pb.LeaderboardEntry
+
+	g, gctx := errgroup.WithContext(ctx)
+
+	// [1] Fetch user profile + streak from MongoDB
+	g.Go(func() error {
+		return s.mongoDB.Collection("users").FindOne(gctx, bson.M{"_id": userID}).Decode(&user)
+	})
+
+	// [2] Fetch quota usage from Redis
+	g.Go(func() error {
+		var err error
+		quotaUsed, err = keys.GetQuotaUsed(gctx, s.rdb, userID)
+		return err
+	})
+
+	// [3] Fetch plan from Redis cache (or MongoDB on miss)
+	g.Go(func() error {
+		var err error
+		plan, err = keys.GetPlan(gctx, s.rdb, userID)
+		if err != nil {
+			return err
+		}
+		if plan == "" {
+			// Cache miss: read from MongoDB
+			var doc bson.M
+			if err := s.mongoDB.Collection("users").FindOne(gctx, bson.M{"_id": userID}).Decode(&doc); err == nil {
+				if p, ok := doc["plan"].(string); ok {
+					plan = p
+				}
+			}
+			if plan == "" {
+				plan = "free"
+			}
+			keys.SetPlan(gctx, s.rdb, userID, plan)
+		}
+		return nil
+	})
+
+	// [4] Fetch leaderboard preview from MongoDB (top users by rating)
+	g.Go(func() error {
+		limit := int64(3)
+		if plan == "premium" {
+			limit = 10
+		}
+		cursor, err := s.mongoDB.Collection("users").Find(gctx,
+			bson.M{},
+			options.Find().SetSort(bson.D{{Key: "rating", Value: -1}}).SetLimit(limit),
+		)
+		if err != nil {
+			return err
+		}
+		defer cursor.Close(gctx)
+		rank := int32(1)
+		for cursor.Next(gctx) {
+			var u bson.M
+			if err := cursor.Decode(&u); err != nil {
+				continue
+			}
+			uid, _ := u["_id"].(string)
+			uname, _ := u["username"].(string)
+			rating := int32(1200)
+			if r, ok := u["rating"].(int32); ok {
+				rating = r
+			}
+			lbPreview = append(lbPreview, &pb.LeaderboardEntry{
+				UserId:   uid,
+				Username: uname,
+				Score:    float64(rating),
+				Rank:     rank,
+			})
+			rank++
+		}
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		return nil, status.Errorf(codes.Internal, "home data fetch failed: %v", err)
+	}
+
+	if user.Plan == "" {
+		user.Plan = "free"
+	}
+	quotaLimit := int32(1)
+	if user.Plan == "premium" {
+		quotaLimit = 999 // unlimited
+	}
+
+	return &pb.GetHomeScreenDataResponse{
+		Profile: &pb.UserProfile{
+			UserId:        user.ID,
+			Username:      user.Username,
+			DisplayName:   user.DisplayName,
+			Email:         user.Email,
+			AvatarUrl:     user.AvatarUrl,
+			Rating:        user.Rating,
+			MatchesPlayed: user.MatchesPlayed,
+			Wins:          user.Wins,
+			Plan:          user.Plan,
+			Coins:         user.Coins,
+			Streak: &pb.StreakInfo{
+				Current:         int32(user.Streak.Current),
+				Longest:         int32(user.Streak.Longest),
+				LastClaimedDate: user.Streak.LastClaimedDate,
+			},
+			ReferralCode: user.ReferralCode,
+			IsGuest:      user.IsGuest,
+		},
+		QuotaRemaining:    int32(int64(quotaLimit) - quotaUsed),
+		QuotaLimit:        quotaLimit,
+		LeaderboardPreview: lbPreview,
+	}, nil
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: UpdateFCMToken
+// ---------------------------------------------------------------------------
+
+func (s *scoringServer) UpdateFCMToken(ctx context.Context, req *pb.UpdateFCMTokenRequest) (*pb.UpdateFCMTokenResponse, error) {
+	userID, err := auth.UserIDFromContext(ctx)
+	if err != nil {
+		return nil, status.Error(codes.Unauthenticated, "not authenticated")
+	}
+
+	_, err = s.mongoDB.Collection("users").UpdateOne(ctx,
+		bson.M{"_id": userID},
+		bson.M{"$addToSet": bson.M{"fcmTokens": req.Token}},
+	)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "update failed: %v", err)
+	}
+
+	return &pb.UpdateFCMTokenResponse{Success: true}, nil
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: GetReferralDashboard (stub — full logic in CP-6)
+// ---------------------------------------------------------------------------
+
+func (s *scoringServer) GetReferralDashboard(ctx context.Context, _ *pb.GetReferralDashboardRequest) (*pb.GetReferralDashboardResponse, error) {
+	userID, err := auth.UserIDFromContext(ctx)
+	if err != nil {
+		return nil, status.Error(codes.Unauthenticated, "not authenticated")
+	}
+
+	var user models.User
+	if err := s.mongoDB.Collection("users").FindOne(ctx, bson.M{"_id": userID}).Decode(&user); err != nil {
+		return nil, status.Error(codes.NotFound, "user not found")
+	}
+
+	// Count referrals
+	total, _ := s.mongoDB.Collection("referrals").CountDocuments(ctx, bson.M{"referrerId": userID})
+	converted, _ := s.mongoDB.Collection("referrals").CountDocuments(ctx, bson.M{"referrerId": userID, "status": "converted"})
+
+	return &pb.GetReferralDashboardResponse{
+		ReferralCode: user.ReferralCode,
+		TotalInvites: int32(total),
+		Conversions:  int32(converted),
+		CoinsEarned:  converted * 100, // 100 coins per conversion
+	}, nil
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: ApplyReferralCode (stub — full logic in CP-6)
+// ---------------------------------------------------------------------------
+
+func (s *scoringServer) ApplyReferralCode(ctx context.Context, req *pb.ApplyReferralCodeRequest) (*pb.ApplyReferralCodeResponse, error) {
+	userID, err := auth.UserIDFromContext(ctx)
+	if err != nil {
+		return nil, status.Error(codes.Unauthenticated, "not authenticated")
+	}
+
+	// Check user hasn't already been referred
+	var user models.User
+	if err := s.mongoDB.Collection("users").FindOne(ctx, bson.M{"_id": userID}).Decode(&user); err != nil {
+		return nil, status.Error(codes.NotFound, "user not found")
+	}
+	if user.ReferredBy != "" {
+		return nil, status.Error(codes.AlreadyExists, "already referred by someone")
+	}
+
+	// Look up referral code
+	referrerID, err := keys.GetRefCode(ctx, s.rdb, req.Code)
+	if err != nil || referrerID == "" {
+		return nil, status.Error(codes.NotFound, "invalid referral code")
+	}
+
+	// Create referral doc + set referredBy
+	s.mongoDB.Collection("referrals").InsertOne(ctx, bson.M{
+		"referrerId":    referrerID,
+		"refereeId":     userID,
+		"referralCode":  req.Code,
+		"status":        "pending",
+		"rewardGranted": false,
+		"createdAt":     time.Now(),
+	})
+	s.mongoDB.Collection("users").UpdateOne(ctx, bson.M{"_id": userID}, bson.M{"$set": bson.M{"referredBy": referrerID}})
+
+	return &pb.ApplyReferralCodeResponse{Success: true}, nil
 }
 
 // ---------------------------------------------------------------------------
