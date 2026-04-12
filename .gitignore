@@ -6,6 +6,8 @@
 /quiz
 /scoring
 /auth
+/payment
+/notification
 
 # Flutter
 flutter/.dart_tool/

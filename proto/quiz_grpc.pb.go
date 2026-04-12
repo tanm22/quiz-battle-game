@@ -201,9 +201,11 @@ var MatchmakingService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	QuizService_GetRoomQuestions_FullMethodName = "/quiz.QuizService/GetRoomQuestions"
-	QuizService_SubmitAnswer_FullMethodName     = "/quiz.QuizService/SubmitAnswer"
-	QuizService_StreamGameEvents_FullMethodName = "/quiz.QuizService/StreamGameEvents"
+	QuizService_GetRoomQuestions_FullMethodName  = "/quiz.QuizService/GetRoomQuestions"
+	QuizService_SubmitAnswer_FullMethodName      = "/quiz.QuizService/SubmitAnswer"
+	QuizService_StreamGameEvents_FullMethodName  = "/quiz.QuizService/StreamGameEvents"
+	QuizService_GetTournamentList_FullMethodName = "/quiz.QuizService/GetTournamentList"
+	QuizService_JoinTournament_FullMethodName    = "/quiz.QuizService/JoinTournament"
 )
 
 // QuizServiceClient is the client API for QuizService service.
@@ -213,6 +215,9 @@ type QuizServiceClient interface {
 	GetRoomQuestions(ctx context.Context, in *GetRoomQuestionsRequest, opts ...grpc.CallOption) (*GetRoomQuestionsResponse, error)
 	SubmitAnswer(ctx context.Context, in *SubmitAnswerRequest, opts ...grpc.CallOption) (*SubmitAnswerResponse, error)
 	StreamGameEvents(ctx context.Context, in *StreamGameEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GameEvent], error)
+	// Phase 2
+	GetTournamentList(ctx context.Context, in *GetTournamentListRequest, opts ...grpc.CallOption) (*GetTournamentListResponse, error)
+	JoinTournament(ctx context.Context, in *JoinTournamentRequest, opts ...grpc.CallOption) (*JoinTournamentResponse, error)
 }
 
 type quizServiceClient struct {
@@ -262,6 +267,26 @@ func (c *quizServiceClient) StreamGameEvents(ctx context.Context, in *StreamGame
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type QuizService_StreamGameEventsClient = grpc.ServerStreamingClient[GameEvent]
 
+func (c *quizServiceClient) GetTournamentList(ctx context.Context, in *GetTournamentListRequest, opts ...grpc.CallOption) (*GetTournamentListResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetTournamentListResponse)
+	err := c.cc.Invoke(ctx, QuizService_GetTournamentList_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *quizServiceClient) JoinTournament(ctx context.Context, in *JoinTournamentRequest, opts ...grpc.CallOption) (*JoinTournamentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(JoinTournamentResponse)
+	err := c.cc.Invoke(ctx, QuizService_JoinTournament_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // QuizServiceServer is the server API for QuizService service.
 // All implementations must embed UnimplementedQuizServiceServer
 // for forward compatibility.
@@ -269,6 +294,9 @@ type QuizServiceServer interface {
 	GetRoomQuestions(context.Context, *GetRoomQuestionsRequest) (*GetRoomQuestionsResponse, error)
 	SubmitAnswer(context.Context, *SubmitAnswerRequest) (*SubmitAnswerResponse, error)
 	StreamGameEvents(*StreamGameEventsRequest, grpc.ServerStreamingServer[GameEvent]) error
+	// Phase 2
+	GetTournamentList(context.Context, *GetTournamentListRequest) (*GetTournamentListResponse, error)
+	JoinTournament(context.Context, *JoinTournamentRequest) (*JoinTournamentResponse, error)
 	mustEmbedUnimplementedQuizServiceServer()
 }
 
@@ -287,6 +315,12 @@ func (UnimplementedQuizServiceServer) SubmitAnswer(context.Context, *SubmitAnswe
 }
 func (UnimplementedQuizServiceServer) StreamGameEvents(*StreamGameEventsRequest, grpc.ServerStreamingServer[GameEvent]) error {
 	return status.Error(codes.Unimplemented, "method StreamGameEvents not implemented")
+}
+func (UnimplementedQuizServiceServer) GetTournamentList(context.Context, *GetTournamentListRequest) (*GetTournamentListResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetTournamentList not implemented")
+}
+func (UnimplementedQuizServiceServer) JoinTournament(context.Context, *JoinTournamentRequest) (*JoinTournamentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method JoinTournament not implemented")
 }
 func (UnimplementedQuizServiceServer) mustEmbedUnimplementedQuizServiceServer() {}
 func (UnimplementedQuizServiceServer) testEmbeddedByValue()                     {}
@@ -356,6 +390,42 @@ func _QuizService_StreamGameEvents_Handler(srv interface{}, stream grpc.ServerSt
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type QuizService_StreamGameEventsServer = grpc.ServerStreamingServer[GameEvent]
 
+func _QuizService_GetTournamentList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTournamentListRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(QuizServiceServer).GetTournamentList(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: QuizService_GetTournamentList_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(QuizServiceServer).GetTournamentList(ctx, req.(*GetTournamentListRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _QuizService_JoinTournament_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(JoinTournamentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(QuizServiceServer).JoinTournament(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: QuizService_JoinTournament_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(QuizServiceServer).JoinTournament(ctx, req.(*JoinTournamentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // QuizService_ServiceDesc is the grpc.ServiceDesc for QuizService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -371,6 +441,14 @@ var QuizService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "SubmitAnswer",
 			Handler:    _QuizService_SubmitAnswer_Handler,
 		},
+		{
+			MethodName: "GetTournamentList",
+			Handler:    _QuizService_GetTournamentList_Handler,
+		},
+		{
+			MethodName: "JoinTournament",
+			Handler:    _QuizService_JoinTournament_Handler,
+		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
@@ -383,9 +461,13 @@ var QuizService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	ScoringService_CalculateScore_FullMethodName  = "/quiz.ScoringService/CalculateScore"
-	ScoringService_GetLeaderboard_FullMethodName  = "/quiz.ScoringService/GetLeaderboard"
-	ScoringService_GetMatchHistory_FullMethodName = "/quiz.ScoringService/GetMatchHistory"
+	ScoringService_CalculateScore_FullMethodName       = "/quiz.ScoringService/CalculateScore"
+	ScoringService_GetLeaderboard_FullMethodName       = "/quiz.ScoringService/GetLeaderboard"
+	ScoringService_GetMatchHistory_FullMethodName      = "/quiz.ScoringService/GetMatchHistory"
+	ScoringService_GetHomeScreenData_FullMethodName    = "/quiz.ScoringService/GetHomeScreenData"
+	ScoringService_GetReferralDashboard_FullMethodName = "/quiz.ScoringService/GetReferralDashboard"
+	ScoringService_ApplyReferralCode_FullMethodName    = "/quiz.ScoringService/ApplyReferralCode"
+	ScoringService_UpdateFCMToken_FullMethodName       = "/quiz.ScoringService/UpdateFCMToken"
 )
 
 // ScoringServiceClient is the client API for ScoringService service.
@@ -395,6 +477,11 @@ type ScoringServiceClient interface {
 	CalculateScore(ctx context.Context, in *CalculateScoreRequest, opts ...grpc.CallOption) (*CalculateScoreResponse, error)
 	GetLeaderboard(ctx context.Context, in *GetLeaderboardRequest, opts ...grpc.CallOption) (*GetLeaderboardResponse, error)
 	GetMatchHistory(ctx context.Context, in *GetMatchHistoryRequest, opts ...grpc.CallOption) (*GetMatchHistoryResponse, error)
+	// Phase 2: User Service RPCs (scoring service acts as user service)
+	GetHomeScreenData(ctx context.Context, in *GetHomeScreenDataRequest, opts ...grpc.CallOption) (*GetHomeScreenDataResponse, error)
+	GetReferralDashboard(ctx context.Context, in *GetReferralDashboardRequest, opts ...grpc.CallOption) (*GetReferralDashboardResponse, error)
+	ApplyReferralCode(ctx context.Context, in *ApplyReferralCodeRequest, opts ...grpc.CallOption) (*ApplyReferralCodeResponse, error)
+	UpdateFCMToken(ctx context.Context, in *UpdateFCMTokenRequest, opts ...grpc.CallOption) (*UpdateFCMTokenResponse, error)
 }
 
 type scoringServiceClient struct {
@@ -435,6 +522,46 @@ func (c *scoringServiceClient) GetMatchHistory(ctx context.Context, in *GetMatch
 	return out, nil
 }
 
+func (c *scoringServiceClient) GetHomeScreenData(ctx context.Context, in *GetHomeScreenDataRequest, opts ...grpc.CallOption) (*GetHomeScreenDataResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetHomeScreenDataResponse)
+	err := c.cc.Invoke(ctx, ScoringService_GetHomeScreenData_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scoringServiceClient) GetReferralDashboard(ctx context.Context, in *GetReferralDashboardRequest, opts ...grpc.CallOption) (*GetReferralDashboardResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetReferralDashboardResponse)
+	err := c.cc.Invoke(ctx, ScoringService_GetReferralDashboard_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scoringServiceClient) ApplyReferralCode(ctx context.Context, in *ApplyReferralCodeRequest, opts ...grpc.CallOption) (*ApplyReferralCodeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ApplyReferralCodeResponse)
+	err := c.cc.Invoke(ctx, ScoringService_ApplyReferralCode_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scoringServiceClient) UpdateFCMToken(ctx context.Context, in *UpdateFCMTokenRequest, opts ...grpc.CallOption) (*UpdateFCMTokenResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateFCMTokenResponse)
+	err := c.cc.Invoke(ctx, ScoringService_UpdateFCMToken_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ScoringServiceServer is the server API for ScoringService service.
 // All implementations must embed UnimplementedScoringServiceServer
 // for forward compatibility.
@@ -442,6 +569,11 @@ type ScoringServiceServer interface {
 	CalculateScore(context.Context, *CalculateScoreRequest) (*CalculateScoreResponse, error)
 	GetLeaderboard(context.Context, *GetLeaderboardRequest) (*GetLeaderboardResponse, error)
 	GetMatchHistory(context.Context, *GetMatchHistoryRequest) (*GetMatchHistoryResponse, error)
+	// Phase 2: User Service RPCs (scoring service acts as user service)
+	GetHomeScreenData(context.Context, *GetHomeScreenDataRequest) (*GetHomeScreenDataResponse, error)
+	GetReferralDashboard(context.Context, *GetReferralDashboardRequest) (*GetReferralDashboardResponse, error)
+	ApplyReferralCode(context.Context, *ApplyReferralCodeRequest) (*ApplyReferralCodeResponse, error)
+	UpdateFCMToken(context.Context, *UpdateFCMTokenRequest) (*UpdateFCMTokenResponse, error)
 	mustEmbedUnimplementedScoringServiceServer()
 }
 
@@ -460,6 +592,18 @@ func (UnimplementedScoringServiceServer) GetLeaderboard(context.Context, *GetLea
 }
 func (UnimplementedScoringServiceServer) GetMatchHistory(context.Context, *GetMatchHistoryRequest) (*GetMatchHistoryResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMatchHistory not implemented")
+}
+func (UnimplementedScoringServiceServer) GetHomeScreenData(context.Context, *GetHomeScreenDataRequest) (*GetHomeScreenDataResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetHomeScreenData not implemented")
+}
+func (UnimplementedScoringServiceServer) GetReferralDashboard(context.Context, *GetReferralDashboardRequest) (*GetReferralDashboardResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetReferralDashboard not implemented")
+}
+func (UnimplementedScoringServiceServer) ApplyReferralCode(context.Context, *ApplyReferralCodeRequest) (*ApplyReferralCodeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ApplyReferralCode not implemented")
+}
+func (UnimplementedScoringServiceServer) UpdateFCMToken(context.Context, *UpdateFCMTokenRequest) (*UpdateFCMTokenResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateFCMToken not implemented")
 }
 func (UnimplementedScoringServiceServer) mustEmbedUnimplementedScoringServiceServer() {}
 func (UnimplementedScoringServiceServer) testEmbeddedByValue()                        {}
@@ -536,6 +680,78 @@ func _ScoringService_GetMatchHistory_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ScoringService_GetHomeScreenData_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetHomeScreenDataRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScoringServiceServer).GetHomeScreenData(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScoringService_GetHomeScreenData_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScoringServiceServer).GetHomeScreenData(ctx, req.(*GetHomeScreenDataRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScoringService_GetReferralDashboard_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetReferralDashboardRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScoringServiceServer).GetReferralDashboard(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScoringService_GetReferralDashboard_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScoringServiceServer).GetReferralDashboard(ctx, req.(*GetReferralDashboardRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScoringService_ApplyReferralCode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ApplyReferralCodeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScoringServiceServer).ApplyReferralCode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScoringService_ApplyReferralCode_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScoringServiceServer).ApplyReferralCode(ctx, req.(*ApplyReferralCodeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScoringService_UpdateFCMToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateFCMTokenRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScoringServiceServer).UpdateFCMToken(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScoringService_UpdateFCMToken_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScoringServiceServer).UpdateFCMToken(ctx, req.(*UpdateFCMTokenRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ScoringService_ServiceDesc is the grpc.ServiceDesc for ScoringService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -555,23 +771,42 @@ var ScoringService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "GetMatchHistory",
 			Handler:    _ScoringService_GetMatchHistory_Handler,
 		},
+		{
+			MethodName: "GetHomeScreenData",
+			Handler:    _ScoringService_GetHomeScreenData_Handler,
+		},
+		{
+			MethodName: "GetReferralDashboard",
+			Handler:    _ScoringService_GetReferralDashboard_Handler,
+		},
+		{
+			MethodName: "ApplyReferralCode",
+			Handler:    _ScoringService_ApplyReferralCode_Handler,
+		},
+		{
+			MethodName: "UpdateFCMToken",
+			Handler:    _ScoringService_UpdateFCMToken_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "proto/quiz.proto",
 }
 
 const (
-	AuthService_Register_FullMethodName        = "/quiz.AuthService/Register"
-	AuthService_Login_FullMethodName           = "/quiz.AuthService/Login"
-	AuthService_GetProfile_FullMethodName      = "/quiz.AuthService/GetProfile"
-	AuthService_GuestLogin_FullMethodName      = "/quiz.AuthService/GuestLogin"
-	AuthService_LoginWithEmail_FullMethodName  = "/quiz.AuthService/LoginWithEmail"
-	AuthService_SendEmailCode_FullMethodName   = "/quiz.AuthService/SendEmailCode"
-	AuthService_VerifyEmailCode_FullMethodName = "/quiz.AuthService/VerifyEmailCode"
-	AuthService_LinkEmail_FullMethodName       = "/quiz.AuthService/LinkEmail"
-	AuthService_ResetPassword_FullMethodName   = "/quiz.AuthService/ResetPassword"
-	AuthService_CheckUsername_FullMethodName   = "/quiz.AuthService/CheckUsername"
-	AuthService_DeleteAccount_FullMethodName   = "/quiz.AuthService/DeleteAccount"
+	AuthService_Register_FullMethodName         = "/quiz.AuthService/Register"
+	AuthService_Login_FullMethodName            = "/quiz.AuthService/Login"
+	AuthService_GetProfile_FullMethodName       = "/quiz.AuthService/GetProfile"
+	AuthService_GuestLogin_FullMethodName       = "/quiz.AuthService/GuestLogin"
+	AuthService_LoginWithEmail_FullMethodName   = "/quiz.AuthService/LoginWithEmail"
+	AuthService_SendEmailCode_FullMethodName    = "/quiz.AuthService/SendEmailCode"
+	AuthService_VerifyEmailCode_FullMethodName  = "/quiz.AuthService/VerifyEmailCode"
+	AuthService_LinkEmail_FullMethodName        = "/quiz.AuthService/LinkEmail"
+	AuthService_ResetPassword_FullMethodName    = "/quiz.AuthService/ResetPassword"
+	AuthService_CheckUsername_FullMethodName    = "/quiz.AuthService/CheckUsername"
+	AuthService_DeleteAccount_FullMethodName    = "/quiz.AuthService/DeleteAccount"
+	AuthService_GoogleSignIn_FullMethodName     = "/quiz.AuthService/GoogleSignIn"
+	AuthService_ClaimDailyReward_FullMethodName = "/quiz.AuthService/ClaimDailyReward"
+	AuthService_GetStreakInfo_FullMethodName    = "/quiz.AuthService/GetStreakInfo"
 )
 
 // AuthServiceClient is the client API for AuthService service.
@@ -589,6 +824,10 @@ type AuthServiceClient interface {
 	ResetPassword(ctx context.Context, in *ResetPasswordRequest, opts ...grpc.CallOption) (*ResetPasswordResponse, error)
 	CheckUsername(ctx context.Context, in *CheckUsernameRequest, opts ...grpc.CallOption) (*CheckUsernameResponse, error)
 	DeleteAccount(ctx context.Context, in *DeleteAccountRequest, opts ...grpc.CallOption) (*DeleteAccountResponse, error)
+	// Phase 2
+	GoogleSignIn(ctx context.Context, in *GoogleSignInRequest, opts ...grpc.CallOption) (*GoogleSignInResponse, error)
+	ClaimDailyReward(ctx context.Context, in *ClaimDailyRewardRequest, opts ...grpc.CallOption) (*ClaimDailyRewardResponse, error)
+	GetStreakInfo(ctx context.Context, in *GetStreakInfoRequest, opts ...grpc.CallOption) (*GetStreakInfoResponse, error)
 }
 
 type authServiceClient struct {
@@ -709,6 +948,36 @@ func (c *authServiceClient) DeleteAccount(ctx context.Context, in *DeleteAccount
 	return out, nil
 }
 
+func (c *authServiceClient) GoogleSignIn(ctx context.Context, in *GoogleSignInRequest, opts ...grpc.CallOption) (*GoogleSignInResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GoogleSignInResponse)
+	err := c.cc.Invoke(ctx, AuthService_GoogleSignIn_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) ClaimDailyReward(ctx context.Context, in *ClaimDailyRewardRequest, opts ...grpc.CallOption) (*ClaimDailyRewardResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ClaimDailyRewardResponse)
+	err := c.cc.Invoke(ctx, AuthService_ClaimDailyReward_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) GetStreakInfo(ctx context.Context, in *GetStreakInfoRequest, opts ...grpc.CallOption) (*GetStreakInfoResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetStreakInfoResponse)
+	err := c.cc.Invoke(ctx, AuthService_GetStreakInfo_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServiceServer is the server API for AuthService service.
 // All implementations must embed UnimplementedAuthServiceServer
 // for forward compatibility.
@@ -724,6 +993,10 @@ type AuthServiceServer interface {
 	ResetPassword(context.Context, *ResetPasswordRequest) (*ResetPasswordResponse, error)
 	CheckUsername(context.Context, *CheckUsernameRequest) (*CheckUsernameResponse, error)
 	DeleteAccount(context.Context, *DeleteAccountRequest) (*DeleteAccountResponse, error)
+	// Phase 2
+	GoogleSignIn(context.Context, *GoogleSignInRequest) (*GoogleSignInResponse, error)
+	ClaimDailyReward(context.Context, *ClaimDailyRewardRequest) (*ClaimDailyRewardResponse, error)
+	GetStreakInfo(context.Context, *GetStreakInfoRequest) (*GetStreakInfoResponse, error)
 	mustEmbedUnimplementedAuthServiceServer()
 }
 
@@ -766,6 +1039,15 @@ func (UnimplementedAuthServiceServer) CheckUsername(context.Context, *CheckUsern
 }
 func (UnimplementedAuthServiceServer) DeleteAccount(context.Context, *DeleteAccountRequest) (*DeleteAccountResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteAccount not implemented")
+}
+func (UnimplementedAuthServiceServer) GoogleSignIn(context.Context, *GoogleSignInRequest) (*GoogleSignInResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GoogleSignIn not implemented")
+}
+func (UnimplementedAuthServiceServer) ClaimDailyReward(context.Context, *ClaimDailyRewardRequest) (*ClaimDailyRewardResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ClaimDailyReward not implemented")
+}
+func (UnimplementedAuthServiceServer) GetStreakInfo(context.Context, *GetStreakInfoRequest) (*GetStreakInfoResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetStreakInfo not implemented")
 }
 func (UnimplementedAuthServiceServer) mustEmbedUnimplementedAuthServiceServer() {}
 func (UnimplementedAuthServiceServer) testEmbeddedByValue()                     {}
@@ -986,6 +1268,60 @@ func _AuthService_DeleteAccount_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_GoogleSignIn_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GoogleSignInRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).GoogleSignIn(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_GoogleSignIn_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).GoogleSignIn(ctx, req.(*GoogleSignInRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_ClaimDailyReward_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ClaimDailyRewardRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).ClaimDailyReward(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_ClaimDailyReward_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).ClaimDailyReward(ctx, req.(*ClaimDailyRewardRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_GetStreakInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetStreakInfoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).GetStreakInfo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_GetStreakInfo_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).GetStreakInfo(ctx, req.(*GetStreakInfoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuthService_ServiceDesc is the grpc.ServiceDesc for AuthService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1036,6 +1372,196 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteAccount",
 			Handler:    _AuthService_DeleteAccount_Handler,
+		},
+		{
+			MethodName: "GoogleSignIn",
+			Handler:    _AuthService_GoogleSignIn_Handler,
+		},
+		{
+			MethodName: "ClaimDailyReward",
+			Handler:    _AuthService_ClaimDailyReward_Handler,
+		},
+		{
+			MethodName: "GetStreakInfo",
+			Handler:    _AuthService_GetStreakInfo_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "proto/quiz.proto",
+}
+
+const (
+	PaymentService_CreateOrder_FullMethodName       = "/quiz.PaymentService/CreateOrder"
+	PaymentService_GetPlanStatus_FullMethodName     = "/quiz.PaymentService/GetPlanStatus"
+	PaymentService_GetPaymentHistory_FullMethodName = "/quiz.PaymentService/GetPaymentHistory"
+)
+
+// PaymentServiceClient is the client API for PaymentService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type PaymentServiceClient interface {
+	CreateOrder(ctx context.Context, in *CreateOrderRequest, opts ...grpc.CallOption) (*CreateOrderResponse, error)
+	GetPlanStatus(ctx context.Context, in *GetPlanStatusRequest, opts ...grpc.CallOption) (*GetPlanStatusResponse, error)
+	GetPaymentHistory(ctx context.Context, in *GetPaymentHistoryRequest, opts ...grpc.CallOption) (*GetPaymentHistoryResponse, error)
+}
+
+type paymentServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewPaymentServiceClient(cc grpc.ClientConnInterface) PaymentServiceClient {
+	return &paymentServiceClient{cc}
+}
+
+func (c *paymentServiceClient) CreateOrder(ctx context.Context, in *CreateOrderRequest, opts ...grpc.CallOption) (*CreateOrderResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateOrderResponse)
+	err := c.cc.Invoke(ctx, PaymentService_CreateOrder_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *paymentServiceClient) GetPlanStatus(ctx context.Context, in *GetPlanStatusRequest, opts ...grpc.CallOption) (*GetPlanStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetPlanStatusResponse)
+	err := c.cc.Invoke(ctx, PaymentService_GetPlanStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *paymentServiceClient) GetPaymentHistory(ctx context.Context, in *GetPaymentHistoryRequest, opts ...grpc.CallOption) (*GetPaymentHistoryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetPaymentHistoryResponse)
+	err := c.cc.Invoke(ctx, PaymentService_GetPaymentHistory_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// PaymentServiceServer is the server API for PaymentService service.
+// All implementations must embed UnimplementedPaymentServiceServer
+// for forward compatibility.
+type PaymentServiceServer interface {
+	CreateOrder(context.Context, *CreateOrderRequest) (*CreateOrderResponse, error)
+	GetPlanStatus(context.Context, *GetPlanStatusRequest) (*GetPlanStatusResponse, error)
+	GetPaymentHistory(context.Context, *GetPaymentHistoryRequest) (*GetPaymentHistoryResponse, error)
+	mustEmbedUnimplementedPaymentServiceServer()
+}
+
+// UnimplementedPaymentServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedPaymentServiceServer struct{}
+
+func (UnimplementedPaymentServiceServer) CreateOrder(context.Context, *CreateOrderRequest) (*CreateOrderResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateOrder not implemented")
+}
+func (UnimplementedPaymentServiceServer) GetPlanStatus(context.Context, *GetPlanStatusRequest) (*GetPlanStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetPlanStatus not implemented")
+}
+func (UnimplementedPaymentServiceServer) GetPaymentHistory(context.Context, *GetPaymentHistoryRequest) (*GetPaymentHistoryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetPaymentHistory not implemented")
+}
+func (UnimplementedPaymentServiceServer) mustEmbedUnimplementedPaymentServiceServer() {}
+func (UnimplementedPaymentServiceServer) testEmbeddedByValue()                        {}
+
+// UnsafePaymentServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to PaymentServiceServer will
+// result in compilation errors.
+type UnsafePaymentServiceServer interface {
+	mustEmbedUnimplementedPaymentServiceServer()
+}
+
+func RegisterPaymentServiceServer(s grpc.ServiceRegistrar, srv PaymentServiceServer) {
+	// If the following call panics, it indicates UnimplementedPaymentServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&PaymentService_ServiceDesc, srv)
+}
+
+func _PaymentService_CreateOrder_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateOrderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PaymentServiceServer).CreateOrder(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PaymentService_CreateOrder_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PaymentServiceServer).CreateOrder(ctx, req.(*CreateOrderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PaymentService_GetPlanStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPlanStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PaymentServiceServer).GetPlanStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PaymentService_GetPlanStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PaymentServiceServer).GetPlanStatus(ctx, req.(*GetPlanStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PaymentService_GetPaymentHistory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPaymentHistoryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PaymentServiceServer).GetPaymentHistory(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PaymentService_GetPaymentHistory_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PaymentServiceServer).GetPaymentHistory(ctx, req.(*GetPaymentHistoryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// PaymentService_ServiceDesc is the grpc.ServiceDesc for PaymentService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var PaymentService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "quiz.PaymentService",
+	HandlerType: (*PaymentServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "CreateOrder",
+			Handler:    _PaymentService_CreateOrder_Handler,
+		},
+		{
+			MethodName: "GetPlanStatus",
+			Handler:    _PaymentService_GetPlanStatus_Handler,
+		},
+		{
+			MethodName: "GetPaymentHistory",
+			Handler:    _PaymentService_GetPaymentHistory_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

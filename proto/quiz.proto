@@ -55,6 +55,9 @@ service QuizService {
   rpc GetRoomQuestions(GetRoomQuestionsRequest) returns (GetRoomQuestionsResponse);
   rpc SubmitAnswer(SubmitAnswerRequest) returns (SubmitAnswerResponse);
   rpc StreamGameEvents(StreamGameEventsRequest) returns (stream GameEvent);
+  // Phase 2
+  rpc GetTournamentList(GetTournamentListRequest) returns (GetTournamentListResponse);
+  rpc JoinTournament(JoinTournamentRequest) returns (JoinTournamentResponse);
 }
 
 message GetRoomQuestionsRequest {
@@ -166,6 +169,11 @@ service ScoringService {
   rpc CalculateScore(CalculateScoreRequest) returns (CalculateScoreResponse);
   rpc GetLeaderboard(GetLeaderboardRequest) returns (GetLeaderboardResponse);
   rpc GetMatchHistory(GetMatchHistoryRequest) returns (GetMatchHistoryResponse);
+  // Phase 2: User Service RPCs (scoring service acts as user service)
+  rpc GetHomeScreenData(GetHomeScreenDataRequest) returns (GetHomeScreenDataResponse);
+  rpc GetReferralDashboard(GetReferralDashboardRequest) returns (GetReferralDashboardResponse);
+  rpc ApplyReferralCode(ApplyReferralCodeRequest) returns (ApplyReferralCodeResponse);
+  rpc UpdateFCMToken(UpdateFCMTokenRequest) returns (UpdateFCMTokenResponse);
 }
 
 // ---------------------------------------------------------------------------
@@ -184,12 +192,27 @@ service AuthService {
   rpc ResetPassword(ResetPasswordRequest) returns (ResetPasswordResponse);
   rpc CheckUsername(CheckUsernameRequest) returns (CheckUsernameResponse);
   rpc DeleteAccount(DeleteAccountRequest) returns (DeleteAccountResponse);
+  // Phase 2
+  rpc GoogleSignIn(GoogleSignInRequest) returns (GoogleSignInResponse);
+  rpc ClaimDailyReward(ClaimDailyRewardRequest) returns (ClaimDailyRewardResponse);
+  rpc GetStreakInfo(GetStreakInfoRequest) returns (GetStreakInfoResponse);
+}
+
+// ---------------------------------------------------------------------------
+// PaymentService (Phase 2)
+// ---------------------------------------------------------------------------
+
+service PaymentService {
+  rpc CreateOrder(CreateOrderRequest) returns (CreateOrderResponse);
+  rpc GetPlanStatus(GetPlanStatusRequest) returns (GetPlanStatusResponse);
+  rpc GetPaymentHistory(GetPaymentHistoryRequest) returns (GetPaymentHistoryResponse);
 }
 
 message RegisterRequest {
-  string username = 1;
-  string password = 2;
-  string email    = 3; // optional at registration
+  string username      = 1;
+  string password      = 2;
+  string email         = 3; // optional at registration
+  string referral_code = 4; // optional referral code
 }
 
 message LoginRequest {
@@ -206,6 +229,12 @@ message AuthResponse {
   int32  wins           = 6;
   string email          = 7;
   bool   is_guest       = 8;
+  string plan           = 9;
+  int64  coins          = 10;
+  StreakInfo streak      = 11;
+  string referral_code  = 12;
+  bool   streak_updated = 13;
+  RewardGrant reward    = 14;
 }
 
 message GetProfileRequest {}
@@ -218,6 +247,10 @@ message ProfileResponse {
   int32  wins           = 5;
   string email          = 6;
   bool   is_guest       = 7;
+  string plan           = 8;
+  int64  coins          = 9;
+  StreakInfo streak      = 10;
+  string referral_code  = 11;
 }
 
 message GuestLoginRequest {}
@@ -317,4 +350,190 @@ message MatchHistoryEntry {
   int32                 rounds     = 4;
   int64                 duration   = 5;
   int64                 created_at = 6;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: Shared types
+// ---------------------------------------------------------------------------
+
+message StreakInfo {
+  int32  current           = 1;
+  int32  longest           = 2;
+  string last_claimed_date = 3; // YYYY-MM-DD in IST
+}
+
+message RewardGrant {
+  int64  coins         = 1;
+  string badge_name    = 2; // empty if no badge
+  int32  bonus_quizzes = 3; // 0 if none
+}
+
+message PlanStatus {
+  string plan       = 1; // "free" or "premium"
+  int64  expires_at = 2; // unix timestamp, 0 if free
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: Google Auth
+// ---------------------------------------------------------------------------
+
+message GoogleSignInRequest {
+  string id_token      = 1;
+  string referral_code = 2; // optional
+}
+
+message GoogleSignInResponse {
+  string      token          = 1; // JWT
+  UserProfile user_profile   = 2;
+  bool        is_new_user    = 3;
+  bool        streak_updated = 4;
+  RewardGrant reward         = 5;
+}
+
+message UserProfile {
+  string     user_id        = 1;
+  string     username       = 2;
+  string     display_name   = 3;
+  string     email          = 4;
+  string     avatar_url     = 5;
+  int32      rating         = 6;
+  int32      matches_played = 7;
+  int32      wins           = 8;
+  string     plan           = 9;
+  int64      coins          = 10;
+  StreakInfo  streak         = 11;
+  string     referral_code  = 12;
+  bool       is_guest       = 13;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: Streak + Daily Reward
+// ---------------------------------------------------------------------------
+
+message ClaimDailyRewardRequest {}
+
+message ClaimDailyRewardResponse {
+  RewardGrant reward = 1;
+  StreakInfo   streak = 2;
+}
+
+message GetStreakInfoRequest {}
+
+message GetStreakInfoResponse {
+  StreakInfo streak = 1;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: Home Screen
+// ---------------------------------------------------------------------------
+
+message GetHomeScreenDataRequest {}
+
+message GetHomeScreenDataResponse {
+  UserProfile            profile              = 1;
+  int32                  quota_remaining      = 2;
+  int32                  quota_limit          = 3;
+  repeated LeaderboardEntry leaderboard_preview = 4;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: Referral
+// ---------------------------------------------------------------------------
+
+message GetReferralDashboardRequest {}
+
+message GetReferralDashboardResponse {
+  string referral_code    = 1;
+  int32  total_invites    = 2;
+  int32  conversions      = 3;
+  int64  coins_earned     = 4;
+}
+
+message ApplyReferralCodeRequest {
+  string code = 1;
+}
+
+message ApplyReferralCodeResponse {
+  bool success = 1;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: FCM Token
+// ---------------------------------------------------------------------------
+
+message UpdateFCMTokenRequest {
+  string token = 1;
+}
+
+message UpdateFCMTokenResponse {
+  bool success = 1;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: Payment
+// ---------------------------------------------------------------------------
+
+message CreateOrderRequest {
+  string plan_duration = 1; // "monthly" or "yearly"
+}
+
+message CreateOrderResponse {
+  string order_id = 1;
+  string key_id   = 2;
+  int64  amount   = 3; // in paise
+  string currency = 4;
+}
+
+message GetPlanStatusRequest {}
+
+message GetPlanStatusResponse {
+  string plan       = 1;
+  int64  expires_at = 2;
+}
+
+message GetPaymentHistoryRequest {
+  int32 limit  = 1;
+  int32 offset = 2;
+}
+
+message GetPaymentHistoryResponse {
+  repeated PaymentRecord payments = 1;
+}
+
+message PaymentRecord {
+  string order_id      = 1;
+  int64  amount        = 2;
+  string currency      = 3;
+  string status        = 4; // "created", "captured", "failed"
+  string plan_duration = 5;
+  int64  created_at    = 6;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: Tournaments
+// ---------------------------------------------------------------------------
+
+message GetTournamentListRequest {}
+
+message GetTournamentListResponse {
+  repeated TournamentInfo tournaments = 1;
+}
+
+message TournamentInfo {
+  string id                = 1;
+  string name              = 2;
+  int64  start_time        = 3;
+  int64  end_time          = 4;
+  string status            = 5; // "upcoming", "active", "completed"
+  int32  participant_count = 6;
+  string required_plan     = 7;
+  string prize_description = 8;
+}
+
+message JoinTournamentRequest {
+  string tournament_id = 1;
+}
+
+message JoinTournamentResponse {
+  bool success = 1;
 }

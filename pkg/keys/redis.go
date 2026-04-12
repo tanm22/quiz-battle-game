@@ -252,3 +252,102 @@ func CheckEmailCode(ctx context.Context, rdb *redis.Client, email, purpose, code
 func CheckEmailRateLimit(ctx context.Context, rdb *redis.Client, email string) (bool, error) {
 	return rdb.SetNX(ctx, EmailRateLimitKey(email), "1", EmailRateLimitTTL).Result()
 }
+
+// ---------------------------------------------------------------------------
+// Phase 2: Daily quota (ISSUE-03 corrected Lua script)
+// ---------------------------------------------------------------------------
+
+// QuotaScript atomically increments the daily quota counter and checks the limit.
+// KEYS[1] = user:{id}:daily_quota, ARGV[1] = limit, ARGV[2] = IST midnight unix.
+// Returns 1 if allowed, 0 if over quota.
+var QuotaScript = redis.NewScript(`
+local current = redis.call('INCR', KEYS[1])
+redis.call('EXPIREAT', KEYS[1], tonumber(ARGV[2]))
+if current > tonumber(ARGV[1]) then
+  redis.call('DECR', KEYS[1])
+  return 0
+end
+return 1
+`)
+
+// ISTMidnightUnix returns the Unix timestamp of the next midnight in IST.
+func ISTMidnightUnix() int64 {
+	ist, _ := time.LoadLocation("Asia/Kolkata")
+	now := time.Now().In(ist)
+	midnight := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, ist)
+	return midnight.Unix()
+}
+
+// CheckQuota atomically checks and increments the daily quiz quota.
+// Returns true if the user is allowed to play, false if over quota.
+func CheckQuota(ctx context.Context, rdb *redis.Client, userID string, limit int) (bool, error) {
+	result, err := QuotaScript.Run(ctx, rdb, []string{DailyQuota(userID)}, limit, ISTMidnightUnix()).Int64()
+	if err != nil {
+		return false, err
+	}
+	return result == 1, nil
+}
+
+// GetQuotaUsed returns the current daily quota usage count.
+func GetQuotaUsed(ctx context.Context, rdb *redis.Client, userID string) (int64, error) {
+	val, err := rdb.Get(ctx, DailyQuota(userID)).Int64()
+	if err == redis.Nil {
+		return 0, nil
+	}
+	return val, err
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: Plan cache (5-minute TTL read-through)
+// ---------------------------------------------------------------------------
+
+const PlanCacheTTL = 5 * time.Minute
+
+// GetPlan reads the cached plan. Returns "" on cache miss.
+func GetPlan(ctx context.Context, rdb *redis.Client, userID string) (string, error) {
+	val, err := rdb.Get(ctx, Plan(userID)).Result()
+	if err == redis.Nil {
+		return "", nil
+	}
+	return val, err
+}
+
+// SetPlan caches the user's plan with 5-minute TTL.
+func SetPlan(ctx context.Context, rdb *redis.Client, userID, plan string) error {
+	return rdb.Set(ctx, Plan(userID), plan, PlanCacheTTL).Err()
+}
+
+// DelPlan invalidates the plan cache (call after plan changes).
+func DelPlan(ctx context.Context, rdb *redis.Client, userID string) error {
+	return rdb.Del(ctx, Plan(userID)).Err()
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: Referral codes (no TTL — persistent mapping)
+// ---------------------------------------------------------------------------
+
+// SetRefCode stores a referral code -> userId mapping with no TTL.
+func SetRefCode(ctx context.Context, rdb *redis.Client, code, userID string) error {
+	return rdb.Set(ctx, RefCode(code), userID, 0).Err()
+}
+
+// GetRefCode looks up the userId for a referral code. Returns "" if not found.
+func GetRefCode(ctx context.Context, rdb *redis.Client, code string) (string, error) {
+	val, err := rdb.Get(ctx, RefCode(code)).Result()
+	if err == redis.Nil {
+		return "", nil
+	}
+	return val, err
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: Webhook idempotency (72-hour TTL)
+// ---------------------------------------------------------------------------
+
+const WebhookIdempotencyTTL = 72 * time.Hour
+
+// SetWebhookIdem attempts to set the idempotency key. Returns true if this is the
+// first time (SETNX succeeded), false if the webhook was already processed.
+func SetWebhookIdem(ctx context.Context, rdb *redis.Client, paymentID string) (bool, error) {
+	return rdb.SetNX(ctx, WebhookIdem(paymentID), "1", WebhookIdempotencyTTL).Result()
+}

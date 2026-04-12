@@ -169,6 +169,21 @@ class QuizServiceClient extends $grpc.Client {
         options: options);
   }
 
+  /// Phase 2
+  $grpc.ResponseFuture<$0.GetTournamentListResponse> getTournamentList(
+    $0.GetTournamentListRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$getTournamentList, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.JoinTournamentResponse> joinTournament(
+    $0.JoinTournamentRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$joinTournament, request, options: options);
+  }
+
   // method descriptors
 
   static final _$getRoomQuestions = $grpc.ClientMethod<
@@ -186,6 +201,16 @@ class QuizServiceClient extends $grpc.Client {
           '/quiz.QuizService/StreamGameEvents',
           ($0.StreamGameEventsRequest value) => value.writeToBuffer(),
           $0.GameEvent.fromBuffer);
+  static final _$getTournamentList = $grpc.ClientMethod<
+          $0.GetTournamentListRequest, $0.GetTournamentListResponse>(
+      '/quiz.QuizService/GetTournamentList',
+      ($0.GetTournamentListRequest value) => value.writeToBuffer(),
+      $0.GetTournamentListResponse.fromBuffer);
+  static final _$joinTournament =
+      $grpc.ClientMethod<$0.JoinTournamentRequest, $0.JoinTournamentResponse>(
+          '/quiz.QuizService/JoinTournament',
+          ($0.JoinTournamentRequest value) => value.writeToBuffer(),
+          $0.JoinTournamentResponse.fromBuffer);
 }
 
 @$pb.GrpcServiceName('quiz.QuizService')
@@ -219,6 +244,24 @@ abstract class QuizServiceBase extends $grpc.Service {
         ($core.List<$core.int> value) =>
             $0.StreamGameEventsRequest.fromBuffer(value),
         ($0.GameEvent value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.GetTournamentListRequest,
+            $0.GetTournamentListResponse>(
+        'GetTournamentList',
+        getTournamentList_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.GetTournamentListRequest.fromBuffer(value),
+        ($0.GetTournamentListResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.JoinTournamentRequest,
+            $0.JoinTournamentResponse>(
+        'JoinTournament',
+        joinTournament_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.JoinTournamentRequest.fromBuffer(value),
+        ($0.JoinTournamentResponse value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.GetRoomQuestionsResponse> getRoomQuestions_Pre(
@@ -246,6 +289,24 @@ abstract class QuizServiceBase extends $grpc.Service {
 
   $async.Stream<$0.GameEvent> streamGameEvents(
       $grpc.ServiceCall call, $0.StreamGameEventsRequest request);
+
+  $async.Future<$0.GetTournamentListResponse> getTournamentList_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.GetTournamentListRequest> $request) async {
+    return getTournamentList($call, await $request);
+  }
+
+  $async.Future<$0.GetTournamentListResponse> getTournamentList(
+      $grpc.ServiceCall call, $0.GetTournamentListRequest request);
+
+  $async.Future<$0.JoinTournamentResponse> joinTournament_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.JoinTournamentRequest> $request) async {
+    return joinTournament($call, await $request);
+  }
+
+  $async.Future<$0.JoinTournamentResponse> joinTournament(
+      $grpc.ServiceCall call, $0.JoinTournamentRequest request);
 }
 
 @$pb.GrpcServiceName('quiz.ScoringService')
@@ -281,6 +342,35 @@ class ScoringServiceClient extends $grpc.Client {
     return $createUnaryCall(_$getMatchHistory, request, options: options);
   }
 
+  /// Phase 2: User Service RPCs (scoring service acts as user service)
+  $grpc.ResponseFuture<$0.GetHomeScreenDataResponse> getHomeScreenData(
+    $0.GetHomeScreenDataRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$getHomeScreenData, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.GetReferralDashboardResponse> getReferralDashboard(
+    $0.GetReferralDashboardRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$getReferralDashboard, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.ApplyReferralCodeResponse> applyReferralCode(
+    $0.ApplyReferralCodeRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$applyReferralCode, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.UpdateFCMTokenResponse> updateFCMToken(
+    $0.UpdateFCMTokenRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$updateFCMToken, request, options: options);
+  }
+
   // method descriptors
 
   static final _$calculateScore =
@@ -298,6 +388,26 @@ class ScoringServiceClient extends $grpc.Client {
           '/quiz.ScoringService/GetMatchHistory',
           ($0.GetMatchHistoryRequest value) => value.writeToBuffer(),
           $0.GetMatchHistoryResponse.fromBuffer);
+  static final _$getHomeScreenData = $grpc.ClientMethod<
+          $0.GetHomeScreenDataRequest, $0.GetHomeScreenDataResponse>(
+      '/quiz.ScoringService/GetHomeScreenData',
+      ($0.GetHomeScreenDataRequest value) => value.writeToBuffer(),
+      $0.GetHomeScreenDataResponse.fromBuffer);
+  static final _$getReferralDashboard = $grpc.ClientMethod<
+          $0.GetReferralDashboardRequest, $0.GetReferralDashboardResponse>(
+      '/quiz.ScoringService/GetReferralDashboard',
+      ($0.GetReferralDashboardRequest value) => value.writeToBuffer(),
+      $0.GetReferralDashboardResponse.fromBuffer);
+  static final _$applyReferralCode = $grpc.ClientMethod<
+          $0.ApplyReferralCodeRequest, $0.ApplyReferralCodeResponse>(
+      '/quiz.ScoringService/ApplyReferralCode',
+      ($0.ApplyReferralCodeRequest value) => value.writeToBuffer(),
+      $0.ApplyReferralCodeResponse.fromBuffer);
+  static final _$updateFCMToken =
+      $grpc.ClientMethod<$0.UpdateFCMTokenRequest, $0.UpdateFCMTokenResponse>(
+          '/quiz.ScoringService/UpdateFCMToken',
+          ($0.UpdateFCMTokenRequest value) => value.writeToBuffer(),
+          $0.UpdateFCMTokenResponse.fromBuffer);
 }
 
 @$pb.GrpcServiceName('quiz.ScoringService')
@@ -332,6 +442,42 @@ abstract class ScoringServiceBase extends $grpc.Service {
         ($core.List<$core.int> value) =>
             $0.GetMatchHistoryRequest.fromBuffer(value),
         ($0.GetMatchHistoryResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.GetHomeScreenDataRequest,
+            $0.GetHomeScreenDataResponse>(
+        'GetHomeScreenData',
+        getHomeScreenData_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.GetHomeScreenDataRequest.fromBuffer(value),
+        ($0.GetHomeScreenDataResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.GetReferralDashboardRequest,
+            $0.GetReferralDashboardResponse>(
+        'GetReferralDashboard',
+        getReferralDashboard_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.GetReferralDashboardRequest.fromBuffer(value),
+        ($0.GetReferralDashboardResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.ApplyReferralCodeRequest,
+            $0.ApplyReferralCodeResponse>(
+        'ApplyReferralCode',
+        applyReferralCode_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.ApplyReferralCodeRequest.fromBuffer(value),
+        ($0.ApplyReferralCodeResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.UpdateFCMTokenRequest,
+            $0.UpdateFCMTokenResponse>(
+        'UpdateFCMToken',
+        updateFCMToken_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.UpdateFCMTokenRequest.fromBuffer(value),
+        ($0.UpdateFCMTokenResponse value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.CalculateScoreResponse> calculateScore_Pre(
@@ -360,6 +506,42 @@ abstract class ScoringServiceBase extends $grpc.Service {
 
   $async.Future<$0.GetMatchHistoryResponse> getMatchHistory(
       $grpc.ServiceCall call, $0.GetMatchHistoryRequest request);
+
+  $async.Future<$0.GetHomeScreenDataResponse> getHomeScreenData_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.GetHomeScreenDataRequest> $request) async {
+    return getHomeScreenData($call, await $request);
+  }
+
+  $async.Future<$0.GetHomeScreenDataResponse> getHomeScreenData(
+      $grpc.ServiceCall call, $0.GetHomeScreenDataRequest request);
+
+  $async.Future<$0.GetReferralDashboardResponse> getReferralDashboard_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.GetReferralDashboardRequest> $request) async {
+    return getReferralDashboard($call, await $request);
+  }
+
+  $async.Future<$0.GetReferralDashboardResponse> getReferralDashboard(
+      $grpc.ServiceCall call, $0.GetReferralDashboardRequest request);
+
+  $async.Future<$0.ApplyReferralCodeResponse> applyReferralCode_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.ApplyReferralCodeRequest> $request) async {
+    return applyReferralCode($call, await $request);
+  }
+
+  $async.Future<$0.ApplyReferralCodeResponse> applyReferralCode(
+      $grpc.ServiceCall call, $0.ApplyReferralCodeRequest request);
+
+  $async.Future<$0.UpdateFCMTokenResponse> updateFCMToken_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.UpdateFCMTokenRequest> $request) async {
+    return updateFCMToken($call, await $request);
+  }
+
+  $async.Future<$0.UpdateFCMTokenResponse> updateFCMToken(
+      $grpc.ServiceCall call, $0.UpdateFCMTokenRequest request);
 }
 
 @$pb.GrpcServiceName('quiz.AuthService')
@@ -451,6 +633,28 @@ class AuthServiceClient extends $grpc.Client {
     return $createUnaryCall(_$deleteAccount, request, options: options);
   }
 
+  /// Phase 2
+  $grpc.ResponseFuture<$0.GoogleSignInResponse> googleSignIn(
+    $0.GoogleSignInRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$googleSignIn, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.ClaimDailyRewardResponse> claimDailyReward(
+    $0.ClaimDailyRewardRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$claimDailyReward, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.GetStreakInfoResponse> getStreakInfo(
+    $0.GetStreakInfoRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$getStreakInfo, request, options: options);
+  }
+
   // method descriptors
 
   static final _$register =
@@ -507,6 +711,21 @@ class AuthServiceClient extends $grpc.Client {
           '/quiz.AuthService/DeleteAccount',
           ($0.DeleteAccountRequest value) => value.writeToBuffer(),
           $0.DeleteAccountResponse.fromBuffer);
+  static final _$googleSignIn =
+      $grpc.ClientMethod<$0.GoogleSignInRequest, $0.GoogleSignInResponse>(
+          '/quiz.AuthService/GoogleSignIn',
+          ($0.GoogleSignInRequest value) => value.writeToBuffer(),
+          $0.GoogleSignInResponse.fromBuffer);
+  static final _$claimDailyReward = $grpc.ClientMethod<
+          $0.ClaimDailyRewardRequest, $0.ClaimDailyRewardResponse>(
+      '/quiz.AuthService/ClaimDailyReward',
+      ($0.ClaimDailyRewardRequest value) => value.writeToBuffer(),
+      $0.ClaimDailyRewardResponse.fromBuffer);
+  static final _$getStreakInfo =
+      $grpc.ClientMethod<$0.GetStreakInfoRequest, $0.GetStreakInfoResponse>(
+          '/quiz.AuthService/GetStreakInfo',
+          ($0.GetStreakInfoRequest value) => value.writeToBuffer(),
+          $0.GetStreakInfoResponse.fromBuffer);
 }
 
 @$pb.GrpcServiceName('quiz.AuthService')
@@ -603,6 +822,33 @@ abstract class AuthServiceBase extends $grpc.Service {
             ($core.List<$core.int> value) =>
                 $0.DeleteAccountRequest.fromBuffer(value),
             ($0.DeleteAccountResponse value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.GoogleSignInRequest, $0.GoogleSignInResponse>(
+            'GoogleSignIn',
+            googleSignIn_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.GoogleSignInRequest.fromBuffer(value),
+            ($0.GoogleSignInResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.ClaimDailyRewardRequest,
+            $0.ClaimDailyRewardResponse>(
+        'ClaimDailyReward',
+        claimDailyReward_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.ClaimDailyRewardRequest.fromBuffer(value),
+        ($0.ClaimDailyRewardResponse value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.GetStreakInfoRequest, $0.GetStreakInfoResponse>(
+            'GetStreakInfo',
+            getStreakInfo_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.GetStreakInfoRequest.fromBuffer(value),
+            ($0.GetStreakInfoResponse value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.AuthResponse> register_Pre($grpc.ServiceCall $call,
@@ -698,4 +944,144 @@ abstract class AuthServiceBase extends $grpc.Service {
 
   $async.Future<$0.DeleteAccountResponse> deleteAccount(
       $grpc.ServiceCall call, $0.DeleteAccountRequest request);
+
+  $async.Future<$0.GoogleSignInResponse> googleSignIn_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.GoogleSignInRequest> $request) async {
+    return googleSignIn($call, await $request);
+  }
+
+  $async.Future<$0.GoogleSignInResponse> googleSignIn(
+      $grpc.ServiceCall call, $0.GoogleSignInRequest request);
+
+  $async.Future<$0.ClaimDailyRewardResponse> claimDailyReward_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.ClaimDailyRewardRequest> $request) async {
+    return claimDailyReward($call, await $request);
+  }
+
+  $async.Future<$0.ClaimDailyRewardResponse> claimDailyReward(
+      $grpc.ServiceCall call, $0.ClaimDailyRewardRequest request);
+
+  $async.Future<$0.GetStreakInfoResponse> getStreakInfo_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.GetStreakInfoRequest> $request) async {
+    return getStreakInfo($call, await $request);
+  }
+
+  $async.Future<$0.GetStreakInfoResponse> getStreakInfo(
+      $grpc.ServiceCall call, $0.GetStreakInfoRequest request);
+}
+
+@$pb.GrpcServiceName('quiz.PaymentService')
+class PaymentServiceClient extends $grpc.Client {
+  /// The hostname for this service.
+  static const $core.String defaultHost = '';
+
+  /// OAuth scopes needed for the client.
+  static const $core.List<$core.String> oauthScopes = [
+    '',
+  ];
+
+  PaymentServiceClient(super.channel, {super.options, super.interceptors});
+
+  $grpc.ResponseFuture<$0.CreateOrderResponse> createOrder(
+    $0.CreateOrderRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$createOrder, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.GetPlanStatusResponse> getPlanStatus(
+    $0.GetPlanStatusRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$getPlanStatus, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.GetPaymentHistoryResponse> getPaymentHistory(
+    $0.GetPaymentHistoryRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$getPaymentHistory, request, options: options);
+  }
+
+  // method descriptors
+
+  static final _$createOrder =
+      $grpc.ClientMethod<$0.CreateOrderRequest, $0.CreateOrderResponse>(
+          '/quiz.PaymentService/CreateOrder',
+          ($0.CreateOrderRequest value) => value.writeToBuffer(),
+          $0.CreateOrderResponse.fromBuffer);
+  static final _$getPlanStatus =
+      $grpc.ClientMethod<$0.GetPlanStatusRequest, $0.GetPlanStatusResponse>(
+          '/quiz.PaymentService/GetPlanStatus',
+          ($0.GetPlanStatusRequest value) => value.writeToBuffer(),
+          $0.GetPlanStatusResponse.fromBuffer);
+  static final _$getPaymentHistory = $grpc.ClientMethod<
+          $0.GetPaymentHistoryRequest, $0.GetPaymentHistoryResponse>(
+      '/quiz.PaymentService/GetPaymentHistory',
+      ($0.GetPaymentHistoryRequest value) => value.writeToBuffer(),
+      $0.GetPaymentHistoryResponse.fromBuffer);
+}
+
+@$pb.GrpcServiceName('quiz.PaymentService')
+abstract class PaymentServiceBase extends $grpc.Service {
+  $core.String get $name => 'quiz.PaymentService';
+
+  PaymentServiceBase() {
+    $addMethod(
+        $grpc.ServiceMethod<$0.CreateOrderRequest, $0.CreateOrderResponse>(
+            'CreateOrder',
+            createOrder_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.CreateOrderRequest.fromBuffer(value),
+            ($0.CreateOrderResponse value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.GetPlanStatusRequest, $0.GetPlanStatusResponse>(
+            'GetPlanStatus',
+            getPlanStatus_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.GetPlanStatusRequest.fromBuffer(value),
+            ($0.GetPlanStatusResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.GetPaymentHistoryRequest,
+            $0.GetPaymentHistoryResponse>(
+        'GetPaymentHistory',
+        getPaymentHistory_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.GetPaymentHistoryRequest.fromBuffer(value),
+        ($0.GetPaymentHistoryResponse value) => value.writeToBuffer()));
+  }
+
+  $async.Future<$0.CreateOrderResponse> createOrder_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.CreateOrderRequest> $request) async {
+    return createOrder($call, await $request);
+  }
+
+  $async.Future<$0.CreateOrderResponse> createOrder(
+      $grpc.ServiceCall call, $0.CreateOrderRequest request);
+
+  $async.Future<$0.GetPlanStatusResponse> getPlanStatus_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.GetPlanStatusRequest> $request) async {
+    return getPlanStatus($call, await $request);
+  }
+
+  $async.Future<$0.GetPlanStatusResponse> getPlanStatus(
+      $grpc.ServiceCall call, $0.GetPlanStatusRequest request);
+
+  $async.Future<$0.GetPaymentHistoryResponse> getPaymentHistory_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.GetPaymentHistoryRequest> $request) async {
+    return getPaymentHistory($call, await $request);
+  }
+
+  $async.Future<$0.GetPaymentHistoryResponse> getPaymentHistory(
+      $grpc.ServiceCall call, $0.GetPaymentHistoryRequest request);
 }

@@ -7,11 +7,13 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 go build -o /out/matchmaking ./services/matchmaking && \
-    CGO_ENABLED=0 go build -o /out/quiz        ./services/quiz && \
-    CGO_ENABLED=0 go build -o /out/scoring      ./services/scoring && \
-    CGO_ENABLED=0 go build -o /out/auth         ./services/auth && \
-    CGO_ENABLED=0 go build -o /out/seed         ./seed
+RUN CGO_ENABLED=0 go build -o /out/matchmaking    ./services/matchmaking && \
+    CGO_ENABLED=0 go build -o /out/quiz           ./services/quiz && \
+    CGO_ENABLED=0 go build -o /out/scoring         ./services/scoring && \
+    CGO_ENABLED=0 go build -o /out/auth            ./services/auth && \
+    CGO_ENABLED=0 go build -o /out/payment         ./services/payment && \
+    CGO_ENABLED=0 go build -o /out/notification    ./services/notification && \
+    CGO_ENABLED=0 go build -o /out/seed            ./seed
 
 # Stage 2: Minimal runtime image
 FROM alpine:3.20

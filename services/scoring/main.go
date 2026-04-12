@@ -644,6 +644,30 @@ func setupRabbitMQ(ch *amqp.Channel) error {
 		return fmt.Errorf("leaderboard queue bind: %w", err)
 	}
 
+	// Phase 2: payment-success-queue (consumed by this service to upgrade plans)
+	if _, err := ch.QueueDeclare("payment-success-queue", true, false, false, false, nil); err != nil {
+		return fmt.Errorf("payment queue declare: %w", err)
+	}
+	if err := ch.QueueBind("payment-success-queue", "payment.*", "sx", false, nil); err != nil {
+		return fmt.Errorf("payment queue bind: %w", err)
+	}
+
+	// Phase 2: referral-event-queue (consumed by this service to grant rewards)
+	if _, err := ch.QueueDeclare("referral-event-queue", true, false, false, false, nil); err != nil {
+		return fmt.Errorf("referral queue declare: %w", err)
+	}
+	if err := ch.QueueBind("referral-event-queue", "referral.*", "sx", false, nil); err != nil {
+		return fmt.Errorf("referral queue bind: %w", err)
+	}
+
+	// Phase 2: push-notification-queue (this service publishes notif.* events)
+	if _, err := ch.QueueDeclare("push-notification-queue", true, false, false, false, nil); err != nil {
+		return fmt.Errorf("push-notification queue declare: %w", err)
+	}
+	if err := ch.QueueBind("push-notification-queue", "notif.#", "sx", false, nil); err != nil {
+		return fmt.Errorf("push-notification queue bind: %w", err)
+	}
+
 	return nil
 }
 

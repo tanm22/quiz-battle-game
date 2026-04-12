@@ -449,13 +449,15 @@ const RegisterRequest$json = {
     {'1': 'username', '3': 1, '4': 1, '5': 9, '10': 'username'},
     {'1': 'password', '3': 2, '4': 1, '5': 9, '10': 'password'},
     {'1': 'email', '3': 3, '4': 1, '5': 9, '10': 'email'},
+    {'1': 'referral_code', '3': 4, '4': 1, '5': 9, '10': 'referralCode'},
   ],
 };
 
 /// Descriptor for `RegisterRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List registerRequestDescriptor = $convert.base64Decode(
     'Cg9SZWdpc3RlclJlcXVlc3QSGgoIdXNlcm5hbWUYASABKAlSCHVzZXJuYW1lEhoKCHBhc3N3b3'
-    'JkGAIgASgJUghwYXNzd29yZBIUCgVlbWFpbBgDIAEoCVIFZW1haWw=');
+    'JkGAIgASgJUghwYXNzd29yZBIUCgVlbWFpbBgDIAEoCVIFZW1haWwSIwoNcmVmZXJyYWxfY29k'
+    'ZRgEIAEoCVIMcmVmZXJyYWxDb2Rl');
 
 @$core.Deprecated('Use loginRequestDescriptor instead')
 const LoginRequest$json = {
@@ -483,6 +485,26 @@ const AuthResponse$json = {
     {'1': 'wins', '3': 6, '4': 1, '5': 5, '10': 'wins'},
     {'1': 'email', '3': 7, '4': 1, '5': 9, '10': 'email'},
     {'1': 'is_guest', '3': 8, '4': 1, '5': 8, '10': 'isGuest'},
+    {'1': 'plan', '3': 9, '4': 1, '5': 9, '10': 'plan'},
+    {'1': 'coins', '3': 10, '4': 1, '5': 3, '10': 'coins'},
+    {
+      '1': 'streak',
+      '3': 11,
+      '4': 1,
+      '5': 11,
+      '6': '.quiz.StreakInfo',
+      '10': 'streak'
+    },
+    {'1': 'referral_code', '3': 12, '4': 1, '5': 9, '10': 'referralCode'},
+    {'1': 'streak_updated', '3': 13, '4': 1, '5': 8, '10': 'streakUpdated'},
+    {
+      '1': 'reward',
+      '3': 14,
+      '4': 1,
+      '5': 11,
+      '6': '.quiz.RewardGrant',
+      '10': 'reward'
+    },
   ],
 };
 
@@ -491,7 +513,11 @@ final $typed_data.Uint8List authResponseDescriptor = $convert.base64Decode(
     'CgxBdXRoUmVzcG9uc2USFwoHdXNlcl9pZBgBIAEoCVIGdXNlcklkEhoKCHVzZXJuYW1lGAIgAS'
     'gJUgh1c2VybmFtZRIUCgV0b2tlbhgDIAEoCVIFdG9rZW4SFgoGcmF0aW5nGAQgASgFUgZyYXRp'
     'bmcSJQoObWF0Y2hlc19wbGF5ZWQYBSABKAVSDW1hdGNoZXNQbGF5ZWQSEgoEd2lucxgGIAEoBV'
-    'IEd2lucxIUCgVlbWFpbBgHIAEoCVIFZW1haWwSGQoIaXNfZ3Vlc3QYCCABKAhSB2lzR3Vlc3Q=');
+    'IEd2lucxIUCgVlbWFpbBgHIAEoCVIFZW1haWwSGQoIaXNfZ3Vlc3QYCCABKAhSB2lzR3Vlc3QS'
+    'EgoEcGxhbhgJIAEoCVIEcGxhbhIUCgVjb2lucxgKIAEoA1IFY29pbnMSKAoGc3RyZWFrGAsgAS'
+    'gLMhAucXVpei5TdHJlYWtJbmZvUgZzdHJlYWsSIwoNcmVmZXJyYWxfY29kZRgMIAEoCVIMcmVm'
+    'ZXJyYWxDb2RlEiUKDnN0cmVha191cGRhdGVkGA0gASgIUg1zdHJlYWtVcGRhdGVkEikKBnJld2'
+    'FyZBgOIAEoCzIRLnF1aXouUmV3YXJkR3JhbnRSBnJld2FyZA==');
 
 @$core.Deprecated('Use getProfileRequestDescriptor instead')
 const GetProfileRequest$json = {
@@ -513,6 +539,17 @@ const ProfileResponse$json = {
     {'1': 'wins', '3': 5, '4': 1, '5': 5, '10': 'wins'},
     {'1': 'email', '3': 6, '4': 1, '5': 9, '10': 'email'},
     {'1': 'is_guest', '3': 7, '4': 1, '5': 8, '10': 'isGuest'},
+    {'1': 'plan', '3': 8, '4': 1, '5': 9, '10': 'plan'},
+    {'1': 'coins', '3': 9, '4': 1, '5': 3, '10': 'coins'},
+    {
+      '1': 'streak',
+      '3': 10,
+      '4': 1,
+      '5': 11,
+      '6': '.quiz.StreakInfo',
+      '10': 'streak'
+    },
+    {'1': 'referral_code', '3': 11, '4': 1, '5': 9, '10': 'referralCode'},
   ],
 };
 
@@ -521,7 +558,9 @@ final $typed_data.Uint8List profileResponseDescriptor = $convert.base64Decode(
     'Cg9Qcm9maWxlUmVzcG9uc2USFwoHdXNlcl9pZBgBIAEoCVIGdXNlcklkEhoKCHVzZXJuYW1lGA'
     'IgASgJUgh1c2VybmFtZRIWCgZyYXRpbmcYAyABKAVSBnJhdGluZxIlCg5tYXRjaGVzX3BsYXll'
     'ZBgEIAEoBVINbWF0Y2hlc1BsYXllZBISCgR3aW5zGAUgASgFUgR3aW5zEhQKBWVtYWlsGAYgAS'
-    'gJUgVlbWFpbBIZCghpc19ndWVzdBgHIAEoCFIHaXNHdWVzdA==');
+    'gJUgVlbWFpbBIZCghpc19ndWVzdBgHIAEoCFIHaXNHdWVzdBISCgRwbGFuGAggASgJUgRwbGFu'
+    'EhQKBWNvaW5zGAkgASgDUgVjb2lucxIoCgZzdHJlYWsYCiABKAsyEC5xdWl6LlN0cmVha0luZm'
+    '9SBnN0cmVhaxIjCg1yZWZlcnJhbF9jb2RlGAsgASgJUgxyZWZlcnJhbENvZGU=');
 
 @$core.Deprecated('Use guestLoginRequestDescriptor instead')
 const GuestLoginRequest$json = {
@@ -834,3 +873,517 @@ final $typed_data.Uint8List matchHistoryEntryDescriptor = $convert.base64Decode(
     'IgASgJUgZ3aW5uZXISLAoHcGxheWVycxgDIAMoCzISLnF1aXouUGxheWVyUmVzdWx0UgdwbGF5'
     'ZXJzEhYKBnJvdW5kcxgEIAEoBVIGcm91bmRzEhoKCGR1cmF0aW9uGAUgASgDUghkdXJhdGlvbh'
     'IdCgpjcmVhdGVkX2F0GAYgASgDUgljcmVhdGVkQXQ=');
+
+@$core.Deprecated('Use streakInfoDescriptor instead')
+const StreakInfo$json = {
+  '1': 'StreakInfo',
+  '2': [
+    {'1': 'current', '3': 1, '4': 1, '5': 5, '10': 'current'},
+    {'1': 'longest', '3': 2, '4': 1, '5': 5, '10': 'longest'},
+    {'1': 'last_claimed_date', '3': 3, '4': 1, '5': 9, '10': 'lastClaimedDate'},
+  ],
+};
+
+/// Descriptor for `StreakInfo`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List streakInfoDescriptor = $convert.base64Decode(
+    'CgpTdHJlYWtJbmZvEhgKB2N1cnJlbnQYASABKAVSB2N1cnJlbnQSGAoHbG9uZ2VzdBgCIAEoBV'
+    'IHbG9uZ2VzdBIqChFsYXN0X2NsYWltZWRfZGF0ZRgDIAEoCVIPbGFzdENsYWltZWREYXRl');
+
+@$core.Deprecated('Use rewardGrantDescriptor instead')
+const RewardGrant$json = {
+  '1': 'RewardGrant',
+  '2': [
+    {'1': 'coins', '3': 1, '4': 1, '5': 3, '10': 'coins'},
+    {'1': 'badge_name', '3': 2, '4': 1, '5': 9, '10': 'badgeName'},
+    {'1': 'bonus_quizzes', '3': 3, '4': 1, '5': 5, '10': 'bonusQuizzes'},
+  ],
+};
+
+/// Descriptor for `RewardGrant`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List rewardGrantDescriptor = $convert.base64Decode(
+    'CgtSZXdhcmRHcmFudBIUCgVjb2lucxgBIAEoA1IFY29pbnMSHQoKYmFkZ2VfbmFtZRgCIAEoCV'
+    'IJYmFkZ2VOYW1lEiMKDWJvbnVzX3F1aXp6ZXMYAyABKAVSDGJvbnVzUXVpenplcw==');
+
+@$core.Deprecated('Use planStatusDescriptor instead')
+const PlanStatus$json = {
+  '1': 'PlanStatus',
+  '2': [
+    {'1': 'plan', '3': 1, '4': 1, '5': 9, '10': 'plan'},
+    {'1': 'expires_at', '3': 2, '4': 1, '5': 3, '10': 'expiresAt'},
+  ],
+};
+
+/// Descriptor for `PlanStatus`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List planStatusDescriptor = $convert.base64Decode(
+    'CgpQbGFuU3RhdHVzEhIKBHBsYW4YASABKAlSBHBsYW4SHQoKZXhwaXJlc19hdBgCIAEoA1IJZX'
+    'hwaXJlc0F0');
+
+@$core.Deprecated('Use googleSignInRequestDescriptor instead')
+const GoogleSignInRequest$json = {
+  '1': 'GoogleSignInRequest',
+  '2': [
+    {'1': 'id_token', '3': 1, '4': 1, '5': 9, '10': 'idToken'},
+    {'1': 'referral_code', '3': 2, '4': 1, '5': 9, '10': 'referralCode'},
+  ],
+};
+
+/// Descriptor for `GoogleSignInRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List googleSignInRequestDescriptor = $convert.base64Decode(
+    'ChNHb29nbGVTaWduSW5SZXF1ZXN0EhkKCGlkX3Rva2VuGAEgASgJUgdpZFRva2VuEiMKDXJlZm'
+    'VycmFsX2NvZGUYAiABKAlSDHJlZmVycmFsQ29kZQ==');
+
+@$core.Deprecated('Use googleSignInResponseDescriptor instead')
+const GoogleSignInResponse$json = {
+  '1': 'GoogleSignInResponse',
+  '2': [
+    {'1': 'token', '3': 1, '4': 1, '5': 9, '10': 'token'},
+    {
+      '1': 'user_profile',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.quiz.UserProfile',
+      '10': 'userProfile'
+    },
+    {'1': 'is_new_user', '3': 3, '4': 1, '5': 8, '10': 'isNewUser'},
+    {'1': 'streak_updated', '3': 4, '4': 1, '5': 8, '10': 'streakUpdated'},
+    {
+      '1': 'reward',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.quiz.RewardGrant',
+      '10': 'reward'
+    },
+  ],
+};
+
+/// Descriptor for `GoogleSignInResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List googleSignInResponseDescriptor = $convert.base64Decode(
+    'ChRHb29nbGVTaWduSW5SZXNwb25zZRIUCgV0b2tlbhgBIAEoCVIFdG9rZW4SNAoMdXNlcl9wcm'
+    '9maWxlGAIgASgLMhEucXVpei5Vc2VyUHJvZmlsZVILdXNlclByb2ZpbGUSHgoLaXNfbmV3X3Vz'
+    'ZXIYAyABKAhSCWlzTmV3VXNlchIlCg5zdHJlYWtfdXBkYXRlZBgEIAEoCFINc3RyZWFrVXBkYX'
+    'RlZBIpCgZyZXdhcmQYBSABKAsyES5xdWl6LlJld2FyZEdyYW50UgZyZXdhcmQ=');
+
+@$core.Deprecated('Use userProfileDescriptor instead')
+const UserProfile$json = {
+  '1': 'UserProfile',
+  '2': [
+    {'1': 'user_id', '3': 1, '4': 1, '5': 9, '10': 'userId'},
+    {'1': 'username', '3': 2, '4': 1, '5': 9, '10': 'username'},
+    {'1': 'display_name', '3': 3, '4': 1, '5': 9, '10': 'displayName'},
+    {'1': 'email', '3': 4, '4': 1, '5': 9, '10': 'email'},
+    {'1': 'avatar_url', '3': 5, '4': 1, '5': 9, '10': 'avatarUrl'},
+    {'1': 'rating', '3': 6, '4': 1, '5': 5, '10': 'rating'},
+    {'1': 'matches_played', '3': 7, '4': 1, '5': 5, '10': 'matchesPlayed'},
+    {'1': 'wins', '3': 8, '4': 1, '5': 5, '10': 'wins'},
+    {'1': 'plan', '3': 9, '4': 1, '5': 9, '10': 'plan'},
+    {'1': 'coins', '3': 10, '4': 1, '5': 3, '10': 'coins'},
+    {
+      '1': 'streak',
+      '3': 11,
+      '4': 1,
+      '5': 11,
+      '6': '.quiz.StreakInfo',
+      '10': 'streak'
+    },
+    {'1': 'referral_code', '3': 12, '4': 1, '5': 9, '10': 'referralCode'},
+    {'1': 'is_guest', '3': 13, '4': 1, '5': 8, '10': 'isGuest'},
+  ],
+};
+
+/// Descriptor for `UserProfile`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List userProfileDescriptor = $convert.base64Decode(
+    'CgtVc2VyUHJvZmlsZRIXCgd1c2VyX2lkGAEgASgJUgZ1c2VySWQSGgoIdXNlcm5hbWUYAiABKA'
+    'lSCHVzZXJuYW1lEiEKDGRpc3BsYXlfbmFtZRgDIAEoCVILZGlzcGxheU5hbWUSFAoFZW1haWwY'
+    'BCABKAlSBWVtYWlsEh0KCmF2YXRhcl91cmwYBSABKAlSCWF2YXRhclVybBIWCgZyYXRpbmcYBi'
+    'ABKAVSBnJhdGluZxIlCg5tYXRjaGVzX3BsYXllZBgHIAEoBVINbWF0Y2hlc1BsYXllZBISCgR3'
+    'aW5zGAggASgFUgR3aW5zEhIKBHBsYW4YCSABKAlSBHBsYW4SFAoFY29pbnMYCiABKANSBWNvaW'
+    '5zEigKBnN0cmVhaxgLIAEoCzIQLnF1aXouU3RyZWFrSW5mb1IGc3RyZWFrEiMKDXJlZmVycmFs'
+    'X2NvZGUYDCABKAlSDHJlZmVycmFsQ29kZRIZCghpc19ndWVzdBgNIAEoCFIHaXNHdWVzdA==');
+
+@$core.Deprecated('Use claimDailyRewardRequestDescriptor instead')
+const ClaimDailyRewardRequest$json = {
+  '1': 'ClaimDailyRewardRequest',
+};
+
+/// Descriptor for `ClaimDailyRewardRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List claimDailyRewardRequestDescriptor =
+    $convert.base64Decode('ChdDbGFpbURhaWx5UmV3YXJkUmVxdWVzdA==');
+
+@$core.Deprecated('Use claimDailyRewardResponseDescriptor instead')
+const ClaimDailyRewardResponse$json = {
+  '1': 'ClaimDailyRewardResponse',
+  '2': [
+    {
+      '1': 'reward',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.quiz.RewardGrant',
+      '10': 'reward'
+    },
+    {
+      '1': 'streak',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.quiz.StreakInfo',
+      '10': 'streak'
+    },
+  ],
+};
+
+/// Descriptor for `ClaimDailyRewardResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List claimDailyRewardResponseDescriptor = $convert.base64Decode(
+    'ChhDbGFpbURhaWx5UmV3YXJkUmVzcG9uc2USKQoGcmV3YXJkGAEgASgLMhEucXVpei5SZXdhcm'
+    'RHcmFudFIGcmV3YXJkEigKBnN0cmVhaxgCIAEoCzIQLnF1aXouU3RyZWFrSW5mb1IGc3RyZWFr');
+
+@$core.Deprecated('Use getStreakInfoRequestDescriptor instead')
+const GetStreakInfoRequest$json = {
+  '1': 'GetStreakInfoRequest',
+};
+
+/// Descriptor for `GetStreakInfoRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getStreakInfoRequestDescriptor =
+    $convert.base64Decode('ChRHZXRTdHJlYWtJbmZvUmVxdWVzdA==');
+
+@$core.Deprecated('Use getStreakInfoResponseDescriptor instead')
+const GetStreakInfoResponse$json = {
+  '1': 'GetStreakInfoResponse',
+  '2': [
+    {
+      '1': 'streak',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.quiz.StreakInfo',
+      '10': 'streak'
+    },
+  ],
+};
+
+/// Descriptor for `GetStreakInfoResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getStreakInfoResponseDescriptor = $convert.base64Decode(
+    'ChVHZXRTdHJlYWtJbmZvUmVzcG9uc2USKAoGc3RyZWFrGAEgASgLMhAucXVpei5TdHJlYWtJbm'
+    'ZvUgZzdHJlYWs=');
+
+@$core.Deprecated('Use getHomeScreenDataRequestDescriptor instead')
+const GetHomeScreenDataRequest$json = {
+  '1': 'GetHomeScreenDataRequest',
+};
+
+/// Descriptor for `GetHomeScreenDataRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getHomeScreenDataRequestDescriptor =
+    $convert.base64Decode('ChhHZXRIb21lU2NyZWVuRGF0YVJlcXVlc3Q=');
+
+@$core.Deprecated('Use getHomeScreenDataResponseDescriptor instead')
+const GetHomeScreenDataResponse$json = {
+  '1': 'GetHomeScreenDataResponse',
+  '2': [
+    {
+      '1': 'profile',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.quiz.UserProfile',
+      '10': 'profile'
+    },
+    {'1': 'quota_remaining', '3': 2, '4': 1, '5': 5, '10': 'quotaRemaining'},
+    {'1': 'quota_limit', '3': 3, '4': 1, '5': 5, '10': 'quotaLimit'},
+    {
+      '1': 'leaderboard_preview',
+      '3': 4,
+      '4': 3,
+      '5': 11,
+      '6': '.quiz.LeaderboardEntry',
+      '10': 'leaderboardPreview'
+    },
+  ],
+};
+
+/// Descriptor for `GetHomeScreenDataResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getHomeScreenDataResponseDescriptor = $convert.base64Decode(
+    'ChlHZXRIb21lU2NyZWVuRGF0YVJlc3BvbnNlEisKB3Byb2ZpbGUYASABKAsyES5xdWl6LlVzZX'
+    'JQcm9maWxlUgdwcm9maWxlEicKD3F1b3RhX3JlbWFpbmluZxgCIAEoBVIOcXVvdGFSZW1haW5p'
+    'bmcSHwoLcXVvdGFfbGltaXQYAyABKAVSCnF1b3RhTGltaXQSRwoTbGVhZGVyYm9hcmRfcHJldm'
+    'lldxgEIAMoCzIWLnF1aXouTGVhZGVyYm9hcmRFbnRyeVISbGVhZGVyYm9hcmRQcmV2aWV3');
+
+@$core.Deprecated('Use getReferralDashboardRequestDescriptor instead')
+const GetReferralDashboardRequest$json = {
+  '1': 'GetReferralDashboardRequest',
+};
+
+/// Descriptor for `GetReferralDashboardRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getReferralDashboardRequestDescriptor =
+    $convert.base64Decode('ChtHZXRSZWZlcnJhbERhc2hib2FyZFJlcXVlc3Q=');
+
+@$core.Deprecated('Use getReferralDashboardResponseDescriptor instead')
+const GetReferralDashboardResponse$json = {
+  '1': 'GetReferralDashboardResponse',
+  '2': [
+    {'1': 'referral_code', '3': 1, '4': 1, '5': 9, '10': 'referralCode'},
+    {'1': 'total_invites', '3': 2, '4': 1, '5': 5, '10': 'totalInvites'},
+    {'1': 'conversions', '3': 3, '4': 1, '5': 5, '10': 'conversions'},
+    {'1': 'coins_earned', '3': 4, '4': 1, '5': 3, '10': 'coinsEarned'},
+  ],
+};
+
+/// Descriptor for `GetReferralDashboardResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getReferralDashboardResponseDescriptor = $convert.base64Decode(
+    'ChxHZXRSZWZlcnJhbERhc2hib2FyZFJlc3BvbnNlEiMKDXJlZmVycmFsX2NvZGUYASABKAlSDH'
+    'JlZmVycmFsQ29kZRIjCg10b3RhbF9pbnZpdGVzGAIgASgFUgx0b3RhbEludml0ZXMSIAoLY29u'
+    'dmVyc2lvbnMYAyABKAVSC2NvbnZlcnNpb25zEiEKDGNvaW5zX2Vhcm5lZBgEIAEoA1ILY29pbn'
+    'NFYXJuZWQ=');
+
+@$core.Deprecated('Use applyReferralCodeRequestDescriptor instead')
+const ApplyReferralCodeRequest$json = {
+  '1': 'ApplyReferralCodeRequest',
+  '2': [
+    {'1': 'code', '3': 1, '4': 1, '5': 9, '10': 'code'},
+  ],
+};
+
+/// Descriptor for `ApplyReferralCodeRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List applyReferralCodeRequestDescriptor =
+    $convert.base64Decode(
+        'ChhBcHBseVJlZmVycmFsQ29kZVJlcXVlc3QSEgoEY29kZRgBIAEoCVIEY29kZQ==');
+
+@$core.Deprecated('Use applyReferralCodeResponseDescriptor instead')
+const ApplyReferralCodeResponse$json = {
+  '1': 'ApplyReferralCodeResponse',
+  '2': [
+    {'1': 'success', '3': 1, '4': 1, '5': 8, '10': 'success'},
+  ],
+};
+
+/// Descriptor for `ApplyReferralCodeResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List applyReferralCodeResponseDescriptor =
+    $convert.base64Decode(
+        'ChlBcHBseVJlZmVycmFsQ29kZVJlc3BvbnNlEhgKB3N1Y2Nlc3MYASABKAhSB3N1Y2Nlc3M=');
+
+@$core.Deprecated('Use updateFCMTokenRequestDescriptor instead')
+const UpdateFCMTokenRequest$json = {
+  '1': 'UpdateFCMTokenRequest',
+  '2': [
+    {'1': 'token', '3': 1, '4': 1, '5': 9, '10': 'token'},
+  ],
+};
+
+/// Descriptor for `UpdateFCMTokenRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List updateFCMTokenRequestDescriptor =
+    $convert.base64Decode(
+        'ChVVcGRhdGVGQ01Ub2tlblJlcXVlc3QSFAoFdG9rZW4YASABKAlSBXRva2Vu');
+
+@$core.Deprecated('Use updateFCMTokenResponseDescriptor instead')
+const UpdateFCMTokenResponse$json = {
+  '1': 'UpdateFCMTokenResponse',
+  '2': [
+    {'1': 'success', '3': 1, '4': 1, '5': 8, '10': 'success'},
+  ],
+};
+
+/// Descriptor for `UpdateFCMTokenResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List updateFCMTokenResponseDescriptor =
+    $convert.base64Decode(
+        'ChZVcGRhdGVGQ01Ub2tlblJlc3BvbnNlEhgKB3N1Y2Nlc3MYASABKAhSB3N1Y2Nlc3M=');
+
+@$core.Deprecated('Use createOrderRequestDescriptor instead')
+const CreateOrderRequest$json = {
+  '1': 'CreateOrderRequest',
+  '2': [
+    {'1': 'plan_duration', '3': 1, '4': 1, '5': 9, '10': 'planDuration'},
+  ],
+};
+
+/// Descriptor for `CreateOrderRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List createOrderRequestDescriptor = $convert.base64Decode(
+    'ChJDcmVhdGVPcmRlclJlcXVlc3QSIwoNcGxhbl9kdXJhdGlvbhgBIAEoCVIMcGxhbkR1cmF0aW'
+    '9u');
+
+@$core.Deprecated('Use createOrderResponseDescriptor instead')
+const CreateOrderResponse$json = {
+  '1': 'CreateOrderResponse',
+  '2': [
+    {'1': 'order_id', '3': 1, '4': 1, '5': 9, '10': 'orderId'},
+    {'1': 'key_id', '3': 2, '4': 1, '5': 9, '10': 'keyId'},
+    {'1': 'amount', '3': 3, '4': 1, '5': 3, '10': 'amount'},
+    {'1': 'currency', '3': 4, '4': 1, '5': 9, '10': 'currency'},
+  ],
+};
+
+/// Descriptor for `CreateOrderResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List createOrderResponseDescriptor = $convert.base64Decode(
+    'ChNDcmVhdGVPcmRlclJlc3BvbnNlEhkKCG9yZGVyX2lkGAEgASgJUgdvcmRlcklkEhUKBmtleV'
+    '9pZBgCIAEoCVIFa2V5SWQSFgoGYW1vdW50GAMgASgDUgZhbW91bnQSGgoIY3VycmVuY3kYBCAB'
+    'KAlSCGN1cnJlbmN5');
+
+@$core.Deprecated('Use getPlanStatusRequestDescriptor instead')
+const GetPlanStatusRequest$json = {
+  '1': 'GetPlanStatusRequest',
+};
+
+/// Descriptor for `GetPlanStatusRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getPlanStatusRequestDescriptor =
+    $convert.base64Decode('ChRHZXRQbGFuU3RhdHVzUmVxdWVzdA==');
+
+@$core.Deprecated('Use getPlanStatusResponseDescriptor instead')
+const GetPlanStatusResponse$json = {
+  '1': 'GetPlanStatusResponse',
+  '2': [
+    {'1': 'plan', '3': 1, '4': 1, '5': 9, '10': 'plan'},
+    {'1': 'expires_at', '3': 2, '4': 1, '5': 3, '10': 'expiresAt'},
+  ],
+};
+
+/// Descriptor for `GetPlanStatusResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getPlanStatusResponseDescriptor = $convert.base64Decode(
+    'ChVHZXRQbGFuU3RhdHVzUmVzcG9uc2USEgoEcGxhbhgBIAEoCVIEcGxhbhIdCgpleHBpcmVzX2'
+    'F0GAIgASgDUglleHBpcmVzQXQ=');
+
+@$core.Deprecated('Use getPaymentHistoryRequestDescriptor instead')
+const GetPaymentHistoryRequest$json = {
+  '1': 'GetPaymentHistoryRequest',
+  '2': [
+    {'1': 'limit', '3': 1, '4': 1, '5': 5, '10': 'limit'},
+    {'1': 'offset', '3': 2, '4': 1, '5': 5, '10': 'offset'},
+  ],
+};
+
+/// Descriptor for `GetPaymentHistoryRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getPaymentHistoryRequestDescriptor =
+    $convert.base64Decode(
+        'ChhHZXRQYXltZW50SGlzdG9yeVJlcXVlc3QSFAoFbGltaXQYASABKAVSBWxpbWl0EhYKBm9mZn'
+        'NldBgCIAEoBVIGb2Zmc2V0');
+
+@$core.Deprecated('Use getPaymentHistoryResponseDescriptor instead')
+const GetPaymentHistoryResponse$json = {
+  '1': 'GetPaymentHistoryResponse',
+  '2': [
+    {
+      '1': 'payments',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.quiz.PaymentRecord',
+      '10': 'payments'
+    },
+  ],
+};
+
+/// Descriptor for `GetPaymentHistoryResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getPaymentHistoryResponseDescriptor =
+    $convert.base64Decode(
+        'ChlHZXRQYXltZW50SGlzdG9yeVJlc3BvbnNlEi8KCHBheW1lbnRzGAEgAygLMhMucXVpei5QYX'
+        'ltZW50UmVjb3JkUghwYXltZW50cw==');
+
+@$core.Deprecated('Use paymentRecordDescriptor instead')
+const PaymentRecord$json = {
+  '1': 'PaymentRecord',
+  '2': [
+    {'1': 'order_id', '3': 1, '4': 1, '5': 9, '10': 'orderId'},
+    {'1': 'amount', '3': 2, '4': 1, '5': 3, '10': 'amount'},
+    {'1': 'currency', '3': 3, '4': 1, '5': 9, '10': 'currency'},
+    {'1': 'status', '3': 4, '4': 1, '5': 9, '10': 'status'},
+    {'1': 'plan_duration', '3': 5, '4': 1, '5': 9, '10': 'planDuration'},
+    {'1': 'created_at', '3': 6, '4': 1, '5': 3, '10': 'createdAt'},
+  ],
+};
+
+/// Descriptor for `PaymentRecord`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List paymentRecordDescriptor = $convert.base64Decode(
+    'Cg1QYXltZW50UmVjb3JkEhkKCG9yZGVyX2lkGAEgASgJUgdvcmRlcklkEhYKBmFtb3VudBgCIA'
+    'EoA1IGYW1vdW50EhoKCGN1cnJlbmN5GAMgASgJUghjdXJyZW5jeRIWCgZzdGF0dXMYBCABKAlS'
+    'BnN0YXR1cxIjCg1wbGFuX2R1cmF0aW9uGAUgASgJUgxwbGFuRHVyYXRpb24SHQoKY3JlYXRlZF'
+    '9hdBgGIAEoA1IJY3JlYXRlZEF0');
+
+@$core.Deprecated('Use getTournamentListRequestDescriptor instead')
+const GetTournamentListRequest$json = {
+  '1': 'GetTournamentListRequest',
+};
+
+/// Descriptor for `GetTournamentListRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getTournamentListRequestDescriptor =
+    $convert.base64Decode('ChhHZXRUb3VybmFtZW50TGlzdFJlcXVlc3Q=');
+
+@$core.Deprecated('Use getTournamentListResponseDescriptor instead')
+const GetTournamentListResponse$json = {
+  '1': 'GetTournamentListResponse',
+  '2': [
+    {
+      '1': 'tournaments',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.quiz.TournamentInfo',
+      '10': 'tournaments'
+    },
+  ],
+};
+
+/// Descriptor for `GetTournamentListResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getTournamentListResponseDescriptor =
+    $convert.base64Decode(
+        'ChlHZXRUb3VybmFtZW50TGlzdFJlc3BvbnNlEjYKC3RvdXJuYW1lbnRzGAEgAygLMhQucXVpei'
+        '5Ub3VybmFtZW50SW5mb1ILdG91cm5hbWVudHM=');
+
+@$core.Deprecated('Use tournamentInfoDescriptor instead')
+const TournamentInfo$json = {
+  '1': 'TournamentInfo',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+    {'1': 'name', '3': 2, '4': 1, '5': 9, '10': 'name'},
+    {'1': 'start_time', '3': 3, '4': 1, '5': 3, '10': 'startTime'},
+    {'1': 'end_time', '3': 4, '4': 1, '5': 3, '10': 'endTime'},
+    {'1': 'status', '3': 5, '4': 1, '5': 9, '10': 'status'},
+    {
+      '1': 'participant_count',
+      '3': 6,
+      '4': 1,
+      '5': 5,
+      '10': 'participantCount'
+    },
+    {'1': 'required_plan', '3': 7, '4': 1, '5': 9, '10': 'requiredPlan'},
+    {
+      '1': 'prize_description',
+      '3': 8,
+      '4': 1,
+      '5': 9,
+      '10': 'prizeDescription'
+    },
+  ],
+};
+
+/// Descriptor for `TournamentInfo`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List tournamentInfoDescriptor = $convert.base64Decode(
+    'Cg5Ub3VybmFtZW50SW5mbxIOCgJpZBgBIAEoCVICaWQSEgoEbmFtZRgCIAEoCVIEbmFtZRIdCg'
+    'pzdGFydF90aW1lGAMgASgDUglzdGFydFRpbWUSGQoIZW5kX3RpbWUYBCABKANSB2VuZFRpbWUS'
+    'FgoGc3RhdHVzGAUgASgJUgZzdGF0dXMSKwoRcGFydGljaXBhbnRfY291bnQYBiABKAVSEHBhcn'
+    'RpY2lwYW50Q291bnQSIwoNcmVxdWlyZWRfcGxhbhgHIAEoCVIMcmVxdWlyZWRQbGFuEisKEXBy'
+    'aXplX2Rlc2NyaXB0aW9uGAggASgJUhBwcml6ZURlc2NyaXB0aW9u');
+
+@$core.Deprecated('Use joinTournamentRequestDescriptor instead')
+const JoinTournamentRequest$json = {
+  '1': 'JoinTournamentRequest',
+  '2': [
+    {'1': 'tournament_id', '3': 1, '4': 1, '5': 9, '10': 'tournamentId'},
+  ],
+};
+
+/// Descriptor for `JoinTournamentRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List joinTournamentRequestDescriptor = $convert.base64Decode(
+    'ChVKb2luVG91cm5hbWVudFJlcXVlc3QSIwoNdG91cm5hbWVudF9pZBgBIAEoCVIMdG91cm5hbW'
+    'VudElk');
+
+@$core.Deprecated('Use joinTournamentResponseDescriptor instead')
+const JoinTournamentResponse$json = {
+  '1': 'JoinTournamentResponse',
+  '2': [
+    {'1': 'success', '3': 1, '4': 1, '5': 8, '10': 'success'},
+  ],
+};
+
+/// Descriptor for `JoinTournamentResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List joinTournamentResponseDescriptor =
+    $convert.base64Decode(
+        'ChZKb2luVG91cm5hbWVudFJlc3BvbnNlEhgKB3N1Y2Nlc3MYASABKAhSB3N1Y2Nlc3M=');

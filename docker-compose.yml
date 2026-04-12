@@ -127,6 +127,42 @@ services:
       - JWT_SECRET=change-me-in-production
       - RESEND_API_KEY=${RESEND_API_KEY:-}
 
+  payment:
+    build: .
+    command: payment
+    ports:
+      - "50055:50055"
+      - "8080:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    environment:
+      - REDIS_ADDR=redis:6379
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - MONGO_URI=mongodb://mongo:27017/quizbattle
+      - JWT_SECRET=change-me-in-production
+      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-}
+      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-}
+      - RAZORPAY_WEBHOOK_SECRET=${RAZORPAY_WEBHOOK_SECRET:-}
+
+  notification:
+    build: .
+    command: notification
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    environment:
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - MONGO_URI=mongodb://mongo:27017/quizbattle
+
 volumes:
   redis_data:
   rabbitmq_data:

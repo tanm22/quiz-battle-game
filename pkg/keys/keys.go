@@ -16,6 +16,11 @@ const (
 	RoomRoundClosed = "room:%s:round:%d:closed"
 	EmailCode       = "emailcode:%s:%s" // email, purpose
 	EmailRateLimit  = "emailrate:%s"    // email
+	// Phase 2
+	UserDailyQuota     = "user:%s:daily_quota"
+	UserPlan           = "user:%s:plan"
+	ReferralCodeKey    = "referral:code:%s"
+	WebhookIdempotency = "webhook:idempotency:%s"
 )
 
 // Key helper functions — one function per key to prevent fmt.Sprintf typos.
@@ -58,4 +63,20 @@ func EmailCodeKey(email, purpose string) string {
 
 func EmailRateLimitKey(email string) string {
 	return fmt.Sprintf(EmailRateLimit, email)
+}
+
+func DailyQuota(userID string) string {
+	return fmt.Sprintf(UserDailyQuota, userID)
+}
+
+func Plan(userID string) string {
+	return fmt.Sprintf(UserPlan, userID)
+}
+
+func RefCode(code string) string {
+	return fmt.Sprintf(ReferralCodeKey, code)
+}
+
+func WebhookIdem(paymentID string) string {
+	return fmt.Sprintf(WebhookIdempotency, paymentID)
 }

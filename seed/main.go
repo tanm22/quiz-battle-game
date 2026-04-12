@@ -66,6 +66,41 @@ func main() {
 		Keys: bson.D{{Key: "players.userId", Value: 1}},
 	})
 
+	// Phase 2 indexes
+	usersColl.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    bson.D{{Key: "googleId", Value: 1}},
+		Options: options.Index().SetUnique(true).SetSparse(true),
+	})
+	usersColl.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    bson.D{{Key: "referralCode", Value: 1}},
+		Options: options.Index().SetUnique(true).SetSparse(true),
+	})
+	usersColl.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "plan", Value: 1}, {Key: "planExpiresAt", Value: 1}},
+	})
+
+	paymentsColl := db.Collection("payments")
+	paymentsColl.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    bson.D{{Key: "razorpayOrderId", Value: 1}},
+		Options: options.Index().SetUnique(true),
+	})
+	paymentsColl.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "userId", Value: 1}},
+	})
+
+	referralsColl := db.Collection("referrals")
+	referralsColl.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    bson.D{{Key: "refereeId", Value: 1}},
+		Options: options.Index().SetUnique(true),
+	})
+	referralsColl.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "referrerId", Value: 1}},
+	})
+
+	db.Collection("tournaments").Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "startTime", Value: 1}, {Key: "status", Value: 1}},
+	})
+
 	log.Println("[seed] indexes created")
 
 	// --- Seed questions ---
@@ -114,6 +149,7 @@ func main() {
 	for _, u := range testUsers {
 		hash, _ := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
 		id := fmt.Sprintf("user_%s", u.Username)
+		refCode := fmt.Sprintf("REF%s", u.Username[:4])
 		doc := bson.M{
 			"_id":           id,
 			"username":      u.Username,
@@ -122,6 +158,10 @@ func main() {
 			"rating":        u.Rating,
 			"matchesPlayed": u.Played,
 			"wins":          u.Wins,
+			"plan":          "free",
+			"coins":         int64(0),
+			"referralCode":  refCode,
+			"streak":        bson.M{"current": 0, "longest": 0, "lastClaimedDate": ""},
 			"createdAt":     time.Now().Unix(),
 		}
 		_, err := usersColl.UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$setOnInsert": doc}, options.UpdateOne().SetUpsert(true))

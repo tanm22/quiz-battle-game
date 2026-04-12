@@ -1361,7 +1361,8 @@ type RegisterRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Username      string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
 	Password      string                 `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
-	Email         string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"` // optional at registration
+	Email         string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`                                   // optional at registration
+	ReferralCode  string                 `protobuf:"bytes,4,opt,name=referral_code,json=referralCode,proto3" json:"referral_code,omitempty"` // optional referral code
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1413,6 +1414,13 @@ func (x *RegisterRequest) GetPassword() string {
 func (x *RegisterRequest) GetEmail() string {
 	if x != nil {
 		return x.Email
+	}
+	return ""
+}
+
+func (x *RegisterRequest) GetReferralCode() string {
+	if x != nil {
+		return x.ReferralCode
 	}
 	return ""
 }
@@ -1479,6 +1487,12 @@ type AuthResponse struct {
 	Wins          int32                  `protobuf:"varint,6,opt,name=wins,proto3" json:"wins,omitempty"`
 	Email         string                 `protobuf:"bytes,7,opt,name=email,proto3" json:"email,omitempty"`
 	IsGuest       bool                   `protobuf:"varint,8,opt,name=is_guest,json=isGuest,proto3" json:"is_guest,omitempty"`
+	Plan          string                 `protobuf:"bytes,9,opt,name=plan,proto3" json:"plan,omitempty"`
+	Coins         int64                  `protobuf:"varint,10,opt,name=coins,proto3" json:"coins,omitempty"`
+	Streak        *StreakInfo            `protobuf:"bytes,11,opt,name=streak,proto3" json:"streak,omitempty"`
+	ReferralCode  string                 `protobuf:"bytes,12,opt,name=referral_code,json=referralCode,proto3" json:"referral_code,omitempty"`
+	StreakUpdated bool                   `protobuf:"varint,13,opt,name=streak_updated,json=streakUpdated,proto3" json:"streak_updated,omitempty"`
+	Reward        *RewardGrant           `protobuf:"bytes,14,opt,name=reward,proto3" json:"reward,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1569,6 +1583,48 @@ func (x *AuthResponse) GetIsGuest() bool {
 	return false
 }
 
+func (x *AuthResponse) GetPlan() string {
+	if x != nil {
+		return x.Plan
+	}
+	return ""
+}
+
+func (x *AuthResponse) GetCoins() int64 {
+	if x != nil {
+		return x.Coins
+	}
+	return 0
+}
+
+func (x *AuthResponse) GetStreak() *StreakInfo {
+	if x != nil {
+		return x.Streak
+	}
+	return nil
+}
+
+func (x *AuthResponse) GetReferralCode() string {
+	if x != nil {
+		return x.ReferralCode
+	}
+	return ""
+}
+
+func (x *AuthResponse) GetStreakUpdated() bool {
+	if x != nil {
+		return x.StreakUpdated
+	}
+	return false
+}
+
+func (x *AuthResponse) GetReward() *RewardGrant {
+	if x != nil {
+		return x.Reward
+	}
+	return nil
+}
+
 type GetProfileRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -1614,6 +1670,10 @@ type ProfileResponse struct {
 	Wins          int32                  `protobuf:"varint,5,opt,name=wins,proto3" json:"wins,omitempty"`
 	Email         string                 `protobuf:"bytes,6,opt,name=email,proto3" json:"email,omitempty"`
 	IsGuest       bool                   `protobuf:"varint,7,opt,name=is_guest,json=isGuest,proto3" json:"is_guest,omitempty"`
+	Plan          string                 `protobuf:"bytes,8,opt,name=plan,proto3" json:"plan,omitempty"`
+	Coins         int64                  `protobuf:"varint,9,opt,name=coins,proto3" json:"coins,omitempty"`
+	Streak        *StreakInfo            `protobuf:"bytes,10,opt,name=streak,proto3" json:"streak,omitempty"`
+	ReferralCode  string                 `protobuf:"bytes,11,opt,name=referral_code,json=referralCode,proto3" json:"referral_code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1695,6 +1755,34 @@ func (x *ProfileResponse) GetIsGuest() bool {
 		return x.IsGuest
 	}
 	return false
+}
+
+func (x *ProfileResponse) GetPlan() string {
+	if x != nil {
+		return x.Plan
+	}
+	return ""
+}
+
+func (x *ProfileResponse) GetCoins() int64 {
+	if x != nil {
+		return x.Coins
+	}
+	return 0
+}
+
+func (x *ProfileResponse) GetStreak() *StreakInfo {
+	if x != nil {
+		return x.Streak
+	}
+	return nil
+}
+
+func (x *ProfileResponse) GetReferralCode() string {
+	if x != nil {
+		return x.ReferralCode
+	}
+	return ""
 }
 
 type GuestLoginRequest struct {
@@ -2757,6 +2845,1646 @@ func (x *MatchHistoryEntry) GetCreatedAt() int64 {
 	return 0
 }
 
+type StreakInfo struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Current         int32                  `protobuf:"varint,1,opt,name=current,proto3" json:"current,omitempty"`
+	Longest         int32                  `protobuf:"varint,2,opt,name=longest,proto3" json:"longest,omitempty"`
+	LastClaimedDate string                 `protobuf:"bytes,3,opt,name=last_claimed_date,json=lastClaimedDate,proto3" json:"last_claimed_date,omitempty"` // YYYY-MM-DD in IST
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *StreakInfo) Reset() {
+	*x = StreakInfo{}
+	mi := &file_proto_quiz_proto_msgTypes[47]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreakInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreakInfo) ProtoMessage() {}
+
+func (x *StreakInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[47]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreakInfo.ProtoReflect.Descriptor instead.
+func (*StreakInfo) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{47}
+}
+
+func (x *StreakInfo) GetCurrent() int32 {
+	if x != nil {
+		return x.Current
+	}
+	return 0
+}
+
+func (x *StreakInfo) GetLongest() int32 {
+	if x != nil {
+		return x.Longest
+	}
+	return 0
+}
+
+func (x *StreakInfo) GetLastClaimedDate() string {
+	if x != nil {
+		return x.LastClaimedDate
+	}
+	return ""
+}
+
+type RewardGrant struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Coins         int64                  `protobuf:"varint,1,opt,name=coins,proto3" json:"coins,omitempty"`
+	BadgeName     string                 `protobuf:"bytes,2,opt,name=badge_name,json=badgeName,proto3" json:"badge_name,omitempty"`           // empty if no badge
+	BonusQuizzes  int32                  `protobuf:"varint,3,opt,name=bonus_quizzes,json=bonusQuizzes,proto3" json:"bonus_quizzes,omitempty"` // 0 if none
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RewardGrant) Reset() {
+	*x = RewardGrant{}
+	mi := &file_proto_quiz_proto_msgTypes[48]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RewardGrant) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RewardGrant) ProtoMessage() {}
+
+func (x *RewardGrant) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[48]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RewardGrant.ProtoReflect.Descriptor instead.
+func (*RewardGrant) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{48}
+}
+
+func (x *RewardGrant) GetCoins() int64 {
+	if x != nil {
+		return x.Coins
+	}
+	return 0
+}
+
+func (x *RewardGrant) GetBadgeName() string {
+	if x != nil {
+		return x.BadgeName
+	}
+	return ""
+}
+
+func (x *RewardGrant) GetBonusQuizzes() int32 {
+	if x != nil {
+		return x.BonusQuizzes
+	}
+	return 0
+}
+
+type PlanStatus struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Plan          string                 `protobuf:"bytes,1,opt,name=plan,proto3" json:"plan,omitempty"`                             // "free" or "premium"
+	ExpiresAt     int64                  `protobuf:"varint,2,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"` // unix timestamp, 0 if free
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PlanStatus) Reset() {
+	*x = PlanStatus{}
+	mi := &file_proto_quiz_proto_msgTypes[49]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PlanStatus) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PlanStatus) ProtoMessage() {}
+
+func (x *PlanStatus) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[49]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PlanStatus.ProtoReflect.Descriptor instead.
+func (*PlanStatus) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{49}
+}
+
+func (x *PlanStatus) GetPlan() string {
+	if x != nil {
+		return x.Plan
+	}
+	return ""
+}
+
+func (x *PlanStatus) GetExpiresAt() int64 {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return 0
+}
+
+type GoogleSignInRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	IdToken       string                 `protobuf:"bytes,1,opt,name=id_token,json=idToken,proto3" json:"id_token,omitempty"`
+	ReferralCode  string                 `protobuf:"bytes,2,opt,name=referral_code,json=referralCode,proto3" json:"referral_code,omitempty"` // optional
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GoogleSignInRequest) Reset() {
+	*x = GoogleSignInRequest{}
+	mi := &file_proto_quiz_proto_msgTypes[50]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GoogleSignInRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GoogleSignInRequest) ProtoMessage() {}
+
+func (x *GoogleSignInRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[50]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GoogleSignInRequest.ProtoReflect.Descriptor instead.
+func (*GoogleSignInRequest) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{50}
+}
+
+func (x *GoogleSignInRequest) GetIdToken() string {
+	if x != nil {
+		return x.IdToken
+	}
+	return ""
+}
+
+func (x *GoogleSignInRequest) GetReferralCode() string {
+	if x != nil {
+		return x.ReferralCode
+	}
+	return ""
+}
+
+type GoogleSignInResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"` // JWT
+	UserProfile   *UserProfile           `protobuf:"bytes,2,opt,name=user_profile,json=userProfile,proto3" json:"user_profile,omitempty"`
+	IsNewUser     bool                   `protobuf:"varint,3,opt,name=is_new_user,json=isNewUser,proto3" json:"is_new_user,omitempty"`
+	StreakUpdated bool                   `protobuf:"varint,4,opt,name=streak_updated,json=streakUpdated,proto3" json:"streak_updated,omitempty"`
+	Reward        *RewardGrant           `protobuf:"bytes,5,opt,name=reward,proto3" json:"reward,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GoogleSignInResponse) Reset() {
+	*x = GoogleSignInResponse{}
+	mi := &file_proto_quiz_proto_msgTypes[51]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GoogleSignInResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GoogleSignInResponse) ProtoMessage() {}
+
+func (x *GoogleSignInResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[51]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GoogleSignInResponse.ProtoReflect.Descriptor instead.
+func (*GoogleSignInResponse) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{51}
+}
+
+func (x *GoogleSignInResponse) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+func (x *GoogleSignInResponse) GetUserProfile() *UserProfile {
+	if x != nil {
+		return x.UserProfile
+	}
+	return nil
+}
+
+func (x *GoogleSignInResponse) GetIsNewUser() bool {
+	if x != nil {
+		return x.IsNewUser
+	}
+	return false
+}
+
+func (x *GoogleSignInResponse) GetStreakUpdated() bool {
+	if x != nil {
+		return x.StreakUpdated
+	}
+	return false
+}
+
+func (x *GoogleSignInResponse) GetReward() *RewardGrant {
+	if x != nil {
+		return x.Reward
+	}
+	return nil
+}
+
+type UserProfile struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Username      string                 `protobuf:"bytes,2,opt,name=username,proto3" json:"username,omitempty"`
+	DisplayName   string                 `protobuf:"bytes,3,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	Email         string                 `protobuf:"bytes,4,opt,name=email,proto3" json:"email,omitempty"`
+	AvatarUrl     string                 `protobuf:"bytes,5,opt,name=avatar_url,json=avatarUrl,proto3" json:"avatar_url,omitempty"`
+	Rating        int32                  `protobuf:"varint,6,opt,name=rating,proto3" json:"rating,omitempty"`
+	MatchesPlayed int32                  `protobuf:"varint,7,opt,name=matches_played,json=matchesPlayed,proto3" json:"matches_played,omitempty"`
+	Wins          int32                  `protobuf:"varint,8,opt,name=wins,proto3" json:"wins,omitempty"`
+	Plan          string                 `protobuf:"bytes,9,opt,name=plan,proto3" json:"plan,omitempty"`
+	Coins         int64                  `protobuf:"varint,10,opt,name=coins,proto3" json:"coins,omitempty"`
+	Streak        *StreakInfo            `protobuf:"bytes,11,opt,name=streak,proto3" json:"streak,omitempty"`
+	ReferralCode  string                 `protobuf:"bytes,12,opt,name=referral_code,json=referralCode,proto3" json:"referral_code,omitempty"`
+	IsGuest       bool                   `protobuf:"varint,13,opt,name=is_guest,json=isGuest,proto3" json:"is_guest,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UserProfile) Reset() {
+	*x = UserProfile{}
+	mi := &file_proto_quiz_proto_msgTypes[52]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserProfile) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserProfile) ProtoMessage() {}
+
+func (x *UserProfile) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[52]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserProfile.ProtoReflect.Descriptor instead.
+func (*UserProfile) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{52}
+}
+
+func (x *UserProfile) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *UserProfile) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *UserProfile) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *UserProfile) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *UserProfile) GetAvatarUrl() string {
+	if x != nil {
+		return x.AvatarUrl
+	}
+	return ""
+}
+
+func (x *UserProfile) GetRating() int32 {
+	if x != nil {
+		return x.Rating
+	}
+	return 0
+}
+
+func (x *UserProfile) GetMatchesPlayed() int32 {
+	if x != nil {
+		return x.MatchesPlayed
+	}
+	return 0
+}
+
+func (x *UserProfile) GetWins() int32 {
+	if x != nil {
+		return x.Wins
+	}
+	return 0
+}
+
+func (x *UserProfile) GetPlan() string {
+	if x != nil {
+		return x.Plan
+	}
+	return ""
+}
+
+func (x *UserProfile) GetCoins() int64 {
+	if x != nil {
+		return x.Coins
+	}
+	return 0
+}
+
+func (x *UserProfile) GetStreak() *StreakInfo {
+	if x != nil {
+		return x.Streak
+	}
+	return nil
+}
+
+func (x *UserProfile) GetReferralCode() string {
+	if x != nil {
+		return x.ReferralCode
+	}
+	return ""
+}
+
+func (x *UserProfile) GetIsGuest() bool {
+	if x != nil {
+		return x.IsGuest
+	}
+	return false
+}
+
+type ClaimDailyRewardRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ClaimDailyRewardRequest) Reset() {
+	*x = ClaimDailyRewardRequest{}
+	mi := &file_proto_quiz_proto_msgTypes[53]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ClaimDailyRewardRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ClaimDailyRewardRequest) ProtoMessage() {}
+
+func (x *ClaimDailyRewardRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[53]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ClaimDailyRewardRequest.ProtoReflect.Descriptor instead.
+func (*ClaimDailyRewardRequest) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{53}
+}
+
+type ClaimDailyRewardResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Reward        *RewardGrant           `protobuf:"bytes,1,opt,name=reward,proto3" json:"reward,omitempty"`
+	Streak        *StreakInfo            `protobuf:"bytes,2,opt,name=streak,proto3" json:"streak,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ClaimDailyRewardResponse) Reset() {
+	*x = ClaimDailyRewardResponse{}
+	mi := &file_proto_quiz_proto_msgTypes[54]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ClaimDailyRewardResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ClaimDailyRewardResponse) ProtoMessage() {}
+
+func (x *ClaimDailyRewardResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[54]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ClaimDailyRewardResponse.ProtoReflect.Descriptor instead.
+func (*ClaimDailyRewardResponse) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{54}
+}
+
+func (x *ClaimDailyRewardResponse) GetReward() *RewardGrant {
+	if x != nil {
+		return x.Reward
+	}
+	return nil
+}
+
+func (x *ClaimDailyRewardResponse) GetStreak() *StreakInfo {
+	if x != nil {
+		return x.Streak
+	}
+	return nil
+}
+
+type GetStreakInfoRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetStreakInfoRequest) Reset() {
+	*x = GetStreakInfoRequest{}
+	mi := &file_proto_quiz_proto_msgTypes[55]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetStreakInfoRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetStreakInfoRequest) ProtoMessage() {}
+
+func (x *GetStreakInfoRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[55]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetStreakInfoRequest.ProtoReflect.Descriptor instead.
+func (*GetStreakInfoRequest) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{55}
+}
+
+type GetStreakInfoResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Streak        *StreakInfo            `protobuf:"bytes,1,opt,name=streak,proto3" json:"streak,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetStreakInfoResponse) Reset() {
+	*x = GetStreakInfoResponse{}
+	mi := &file_proto_quiz_proto_msgTypes[56]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetStreakInfoResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetStreakInfoResponse) ProtoMessage() {}
+
+func (x *GetStreakInfoResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[56]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetStreakInfoResponse.ProtoReflect.Descriptor instead.
+func (*GetStreakInfoResponse) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{56}
+}
+
+func (x *GetStreakInfoResponse) GetStreak() *StreakInfo {
+	if x != nil {
+		return x.Streak
+	}
+	return nil
+}
+
+type GetHomeScreenDataRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetHomeScreenDataRequest) Reset() {
+	*x = GetHomeScreenDataRequest{}
+	mi := &file_proto_quiz_proto_msgTypes[57]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetHomeScreenDataRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetHomeScreenDataRequest) ProtoMessage() {}
+
+func (x *GetHomeScreenDataRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[57]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetHomeScreenDataRequest.ProtoReflect.Descriptor instead.
+func (*GetHomeScreenDataRequest) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{57}
+}
+
+type GetHomeScreenDataResponse struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Profile            *UserProfile           `protobuf:"bytes,1,opt,name=profile,proto3" json:"profile,omitempty"`
+	QuotaRemaining     int32                  `protobuf:"varint,2,opt,name=quota_remaining,json=quotaRemaining,proto3" json:"quota_remaining,omitempty"`
+	QuotaLimit         int32                  `protobuf:"varint,3,opt,name=quota_limit,json=quotaLimit,proto3" json:"quota_limit,omitempty"`
+	LeaderboardPreview []*LeaderboardEntry    `protobuf:"bytes,4,rep,name=leaderboard_preview,json=leaderboardPreview,proto3" json:"leaderboard_preview,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *GetHomeScreenDataResponse) Reset() {
+	*x = GetHomeScreenDataResponse{}
+	mi := &file_proto_quiz_proto_msgTypes[58]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetHomeScreenDataResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetHomeScreenDataResponse) ProtoMessage() {}
+
+func (x *GetHomeScreenDataResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[58]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetHomeScreenDataResponse.ProtoReflect.Descriptor instead.
+func (*GetHomeScreenDataResponse) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{58}
+}
+
+func (x *GetHomeScreenDataResponse) GetProfile() *UserProfile {
+	if x != nil {
+		return x.Profile
+	}
+	return nil
+}
+
+func (x *GetHomeScreenDataResponse) GetQuotaRemaining() int32 {
+	if x != nil {
+		return x.QuotaRemaining
+	}
+	return 0
+}
+
+func (x *GetHomeScreenDataResponse) GetQuotaLimit() int32 {
+	if x != nil {
+		return x.QuotaLimit
+	}
+	return 0
+}
+
+func (x *GetHomeScreenDataResponse) GetLeaderboardPreview() []*LeaderboardEntry {
+	if x != nil {
+		return x.LeaderboardPreview
+	}
+	return nil
+}
+
+type GetReferralDashboardRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetReferralDashboardRequest) Reset() {
+	*x = GetReferralDashboardRequest{}
+	mi := &file_proto_quiz_proto_msgTypes[59]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetReferralDashboardRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetReferralDashboardRequest) ProtoMessage() {}
+
+func (x *GetReferralDashboardRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[59]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetReferralDashboardRequest.ProtoReflect.Descriptor instead.
+func (*GetReferralDashboardRequest) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{59}
+}
+
+type GetReferralDashboardResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ReferralCode  string                 `protobuf:"bytes,1,opt,name=referral_code,json=referralCode,proto3" json:"referral_code,omitempty"`
+	TotalInvites  int32                  `protobuf:"varint,2,opt,name=total_invites,json=totalInvites,proto3" json:"total_invites,omitempty"`
+	Conversions   int32                  `protobuf:"varint,3,opt,name=conversions,proto3" json:"conversions,omitempty"`
+	CoinsEarned   int64                  `protobuf:"varint,4,opt,name=coins_earned,json=coinsEarned,proto3" json:"coins_earned,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetReferralDashboardResponse) Reset() {
+	*x = GetReferralDashboardResponse{}
+	mi := &file_proto_quiz_proto_msgTypes[60]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetReferralDashboardResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetReferralDashboardResponse) ProtoMessage() {}
+
+func (x *GetReferralDashboardResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[60]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetReferralDashboardResponse.ProtoReflect.Descriptor instead.
+func (*GetReferralDashboardResponse) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{60}
+}
+
+func (x *GetReferralDashboardResponse) GetReferralCode() string {
+	if x != nil {
+		return x.ReferralCode
+	}
+	return ""
+}
+
+func (x *GetReferralDashboardResponse) GetTotalInvites() int32 {
+	if x != nil {
+		return x.TotalInvites
+	}
+	return 0
+}
+
+func (x *GetReferralDashboardResponse) GetConversions() int32 {
+	if x != nil {
+		return x.Conversions
+	}
+	return 0
+}
+
+func (x *GetReferralDashboardResponse) GetCoinsEarned() int64 {
+	if x != nil {
+		return x.CoinsEarned
+	}
+	return 0
+}
+
+type ApplyReferralCodeRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ApplyReferralCodeRequest) Reset() {
+	*x = ApplyReferralCodeRequest{}
+	mi := &file_proto_quiz_proto_msgTypes[61]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ApplyReferralCodeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ApplyReferralCodeRequest) ProtoMessage() {}
+
+func (x *ApplyReferralCodeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[61]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ApplyReferralCodeRequest.ProtoReflect.Descriptor instead.
+func (*ApplyReferralCodeRequest) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{61}
+}
+
+func (x *ApplyReferralCodeRequest) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+type ApplyReferralCodeResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ApplyReferralCodeResponse) Reset() {
+	*x = ApplyReferralCodeResponse{}
+	mi := &file_proto_quiz_proto_msgTypes[62]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ApplyReferralCodeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ApplyReferralCodeResponse) ProtoMessage() {}
+
+func (x *ApplyReferralCodeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[62]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ApplyReferralCodeResponse.ProtoReflect.Descriptor instead.
+func (*ApplyReferralCodeResponse) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{62}
+}
+
+func (x *ApplyReferralCodeResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+type UpdateFCMTokenRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateFCMTokenRequest) Reset() {
+	*x = UpdateFCMTokenRequest{}
+	mi := &file_proto_quiz_proto_msgTypes[63]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateFCMTokenRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateFCMTokenRequest) ProtoMessage() {}
+
+func (x *UpdateFCMTokenRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[63]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateFCMTokenRequest.ProtoReflect.Descriptor instead.
+func (*UpdateFCMTokenRequest) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{63}
+}
+
+func (x *UpdateFCMTokenRequest) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+type UpdateFCMTokenResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateFCMTokenResponse) Reset() {
+	*x = UpdateFCMTokenResponse{}
+	mi := &file_proto_quiz_proto_msgTypes[64]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateFCMTokenResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateFCMTokenResponse) ProtoMessage() {}
+
+func (x *UpdateFCMTokenResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[64]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateFCMTokenResponse.ProtoReflect.Descriptor instead.
+func (*UpdateFCMTokenResponse) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{64}
+}
+
+func (x *UpdateFCMTokenResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+type CreateOrderRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PlanDuration  string                 `protobuf:"bytes,1,opt,name=plan_duration,json=planDuration,proto3" json:"plan_duration,omitempty"` // "monthly" or "yearly"
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateOrderRequest) Reset() {
+	*x = CreateOrderRequest{}
+	mi := &file_proto_quiz_proto_msgTypes[65]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateOrderRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateOrderRequest) ProtoMessage() {}
+
+func (x *CreateOrderRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[65]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateOrderRequest.ProtoReflect.Descriptor instead.
+func (*CreateOrderRequest) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{65}
+}
+
+func (x *CreateOrderRequest) GetPlanDuration() string {
+	if x != nil {
+		return x.PlanDuration
+	}
+	return ""
+}
+
+type CreateOrderResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OrderId       string                 `protobuf:"bytes,1,opt,name=order_id,json=orderId,proto3" json:"order_id,omitempty"`
+	KeyId         string                 `protobuf:"bytes,2,opt,name=key_id,json=keyId,proto3" json:"key_id,omitempty"`
+	Amount        int64                  `protobuf:"varint,3,opt,name=amount,proto3" json:"amount,omitempty"` // in paise
+	Currency      string                 `protobuf:"bytes,4,opt,name=currency,proto3" json:"currency,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateOrderResponse) Reset() {
+	*x = CreateOrderResponse{}
+	mi := &file_proto_quiz_proto_msgTypes[66]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateOrderResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateOrderResponse) ProtoMessage() {}
+
+func (x *CreateOrderResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[66]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateOrderResponse.ProtoReflect.Descriptor instead.
+func (*CreateOrderResponse) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{66}
+}
+
+func (x *CreateOrderResponse) GetOrderId() string {
+	if x != nil {
+		return x.OrderId
+	}
+	return ""
+}
+
+func (x *CreateOrderResponse) GetKeyId() string {
+	if x != nil {
+		return x.KeyId
+	}
+	return ""
+}
+
+func (x *CreateOrderResponse) GetAmount() int64 {
+	if x != nil {
+		return x.Amount
+	}
+	return 0
+}
+
+func (x *CreateOrderResponse) GetCurrency() string {
+	if x != nil {
+		return x.Currency
+	}
+	return ""
+}
+
+type GetPlanStatusRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetPlanStatusRequest) Reset() {
+	*x = GetPlanStatusRequest{}
+	mi := &file_proto_quiz_proto_msgTypes[67]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetPlanStatusRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPlanStatusRequest) ProtoMessage() {}
+
+func (x *GetPlanStatusRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[67]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPlanStatusRequest.ProtoReflect.Descriptor instead.
+func (*GetPlanStatusRequest) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{67}
+}
+
+type GetPlanStatusResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Plan          string                 `protobuf:"bytes,1,opt,name=plan,proto3" json:"plan,omitempty"`
+	ExpiresAt     int64                  `protobuf:"varint,2,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetPlanStatusResponse) Reset() {
+	*x = GetPlanStatusResponse{}
+	mi := &file_proto_quiz_proto_msgTypes[68]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetPlanStatusResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPlanStatusResponse) ProtoMessage() {}
+
+func (x *GetPlanStatusResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[68]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPlanStatusResponse.ProtoReflect.Descriptor instead.
+func (*GetPlanStatusResponse) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{68}
+}
+
+func (x *GetPlanStatusResponse) GetPlan() string {
+	if x != nil {
+		return x.Plan
+	}
+	return ""
+}
+
+func (x *GetPlanStatusResponse) GetExpiresAt() int64 {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return 0
+}
+
+type GetPaymentHistoryRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Limit         int32                  `protobuf:"varint,1,opt,name=limit,proto3" json:"limit,omitempty"`
+	Offset        int32                  `protobuf:"varint,2,opt,name=offset,proto3" json:"offset,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetPaymentHistoryRequest) Reset() {
+	*x = GetPaymentHistoryRequest{}
+	mi := &file_proto_quiz_proto_msgTypes[69]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetPaymentHistoryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPaymentHistoryRequest) ProtoMessage() {}
+
+func (x *GetPaymentHistoryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[69]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPaymentHistoryRequest.ProtoReflect.Descriptor instead.
+func (*GetPaymentHistoryRequest) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{69}
+}
+
+func (x *GetPaymentHistoryRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *GetPaymentHistoryRequest) GetOffset() int32 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
+}
+
+type GetPaymentHistoryResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Payments      []*PaymentRecord       `protobuf:"bytes,1,rep,name=payments,proto3" json:"payments,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetPaymentHistoryResponse) Reset() {
+	*x = GetPaymentHistoryResponse{}
+	mi := &file_proto_quiz_proto_msgTypes[70]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetPaymentHistoryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPaymentHistoryResponse) ProtoMessage() {}
+
+func (x *GetPaymentHistoryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[70]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPaymentHistoryResponse.ProtoReflect.Descriptor instead.
+func (*GetPaymentHistoryResponse) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{70}
+}
+
+func (x *GetPaymentHistoryResponse) GetPayments() []*PaymentRecord {
+	if x != nil {
+		return x.Payments
+	}
+	return nil
+}
+
+type PaymentRecord struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OrderId       string                 `protobuf:"bytes,1,opt,name=order_id,json=orderId,proto3" json:"order_id,omitempty"`
+	Amount        int64                  `protobuf:"varint,2,opt,name=amount,proto3" json:"amount,omitempty"`
+	Currency      string                 `protobuf:"bytes,3,opt,name=currency,proto3" json:"currency,omitempty"`
+	Status        string                 `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"` // "created", "captured", "failed"
+	PlanDuration  string                 `protobuf:"bytes,5,opt,name=plan_duration,json=planDuration,proto3" json:"plan_duration,omitempty"`
+	CreatedAt     int64                  `protobuf:"varint,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PaymentRecord) Reset() {
+	*x = PaymentRecord{}
+	mi := &file_proto_quiz_proto_msgTypes[71]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PaymentRecord) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PaymentRecord) ProtoMessage() {}
+
+func (x *PaymentRecord) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[71]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PaymentRecord.ProtoReflect.Descriptor instead.
+func (*PaymentRecord) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{71}
+}
+
+func (x *PaymentRecord) GetOrderId() string {
+	if x != nil {
+		return x.OrderId
+	}
+	return ""
+}
+
+func (x *PaymentRecord) GetAmount() int64 {
+	if x != nil {
+		return x.Amount
+	}
+	return 0
+}
+
+func (x *PaymentRecord) GetCurrency() string {
+	if x != nil {
+		return x.Currency
+	}
+	return ""
+}
+
+func (x *PaymentRecord) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *PaymentRecord) GetPlanDuration() string {
+	if x != nil {
+		return x.PlanDuration
+	}
+	return ""
+}
+
+func (x *PaymentRecord) GetCreatedAt() int64 {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return 0
+}
+
+type GetTournamentListRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTournamentListRequest) Reset() {
+	*x = GetTournamentListRequest{}
+	mi := &file_proto_quiz_proto_msgTypes[72]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTournamentListRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTournamentListRequest) ProtoMessage() {}
+
+func (x *GetTournamentListRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[72]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTournamentListRequest.ProtoReflect.Descriptor instead.
+func (*GetTournamentListRequest) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{72}
+}
+
+type GetTournamentListResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Tournaments   []*TournamentInfo      `protobuf:"bytes,1,rep,name=tournaments,proto3" json:"tournaments,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTournamentListResponse) Reset() {
+	*x = GetTournamentListResponse{}
+	mi := &file_proto_quiz_proto_msgTypes[73]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTournamentListResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTournamentListResponse) ProtoMessage() {}
+
+func (x *GetTournamentListResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[73]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTournamentListResponse.ProtoReflect.Descriptor instead.
+func (*GetTournamentListResponse) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{73}
+}
+
+func (x *GetTournamentListResponse) GetTournaments() []*TournamentInfo {
+	if x != nil {
+		return x.Tournaments
+	}
+	return nil
+}
+
+type TournamentInfo struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name             string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	StartTime        int64                  `protobuf:"varint,3,opt,name=start_time,json=startTime,proto3" json:"start_time,omitempty"`
+	EndTime          int64                  `protobuf:"varint,4,opt,name=end_time,json=endTime,proto3" json:"end_time,omitempty"`
+	Status           string                 `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"` // "upcoming", "active", "completed"
+	ParticipantCount int32                  `protobuf:"varint,6,opt,name=participant_count,json=participantCount,proto3" json:"participant_count,omitempty"`
+	RequiredPlan     string                 `protobuf:"bytes,7,opt,name=required_plan,json=requiredPlan,proto3" json:"required_plan,omitempty"`
+	PrizeDescription string                 `protobuf:"bytes,8,opt,name=prize_description,json=prizeDescription,proto3" json:"prize_description,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *TournamentInfo) Reset() {
+	*x = TournamentInfo{}
+	mi := &file_proto_quiz_proto_msgTypes[74]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TournamentInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TournamentInfo) ProtoMessage() {}
+
+func (x *TournamentInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[74]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TournamentInfo.ProtoReflect.Descriptor instead.
+func (*TournamentInfo) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{74}
+}
+
+func (x *TournamentInfo) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *TournamentInfo) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *TournamentInfo) GetStartTime() int64 {
+	if x != nil {
+		return x.StartTime
+	}
+	return 0
+}
+
+func (x *TournamentInfo) GetEndTime() int64 {
+	if x != nil {
+		return x.EndTime
+	}
+	return 0
+}
+
+func (x *TournamentInfo) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *TournamentInfo) GetParticipantCount() int32 {
+	if x != nil {
+		return x.ParticipantCount
+	}
+	return 0
+}
+
+func (x *TournamentInfo) GetRequiredPlan() string {
+	if x != nil {
+		return x.RequiredPlan
+	}
+	return ""
+}
+
+func (x *TournamentInfo) GetPrizeDescription() string {
+	if x != nil {
+		return x.PrizeDescription
+	}
+	return ""
+}
+
+type JoinTournamentRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TournamentId  string                 `protobuf:"bytes,1,opt,name=tournament_id,json=tournamentId,proto3" json:"tournament_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *JoinTournamentRequest) Reset() {
+	*x = JoinTournamentRequest{}
+	mi := &file_proto_quiz_proto_msgTypes[75]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *JoinTournamentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*JoinTournamentRequest) ProtoMessage() {}
+
+func (x *JoinTournamentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[75]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use JoinTournamentRequest.ProtoReflect.Descriptor instead.
+func (*JoinTournamentRequest) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{75}
+}
+
+func (x *JoinTournamentRequest) GetTournamentId() string {
+	if x != nil {
+		return x.TournamentId
+	}
+	return ""
+}
+
+type JoinTournamentResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *JoinTournamentResponse) Reset() {
+	*x = JoinTournamentResponse{}
+	mi := &file_proto_quiz_proto_msgTypes[76]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *JoinTournamentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*JoinTournamentResponse) ProtoMessage() {}
+
+func (x *JoinTournamentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[76]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use JoinTournamentResponse.ProtoReflect.Descriptor instead.
+func (*JoinTournamentResponse) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{76}
+}
+
+func (x *JoinTournamentResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
 var File_proto_quiz_proto protoreflect.FileDescriptor
 
 const file_proto_quiz_proto_rawDesc = "" +
@@ -2848,14 +4576,15 @@ const file_proto_quiz_proto_rawDesc = "" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1a\n" +
 	"\busername\x18\x02 \x01(\tR\busername\"0\n" +
 	"\tTimerSync\x12#\n" +
-	"\rdeadline_unix\x18\x01 \x01(\x03R\fdeadlineUnix\"_\n" +
+	"\rdeadline_unix\x18\x01 \x01(\x03R\fdeadlineUnix\"\x84\x01\n" +
 	"\x0fRegisterRequest\x12\x1a\n" +
 	"\busername\x18\x01 \x01(\tR\busername\x12\x1a\n" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\x12\x14\n" +
-	"\x05email\x18\x03 \x01(\tR\x05email\"F\n" +
+	"\x05email\x18\x03 \x01(\tR\x05email\x12#\n" +
+	"\rreferral_code\x18\x04 \x01(\tR\freferralCode\"F\n" +
 	"\fLoginRequest\x12\x1a\n" +
 	"\busername\x18\x01 \x01(\tR\busername\x12\x1a\n" +
-	"\bpassword\x18\x02 \x01(\tR\bpassword\"\xdd\x01\n" +
+	"\bpassword\x18\x02 \x01(\tR\bpassword\"\xa8\x03\n" +
 	"\fAuthResponse\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1a\n" +
 	"\busername\x18\x02 \x01(\tR\busername\x12\x14\n" +
@@ -2864,8 +4593,15 @@ const file_proto_quiz_proto_rawDesc = "" +
 	"\x0ematches_played\x18\x05 \x01(\x05R\rmatchesPlayed\x12\x12\n" +
 	"\x04wins\x18\x06 \x01(\x05R\x04wins\x12\x14\n" +
 	"\x05email\x18\a \x01(\tR\x05email\x12\x19\n" +
-	"\bis_guest\x18\b \x01(\bR\aisGuest\"\x13\n" +
-	"\x11GetProfileRequest\"\xca\x01\n" +
+	"\bis_guest\x18\b \x01(\bR\aisGuest\x12\x12\n" +
+	"\x04plan\x18\t \x01(\tR\x04plan\x12\x14\n" +
+	"\x05coins\x18\n" +
+	" \x01(\x03R\x05coins\x12(\n" +
+	"\x06streak\x18\v \x01(\v2\x10.quiz.StreakInfoR\x06streak\x12#\n" +
+	"\rreferral_code\x18\f \x01(\tR\freferralCode\x12%\n" +
+	"\x0estreak_updated\x18\r \x01(\bR\rstreakUpdated\x12)\n" +
+	"\x06reward\x18\x0e \x01(\v2\x11.quiz.RewardGrantR\x06reward\"\x13\n" +
+	"\x11GetProfileRequest\"\xc3\x02\n" +
 	"\x0fProfileResponse\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1a\n" +
 	"\busername\x18\x02 \x01(\tR\busername\x12\x16\n" +
@@ -2873,7 +4609,12 @@ const file_proto_quiz_proto_rawDesc = "" +
 	"\x0ematches_played\x18\x04 \x01(\x05R\rmatchesPlayed\x12\x12\n" +
 	"\x04wins\x18\x05 \x01(\x05R\x04wins\x12\x14\n" +
 	"\x05email\x18\x06 \x01(\tR\x05email\x12\x19\n" +
-	"\bis_guest\x18\a \x01(\bR\aisGuest\"\x13\n" +
+	"\bis_guest\x18\a \x01(\bR\aisGuest\x12\x12\n" +
+	"\x04plan\x18\b \x01(\tR\x04plan\x12\x14\n" +
+	"\x05coins\x18\t \x01(\x03R\x05coins\x12(\n" +
+	"\x06streak\x18\n" +
+	" \x01(\v2\x10.quiz.StreakInfoR\x06streak\x12#\n" +
+	"\rreferral_code\x18\v \x01(\tR\freferralCode\"\x13\n" +
 	"\x11GuestLoginRequest\")\n" +
 	"\x11EmailLoginRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\"F\n" +
@@ -2933,7 +4674,117 @@ const file_proto_quiz_proto_rawDesc = "" +
 	"\x06rounds\x18\x04 \x01(\x05R\x06rounds\x12\x1a\n" +
 	"\bduration\x18\x05 \x01(\x03R\bduration\x12\x1d\n" +
 	"\n" +
-	"created_at\x18\x06 \x01(\x03R\tcreatedAt*5\n" +
+	"created_at\x18\x06 \x01(\x03R\tcreatedAt\"l\n" +
+	"\n" +
+	"StreakInfo\x12\x18\n" +
+	"\acurrent\x18\x01 \x01(\x05R\acurrent\x12\x18\n" +
+	"\alongest\x18\x02 \x01(\x05R\alongest\x12*\n" +
+	"\x11last_claimed_date\x18\x03 \x01(\tR\x0flastClaimedDate\"g\n" +
+	"\vRewardGrant\x12\x14\n" +
+	"\x05coins\x18\x01 \x01(\x03R\x05coins\x12\x1d\n" +
+	"\n" +
+	"badge_name\x18\x02 \x01(\tR\tbadgeName\x12#\n" +
+	"\rbonus_quizzes\x18\x03 \x01(\x05R\fbonusQuizzes\"?\n" +
+	"\n" +
+	"PlanStatus\x12\x12\n" +
+	"\x04plan\x18\x01 \x01(\tR\x04plan\x12\x1d\n" +
+	"\n" +
+	"expires_at\x18\x02 \x01(\x03R\texpiresAt\"U\n" +
+	"\x13GoogleSignInRequest\x12\x19\n" +
+	"\bid_token\x18\x01 \x01(\tR\aidToken\x12#\n" +
+	"\rreferral_code\x18\x02 \x01(\tR\freferralCode\"\xd4\x01\n" +
+	"\x14GoogleSignInResponse\x12\x14\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token\x124\n" +
+	"\fuser_profile\x18\x02 \x01(\v2\x11.quiz.UserProfileR\vuserProfile\x12\x1e\n" +
+	"\vis_new_user\x18\x03 \x01(\bR\tisNewUser\x12%\n" +
+	"\x0estreak_updated\x18\x04 \x01(\bR\rstreakUpdated\x12)\n" +
+	"\x06reward\x18\x05 \x01(\v2\x11.quiz.RewardGrantR\x06reward\"\x81\x03\n" +
+	"\vUserProfile\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1a\n" +
+	"\busername\x18\x02 \x01(\tR\busername\x12!\n" +
+	"\fdisplay_name\x18\x03 \x01(\tR\vdisplayName\x12\x14\n" +
+	"\x05email\x18\x04 \x01(\tR\x05email\x12\x1d\n" +
+	"\n" +
+	"avatar_url\x18\x05 \x01(\tR\tavatarUrl\x12\x16\n" +
+	"\x06rating\x18\x06 \x01(\x05R\x06rating\x12%\n" +
+	"\x0ematches_played\x18\a \x01(\x05R\rmatchesPlayed\x12\x12\n" +
+	"\x04wins\x18\b \x01(\x05R\x04wins\x12\x12\n" +
+	"\x04plan\x18\t \x01(\tR\x04plan\x12\x14\n" +
+	"\x05coins\x18\n" +
+	" \x01(\x03R\x05coins\x12(\n" +
+	"\x06streak\x18\v \x01(\v2\x10.quiz.StreakInfoR\x06streak\x12#\n" +
+	"\rreferral_code\x18\f \x01(\tR\freferralCode\x12\x19\n" +
+	"\bis_guest\x18\r \x01(\bR\aisGuest\"\x19\n" +
+	"\x17ClaimDailyRewardRequest\"o\n" +
+	"\x18ClaimDailyRewardResponse\x12)\n" +
+	"\x06reward\x18\x01 \x01(\v2\x11.quiz.RewardGrantR\x06reward\x12(\n" +
+	"\x06streak\x18\x02 \x01(\v2\x10.quiz.StreakInfoR\x06streak\"\x16\n" +
+	"\x14GetStreakInfoRequest\"A\n" +
+	"\x15GetStreakInfoResponse\x12(\n" +
+	"\x06streak\x18\x01 \x01(\v2\x10.quiz.StreakInfoR\x06streak\"\x1a\n" +
+	"\x18GetHomeScreenDataRequest\"\xdb\x01\n" +
+	"\x19GetHomeScreenDataResponse\x12+\n" +
+	"\aprofile\x18\x01 \x01(\v2\x11.quiz.UserProfileR\aprofile\x12'\n" +
+	"\x0fquota_remaining\x18\x02 \x01(\x05R\x0equotaRemaining\x12\x1f\n" +
+	"\vquota_limit\x18\x03 \x01(\x05R\n" +
+	"quotaLimit\x12G\n" +
+	"\x13leaderboard_preview\x18\x04 \x03(\v2\x16.quiz.LeaderboardEntryR\x12leaderboardPreview\"\x1d\n" +
+	"\x1bGetReferralDashboardRequest\"\xad\x01\n" +
+	"\x1cGetReferralDashboardResponse\x12#\n" +
+	"\rreferral_code\x18\x01 \x01(\tR\freferralCode\x12#\n" +
+	"\rtotal_invites\x18\x02 \x01(\x05R\ftotalInvites\x12 \n" +
+	"\vconversions\x18\x03 \x01(\x05R\vconversions\x12!\n" +
+	"\fcoins_earned\x18\x04 \x01(\x03R\vcoinsEarned\".\n" +
+	"\x18ApplyReferralCodeRequest\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\"5\n" +
+	"\x19ApplyReferralCodeResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\"-\n" +
+	"\x15UpdateFCMTokenRequest\x12\x14\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token\"2\n" +
+	"\x16UpdateFCMTokenResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\"9\n" +
+	"\x12CreateOrderRequest\x12#\n" +
+	"\rplan_duration\x18\x01 \x01(\tR\fplanDuration\"{\n" +
+	"\x13CreateOrderResponse\x12\x19\n" +
+	"\border_id\x18\x01 \x01(\tR\aorderId\x12\x15\n" +
+	"\x06key_id\x18\x02 \x01(\tR\x05keyId\x12\x16\n" +
+	"\x06amount\x18\x03 \x01(\x03R\x06amount\x12\x1a\n" +
+	"\bcurrency\x18\x04 \x01(\tR\bcurrency\"\x16\n" +
+	"\x14GetPlanStatusRequest\"J\n" +
+	"\x15GetPlanStatusResponse\x12\x12\n" +
+	"\x04plan\x18\x01 \x01(\tR\x04plan\x12\x1d\n" +
+	"\n" +
+	"expires_at\x18\x02 \x01(\x03R\texpiresAt\"H\n" +
+	"\x18GetPaymentHistoryRequest\x12\x14\n" +
+	"\x05limit\x18\x01 \x01(\x05R\x05limit\x12\x16\n" +
+	"\x06offset\x18\x02 \x01(\x05R\x06offset\"L\n" +
+	"\x19GetPaymentHistoryResponse\x12/\n" +
+	"\bpayments\x18\x01 \x03(\v2\x13.quiz.PaymentRecordR\bpayments\"\xba\x01\n" +
+	"\rPaymentRecord\x12\x19\n" +
+	"\border_id\x18\x01 \x01(\tR\aorderId\x12\x16\n" +
+	"\x06amount\x18\x02 \x01(\x03R\x06amount\x12\x1a\n" +
+	"\bcurrency\x18\x03 \x01(\tR\bcurrency\x12\x16\n" +
+	"\x06status\x18\x04 \x01(\tR\x06status\x12#\n" +
+	"\rplan_duration\x18\x05 \x01(\tR\fplanDuration\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\x06 \x01(\x03R\tcreatedAt\"\x1a\n" +
+	"\x18GetTournamentListRequest\"S\n" +
+	"\x19GetTournamentListResponse\x126\n" +
+	"\vtournaments\x18\x01 \x03(\v2\x14.quiz.TournamentInfoR\vtournaments\"\x85\x02\n" +
+	"\x0eTournamentInfo\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1d\n" +
+	"\n" +
+	"start_time\x18\x03 \x01(\x03R\tstartTime\x12\x19\n" +
+	"\bend_time\x18\x04 \x01(\x03R\aendTime\x12\x16\n" +
+	"\x06status\x18\x05 \x01(\tR\x06status\x12+\n" +
+	"\x11participant_count\x18\x06 \x01(\x05R\x10participantCount\x12#\n" +
+	"\rrequired_plan\x18\a \x01(\tR\frequiredPlan\x12+\n" +
+	"\x11prize_description\x18\b \x01(\tR\x10prizeDescription\"<\n" +
+	"\x15JoinTournamentRequest\x12#\n" +
+	"\rtournament_id\x18\x01 \x01(\tR\ftournamentId\"2\n" +
+	"\x16JoinTournamentResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess*5\n" +
 	"\x11MatchmakingStatus\x12\n" +
 	"\n" +
 	"\x06QUEUED\x10\x00\x12\x14\n" +
@@ -2941,15 +4792,21 @@ const file_proto_quiz_proto_rawDesc = "" +
 	"\x12MatchmakingService\x12N\n" +
 	"\x0fJoinMatchmaking\x12\x1c.quiz.JoinMatchmakingRequest\x1a\x1d.quiz.JoinMatchmakingResponse\x12Q\n" +
 	"\x10LeaveMatchmaking\x12\x1d.quiz.LeaveMatchmakingRequest\x1a\x1e.quiz.LeaveMatchmakingResponse\x12E\n" +
-	"\x10SubscribeToMatch\x12\x1d.quiz.SubscribeToMatchRequest\x1a\x10.quiz.MatchEvent0\x012\xed\x01\n" +
+	"\x10SubscribeToMatch\x12\x1d.quiz.SubscribeToMatchRequest\x1a\x10.quiz.MatchEvent0\x012\x90\x03\n" +
 	"\vQuizService\x12Q\n" +
 	"\x10GetRoomQuestions\x12\x1d.quiz.GetRoomQuestionsRequest\x1a\x1e.quiz.GetRoomQuestionsResponse\x12E\n" +
 	"\fSubmitAnswer\x12\x19.quiz.SubmitAnswerRequest\x1a\x1a.quiz.SubmitAnswerResponse\x12D\n" +
-	"\x10StreamGameEvents\x12\x1d.quiz.StreamGameEventsRequest\x1a\x0f.quiz.GameEvent0\x012\xfa\x01\n" +
+	"\x10StreamGameEvents\x12\x1d.quiz.StreamGameEventsRequest\x1a\x0f.quiz.GameEvent0\x01\x12T\n" +
+	"\x11GetTournamentList\x12\x1e.quiz.GetTournamentListRequest\x1a\x1f.quiz.GetTournamentListResponse\x12K\n" +
+	"\x0eJoinTournament\x12\x1b.quiz.JoinTournamentRequest\x1a\x1c.quiz.JoinTournamentResponse2\xd2\x04\n" +
 	"\x0eScoringService\x12K\n" +
 	"\x0eCalculateScore\x12\x1b.quiz.CalculateScoreRequest\x1a\x1c.quiz.CalculateScoreResponse\x12K\n" +
 	"\x0eGetLeaderboard\x12\x1b.quiz.GetLeaderboardRequest\x1a\x1c.quiz.GetLeaderboardResponse\x12N\n" +
-	"\x0fGetMatchHistory\x12\x1c.quiz.GetMatchHistoryRequest\x1a\x1d.quiz.GetMatchHistoryResponse2\xec\x05\n" +
+	"\x0fGetMatchHistory\x12\x1c.quiz.GetMatchHistoryRequest\x1a\x1d.quiz.GetMatchHistoryResponse\x12T\n" +
+	"\x11GetHomeScreenData\x12\x1e.quiz.GetHomeScreenDataRequest\x1a\x1f.quiz.GetHomeScreenDataResponse\x12]\n" +
+	"\x14GetReferralDashboard\x12!.quiz.GetReferralDashboardRequest\x1a\".quiz.GetReferralDashboardResponse\x12T\n" +
+	"\x11ApplyReferralCode\x12\x1e.quiz.ApplyReferralCodeRequest\x1a\x1f.quiz.ApplyReferralCodeResponse\x12K\n" +
+	"\x0eUpdateFCMToken\x12\x1b.quiz.UpdateFCMTokenRequest\x1a\x1c.quiz.UpdateFCMTokenResponse2\xd0\a\n" +
 	"\vAuthService\x125\n" +
 	"\bRegister\x12\x15.quiz.RegisterRequest\x1a\x12.quiz.AuthResponse\x12/\n" +
 	"\x05Login\x12\x12.quiz.LoginRequest\x1a\x12.quiz.AuthResponse\x12<\n" +
@@ -2963,7 +4820,14 @@ const file_proto_quiz_proto_rawDesc = "" +
 	"\tLinkEmail\x12\x16.quiz.LinkEmailRequest\x1a\x17.quiz.LinkEmailResponse\x12H\n" +
 	"\rResetPassword\x12\x1a.quiz.ResetPasswordRequest\x1a\x1b.quiz.ResetPasswordResponse\x12H\n" +
 	"\rCheckUsername\x12\x1a.quiz.CheckUsernameRequest\x1a\x1b.quiz.CheckUsernameResponse\x12H\n" +
-	"\rDeleteAccount\x12\x1a.quiz.DeleteAccountRequest\x1a\x1b.quiz.DeleteAccountResponseB\x13Z\x11quiz-battle/protob\x06proto3"
+	"\rDeleteAccount\x12\x1a.quiz.DeleteAccountRequest\x1a\x1b.quiz.DeleteAccountResponse\x12E\n" +
+	"\fGoogleSignIn\x12\x19.quiz.GoogleSignInRequest\x1a\x1a.quiz.GoogleSignInResponse\x12Q\n" +
+	"\x10ClaimDailyReward\x12\x1d.quiz.ClaimDailyRewardRequest\x1a\x1e.quiz.ClaimDailyRewardResponse\x12H\n" +
+	"\rGetStreakInfo\x12\x1a.quiz.GetStreakInfoRequest\x1a\x1b.quiz.GetStreakInfoResponse2\xf4\x01\n" +
+	"\x0ePaymentService\x12B\n" +
+	"\vCreateOrder\x12\x18.quiz.CreateOrderRequest\x1a\x19.quiz.CreateOrderResponse\x12H\n" +
+	"\rGetPlanStatus\x12\x1a.quiz.GetPlanStatusRequest\x1a\x1b.quiz.GetPlanStatusResponse\x12T\n" +
+	"\x11GetPaymentHistory\x12\x1e.quiz.GetPaymentHistoryRequest\x1a\x1f.quiz.GetPaymentHistoryResponseB\x13Z\x11quiz-battle/protob\x06proto3"
 
 var (
 	file_proto_quiz_proto_rawDescOnce sync.Once
@@ -2978,56 +4842,86 @@ func file_proto_quiz_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_quiz_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_proto_quiz_proto_msgTypes = make([]protoimpl.MessageInfo, 47)
+var file_proto_quiz_proto_msgTypes = make([]protoimpl.MessageInfo, 77)
 var file_proto_quiz_proto_goTypes = []any{
-	(MatchmakingStatus)(0),           // 0: quiz.MatchmakingStatus
-	(*JoinMatchmakingRequest)(nil),   // 1: quiz.JoinMatchmakingRequest
-	(*JoinMatchmakingResponse)(nil),  // 2: quiz.JoinMatchmakingResponse
-	(*LeaveMatchmakingRequest)(nil),  // 3: quiz.LeaveMatchmakingRequest
-	(*LeaveMatchmakingResponse)(nil), // 4: quiz.LeaveMatchmakingResponse
-	(*SubscribeToMatchRequest)(nil),  // 5: quiz.SubscribeToMatchRequest
-	(*MatchEvent)(nil),               // 6: quiz.MatchEvent
-	(*GetRoomQuestionsRequest)(nil),  // 7: quiz.GetRoomQuestionsRequest
-	(*GetRoomQuestionsResponse)(nil), // 8: quiz.GetRoomQuestionsResponse
-	(*Question)(nil),                 // 9: quiz.Question
-	(*SubmitAnswerRequest)(nil),      // 10: quiz.SubmitAnswerRequest
-	(*SubmitAnswerResponse)(nil),     // 11: quiz.SubmitAnswerResponse
-	(*StreamGameEventsRequest)(nil),  // 12: quiz.StreamGameEventsRequest
-	(*GameEvent)(nil),                // 13: quiz.GameEvent
-	(*QuestionBroadcast)(nil),        // 14: quiz.QuestionBroadcast
-	(*LeaderboardUpdate)(nil),        // 15: quiz.LeaderboardUpdate
-	(*LeaderboardEntry)(nil),         // 16: quiz.LeaderboardEntry
-	(*RoundResult)(nil),              // 17: quiz.RoundResult
-	(*MatchEnd)(nil),                 // 18: quiz.MatchEnd
-	(*PlayerResult)(nil),             // 19: quiz.PlayerResult
-	(*PlayerJoined)(nil),             // 20: quiz.PlayerJoined
-	(*TimerSync)(nil),                // 21: quiz.TimerSync
-	(*RegisterRequest)(nil),          // 22: quiz.RegisterRequest
-	(*LoginRequest)(nil),             // 23: quiz.LoginRequest
-	(*AuthResponse)(nil),             // 24: quiz.AuthResponse
-	(*GetProfileRequest)(nil),        // 25: quiz.GetProfileRequest
-	(*ProfileResponse)(nil),          // 26: quiz.ProfileResponse
-	(*GuestLoginRequest)(nil),        // 27: quiz.GuestLoginRequest
-	(*EmailLoginRequest)(nil),        // 28: quiz.EmailLoginRequest
-	(*SendEmailCodeRequest)(nil),     // 29: quiz.SendEmailCodeRequest
-	(*SendEmailCodeResponse)(nil),    // 30: quiz.SendEmailCodeResponse
-	(*VerifyEmailCodeRequest)(nil),   // 31: quiz.VerifyEmailCodeRequest
-	(*VerifyEmailCodeResponse)(nil),  // 32: quiz.VerifyEmailCodeResponse
-	(*LinkEmailRequest)(nil),         // 33: quiz.LinkEmailRequest
-	(*LinkEmailResponse)(nil),        // 34: quiz.LinkEmailResponse
-	(*ResetPasswordRequest)(nil),     // 35: quiz.ResetPasswordRequest
-	(*ResetPasswordResponse)(nil),    // 36: quiz.ResetPasswordResponse
-	(*CheckUsernameRequest)(nil),     // 37: quiz.CheckUsernameRequest
-	(*CheckUsernameResponse)(nil),    // 38: quiz.CheckUsernameResponse
-	(*DeleteAccountRequest)(nil),     // 39: quiz.DeleteAccountRequest
-	(*DeleteAccountResponse)(nil),    // 40: quiz.DeleteAccountResponse
-	(*CalculateScoreRequest)(nil),    // 41: quiz.CalculateScoreRequest
-	(*CalculateScoreResponse)(nil),   // 42: quiz.CalculateScoreResponse
-	(*GetLeaderboardRequest)(nil),    // 43: quiz.GetLeaderboardRequest
-	(*GetLeaderboardResponse)(nil),   // 44: quiz.GetLeaderboardResponse
-	(*GetMatchHistoryRequest)(nil),   // 45: quiz.GetMatchHistoryRequest
-	(*GetMatchHistoryResponse)(nil),  // 46: quiz.GetMatchHistoryResponse
-	(*MatchHistoryEntry)(nil),        // 47: quiz.MatchHistoryEntry
+	(MatchmakingStatus)(0),               // 0: quiz.MatchmakingStatus
+	(*JoinMatchmakingRequest)(nil),       // 1: quiz.JoinMatchmakingRequest
+	(*JoinMatchmakingResponse)(nil),      // 2: quiz.JoinMatchmakingResponse
+	(*LeaveMatchmakingRequest)(nil),      // 3: quiz.LeaveMatchmakingRequest
+	(*LeaveMatchmakingResponse)(nil),     // 4: quiz.LeaveMatchmakingResponse
+	(*SubscribeToMatchRequest)(nil),      // 5: quiz.SubscribeToMatchRequest
+	(*MatchEvent)(nil),                   // 6: quiz.MatchEvent
+	(*GetRoomQuestionsRequest)(nil),      // 7: quiz.GetRoomQuestionsRequest
+	(*GetRoomQuestionsResponse)(nil),     // 8: quiz.GetRoomQuestionsResponse
+	(*Question)(nil),                     // 9: quiz.Question
+	(*SubmitAnswerRequest)(nil),          // 10: quiz.SubmitAnswerRequest
+	(*SubmitAnswerResponse)(nil),         // 11: quiz.SubmitAnswerResponse
+	(*StreamGameEventsRequest)(nil),      // 12: quiz.StreamGameEventsRequest
+	(*GameEvent)(nil),                    // 13: quiz.GameEvent
+	(*QuestionBroadcast)(nil),            // 14: quiz.QuestionBroadcast
+	(*LeaderboardUpdate)(nil),            // 15: quiz.LeaderboardUpdate
+	(*LeaderboardEntry)(nil),             // 16: quiz.LeaderboardEntry
+	(*RoundResult)(nil),                  // 17: quiz.RoundResult
+	(*MatchEnd)(nil),                     // 18: quiz.MatchEnd
+	(*PlayerResult)(nil),                 // 19: quiz.PlayerResult
+	(*PlayerJoined)(nil),                 // 20: quiz.PlayerJoined
+	(*TimerSync)(nil),                    // 21: quiz.TimerSync
+	(*RegisterRequest)(nil),              // 22: quiz.RegisterRequest
+	(*LoginRequest)(nil),                 // 23: quiz.LoginRequest
+	(*AuthResponse)(nil),                 // 24: quiz.AuthResponse
+	(*GetProfileRequest)(nil),            // 25: quiz.GetProfileRequest
+	(*ProfileResponse)(nil),              // 26: quiz.ProfileResponse
+	(*GuestLoginRequest)(nil),            // 27: quiz.GuestLoginRequest
+	(*EmailLoginRequest)(nil),            // 28: quiz.EmailLoginRequest
+	(*SendEmailCodeRequest)(nil),         // 29: quiz.SendEmailCodeRequest
+	(*SendEmailCodeResponse)(nil),        // 30: quiz.SendEmailCodeResponse
+	(*VerifyEmailCodeRequest)(nil),       // 31: quiz.VerifyEmailCodeRequest
+	(*VerifyEmailCodeResponse)(nil),      // 32: quiz.VerifyEmailCodeResponse
+	(*LinkEmailRequest)(nil),             // 33: quiz.LinkEmailRequest
+	(*LinkEmailResponse)(nil),            // 34: quiz.LinkEmailResponse
+	(*ResetPasswordRequest)(nil),         // 35: quiz.ResetPasswordRequest
+	(*ResetPasswordResponse)(nil),        // 36: quiz.ResetPasswordResponse
+	(*CheckUsernameRequest)(nil),         // 37: quiz.CheckUsernameRequest
+	(*CheckUsernameResponse)(nil),        // 38: quiz.CheckUsernameResponse
+	(*DeleteAccountRequest)(nil),         // 39: quiz.DeleteAccountRequest
+	(*DeleteAccountResponse)(nil),        // 40: quiz.DeleteAccountResponse
+	(*CalculateScoreRequest)(nil),        // 41: quiz.CalculateScoreRequest
+	(*CalculateScoreResponse)(nil),       // 42: quiz.CalculateScoreResponse
+	(*GetLeaderboardRequest)(nil),        // 43: quiz.GetLeaderboardRequest
+	(*GetLeaderboardResponse)(nil),       // 44: quiz.GetLeaderboardResponse
+	(*GetMatchHistoryRequest)(nil),       // 45: quiz.GetMatchHistoryRequest
+	(*GetMatchHistoryResponse)(nil),      // 46: quiz.GetMatchHistoryResponse
+	(*MatchHistoryEntry)(nil),            // 47: quiz.MatchHistoryEntry
+	(*StreakInfo)(nil),                   // 48: quiz.StreakInfo
+	(*RewardGrant)(nil),                  // 49: quiz.RewardGrant
+	(*PlanStatus)(nil),                   // 50: quiz.PlanStatus
+	(*GoogleSignInRequest)(nil),          // 51: quiz.GoogleSignInRequest
+	(*GoogleSignInResponse)(nil),         // 52: quiz.GoogleSignInResponse
+	(*UserProfile)(nil),                  // 53: quiz.UserProfile
+	(*ClaimDailyRewardRequest)(nil),      // 54: quiz.ClaimDailyRewardRequest
+	(*ClaimDailyRewardResponse)(nil),     // 55: quiz.ClaimDailyRewardResponse
+	(*GetStreakInfoRequest)(nil),         // 56: quiz.GetStreakInfoRequest
+	(*GetStreakInfoResponse)(nil),        // 57: quiz.GetStreakInfoResponse
+	(*GetHomeScreenDataRequest)(nil),     // 58: quiz.GetHomeScreenDataRequest
+	(*GetHomeScreenDataResponse)(nil),    // 59: quiz.GetHomeScreenDataResponse
+	(*GetReferralDashboardRequest)(nil),  // 60: quiz.GetReferralDashboardRequest
+	(*GetReferralDashboardResponse)(nil), // 61: quiz.GetReferralDashboardResponse
+	(*ApplyReferralCodeRequest)(nil),     // 62: quiz.ApplyReferralCodeRequest
+	(*ApplyReferralCodeResponse)(nil),    // 63: quiz.ApplyReferralCodeResponse
+	(*UpdateFCMTokenRequest)(nil),        // 64: quiz.UpdateFCMTokenRequest
+	(*UpdateFCMTokenResponse)(nil),       // 65: quiz.UpdateFCMTokenResponse
+	(*CreateOrderRequest)(nil),           // 66: quiz.CreateOrderRequest
+	(*CreateOrderResponse)(nil),          // 67: quiz.CreateOrderResponse
+	(*GetPlanStatusRequest)(nil),         // 68: quiz.GetPlanStatusRequest
+	(*GetPlanStatusResponse)(nil),        // 69: quiz.GetPlanStatusResponse
+	(*GetPaymentHistoryRequest)(nil),     // 70: quiz.GetPaymentHistoryRequest
+	(*GetPaymentHistoryResponse)(nil),    // 71: quiz.GetPaymentHistoryResponse
+	(*PaymentRecord)(nil),                // 72: quiz.PaymentRecord
+	(*GetTournamentListRequest)(nil),     // 73: quiz.GetTournamentListRequest
+	(*GetTournamentListResponse)(nil),    // 74: quiz.GetTournamentListResponse
+	(*TournamentInfo)(nil),               // 75: quiz.TournamentInfo
+	(*JoinTournamentRequest)(nil),        // 76: quiz.JoinTournamentRequest
+	(*JoinTournamentResponse)(nil),       // 77: quiz.JoinTournamentResponse
 }
 var file_proto_quiz_proto_depIdxs = []int32{
 	0,  // 0: quiz.JoinMatchmakingResponse.status:type_name -> quiz.MatchmakingStatus
@@ -3040,54 +4934,91 @@ var file_proto_quiz_proto_depIdxs = []int32{
 	21, // 7: quiz.GameEvent.timer_sync:type_name -> quiz.TimerSync
 	16, // 8: quiz.LeaderboardUpdate.entries:type_name -> quiz.LeaderboardEntry
 	19, // 9: quiz.MatchEnd.players:type_name -> quiz.PlayerResult
-	16, // 10: quiz.GetLeaderboardResponse.entries:type_name -> quiz.LeaderboardEntry
-	47, // 11: quiz.GetMatchHistoryResponse.matches:type_name -> quiz.MatchHistoryEntry
-	19, // 12: quiz.MatchHistoryEntry.players:type_name -> quiz.PlayerResult
-	1,  // 13: quiz.MatchmakingService.JoinMatchmaking:input_type -> quiz.JoinMatchmakingRequest
-	3,  // 14: quiz.MatchmakingService.LeaveMatchmaking:input_type -> quiz.LeaveMatchmakingRequest
-	5,  // 15: quiz.MatchmakingService.SubscribeToMatch:input_type -> quiz.SubscribeToMatchRequest
-	7,  // 16: quiz.QuizService.GetRoomQuestions:input_type -> quiz.GetRoomQuestionsRequest
-	10, // 17: quiz.QuizService.SubmitAnswer:input_type -> quiz.SubmitAnswerRequest
-	12, // 18: quiz.QuizService.StreamGameEvents:input_type -> quiz.StreamGameEventsRequest
-	41, // 19: quiz.ScoringService.CalculateScore:input_type -> quiz.CalculateScoreRequest
-	43, // 20: quiz.ScoringService.GetLeaderboard:input_type -> quiz.GetLeaderboardRequest
-	45, // 21: quiz.ScoringService.GetMatchHistory:input_type -> quiz.GetMatchHistoryRequest
-	22, // 22: quiz.AuthService.Register:input_type -> quiz.RegisterRequest
-	23, // 23: quiz.AuthService.Login:input_type -> quiz.LoginRequest
-	25, // 24: quiz.AuthService.GetProfile:input_type -> quiz.GetProfileRequest
-	27, // 25: quiz.AuthService.GuestLogin:input_type -> quiz.GuestLoginRequest
-	28, // 26: quiz.AuthService.LoginWithEmail:input_type -> quiz.EmailLoginRequest
-	29, // 27: quiz.AuthService.SendEmailCode:input_type -> quiz.SendEmailCodeRequest
-	31, // 28: quiz.AuthService.VerifyEmailCode:input_type -> quiz.VerifyEmailCodeRequest
-	33, // 29: quiz.AuthService.LinkEmail:input_type -> quiz.LinkEmailRequest
-	35, // 30: quiz.AuthService.ResetPassword:input_type -> quiz.ResetPasswordRequest
-	37, // 31: quiz.AuthService.CheckUsername:input_type -> quiz.CheckUsernameRequest
-	39, // 32: quiz.AuthService.DeleteAccount:input_type -> quiz.DeleteAccountRequest
-	2,  // 33: quiz.MatchmakingService.JoinMatchmaking:output_type -> quiz.JoinMatchmakingResponse
-	4,  // 34: quiz.MatchmakingService.LeaveMatchmaking:output_type -> quiz.LeaveMatchmakingResponse
-	6,  // 35: quiz.MatchmakingService.SubscribeToMatch:output_type -> quiz.MatchEvent
-	8,  // 36: quiz.QuizService.GetRoomQuestions:output_type -> quiz.GetRoomQuestionsResponse
-	11, // 37: quiz.QuizService.SubmitAnswer:output_type -> quiz.SubmitAnswerResponse
-	13, // 38: quiz.QuizService.StreamGameEvents:output_type -> quiz.GameEvent
-	42, // 39: quiz.ScoringService.CalculateScore:output_type -> quiz.CalculateScoreResponse
-	44, // 40: quiz.ScoringService.GetLeaderboard:output_type -> quiz.GetLeaderboardResponse
-	46, // 41: quiz.ScoringService.GetMatchHistory:output_type -> quiz.GetMatchHistoryResponse
-	24, // 42: quiz.AuthService.Register:output_type -> quiz.AuthResponse
-	24, // 43: quiz.AuthService.Login:output_type -> quiz.AuthResponse
-	26, // 44: quiz.AuthService.GetProfile:output_type -> quiz.ProfileResponse
-	24, // 45: quiz.AuthService.GuestLogin:output_type -> quiz.AuthResponse
-	30, // 46: quiz.AuthService.LoginWithEmail:output_type -> quiz.SendEmailCodeResponse
-	30, // 47: quiz.AuthService.SendEmailCode:output_type -> quiz.SendEmailCodeResponse
-	32, // 48: quiz.AuthService.VerifyEmailCode:output_type -> quiz.VerifyEmailCodeResponse
-	34, // 49: quiz.AuthService.LinkEmail:output_type -> quiz.LinkEmailResponse
-	36, // 50: quiz.AuthService.ResetPassword:output_type -> quiz.ResetPasswordResponse
-	38, // 51: quiz.AuthService.CheckUsername:output_type -> quiz.CheckUsernameResponse
-	40, // 52: quiz.AuthService.DeleteAccount:output_type -> quiz.DeleteAccountResponse
-	33, // [33:53] is the sub-list for method output_type
-	13, // [13:33] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	48, // 10: quiz.AuthResponse.streak:type_name -> quiz.StreakInfo
+	49, // 11: quiz.AuthResponse.reward:type_name -> quiz.RewardGrant
+	48, // 12: quiz.ProfileResponse.streak:type_name -> quiz.StreakInfo
+	16, // 13: quiz.GetLeaderboardResponse.entries:type_name -> quiz.LeaderboardEntry
+	47, // 14: quiz.GetMatchHistoryResponse.matches:type_name -> quiz.MatchHistoryEntry
+	19, // 15: quiz.MatchHistoryEntry.players:type_name -> quiz.PlayerResult
+	53, // 16: quiz.GoogleSignInResponse.user_profile:type_name -> quiz.UserProfile
+	49, // 17: quiz.GoogleSignInResponse.reward:type_name -> quiz.RewardGrant
+	48, // 18: quiz.UserProfile.streak:type_name -> quiz.StreakInfo
+	49, // 19: quiz.ClaimDailyRewardResponse.reward:type_name -> quiz.RewardGrant
+	48, // 20: quiz.ClaimDailyRewardResponse.streak:type_name -> quiz.StreakInfo
+	48, // 21: quiz.GetStreakInfoResponse.streak:type_name -> quiz.StreakInfo
+	53, // 22: quiz.GetHomeScreenDataResponse.profile:type_name -> quiz.UserProfile
+	16, // 23: quiz.GetHomeScreenDataResponse.leaderboard_preview:type_name -> quiz.LeaderboardEntry
+	72, // 24: quiz.GetPaymentHistoryResponse.payments:type_name -> quiz.PaymentRecord
+	75, // 25: quiz.GetTournamentListResponse.tournaments:type_name -> quiz.TournamentInfo
+	1,  // 26: quiz.MatchmakingService.JoinMatchmaking:input_type -> quiz.JoinMatchmakingRequest
+	3,  // 27: quiz.MatchmakingService.LeaveMatchmaking:input_type -> quiz.LeaveMatchmakingRequest
+	5,  // 28: quiz.MatchmakingService.SubscribeToMatch:input_type -> quiz.SubscribeToMatchRequest
+	7,  // 29: quiz.QuizService.GetRoomQuestions:input_type -> quiz.GetRoomQuestionsRequest
+	10, // 30: quiz.QuizService.SubmitAnswer:input_type -> quiz.SubmitAnswerRequest
+	12, // 31: quiz.QuizService.StreamGameEvents:input_type -> quiz.StreamGameEventsRequest
+	73, // 32: quiz.QuizService.GetTournamentList:input_type -> quiz.GetTournamentListRequest
+	76, // 33: quiz.QuizService.JoinTournament:input_type -> quiz.JoinTournamentRequest
+	41, // 34: quiz.ScoringService.CalculateScore:input_type -> quiz.CalculateScoreRequest
+	43, // 35: quiz.ScoringService.GetLeaderboard:input_type -> quiz.GetLeaderboardRequest
+	45, // 36: quiz.ScoringService.GetMatchHistory:input_type -> quiz.GetMatchHistoryRequest
+	58, // 37: quiz.ScoringService.GetHomeScreenData:input_type -> quiz.GetHomeScreenDataRequest
+	60, // 38: quiz.ScoringService.GetReferralDashboard:input_type -> quiz.GetReferralDashboardRequest
+	62, // 39: quiz.ScoringService.ApplyReferralCode:input_type -> quiz.ApplyReferralCodeRequest
+	64, // 40: quiz.ScoringService.UpdateFCMToken:input_type -> quiz.UpdateFCMTokenRequest
+	22, // 41: quiz.AuthService.Register:input_type -> quiz.RegisterRequest
+	23, // 42: quiz.AuthService.Login:input_type -> quiz.LoginRequest
+	25, // 43: quiz.AuthService.GetProfile:input_type -> quiz.GetProfileRequest
+	27, // 44: quiz.AuthService.GuestLogin:input_type -> quiz.GuestLoginRequest
+	28, // 45: quiz.AuthService.LoginWithEmail:input_type -> quiz.EmailLoginRequest
+	29, // 46: quiz.AuthService.SendEmailCode:input_type -> quiz.SendEmailCodeRequest
+	31, // 47: quiz.AuthService.VerifyEmailCode:input_type -> quiz.VerifyEmailCodeRequest
+	33, // 48: quiz.AuthService.LinkEmail:input_type -> quiz.LinkEmailRequest
+	35, // 49: quiz.AuthService.ResetPassword:input_type -> quiz.ResetPasswordRequest
+	37, // 50: quiz.AuthService.CheckUsername:input_type -> quiz.CheckUsernameRequest
+	39, // 51: quiz.AuthService.DeleteAccount:input_type -> quiz.DeleteAccountRequest
+	51, // 52: quiz.AuthService.GoogleSignIn:input_type -> quiz.GoogleSignInRequest
+	54, // 53: quiz.AuthService.ClaimDailyReward:input_type -> quiz.ClaimDailyRewardRequest
+	56, // 54: quiz.AuthService.GetStreakInfo:input_type -> quiz.GetStreakInfoRequest
+	66, // 55: quiz.PaymentService.CreateOrder:input_type -> quiz.CreateOrderRequest
+	68, // 56: quiz.PaymentService.GetPlanStatus:input_type -> quiz.GetPlanStatusRequest
+	70, // 57: quiz.PaymentService.GetPaymentHistory:input_type -> quiz.GetPaymentHistoryRequest
+	2,  // 58: quiz.MatchmakingService.JoinMatchmaking:output_type -> quiz.JoinMatchmakingResponse
+	4,  // 59: quiz.MatchmakingService.LeaveMatchmaking:output_type -> quiz.LeaveMatchmakingResponse
+	6,  // 60: quiz.MatchmakingService.SubscribeToMatch:output_type -> quiz.MatchEvent
+	8,  // 61: quiz.QuizService.GetRoomQuestions:output_type -> quiz.GetRoomQuestionsResponse
+	11, // 62: quiz.QuizService.SubmitAnswer:output_type -> quiz.SubmitAnswerResponse
+	13, // 63: quiz.QuizService.StreamGameEvents:output_type -> quiz.GameEvent
+	74, // 64: quiz.QuizService.GetTournamentList:output_type -> quiz.GetTournamentListResponse
+	77, // 65: quiz.QuizService.JoinTournament:output_type -> quiz.JoinTournamentResponse
+	42, // 66: quiz.ScoringService.CalculateScore:output_type -> quiz.CalculateScoreResponse
+	44, // 67: quiz.ScoringService.GetLeaderboard:output_type -> quiz.GetLeaderboardResponse
+	46, // 68: quiz.ScoringService.GetMatchHistory:output_type -> quiz.GetMatchHistoryResponse
+	59, // 69: quiz.ScoringService.GetHomeScreenData:output_type -> quiz.GetHomeScreenDataResponse
+	61, // 70: quiz.ScoringService.GetReferralDashboard:output_type -> quiz.GetReferralDashboardResponse
+	63, // 71: quiz.ScoringService.ApplyReferralCode:output_type -> quiz.ApplyReferralCodeResponse
+	65, // 72: quiz.ScoringService.UpdateFCMToken:output_type -> quiz.UpdateFCMTokenResponse
+	24, // 73: quiz.AuthService.Register:output_type -> quiz.AuthResponse
+	24, // 74: quiz.AuthService.Login:output_type -> quiz.AuthResponse
+	26, // 75: quiz.AuthService.GetProfile:output_type -> quiz.ProfileResponse
+	24, // 76: quiz.AuthService.GuestLogin:output_type -> quiz.AuthResponse
+	30, // 77: quiz.AuthService.LoginWithEmail:output_type -> quiz.SendEmailCodeResponse
+	30, // 78: quiz.AuthService.SendEmailCode:output_type -> quiz.SendEmailCodeResponse
+	32, // 79: quiz.AuthService.VerifyEmailCode:output_type -> quiz.VerifyEmailCodeResponse
+	34, // 80: quiz.AuthService.LinkEmail:output_type -> quiz.LinkEmailResponse
+	36, // 81: quiz.AuthService.ResetPassword:output_type -> quiz.ResetPasswordResponse
+	38, // 82: quiz.AuthService.CheckUsername:output_type -> quiz.CheckUsernameResponse
+	40, // 83: quiz.AuthService.DeleteAccount:output_type -> quiz.DeleteAccountResponse
+	52, // 84: quiz.AuthService.GoogleSignIn:output_type -> quiz.GoogleSignInResponse
+	55, // 85: quiz.AuthService.ClaimDailyReward:output_type -> quiz.ClaimDailyRewardResponse
+	57, // 86: quiz.AuthService.GetStreakInfo:output_type -> quiz.GetStreakInfoResponse
+	67, // 87: quiz.PaymentService.CreateOrder:output_type -> quiz.CreateOrderResponse
+	69, // 88: quiz.PaymentService.GetPlanStatus:output_type -> quiz.GetPlanStatusResponse
+	71, // 89: quiz.PaymentService.GetPaymentHistory:output_type -> quiz.GetPaymentHistoryResponse
+	58, // [58:90] is the sub-list for method output_type
+	26, // [26:58] is the sub-list for method input_type
+	26, // [26:26] is the sub-list for extension type_name
+	26, // [26:26] is the sub-list for extension extendee
+	0,  // [0:26] is the sub-list for field type_name
 }
 
 func init() { file_proto_quiz_proto_init() }
@@ -3109,9 +5040,9 @@ func file_proto_quiz_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_quiz_proto_rawDesc), len(file_proto_quiz_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   47,
+			NumMessages:   77,
 			NumExtensions: 0,
-			NumServices:   4,
+			NumServices:   5,
 		},
 		GoTypes:           file_proto_quiz_proto_goTypes,
 		DependencyIndexes: file_proto_quiz_proto_depIdxs,
