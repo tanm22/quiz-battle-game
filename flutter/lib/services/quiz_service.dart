@@ -150,6 +150,27 @@ class QuizService {
     );
   }
 
+  Future<GetGlobalLeaderboardResponse> getGlobalLeaderboard({String timeFilter = 'alltime'}) {
+    return scoring.getGlobalLeaderboard(
+      GetGlobalLeaderboardRequest()..timeFilter = timeFilter,
+      options: _opts(),
+    );
+  }
+
+  Future<GetTournamentListResponse> getTournamentList() {
+    return quiz.getTournamentList(
+      GetTournamentListRequest(),
+      options: _opts(),
+    );
+  }
+
+  Future<JoinTournamentResponse> joinTournament(String tournamentId) {
+    return quiz.joinTournament(
+      JoinTournamentRequest()..tournamentId = tournamentId,
+      options: _opts(),
+    );
+  }
+
   Future<void> shutdown() async {
     await _matchmakingChannel.shutdown();
     await _quizChannel.shutdown();

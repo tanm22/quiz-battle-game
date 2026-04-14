@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../proto/quiz.pb.dart';
 import '../providers/game_state.dart';
 
 const _optionColors = [
@@ -194,7 +195,7 @@ class _GameplayScreenState extends ConsumerState<GameplayScreen>
               ),
 
               // Mini leaderboard
-              _MiniLeaderboard(scores: gameState.scores),
+              _MiniLeaderboard(entries: gameState.leaderboard),
             ],
           ),
         ),
@@ -341,13 +342,13 @@ class _OptionButton extends StatelessWidget {
 }
 
 class _MiniLeaderboard extends StatelessWidget {
-  final Map<String, double> scores;
-  const _MiniLeaderboard({required this.scores});
+  final List<LeaderboardEntry> entries;
+  const _MiniLeaderboard({required this.entries});
 
   @override
   Widget build(BuildContext context) {
-    if (scores.isEmpty) return const SizedBox.shrink();
-    final sorted = scores.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    if (entries.isEmpty) return const SizedBox.shrink();
+    final sorted = entries.toList()..sort((a, b) => b.score.compareTo(a.score));
 
     return Container(
       width: double.infinity,
@@ -362,17 +363,28 @@ class _MiniLeaderboard extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: sorted.take(4).indexed.map((item) {
           final (i, e) = item;
+          final name = e.username.isNotEmpty ? e.username : e.userId;
           return Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (i == 0) const Icon(Icons.emoji_events, color: Color(0xFFFFD700), size: 16),
-              Text(
-                e.key.length > 10 ? '${e.key.substring(0, 10)}...' : e.key,
-                style: TextStyle(color: Colors.white.withAlpha(150), fontSize: 11),
-                overflow: TextOverflow.ellipsis,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    name.length > 8 ? '${name.substring(0, 8)}..' : name,
+                    style: TextStyle(color: Colors.white.withAlpha(150), fontSize: 11),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (e.plan == 'premium')
+                    Padding(
+                      padding: const EdgeInsets.only(left: 3),
+                      child: Icon(Icons.workspace_premium, color: const Color(0xFFFFD700), size: 12),
+                    ),
+                ],
               ),
               Text(
-                '${e.value.toInt()}',
+                '${e.score.toInt()}',
                 style: TextStyle(
                   color: i == 0 ? const Color(0xFFFFD700) : Colors.white,
                   fontSize: 17,

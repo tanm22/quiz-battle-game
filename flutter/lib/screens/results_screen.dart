@@ -182,9 +182,26 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen>
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: Text(
-                                p.username.isEmpty ? p.userId : p.username,
-                                style: TextStyle(color: isSelf ? Colors.white : Colors.white70, fontSize: 15, fontWeight: isSelf ? FontWeight.bold : FontWeight.normal),
+                              child: Row(
+                                children: [
+                                  Flexible(child: Text(
+                                    p.username.isEmpty ? p.userId : p.username,
+                                    style: TextStyle(color: isSelf ? Colors.white : Colors.white70, fontSize: 15, fontWeight: isSelf ? FontWeight.bold : FontWeight.normal),
+                                    overflow: TextOverflow.ellipsis,
+                                  )),
+                                  if (p.plan == 'premium') ...[
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFFD700).withAlpha(30),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: const Color(0xFFFFD700).withAlpha(80)),
+                                      ),
+                                      child: const Text('PRO', style: TextStyle(color: Color(0xFFFFD700), fontSize: 9, fontWeight: FontWeight.w700)),
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
                             Text(

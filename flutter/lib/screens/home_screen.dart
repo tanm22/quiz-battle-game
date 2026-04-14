@@ -9,6 +9,7 @@ import '../proto/quiz.pbgrpc.dart';
 import 'match_history_screen.dart';
 import 'payment_screen.dart';
 import 'link_email_screen.dart';
+import 'tournament_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -23,6 +24,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   String? _error;
   bool _rewardShown = false;
   int _currentTab = 0;
+  // Leaderboard tab state
+  String _lbFilter = 'alltime';
+  List<LeaderboardEntry>? _lbEntries;
+  bool _lbLoading = false;
 
   @override
   void initState() {
@@ -43,6 +48,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       }
     } catch (e) {
       if (mounted) setState(() { _error = e is GrpcError ? (e.message ?? 'Failed to load') : e.toString(); _loading = false; });
+    }
+  }
+
+  Future<void> _loadLeaderboard([String? filter]) async {
+    final f = filter ?? _lbFilter;
+    setState(() { _lbLoading = true; _lbFilter = f; });
+    try {
+      final resp = await QuizService().getGlobalLeaderboard(timeFilter: f);
+      if (mounted) setState(() { _lbEntries = resp.entries; _lbLoading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _lbLoading = false);
     }
   }
 
@@ -229,7 +245,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
           const SizedBox(height: 16),
 
-          // Action row: History, Premium, Referral
+          // Action row: History, Tournaments, Premium, Invite
           Row(
             children: [
               Expanded(child: _actionButton(Icons.history, 'History', () {
@@ -237,11 +253,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   builder: (_) => MatchHistoryScreen(currentUserId: gameState.userId ?? ''),
                 ));
               })),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
+              Expanded(child: _actionButton(Icons.emoji_events, 'Tourneys', () {
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => TournamentScreen(currentPlan: _homeData?.profile.plan ?? 'free'),
+                ));
+              })),
+              const SizedBox(width: 8),
               Expanded(child: _actionButton(Icons.workspace_premium, 'Premium', () {
                 Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentScreen()));
               }, color: const Color(0xFFFFD700))),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(child: _actionButton(Icons.share, 'Invite', () {
                 _showShareDialog(gameState);
               })),
@@ -284,6 +306,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   // ---------------------------------------------------------------------------
 
   Widget _buildLeaderboardTab() {
+    // Load leaderboard on first visit
+    if (_lbEntries == null && !_lbLoading) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadLeaderboard());
+    }
+
     return Column(
       children: [
         Padding(
@@ -296,19 +323,76 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ],
           ),
         ),
-        if (_loading && _homeData == null)
+        // Time filter chips
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          child: Row(
+            children: [
+              _filterChip('Daily', 'daily'),
+              const SizedBox(width: 8),
+              _filterChip('Weekly', 'weekly'),
+              const SizedBox(width: 8),
+              _filterChip('All Time', 'alltime'),
+            ],
+          ),
+        ),
+        if (_lbLoading)
           const Expanded(child: Center(child: CircularProgressIndicator(color: Color(0xFFFF6B35)))),
-        if (_homeData != null && _homeData!.leaderboardPreview.isNotEmpty)
+        if (!_lbLoading && _lbEntries != null && _lbEntries!.isNotEmpty)
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              itemCount: _homeData!.leaderboardPreview.length,
-              itemBuilder: (_, i) => _leaderboardRow(_homeData!.leaderboardPreview[i]),
+              itemCount: _lbEntries!.length,
+              itemBuilder: (_, i) => _leaderboardRow(_lbEntries![i]),
             ),
           ),
-        if (_homeData != null && _homeData!.leaderboardPreview.isEmpty)
+        if (!_lbLoading && (_lbEntries == null || _lbEntries!.isEmpty))
           Expanded(child: Center(child: Text('No leaderboard data yet', style: TextStyle(color: Colors.white.withAlpha(100))))),
+        // Upsell for free users
+        if ((_homeData?.profile.plan ?? 'free') != 'premium' && !_lbLoading && _lbEntries != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+            child: GestureDetector(
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentScreen())),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFD700).withAlpha(15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFFFD700).withAlpha(40)),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.lock_open, color: Color(0xFFFFD700), size: 16),
+                    SizedBox(width: 8),
+                    Text('Upgrade to see the full leaderboard', style: TextStyle(color: Color(0xFFFFD700), fontSize: 13, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
+          ),
       ],
+    );
+  }
+
+  Widget _filterChip(String label, String value) {
+    final selected = _lbFilter == value;
+    return GestureDetector(
+      onTap: () => _loadLeaderboard(value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFFFF6B35).withAlpha(30) : Colors.white.withAlpha(6),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: selected ? const Color(0xFFFF6B35) : Colors.white.withAlpha(20)),
+        ),
+        child: Text(label, style: TextStyle(
+          color: selected ? const Color(0xFFFF6B35) : Colors.white54,
+          fontSize: 13, fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+        )),
+      ),
     );
   }
 
@@ -783,7 +867,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         children: [
           SizedBox(width: 28, child: Text('#${e.rank}', style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 14))),
           const SizedBox(width: 8),
-          Expanded(child: Text(e.username.isEmpty ? e.userId : e.username, style: const TextStyle(color: Colors.white70, fontSize: 14))),
+          Expanded(child: Row(
+            children: [
+              Flexible(child: Text(e.username.isEmpty ? e.userId : e.username, style: const TextStyle(color: Colors.white70, fontSize: 14), overflow: TextOverflow.ellipsis)),
+              if (e.plan == 'premium') ...[
+                const SizedBox(width: 6),
+                _badge('PRO', const Color(0xFFFFD700)),
+              ],
+            ],
+          )),
           Text('${e.score.toInt()}', style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 15)),
         ],
       ),
