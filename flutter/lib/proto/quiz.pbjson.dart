@@ -342,6 +342,7 @@ const LeaderboardEntry$json = {
     {'1': 'username', '3': 2, '4': 1, '5': 9, '10': 'username'},
     {'1': 'score', '3': 3, '4': 1, '5': 1, '10': 'score'},
     {'1': 'rank', '3': 4, '4': 1, '5': 5, '10': 'rank'},
+    {'1': 'plan', '3': 5, '4': 1, '5': 9, '10': 'plan'},
   ],
 };
 
@@ -349,7 +350,7 @@ const LeaderboardEntry$json = {
 final $typed_data.Uint8List leaderboardEntryDescriptor = $convert.base64Decode(
     'ChBMZWFkZXJib2FyZEVudHJ5EhcKB3VzZXJfaWQYASABKAlSBnVzZXJJZBIaCgh1c2VybmFtZR'
     'gCIAEoCVIIdXNlcm5hbWUSFAoFc2NvcmUYAyABKAFSBXNjb3JlEhIKBHJhbmsYBCABKAVSBHJh'
-    'bms=');
+    'bmsSEgoEcGxhbhgFIAEoCVIEcGxhbg==');
 
 @$core.Deprecated('Use roundResultDescriptor instead')
 const RoundResult$json = {
@@ -406,6 +407,7 @@ const PlayerResult$json = {
       '5': 1,
       '10': 'avgResponseTimeMs'
     },
+    {'1': 'plan', '3': 7, '4': 1, '5': 9, '10': 'plan'},
   ],
 };
 
@@ -414,7 +416,8 @@ final $typed_data.Uint8List playerResultDescriptor = $convert.base64Decode(
     'CgxQbGF5ZXJSZXN1bHQSFwoHdXNlcl9pZBgBIAEoCVIGdXNlcklkEhoKCHVzZXJuYW1lGAIgAS'
     'gJUgh1c2VybmFtZRIfCgtmaW5hbF9zY29yZRgDIAEoAVIKZmluYWxTY29yZRISCgRyYW5rGAQg'
     'ASgFUgRyYW5rEicKD2Fuc3dlcnNfY29ycmVjdBgFIAEoBVIOYW5zd2Vyc0NvcnJlY3QSLwoUYX'
-    'ZnX3Jlc3BvbnNlX3RpbWVfbXMYBiABKAFSEWF2Z1Jlc3BvbnNlVGltZU1z');
+    'ZnX3Jlc3BvbnNlX3RpbWVfbXMYBiABKAFSEWF2Z1Jlc3BvbnNlVGltZU1zEhIKBHBsYW4YByAB'
+    'KAlSBHBsYW4=');
 
 @$core.Deprecated('Use playerJoinedDescriptor instead')
 const PlayerJoined$json = {
@@ -422,13 +425,14 @@ const PlayerJoined$json = {
   '2': [
     {'1': 'user_id', '3': 1, '4': 1, '5': 9, '10': 'userId'},
     {'1': 'username', '3': 2, '4': 1, '5': 9, '10': 'username'},
+    {'1': 'plan', '3': 3, '4': 1, '5': 9, '10': 'plan'},
   ],
 };
 
 /// Descriptor for `PlayerJoined`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List playerJoinedDescriptor = $convert.base64Decode(
     'CgxQbGF5ZXJKb2luZWQSFwoHdXNlcl9pZBgBIAEoCVIGdXNlcklkEhoKCHVzZXJuYW1lGAIgAS'
-    'gJUgh1c2VybmFtZQ==');
+    'gJUgh1c2VybmFtZRISCgRwbGFuGAMgASgJUgRwbGFu');
 
 @$core.Deprecated('Use timerSyncDescriptor instead')
 const TimerSync$json = {
@@ -1389,3 +1393,38 @@ const JoinTournamentResponse$json = {
 final $typed_data.Uint8List joinTournamentResponseDescriptor =
     $convert.base64Decode(
         'ChZKb2luVG91cm5hbWVudFJlc3BvbnNlEhgKB3N1Y2Nlc3MYASABKAhSB3N1Y2Nlc3M=');
+
+@$core.Deprecated('Use getGlobalLeaderboardRequestDescriptor instead')
+const GetGlobalLeaderboardRequest$json = {
+  '1': 'GetGlobalLeaderboardRequest',
+  '2': [
+    {'1': 'time_filter', '3': 1, '4': 1, '5': 9, '10': 'timeFilter'},
+  ],
+};
+
+/// Descriptor for `GetGlobalLeaderboardRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getGlobalLeaderboardRequestDescriptor =
+    $convert.base64Decode(
+        'ChtHZXRHbG9iYWxMZWFkZXJib2FyZFJlcXVlc3QSHwoLdGltZV9maWx0ZXIYASABKAlSCnRpbW'
+        'VGaWx0ZXI=');
+
+@$core.Deprecated('Use getGlobalLeaderboardResponseDescriptor instead')
+const GetGlobalLeaderboardResponse$json = {
+  '1': 'GetGlobalLeaderboardResponse',
+  '2': [
+    {
+      '1': 'entries',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.quiz.LeaderboardEntry',
+      '10': 'entries'
+    },
+  ],
+};
+
+/// Descriptor for `GetGlobalLeaderboardResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getGlobalLeaderboardResponseDescriptor =
+    $convert.base64Decode(
+        'ChxHZXRHbG9iYWxMZWFkZXJib2FyZFJlc3BvbnNlEjAKB2VudHJpZXMYASADKAsyFi5xdWl6Lk'
+        'xlYWRlcmJvYXJkRW50cnlSB2VudHJpZXM=');

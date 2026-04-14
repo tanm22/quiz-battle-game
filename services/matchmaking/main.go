@@ -234,16 +234,21 @@ func (s *matchmakingServer) createRoom(ctx context.Context, players []redis.Z) {
 	for _, p := range players {
 		userID := p.Member.(string)
 		username := userID
+		userPlan := "free"
 		var userDoc bson.M
 		if err := s.mongoDB.Collection("users").FindOne(ctx, bson.M{"_id": userID}).Decode(&userDoc); err == nil {
 			if u, ok := userDoc["username"].(string); ok && u != "" {
 				username = u
+			}
+			if pl, ok := userDoc["plan"].(string); ok && pl != "" {
+				userPlan = pl
 			}
 		}
 		info := models.PlayerInfo{
 			UserID:   userID,
 			Username: username,
 			Rating:   int32(p.Score),
+			Plan:     userPlan,
 		}
 		infoJSON, err := json.Marshal(info)
 		if err != nil {

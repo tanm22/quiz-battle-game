@@ -371,6 +371,14 @@ class ScoringServiceClient extends $grpc.Client {
     return $createUnaryCall(_$updateFCMToken, request, options: options);
   }
 
+  /// Phase 3: Global leaderboard with time filters
+  $grpc.ResponseFuture<$0.GetGlobalLeaderboardResponse> getGlobalLeaderboard(
+    $0.GetGlobalLeaderboardRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$getGlobalLeaderboard, request, options: options);
+  }
+
   // method descriptors
 
   static final _$calculateScore =
@@ -408,6 +416,11 @@ class ScoringServiceClient extends $grpc.Client {
           '/quiz.ScoringService/UpdateFCMToken',
           ($0.UpdateFCMTokenRequest value) => value.writeToBuffer(),
           $0.UpdateFCMTokenResponse.fromBuffer);
+  static final _$getGlobalLeaderboard = $grpc.ClientMethod<
+          $0.GetGlobalLeaderboardRequest, $0.GetGlobalLeaderboardResponse>(
+      '/quiz.ScoringService/GetGlobalLeaderboard',
+      ($0.GetGlobalLeaderboardRequest value) => value.writeToBuffer(),
+      $0.GetGlobalLeaderboardResponse.fromBuffer);
 }
 
 @$pb.GrpcServiceName('quiz.ScoringService')
@@ -478,6 +491,15 @@ abstract class ScoringServiceBase extends $grpc.Service {
         ($core.List<$core.int> value) =>
             $0.UpdateFCMTokenRequest.fromBuffer(value),
         ($0.UpdateFCMTokenResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.GetGlobalLeaderboardRequest,
+            $0.GetGlobalLeaderboardResponse>(
+        'GetGlobalLeaderboard',
+        getGlobalLeaderboard_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.GetGlobalLeaderboardRequest.fromBuffer(value),
+        ($0.GetGlobalLeaderboardResponse value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.CalculateScoreResponse> calculateScore_Pre(
@@ -542,6 +564,15 @@ abstract class ScoringServiceBase extends $grpc.Service {
 
   $async.Future<$0.UpdateFCMTokenResponse> updateFCMToken(
       $grpc.ServiceCall call, $0.UpdateFCMTokenRequest request);
+
+  $async.Future<$0.GetGlobalLeaderboardResponse> getGlobalLeaderboard_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.GetGlobalLeaderboardRequest> $request) async {
+    return getGlobalLeaderboard($call, await $request);
+  }
+
+  $async.Future<$0.GetGlobalLeaderboardResponse> getGlobalLeaderboard(
+      $grpc.ServiceCall call, $0.GetGlobalLeaderboardRequest request);
 }
 
 @$pb.GrpcServiceName('quiz.AuthService')

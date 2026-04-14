@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.1
 // - protoc             v4.25.1
-// source: quiz.proto
+// source: proto/quiz.proto
 
 package proto
 
@@ -197,7 +197,7 @@ var MatchmakingService_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "quiz.proto",
+	Metadata: "proto/quiz.proto",
 }
 
 const (
@@ -457,7 +457,7 @@ var QuizService_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "quiz.proto",
+	Metadata: "proto/quiz.proto",
 }
 
 const (
@@ -468,6 +468,7 @@ const (
 	ScoringService_GetReferralDashboard_FullMethodName = "/quiz.ScoringService/GetReferralDashboard"
 	ScoringService_ApplyReferralCode_FullMethodName    = "/quiz.ScoringService/ApplyReferralCode"
 	ScoringService_UpdateFCMToken_FullMethodName       = "/quiz.ScoringService/UpdateFCMToken"
+	ScoringService_GetGlobalLeaderboard_FullMethodName = "/quiz.ScoringService/GetGlobalLeaderboard"
 )
 
 // ScoringServiceClient is the client API for ScoringService service.
@@ -482,6 +483,8 @@ type ScoringServiceClient interface {
 	GetReferralDashboard(ctx context.Context, in *GetReferralDashboardRequest, opts ...grpc.CallOption) (*GetReferralDashboardResponse, error)
 	ApplyReferralCode(ctx context.Context, in *ApplyReferralCodeRequest, opts ...grpc.CallOption) (*ApplyReferralCodeResponse, error)
 	UpdateFCMToken(ctx context.Context, in *UpdateFCMTokenRequest, opts ...grpc.CallOption) (*UpdateFCMTokenResponse, error)
+	// Phase 3: Global leaderboard with time filters
+	GetGlobalLeaderboard(ctx context.Context, in *GetGlobalLeaderboardRequest, opts ...grpc.CallOption) (*GetGlobalLeaderboardResponse, error)
 }
 
 type scoringServiceClient struct {
@@ -562,6 +565,16 @@ func (c *scoringServiceClient) UpdateFCMToken(ctx context.Context, in *UpdateFCM
 	return out, nil
 }
 
+func (c *scoringServiceClient) GetGlobalLeaderboard(ctx context.Context, in *GetGlobalLeaderboardRequest, opts ...grpc.CallOption) (*GetGlobalLeaderboardResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetGlobalLeaderboardResponse)
+	err := c.cc.Invoke(ctx, ScoringService_GetGlobalLeaderboard_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ScoringServiceServer is the server API for ScoringService service.
 // All implementations must embed UnimplementedScoringServiceServer
 // for forward compatibility.
@@ -574,6 +587,8 @@ type ScoringServiceServer interface {
 	GetReferralDashboard(context.Context, *GetReferralDashboardRequest) (*GetReferralDashboardResponse, error)
 	ApplyReferralCode(context.Context, *ApplyReferralCodeRequest) (*ApplyReferralCodeResponse, error)
 	UpdateFCMToken(context.Context, *UpdateFCMTokenRequest) (*UpdateFCMTokenResponse, error)
+	// Phase 3: Global leaderboard with time filters
+	GetGlobalLeaderboard(context.Context, *GetGlobalLeaderboardRequest) (*GetGlobalLeaderboardResponse, error)
 	mustEmbedUnimplementedScoringServiceServer()
 }
 
@@ -604,6 +619,9 @@ func (UnimplementedScoringServiceServer) ApplyReferralCode(context.Context, *App
 }
 func (UnimplementedScoringServiceServer) UpdateFCMToken(context.Context, *UpdateFCMTokenRequest) (*UpdateFCMTokenResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateFCMToken not implemented")
+}
+func (UnimplementedScoringServiceServer) GetGlobalLeaderboard(context.Context, *GetGlobalLeaderboardRequest) (*GetGlobalLeaderboardResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetGlobalLeaderboard not implemented")
 }
 func (UnimplementedScoringServiceServer) mustEmbedUnimplementedScoringServiceServer() {}
 func (UnimplementedScoringServiceServer) testEmbeddedByValue()                        {}
@@ -752,6 +770,24 @@ func _ScoringService_UpdateFCMToken_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ScoringService_GetGlobalLeaderboard_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetGlobalLeaderboardRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScoringServiceServer).GetGlobalLeaderboard(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScoringService_GetGlobalLeaderboard_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScoringServiceServer).GetGlobalLeaderboard(ctx, req.(*GetGlobalLeaderboardRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ScoringService_ServiceDesc is the grpc.ServiceDesc for ScoringService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -787,9 +823,13 @@ var ScoringService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "UpdateFCMToken",
 			Handler:    _ScoringService_UpdateFCMToken_Handler,
 		},
+		{
+			MethodName: "GetGlobalLeaderboard",
+			Handler:    _ScoringService_GetGlobalLeaderboard_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "quiz.proto",
+	Metadata: "proto/quiz.proto",
 }
 
 const (
@@ -1387,7 +1427,7 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "quiz.proto",
+	Metadata: "proto/quiz.proto",
 }
 
 const (
@@ -1565,5 +1605,5 @@ var PaymentService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "quiz.proto",
+	Metadata: "proto/quiz.proto",
 }

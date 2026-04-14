@@ -1156,12 +1156,14 @@ class LeaderboardEntry extends $pb.GeneratedMessage {
     $core.String? username,
     $core.double? score,
     $core.int? rank,
+    $core.String? plan,
   }) {
     final result = create();
     if (userId != null) result.userId = userId;
     if (username != null) result.username = username;
     if (score != null) result.score = score;
     if (rank != null) result.rank = rank;
+    if (plan != null) result.plan = plan;
     return result;
   }
 
@@ -1182,6 +1184,7 @@ class LeaderboardEntry extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'username')
     ..aD(3, _omitFieldNames ? '' : 'score')
     ..aI(4, _omitFieldNames ? '' : 'rank')
+    ..aOS(5, _omitFieldNames ? '' : 'plan')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1238,6 +1241,15 @@ class LeaderboardEntry extends $pb.GeneratedMessage {
   $core.bool hasRank() => $_has(3);
   @$pb.TagNumber(4)
   void clearRank() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get plan => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set plan($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasPlan() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearPlan() => $_clearField(5);
 }
 
 class RoundResult extends $pb.GeneratedMessage {
@@ -1410,6 +1422,7 @@ class PlayerResult extends $pb.GeneratedMessage {
     $core.int? rank,
     $core.int? answersCorrect,
     $core.double? avgResponseTimeMs,
+    $core.String? plan,
   }) {
     final result = create();
     if (userId != null) result.userId = userId;
@@ -1418,6 +1431,7 @@ class PlayerResult extends $pb.GeneratedMessage {
     if (rank != null) result.rank = rank;
     if (answersCorrect != null) result.answersCorrect = answersCorrect;
     if (avgResponseTimeMs != null) result.avgResponseTimeMs = avgResponseTimeMs;
+    if (plan != null) result.plan = plan;
     return result;
   }
 
@@ -1440,6 +1454,7 @@ class PlayerResult extends $pb.GeneratedMessage {
     ..aI(4, _omitFieldNames ? '' : 'rank')
     ..aI(5, _omitFieldNames ? '' : 'answersCorrect')
     ..aD(6, _omitFieldNames ? '' : 'avgResponseTimeMs')
+    ..aOS(7, _omitFieldNames ? '' : 'plan')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1514,16 +1529,27 @@ class PlayerResult extends $pb.GeneratedMessage {
   $core.bool hasAvgResponseTimeMs() => $_has(5);
   @$pb.TagNumber(6)
   void clearAvgResponseTimeMs() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.String get plan => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set plan($core.String value) => $_setString(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasPlan() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearPlan() => $_clearField(7);
 }
 
 class PlayerJoined extends $pb.GeneratedMessage {
   factory PlayerJoined({
     $core.String? userId,
     $core.String? username,
+    $core.String? plan,
   }) {
     final result = create();
     if (userId != null) result.userId = userId;
     if (username != null) result.username = username;
+    if (plan != null) result.plan = plan;
     return result;
   }
 
@@ -1542,6 +1568,7 @@ class PlayerJoined extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'userId')
     ..aOS(2, _omitFieldNames ? '' : 'username')
+    ..aOS(3, _omitFieldNames ? '' : 'plan')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1580,6 +1607,15 @@ class PlayerJoined extends $pb.GeneratedMessage {
   $core.bool hasUsername() => $_has(1);
   @$pb.TagNumber(2)
   void clearUsername() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get plan => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set plan($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasPlan() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearPlan() => $_clearField(3);
 }
 
 class TimerSync extends $pb.GeneratedMessage {
@@ -5663,6 +5699,115 @@ class JoinTournamentResponse extends $pb.GeneratedMessage {
   $core.bool hasSuccess() => $_has(0);
   @$pb.TagNumber(1)
   void clearSuccess() => $_clearField(1);
+}
+
+class GetGlobalLeaderboardRequest extends $pb.GeneratedMessage {
+  factory GetGlobalLeaderboardRequest({
+    $core.String? timeFilter,
+  }) {
+    final result = create();
+    if (timeFilter != null) result.timeFilter = timeFilter;
+    return result;
+  }
+
+  GetGlobalLeaderboardRequest._();
+
+  factory GetGlobalLeaderboardRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetGlobalLeaderboardRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetGlobalLeaderboardRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'timeFilter')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetGlobalLeaderboardRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetGlobalLeaderboardRequest copyWith(
+          void Function(GetGlobalLeaderboardRequest) updates) =>
+      super.copyWith(
+              (message) => updates(message as GetGlobalLeaderboardRequest))
+          as GetGlobalLeaderboardRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetGlobalLeaderboardRequest create() =>
+      GetGlobalLeaderboardRequest._();
+  @$core.override
+  GetGlobalLeaderboardRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetGlobalLeaderboardRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetGlobalLeaderboardRequest>(create);
+  static GetGlobalLeaderboardRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get timeFilter => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set timeFilter($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasTimeFilter() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearTimeFilter() => $_clearField(1);
+}
+
+class GetGlobalLeaderboardResponse extends $pb.GeneratedMessage {
+  factory GetGlobalLeaderboardResponse({
+    $core.Iterable<LeaderboardEntry>? entries,
+  }) {
+    final result = create();
+    if (entries != null) result.entries.addAll(entries);
+    return result;
+  }
+
+  GetGlobalLeaderboardResponse._();
+
+  factory GetGlobalLeaderboardResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetGlobalLeaderboardResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetGlobalLeaderboardResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..pPM<LeaderboardEntry>(1, _omitFieldNames ? '' : 'entries',
+        subBuilder: LeaderboardEntry.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetGlobalLeaderboardResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetGlobalLeaderboardResponse copyWith(
+          void Function(GetGlobalLeaderboardResponse) updates) =>
+      super.copyWith(
+              (message) => updates(message as GetGlobalLeaderboardResponse))
+          as GetGlobalLeaderboardResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetGlobalLeaderboardResponse create() =>
+      GetGlobalLeaderboardResponse._();
+  @$core.override
+  GetGlobalLeaderboardResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetGlobalLeaderboardResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetGlobalLeaderboardResponse>(create);
+  static GetGlobalLeaderboardResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<LeaderboardEntry> get entries => $_getList(0);
 }
 
 const $core.bool _omitFieldNames =

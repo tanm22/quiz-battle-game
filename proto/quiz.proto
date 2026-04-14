@@ -128,6 +128,7 @@ message LeaderboardEntry {
   string username = 2;
   double score    = 3;
   int32  rank     = 4;
+  string plan     = 5; // "free" or "premium"
 }
 
 message RoundResult {
@@ -150,11 +151,13 @@ message PlayerResult {
   int32  rank                  = 4;
   int32  answers_correct       = 5;
   double avg_response_time_ms  = 6;
+  string plan                  = 7; // "free" or "premium"
 }
 
 message PlayerJoined {
   string user_id  = 1;
   string username = 2;
+  string plan     = 3; // "free" or "premium"
 }
 
 message TimerSync {
@@ -174,6 +177,8 @@ service ScoringService {
   rpc GetReferralDashboard(GetReferralDashboardRequest) returns (GetReferralDashboardResponse);
   rpc ApplyReferralCode(ApplyReferralCodeRequest) returns (ApplyReferralCodeResponse);
   rpc UpdateFCMToken(UpdateFCMTokenRequest) returns (UpdateFCMTokenResponse);
+  // Phase 3: Global leaderboard with time filters
+  rpc GetGlobalLeaderboard(GetGlobalLeaderboardRequest) returns (GetGlobalLeaderboardResponse);
 }
 
 // ---------------------------------------------------------------------------
@@ -537,4 +542,16 @@ message JoinTournamentRequest {
 
 message JoinTournamentResponse {
   bool success = 1;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3: Global Leaderboard
+// ---------------------------------------------------------------------------
+
+message GetGlobalLeaderboardRequest {
+  string time_filter = 1; // "daily", "weekly", "alltime" (default)
+}
+
+message GetGlobalLeaderboardResponse {
+  repeated LeaderboardEntry entries = 1;
 }

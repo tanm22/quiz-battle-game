@@ -7,6 +7,7 @@ type PlayerInfo struct {
 	UserID   string `json:"userId"`
 	Username string `json:"username"`
 	Rating   int32  `json:"rating"`
+	Plan     string `json:"plan"`
 }
 
 // RoomState is stored as JSON in room:{id}:state.
