@@ -22,12 +22,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _loading = true;
   String? _error;
   bool _rewardShown = false;
+  int _currentTab = 0;
 
   @override
   void initState() {
     super.initState();
     _loadHomeData();
-    _checkStreakReward();
   }
 
   Future<void> _loadHomeData() async {
@@ -37,22 +37,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         GetHomeScreenDataRequest(),
         options: QuizService().authCallOptions,
       );
-      if (mounted) setState(() { _homeData = resp; _loading = false; });
+      if (mounted) {
+        setState(() { _homeData = resp; _loading = false; });
+        _maybeShowStreakReward(resp);
+      }
     } catch (e) {
       if (mounted) setState(() { _error = e is GrpcError ? (e.message ?? 'Failed to load') : e.toString(); _loading = false; });
     }
   }
 
-  void _checkStreakReward() {
-    // Show daily reward popup if streak was updated on login
+  void _maybeShowStreakReward(GetHomeScreenDataResponse data) {
+    if (_rewardShown) return;
+    final streak = data.profile.streak;
+    if (streak.current <= 0) return;
+    // Show reward dialog once per session if today's reward hasn't been claimed yet
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    if (streak.lastClaimedDate == today) return;
+    _rewardShown = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final gs = ref.read(gameStateProvider);
-      // The AuthResponse carries streakUpdated/reward — check via the login flow
-      // For now we rely on the home data streak info
-      if (!_rewardShown && gs.currentScreen == GameScreen.home) {
-        _rewardShown = true;
-        // Popup will be shown after home data loads if streak > 0
-      }
+      if (mounted) _showDailyRewardDialog(streak.current, streak.current * 10);
     });
   }
 
@@ -63,6 +66,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       builder: (ctx) => _DailyRewardDialog(streakDay: streakDay, coins: coins),
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Build — scaffold with bottom navigation
+  // ---------------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -79,155 +86,354 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
         child: SafeArea(
-          child: RefreshIndicator(
-            onRefresh: _loadHomeData,
-            color: const Color(0xFFFF6B35),
-            child: ListView(
-              padding: const EdgeInsets.all(20),
+          child: _buildTabContent(auth, gameState),
+        ),
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentTab,
+        onTap: (index) {
+          if (index == 1) {
+            // Play — trigger matchmaking directly
+            ref.read(gameStateProvider.notifier).navigateToMatchmaking();
+          } else {
+            setState(() => _currentTab = index);
+          }
+        },
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: const Color(0xFF150F35),
+        selectedItemColor: const Color(0xFFFF6B35),
+        unselectedItemColor: Colors.white38,
+        showUnselectedLabels: true,
+        selectedFontSize: 12,
+        unselectedFontSize: 11,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.play_circle_filled, size: 32), label: 'Play'),
+          BottomNavigationBarItem(icon: Icon(Icons.leaderboard_rounded), label: 'Leaderboard'),
+          BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Profile'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabContent(AuthService auth, GameState gs) {
+    switch (_currentTab) {
+      case 2:
+        return _buildLeaderboardTab();
+      case 3:
+        return _buildProfileTab(auth, gs);
+      default:
+        return _buildHomeTab(auth, gs);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Home tab
+  // ---------------------------------------------------------------------------
+
+  Widget _buildHomeTab(AuthService auth, GameState gameState) {
+    final isPremium = (_homeData?.profile.plan ?? 'free') == 'premium';
+    final remaining = _homeData?.quotaRemaining ?? 0;
+    final quotaExhausted = !isPremium && _homeData != null && remaining <= 0;
+
+    return RefreshIndicator(
+      onRefresh: _loadHomeData,
+      color: const Color(0xFFFF6B35),
+      child: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          // Title
+          ShaderMask(
+            shaderCallback: (bounds) => const LinearGradient(
+              colors: [Color(0xFFFF6B35), Color(0xFFFFD700)],
+            ).createShader(bounds),
+            child: const Text(
+              'QUIZ BATTLE',
+              style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 2),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Profile card
+          _buildProfileCard(auth, gameState),
+          const SizedBox(height: 16),
+
+          // Guest email-link prompt
+          if (gameState.isGuest)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: _buildLinkEmailPrompt(),
+            ),
+
+          // Streak + Quota row
+          if (_homeData != null) ...[
+            Row(
               children: [
-                // Title
-                ShaderMask(
-                  shaderCallback: (bounds) => const LinearGradient(
-                    colors: [Color(0xFFFF6B35), Color(0xFFFFD700)],
-                  ).createShader(bounds),
-                  child: const Text(
-                    'QUIZ BATTLE',
-                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 2),
-                    textAlign: TextAlign.center,
-                  ),
+                Expanded(child: _buildStreakCard()),
+                const SizedBox(width: 12),
+                Expanded(child: _buildQuotaCard()),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _buildStatsRow(),
+            const SizedBox(height: 24),
+          ],
+
+          if (_loading && _homeData == null)
+            const Center(child: Padding(
+              padding: EdgeInsets.all(40),
+              child: CircularProgressIndicator(color: Color(0xFFFF6B35)),
+            )),
+
+          if (_error != null)
+            Center(child: Column(
+              children: [
+                Text(_error!, style: const TextStyle(color: Colors.redAccent)),
+                const SizedBox(height: 8),
+                TextButton(onPressed: _loadHomeData, child: const Text('Retry', style: TextStyle(color: Color(0xFFFF6B35)))),
+              ],
+            )),
+
+          // Play button — disabled when quota exhausted
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: quotaExhausted
+                    ? LinearGradient(colors: [Colors.grey.shade700, Colors.grey.shade600])
+                    : const LinearGradient(colors: [Color(0xFFFF6B35), Color(0xFFFF8F5E)]),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: quotaExhausted
+                    ? []
+                    : [BoxShadow(color: const Color(0xFFFF6B35).withAlpha(100), blurRadius: 20, offset: const Offset(0, 6))],
+              ),
+              child: ElevatedButton.icon(
+                onPressed: quotaExhausted
+                    ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentScreen()))
+                    : () => ref.read(gameStateProvider.notifier).navigateToMatchmaking(),
+                icon: Icon(quotaExhausted ? Icons.lock : Icons.bolt, size: 26),
+                label: Text(
+                  quotaExhausted ? 'UPGRADE TO PLAY' : 'START BATTLE',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 1),
                 ),
-                const SizedBox(height: 20),
-
-                // Profile card
-                _buildProfileCard(auth, gameState),
-                const SizedBox(height: 16),
-
-                // Guest email-link prompt
-                if (gameState.isGuest)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: _buildLinkEmailPrompt(),
-                  ),
-
-                // Streak + Quota row
-                if (_homeData != null) ...[
-                  Row(
-                    children: [
-                      Expanded(child: _buildStreakCard()),
-                      const SizedBox(width: 12),
-                      Expanded(child: _buildQuotaCard()),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  _buildStatsRow(),
-                  const SizedBox(height: 24),
-                ],
-
-                if (_loading && _homeData == null)
-                  const Center(child: Padding(
-                    padding: EdgeInsets.all(40),
-                    child: CircularProgressIndicator(color: Color(0xFFFF6B35)),
-                  )),
-
-                if (_error != null)
-                  Center(child: Column(
-                    children: [
-                      Text(_error!, style: const TextStyle(color: Colors.redAccent)),
-                      const SizedBox(height: 8),
-                      TextButton(onPressed: _loadHomeData, child: const Text('Retry', style: TextStyle(color: Color(0xFFFF6B35)))),
-                    ],
-                  )),
-
-                // Play button
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(colors: [Color(0xFFFF6B35), Color(0xFFFF8F5E)]),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [BoxShadow(color: const Color(0xFFFF6B35).withAlpha(100), blurRadius: 20, offset: const Offset(0, 6))],
-                    ),
-                    child: ElevatedButton.icon(
-                      onPressed: () => ref.read(gameStateProvider.notifier).navigateToMatchmaking(),
-                      icon: const Icon(Icons.bolt, size: 26),
-                      label: const Text('START BATTLE', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 1)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.transparent,
-                        shadowColor: Colors.transparent,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      ),
-                    ),
-                  ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
-                const SizedBox(height: 16),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
 
-                // Action row: History, Premium, Referral
-                Row(
-                  children: [
-                    Expanded(child: _actionButton(Icons.history, 'History', () {
-                      Navigator.push(context, MaterialPageRoute(
-                        builder: (_) => MatchHistoryScreen(currentUserId: gameState.userId ?? ''),
-                      ));
-                    })),
-                    const SizedBox(width: 10),
-                    Expanded(child: _actionButton(Icons.workspace_premium, 'Premium', () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentScreen()));
-                    }, color: const Color(0xFFFFD700))),
-                    const SizedBox(width: 10),
-                    Expanded(child: _actionButton(Icons.share, 'Invite', () {
-                      _showShareDialog(gameState);
-                    })),
-                  ],
-                ),
-                const SizedBox(height: 12),
+          // Action row: History, Premium, Referral
+          Row(
+            children: [
+              Expanded(child: _actionButton(Icons.history, 'History', () {
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => MatchHistoryScreen(currentUserId: gameState.userId ?? ''),
+                ));
+              })),
+              const SizedBox(width: 10),
+              Expanded(child: _actionButton(Icons.workspace_premium, 'Premium', () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentScreen()));
+              }, color: const Color(0xFFFFD700))),
+              const SizedBox(width: 10),
+              Expanded(child: _actionButton(Icons.share, 'Invite', () {
+                _showShareDialog(gameState);
+              })),
+            ],
+          ),
+          const SizedBox(height: 16),
 
-                // Leaderboard preview
-                if (_homeData != null && _homeData!.leaderboardPreview.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(Icons.leaderboard, color: Color(0xFFFFD700), size: 20),
-                      const SizedBox(width: 8),
-                      const Text('Top Players', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  ..._homeData!.leaderboardPreview.map((e) => _leaderboardRow(e)),
-                ],
+          // Premium upsell card (free users only)
+          if (!isPremium && _homeData != null) ...[
+            _buildUpsellCard(),
+            const SizedBox(height: 16),
+          ],
 
-                const SizedBox(height: 24),
-
-                // Logout + Delete
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    TextButton.icon(
-                      onPressed: () async {
-                        await auth.logout();
-                        if (context.mounted) ref.read(gameStateProvider.notifier).logout();
-                      },
-                      icon: const Icon(Icons.logout, size: 16),
-                      label: const Text('Logout'),
-                      style: TextButton.styleFrom(foregroundColor: Colors.white38),
-                    ),
-                    const SizedBox(width: 16),
-                    TextButton.icon(
-                      onPressed: () => _confirmDeleteAccount(auth),
-                      icon: const Icon(Icons.delete_forever, size: 16),
-                      label: const Text('Delete Account'),
-                      style: TextButton.styleFrom(foregroundColor: Colors.redAccent.withAlpha(150)),
-                    ),
-                  ],
+          // Leaderboard preview
+          if (_homeData != null && _homeData!.leaderboardPreview.isNotEmpty) ...[
+            Row(
+              children: [
+                const Icon(Icons.leaderboard, color: Color(0xFFFFD700), size: 20),
+                const SizedBox(width: 8),
+                const Text('Top Players', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () => setState(() => _currentTab = 2),
+                  child: Text('See all', style: TextStyle(color: const Color(0xFFFF6B35).withAlpha(200), fontSize: 13)),
                 ),
               ],
             ),
+            const SizedBox(height: 8),
+            ..._homeData!.leaderboardPreview.take(5).map((e) => _leaderboardRow(e)),
+          ],
+
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Leaderboard tab
+  // ---------------------------------------------------------------------------
+
+  Widget _buildLeaderboardTab() {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+          child: Row(
+            children: [
+              const Icon(Icons.leaderboard, color: Color(0xFFFFD700), size: 28),
+              const SizedBox(width: 10),
+              const Text('Leaderboard', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+            ],
           ),
+        ),
+        if (_loading && _homeData == null)
+          const Expanded(child: Center(child: CircularProgressIndicator(color: Color(0xFFFF6B35)))),
+        if (_homeData != null && _homeData!.leaderboardPreview.isNotEmpty)
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              itemCount: _homeData!.leaderboardPreview.length,
+              itemBuilder: (_, i) => _leaderboardRow(_homeData!.leaderboardPreview[i]),
+            ),
+          ),
+        if (_homeData != null && _homeData!.leaderboardPreview.isEmpty)
+          Expanded(child: Center(child: Text('No leaderboard data yet', style: TextStyle(color: Colors.white.withAlpha(100))))),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Profile tab
+  // ---------------------------------------------------------------------------
+
+  Widget _buildProfileTab(AuthService auth, GameState gameState) {
+    final profile = _homeData?.profile;
+
+    return RefreshIndicator(
+      onRefresh: _loadHomeData,
+      color: const Color(0xFFFF6B35),
+      child: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          const Text('Profile', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 20),
+
+          _buildProfileCard(auth, gameState),
+          const SizedBox(height: 16),
+
+          // Guest email-link prompt
+          if (gameState.isGuest) ...[
+            _buildLinkEmailPrompt(),
+            const SizedBox(height: 16),
+          ],
+
+          // Info rows
+          if (auth.email != null && auth.email!.isNotEmpty)
+            _profileInfoRow(Icons.email, 'Email', auth.email!),
+          if (profile?.referralCode.isNotEmpty == true)
+            _profileInfoRow(Icons.card_giftcard, 'Referral Code', profile!.referralCode),
+
+          const SizedBox(height: 16),
+
+          // Actions
+          _profileActionButton(Icons.history, 'Match History', () {
+            Navigator.push(context, MaterialPageRoute(
+              builder: (_) => MatchHistoryScreen(currentUserId: gameState.userId ?? ''),
+            ));
+          }),
+          const SizedBox(height: 8),
+          _profileActionButton(Icons.workspace_premium, 'Premium', () {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentScreen()));
+          }, color: const Color(0xFFFFD700)),
+          const SizedBox(height: 8),
+          _profileActionButton(Icons.share, 'Invite Friends', () {
+            _showShareDialog(gameState);
+          }),
+
+          const SizedBox(height: 32),
+
+          // Logout + Delete
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TextButton.icon(
+                onPressed: () async {
+                  await auth.logout();
+                  if (context.mounted) ref.read(gameStateProvider.notifier).logout();
+                },
+                icon: const Icon(Icons.logout, size: 16),
+                label: const Text('Logout'),
+                style: TextButton.styleFrom(foregroundColor: Colors.white38),
+              ),
+              const SizedBox(width: 16),
+              TextButton.icon(
+                onPressed: () => _confirmDeleteAccount(auth),
+                icon: const Icon(Icons.delete_forever, size: 16),
+                label: const Text('Delete Account'),
+                style: TextButton.styleFrom(foregroundColor: Colors.redAccent.withAlpha(150)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _profileInfoRow(IconData icon, String label, String value) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withAlpha(6),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.white54, size: 20),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: TextStyle(color: Colors.white.withAlpha(100), fontSize: 11)),
+              Text(value, style: const TextStyle(color: Colors.white, fontSize: 14)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _profileActionButton(IconData icon, String label, VoidCallback onTap, {Color? color}) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: onTap,
+        icon: Icon(icon, size: 18),
+        label: Text(label),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: color ?? Colors.white70,
+          side: BorderSide(color: (color ?? Colors.white).withAlpha(30)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+          alignment: Alignment.centerLeft,
         ),
       ),
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Shared widgets
+  // ---------------------------------------------------------------------------
 
   Widget _actionButton(IconData icon, String label, VoidCallback onTap, {Color? color}) {
     return OutlinedButton(
@@ -349,6 +555,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Cards
+  // ---------------------------------------------------------------------------
+
   Widget _buildProfileCard(AuthService auth, GameState gameState) {
     final profile = _homeData?.profile;
     final name = profile?.displayName.isNotEmpty == true
@@ -376,7 +586,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               backgroundColor: const Color(0xFF1A1145),
               child: profile?.avatarUrl.isNotEmpty == true
                   ? ClipOval(child: Image.network(profile!.avatarUrl, width: 48, height: 48, fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Colors.white, size: 26)))
+                      errorBuilder: (_, e, s) => const Icon(Icons.person, color: Colors.white, size: 26)))
                   : const Icon(Icons.person, color: Colors.white, size: 26),
             ),
           ),
@@ -405,6 +615,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     const SizedBox(width: 3),
                     Text('${profile?.rating ?? gameState.rating}', style: const TextStyle(color: Color(0xFFFFD700), fontSize: 13, fontWeight: FontWeight.w600)),
                     if (profile != null) ...[
+                      const SizedBox(width: 12),
+                      Text('${profile.wins}W/${profile.matchesPlayed - profile.wins}L',
+                        style: TextStyle(color: Colors.white.withAlpha(150), fontSize: 13, fontWeight: FontWeight.w600)),
                       const SizedBox(width: 12),
                       const Icon(Icons.monetization_on, size: 14, color: Color(0xFFFF6B35)),
                       const SizedBox(width: 3),
@@ -470,7 +683,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             Icon(isPremium ? Icons.all_inclusive : Icons.play_circle_outline, color: const Color(0xFF00E5FF), size: 28),
             const SizedBox(height: 4),
             Text(isPremium ? 'Unlimited' : '$remaining/$limit',
-              style: const TextStyle(color: Colors.white, fontSize: isPremium ? 16 : 22, fontWeight: FontWeight.w900)),
+              style: TextStyle(color: Colors.white, fontSize: isPremium ? 16 : 22, fontWeight: FontWeight.w900)),
             Text(isPremium ? 'premium' : 'quizzes left', style: TextStyle(color: Colors.white.withAlpha(120), fontSize: 12)),
           ],
         ),
@@ -483,16 +696,76 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final wins = profile?.wins ?? 0;
     final played = profile?.matchesPlayed ?? 0;
     final losses = played - wins;
+    final streak = profile?.streak.current ?? 0;
+    // Matches today = quotaUsed = quotaLimit - quotaRemaining
+    final matchesToday = (_homeData?.quotaLimit ?? 0) - (_homeData?.quotaRemaining ?? 0);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(color: Colors.white.withAlpha(6), borderRadius: BorderRadius.circular(14)),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _Stat(Icons.emoji_events, '$wins', 'Wins', const Color(0xFF4CAF50)),
           _Stat(Icons.close, '$losses', 'Losses', const Color(0xFFFF5252)),
-          _Stat(Icons.sports_esports, '$played', 'Played', Colors.white70),
+          _Stat(Icons.today, '$matchesToday', 'Today', Colors.white70),
+          _Stat(Icons.local_fire_department, '$streak', 'Streak', const Color(0xFFFF6B35)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUpsellCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [const Color(0xFFFFD700).withAlpha(20), const Color(0xFFFF6B35).withAlpha(15)],
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFFFD700).withAlpha(50)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.workspace_premium, color: Color(0xFFFFD700), size: 24),
+              const SizedBox(width: 10),
+              const Text('Go Premium', style: TextStyle(color: Color(0xFFFFD700), fontSize: 16, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _upsellBenefit(Icons.all_inclusive, 'Unlimited quizzes every day'),
+          _upsellBenefit(Icons.leaderboard, 'Full leaderboard access'),
+          _upsellBenefit(Icons.bolt, 'Priority matchmaking'),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentScreen())),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFFD700),
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              child: const Text('Upgrade Now', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _upsellBenefit(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.white60, size: 16),
+          const SizedBox(width: 8),
+          Text(text, style: const TextStyle(color: Colors.white70, fontSize: 13)),
         ],
       ),
     );
@@ -584,7 +857,7 @@ class _DailyRewardDialogState extends State<_DailyRewardDialog>
           children: [
             AnimatedBuilder(
               animation: _controller,
-              builder: (_, __) => Transform.scale(
+              builder: (context, child) => Transform.scale(
                 scale: _scale.value,
                 child: Container(
                   padding: const EdgeInsets.all(20),
