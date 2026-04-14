@@ -1,6 +1,6 @@
 // This is a generated file - do not edit.
 //
-// Generated from proto/quiz.proto.
+// Generated from quiz.proto.
 
 // @dart = 3.3
 
@@ -989,6 +989,7 @@ const UserProfile$json = {
     },
     {'1': 'referral_code', '3': 12, '4': 1, '5': 9, '10': 'referralCode'},
     {'1': 'is_guest', '3': 13, '4': 1, '5': 8, '10': 'isGuest'},
+    {'1': 'accuracy_percent', '3': 14, '4': 1, '5': 2, '10': 'accuracyPercent'},
   ],
 };
 
@@ -1000,7 +1001,8 @@ final $typed_data.Uint8List userProfileDescriptor = $convert.base64Decode(
     'ABKAVSBnJhdGluZxIlCg5tYXRjaGVzX3BsYXllZBgHIAEoBVINbWF0Y2hlc1BsYXllZBISCgR3'
     'aW5zGAggASgFUgR3aW5zEhIKBHBsYW4YCSABKAlSBHBsYW4SFAoFY29pbnMYCiABKANSBWNvaW'
     '5zEigKBnN0cmVhaxgLIAEoCzIQLnF1aXouU3RyZWFrSW5mb1IGc3RyZWFrEiMKDXJlZmVycmFs'
-    'X2NvZGUYDCABKAlSDHJlZmVycmFsQ29kZRIZCghpc19ndWVzdBgNIAEoCFIHaXNHdWVzdA==');
+    'X2NvZGUYDCABKAlSDHJlZmVycmFsQ29kZRIZCghpc19ndWVzdBgNIAEoCFIHaXNHdWVzdBIpCh'
+    'BhY2N1cmFjeV9wZXJjZW50GA4gASgCUg9hY2N1cmFjeVBlcmNlbnQ=');
 
 @$core.Deprecated('Use claimDailyRewardRequestDescriptor instead')
 const ClaimDailyRewardRequest$json = {

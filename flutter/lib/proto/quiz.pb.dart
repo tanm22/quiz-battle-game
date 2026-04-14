@@ -1,6 +1,6 @@
 // This is a generated file - do not edit.
 //
-// Generated from proto/quiz.proto.
+// Generated from quiz.proto.
 
 // @dart = 3.3
 
@@ -3958,6 +3958,7 @@ class UserProfile extends $pb.GeneratedMessage {
     StreakInfo? streak,
     $core.String? referralCode,
     $core.bool? isGuest,
+    $core.double? accuracyPercent,
   }) {
     final result = create();
     if (userId != null) result.userId = userId;
@@ -3973,6 +3974,7 @@ class UserProfile extends $pb.GeneratedMessage {
     if (streak != null) result.streak = streak;
     if (referralCode != null) result.referralCode = referralCode;
     if (isGuest != null) result.isGuest = isGuest;
+    if (accuracyPercent != null) result.accuracyPercent = accuracyPercent;
     return result;
   }
 
@@ -4003,6 +4005,8 @@ class UserProfile extends $pb.GeneratedMessage {
         subBuilder: StreakInfo.create)
     ..aOS(12, _omitFieldNames ? '' : 'referralCode')
     ..aOB(13, _omitFieldNames ? '' : 'isGuest')
+    ..aD(14, _omitFieldNames ? '' : 'accuracyPercent',
+        fieldType: $pb.PbFieldType.OF)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4142,6 +4146,15 @@ class UserProfile extends $pb.GeneratedMessage {
   $core.bool hasIsGuest() => $_has(12);
   @$pb.TagNumber(13)
   void clearIsGuest() => $_clearField(13);
+
+  @$pb.TagNumber(14)
+  $core.double get accuracyPercent => $_getN(13);
+  @$pb.TagNumber(14)
+  set accuracyPercent($core.double value) => $_setFloat(13, value);
+  @$pb.TagNumber(14)
+  $core.bool hasAccuracyPercent() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearAccuracyPercent() => $_clearField(14);
 }
 
 class ClaimDailyRewardRequest extends $pb.GeneratedMessage {

@@ -693,23 +693,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Widget _buildStatsRow() {
     final profile = _homeData?.profile;
-    final wins = profile?.wins ?? 0;
-    final played = profile?.matchesPlayed ?? 0;
-    final losses = played - wins;
     final streak = profile?.streak.current ?? 0;
+    final accuracy = profile?.accuracyPercent ?? 0.0;
     // Matches today = quotaUsed = quotaLimit - quotaRemaining
     final matchesToday = (_homeData?.quotaLimit ?? 0) - (_homeData?.quotaRemaining ?? 0);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       decoration: BoxDecoration(color: Colors.white.withAlpha(6), borderRadius: BorderRadius.circular(14)),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _Stat(Icons.emoji_events, '$wins', 'Wins', const Color(0xFF4CAF50)),
-          _Stat(Icons.close, '$losses', 'Losses', const Color(0xFFFF5252)),
           _Stat(Icons.today, '$matchesToday', 'Today', Colors.white70),
           _Stat(Icons.local_fire_department, '$streak', 'Streak', const Color(0xFFFF6B35)),
+          _Stat(Icons.track_changes, '${accuracy.toStringAsFixed(0)}%', 'Accuracy', const Color(0xFF00E5FF)),
         ],
       ),
     );

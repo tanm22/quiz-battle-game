@@ -391,19 +391,20 @@ message GoogleSignInResponse {
 }
 
 message UserProfile {
-  string     user_id        = 1;
-  string     username       = 2;
-  string     display_name   = 3;
-  string     email          = 4;
-  string     avatar_url     = 5;
-  int32      rating         = 6;
-  int32      matches_played = 7;
-  int32      wins           = 8;
-  string     plan           = 9;
-  int64      coins          = 10;
-  StreakInfo  streak         = 11;
-  string     referral_code  = 12;
-  bool       is_guest       = 13;
+  string     user_id          = 1;
+  string     username         = 2;
+  string     display_name     = 3;
+  string     email            = 4;
+  string     avatar_url       = 5;
+  int32      rating           = 6;
+  int32      matches_played   = 7;
+  int32      wins             = 8;
+  string     plan             = 9;
+  int64      coins            = 10;
+  StreakInfo  streak           = 11;
+  string     referral_code    = 12;
+  bool       is_guest         = 13;
+  float      accuracy_percent = 14; // lifetime accuracy: correct_answers / total_answers * 100
 }
 
 // ---------------------------------------------------------------------------

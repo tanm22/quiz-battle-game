@@ -52,8 +52,10 @@ type User struct {
 	FCMTokens     []string   `bson:"fcmTokens,omitempty"`
 	ReferralCode  string     `bson:"referralCode,omitempty"`
 	ReferredBy    string     `bson:"referredBy,omitempty"`
-	Streak        Streak     `bson:"streak"`
-	CreatedAt     int64      `bson:"createdAt"`
+	Streak         Streak     `bson:"streak"`
+	CorrectAnswers int32      `bson:"correctAnswers"`
+	TotalAnswers   int32      `bson:"totalAnswers"`
+	CreatedAt      int64      `bson:"createdAt"`
 }
 
 // Payment is the MongoDB document in the payments collection.

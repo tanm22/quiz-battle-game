@@ -335,25 +335,31 @@ func (s *scoringServer) GetHomeScreenData(ctx context.Context, _ *pb.GetHomeScre
 		quotaLimit = 999 // unlimited
 	}
 
+	var accuracy float32
+	if user.TotalAnswers > 0 {
+		accuracy = float32(user.CorrectAnswers) / float32(user.TotalAnswers) * 100
+	}
+
 	return &pb.GetHomeScreenDataResponse{
 		Profile: &pb.UserProfile{
-			UserId:        user.ID,
-			Username:      user.Username,
-			DisplayName:   user.DisplayName,
-			Email:         user.Email,
-			AvatarUrl:     user.AvatarUrl,
-			Rating:        user.Rating,
-			MatchesPlayed: user.MatchesPlayed,
-			Wins:          user.Wins,
-			Plan:          user.Plan,
-			Coins:         user.Coins,
+			UserId:          user.ID,
+			Username:        user.Username,
+			DisplayName:     user.DisplayName,
+			Email:           user.Email,
+			AvatarUrl:       user.AvatarUrl,
+			Rating:          user.Rating,
+			MatchesPlayed:   user.MatchesPlayed,
+			Wins:            user.Wins,
+			Plan:            user.Plan,
+			Coins:           user.Coins,
 			Streak: &pb.StreakInfo{
 				Current:         int32(user.Streak.Current),
 				Longest:         int32(user.Streak.Longest),
 				LastClaimedDate: user.Streak.LastClaimedDate,
 			},
-			ReferralCode: user.ReferralCode,
-			IsGuest:      user.IsGuest,
+			ReferralCode:    user.ReferralCode,
+			IsGuest:         user.IsGuest,
+			AccuracyPercent: accuracy,
 		},
 		QuotaRemaining:    int32(int64(quotaLimit) - quotaUsed),
 		QuotaLimit:        quotaLimit,
@@ -654,6 +660,8 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 
 	// Compute per-player stats from answer records in Redis
 	players := make([]bson.M, 0, len(entries))
+	playerCorrect := make(map[string]int32)
+	playerTotal := make(map[string]int32)
 	var winner string
 	for i, e := range entries {
 		userID := e.Member.(string)
@@ -700,6 +708,9 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 		if answeredRounds > 0 {
 			avgResponseTimeMs = float64(totalResponseMs) / float64(answeredRounds)
 		}
+
+		playerCorrect[userID] = int32(answersCorrect)
+		playerTotal[userID] = int32(answeredRounds)
 
 		players = append(players, bson.M{
 			"userId":            userID,
@@ -804,7 +815,12 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 		}
 		delta := int32(math.Round(K * (actual - avgExpected)))
 
-		update := bson.M{"$inc": bson.M{"matchesPlayed": 1, "rating": delta}}
+		update := bson.M{"$inc": bson.M{
+			"matchesPlayed":  1,
+			"rating":         delta,
+			"correctAnswers": playerCorrect[userID],
+			"totalAnswers":   playerTotal[userID],
+		}}
 		if isWinner {
 			update["$inc"].(bson.M)["wins"] = 1
 		}

@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.1
 // - protoc             v4.25.1
-// source: proto/quiz.proto
+// source: quiz.proto
 
 package proto
 
@@ -197,7 +197,7 @@ var MatchmakingService_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "proto/quiz.proto",
+	Metadata: "quiz.proto",
 }
 
 const (
@@ -457,7 +457,7 @@ var QuizService_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "proto/quiz.proto",
+	Metadata: "quiz.proto",
 }
 
 const (
@@ -789,7 +789,7 @@ var ScoringService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "proto/quiz.proto",
+	Metadata: "quiz.proto",
 }
 
 const (
@@ -1387,7 +1387,7 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "proto/quiz.proto",
+	Metadata: "quiz.proto",
 }
 
 const (
@@ -1565,5 +1565,5 @@ var PaymentService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "proto/quiz.proto",
+	Metadata: "quiz.proto",
 }

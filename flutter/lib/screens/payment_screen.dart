@@ -1,3 +1,4 @@
+import 'package:fixnum/fixnum.dart';
 import 'package:flutter/material.dart';
 import 'package:grpc/grpc.dart';
 import '../services/quiz_service.dart';
@@ -14,7 +15,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
   String _selectedPlan = 'monthly';
   bool _loading = false;
   String? _currentPlan;
-  int64? _expiresAt;
+  Int64? _expiresAt;
 
   @override
   void initState() {
@@ -51,7 +52,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       // For now, show the order details
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Order created: ${resp.orderId} (${resp.amount / 100} ${resp.currency})'),
+          content: Text('Order created: ${resp.orderId} (${resp.amount.toInt() / 100} ${resp.currency})'),
           backgroundColor: Colors.green,
           behavior: SnackBarBehavior.floating,
         ),
@@ -101,9 +102,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     const Icon(Icons.workspace_premium, size: 48, color: Colors.white),
                     const SizedBox(height: 8),
                     const Text('You are Premium!', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-                    if (_expiresAt != null && _expiresAt! > 0)
+                    if (_expiresAt != null && _expiresAt! > Int64.ZERO)
                       Text(
-                        'Expires: ${DateTime.fromMillisecondsSinceEpoch(_expiresAt! * 1000).toString().split(' ')[0]}',
+                        'Expires: ${DateTime.fromMillisecondsSinceEpoch(_expiresAt!.toInt() * 1000).toString().split(' ')[0]}',
                         style: const TextStyle(color: Colors.white70, fontSize: 14),
                       ),
                   ],
