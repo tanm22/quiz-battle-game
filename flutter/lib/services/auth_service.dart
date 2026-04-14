@@ -1,3 +1,4 @@
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:grpc/grpc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../proto/quiz.pbgrpc.dart';
@@ -21,6 +22,11 @@ class AuthService {
   int _wins = 0;
 
   static const _backendHost = String.fromEnvironment('BACKEND_HOST', defaultValue: 'localhost');
+  // Web (server) client ID — used on Android to request an idToken, and by the backend to verify it.
+  // Pass via --dart-define=GOOGLE_SERVER_CLIENT_ID=...
+  static const _googleServerClientId = String.fromEnvironment('GOOGLE_SERVER_CLIENT_ID');
+  // iOS client ID — pass via --dart-define=GOOGLE_IOS_CLIENT_ID=...
+  static const _googleIosClientId = String.fromEnvironment('GOOGLE_IOS_CLIENT_ID');
 
   AuthService._internal() {
     _channel = ClientChannel(
@@ -125,6 +131,44 @@ class AuthService {
     _wins = resp.wins;
     if (resp.email.isNotEmpty) _email = resp.email;
     await _saveToPrefs();
+  }
+
+  Future<GoogleSignInResponse> signInWithGoogle({String? referralCode}) async {
+    final googleSignIn = GoogleSignIn(
+      serverClientId: _googleServerClientId.isNotEmpty ? _googleServerClientId : null,
+      clientId: _googleIosClientId.isNotEmpty ? _googleIosClientId : null,
+      scopes: ['email'],
+    );
+
+    final account = await googleSignIn.signIn();
+    if (account == null) {
+      throw Exception('Google sign-in was cancelled');
+    }
+
+    final authentication = await account.authentication;
+    final idToken = authentication.idToken;
+    if (idToken == null) {
+      throw Exception('Failed to obtain Google ID token');
+    }
+
+    final req = GoogleSignInRequest()..idToken = idToken;
+    if (referralCode != null && referralCode.isNotEmpty) {
+      req.referralCode = referralCode;
+    }
+
+    final resp = await _client.googleSignIn(req, options: _opts());
+    final profile = resp.userProfile;
+    _token = resp.token;
+    _userId = profile.userId;
+    _username = profile.username;
+    _email = profile.email;
+    _isGuest = false;
+    _rating = profile.rating;
+    _matchesPlayed = profile.matchesPlayed;
+    _wins = profile.wins;
+    await _saveToPrefs();
+
+    return resp;
   }
 
   Future<void> sendEmailCode(String email, String purpose) async {
@@ -242,6 +286,7 @@ class AuthService {
   }
 
   Future<void> logout() async {
+    try { await GoogleSignIn().signOut(); } catch (_) {}
     _token = null;
     _userId = null;
     _username = null;

@@ -98,6 +98,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     );
   }
 
+  Future<void> _googleSignIn() async {
+    setState(() => _isLoading = true);
+    try {
+      final auth = AuthService();
+      await auth.signInWithGoogle();
+      _navigateToMatchmaking(auth);
+    } on GrpcError catch (e) {
+      _showError(e.message ?? 'Google sign-in failed');
+    } catch (e) {
+      final msg = e.toString();
+      if (!msg.contains('cancelled')) _showError(msg);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   Future<void> _guestLogin() async {
     setState(() => _isLoading = true);
     try {
@@ -387,6 +403,39 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   ),
                   const SizedBox(height: 36),
 
+                  // Google Sign-In — primary auth
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton.icon(
+                      onPressed: _isLoading ? null : _googleSignIn,
+                      icon: Container(
+                        width: 24, height: 24,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Center(
+                          child: Text('G', style: TextStyle(
+                            color: Color(0xFF4285F4),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                            height: 1,
+                          )),
+                        ),
+                      ),
+                      label: const Text('Sign in with Google', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black87,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        elevation: 2,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
                   // Guest login
                   SizedBox(
                     width: double.infinity,
@@ -409,7 +458,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       Expanded(child: Divider(color: Colors.white.withAlpha(40))),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text('or sign in', style: TextStyle(color: Colors.white.withAlpha(80))),
+                        child: Text('or use credentials', style: TextStyle(color: Colors.white.withAlpha(80))),
                       ),
                       Expanded(child: Divider(color: Colors.white.withAlpha(40))),
                     ],
