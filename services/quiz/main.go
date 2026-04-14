@@ -68,11 +68,15 @@ func (s *quizServer) getSeqCounter(roomID string) *atomic.Int64 {
 	return val.(*atomic.Int64)
 }
 
+// freeTopics is the subset of question topics available to free-tier users.
+// Premium users get all topics (no filter applied).
+var freeTopics = []string{"science", "history", "geography"}
+
 // ---------------------------------------------------------------------------
 // 42. selectQuestions — weighted random pick from MongoDB
 // ---------------------------------------------------------------------------
 
-func (s *quizServer) selectQuestions(ctx context.Context) ([]Question, error) {
+func (s *quizServer) selectQuestions(ctx context.Context, allowedTopics []string) ([]Question, error) {
 	coll := s.mongoDB.Collection("questions")
 
 	// Weighted distribution: ~30% easy (1), ~50% medium (3), ~20% hard (1) = 5 questions
@@ -86,7 +90,20 @@ func (s *quizServer) selectQuestions(ctx context.Context) ([]Question, error) {
 
 		// Build filter: match difficulty, exclude last topic to prevent adjacent repeats
 		filter := bson.M{"difficulty": diff}
-		if lastTopic != "" {
+		if len(allowedTopics) > 0 {
+			if lastTopic != "" {
+				// Intersect: allowed topics minus lastTopic
+				filtered := make([]string, 0, len(allowedTopics))
+				for _, t := range allowedTopics {
+					if t != lastTopic {
+						filtered = append(filtered, t)
+					}
+				}
+				filter["topic"] = bson.M{"$in": filtered}
+			} else {
+				filter["topic"] = bson.M{"$in": allowedTopics}
+			}
+		} else if lastTopic != "" {
 			filter["topic"] = bson.M{"$ne": lastTopic}
 		}
 
@@ -170,8 +187,31 @@ func (s *quizServer) consumeMatchCreated(ctx context.Context) {
 
 			log.Printf("[quiz] match.created for room %s with players %v", event.RoomID, event.PlayerIDs)
 
+			// Determine allowed topics based on player plans.
+			// If any player is free, restrict to free topics for fairness.
+			var allowedTopics []string
+			allPremium := true
+			for _, pid := range event.PlayerIDs {
+				p, _ := keys.GetPlan(ctx, s.rdb, pid)
+				if p == "" {
+					var doc bson.M
+					if s.mongoDB.Collection("users").FindOne(ctx, bson.M{"_id": pid}).Decode(&doc) == nil {
+						if pl, ok := doc["plan"].(string); ok {
+							p = pl
+						}
+					}
+				}
+				if p != "premium" {
+					allPremium = false
+					break
+				}
+			}
+			if !allPremium {
+				allowedTopics = freeTopics
+			}
+
 			// Select questions and store in Redis
-			questions, err := s.selectQuestions(ctx)
+			questions, err := s.selectQuestions(ctx, allowedTopics)
 			if err != nil {
 				log.Printf("[quiz] selectQuestions error: %v", err)
 				msg.Nack(false, true) // requeue
@@ -365,14 +405,21 @@ func (s *quizServer) finishMatch(ctx context.Context, roomID string, totalRounds
 			winner = userID
 		}
 
-		// Resolve real username from Redis player info or fall back to userId
+		// Resolve real username + plan from Redis player info
 		username := userID
+		pPlan := "free"
 		if playerJSON, err := keys.GetPlayer(ctx, s.rdb, roomID, userID); err == nil {
 			var info struct {
 				Username string `json:"username"`
+				Plan     string `json:"plan"`
 			}
-			if json.Unmarshal([]byte(playerJSON), &info) == nil && info.Username != "" {
-				username = info.Username
+			if json.Unmarshal([]byte(playerJSON), &info) == nil {
+				if info.Username != "" {
+					username = info.Username
+				}
+				if info.Plan != "" {
+					pPlan = info.Plan
+				}
 			}
 		}
 
@@ -381,6 +428,7 @@ func (s *quizServer) finishMatch(ctx context.Context, roomID string, totalRounds
 			Username:   username,
 			FinalScore: e.Score,
 			Rank:       int32(i + 1),
+			Plan:       pPlan,
 		})
 	}
 
@@ -486,12 +534,19 @@ func (s *quizServer) sendStateSnapshot(ctx context.Context, roomID string, strea
 		for i, e := range entries {
 			userID := e.Member.(string)
 			username := userID
+			ePlan := "free"
 			if playerJSON, err := keys.GetPlayer(ctx, s.rdb, roomID, userID); err == nil {
 				var info struct {
 					Username string `json:"username"`
+					Plan     string `json:"plan"`
 				}
-				if json.Unmarshal([]byte(playerJSON), &info) == nil && info.Username != "" {
-					username = info.Username
+				if json.Unmarshal([]byte(playerJSON), &info) == nil {
+					if info.Username != "" {
+						username = info.Username
+					}
+					if info.Plan != "" {
+						ePlan = info.Plan
+					}
 				}
 			}
 			lbEntries = append(lbEntries, &pb.LeaderboardEntry{
@@ -499,6 +554,7 @@ func (s *quizServer) sendStateSnapshot(ctx context.Context, roomID string, strea
 				Username: username,
 				Score:    e.Score,
 				Rank:     int32(i + 1),
+				Plan:     ePlan,
 			})
 		}
 		stream.Send(&pb.GameEvent{
@@ -577,12 +633,19 @@ func (s *quizServer) StreamGameEvents(req *pb.StreamGameEventsRequest, stream pb
 
 	// Broadcast PlayerJoined to existing players in the room
 	username := userID
+	playerPlan := "free"
 	if playerJSON, err := keys.GetPlayer(stream.Context(), s.rdb, req.RoomId, userID); err == nil {
 		var info struct {
 			Username string `json:"username"`
+			Plan     string `json:"plan"`
 		}
-		if json.Unmarshal([]byte(playerJSON), &info) == nil && info.Username != "" {
-			username = info.Username
+		if json.Unmarshal([]byte(playerJSON), &info) == nil {
+			if info.Username != "" {
+				username = info.Username
+			}
+			if info.Plan != "" {
+				playerPlan = info.Plan
+			}
 		}
 	}
 	seq := s.getSeqCounter(req.RoomId).Add(1)
@@ -592,6 +655,7 @@ func (s *quizServer) StreamGameEvents(req *pb.StreamGameEventsRequest, stream pb
 			PlayerJoined: &pb.PlayerJoined{
 				UserId:   userID,
 				Username: username,
+				Plan:     playerPlan,
 			},
 		},
 	})
@@ -981,17 +1045,24 @@ func (s *quizServer) consumeLeaderboardUpdated(ctx context.Context) {
 				continue
 			}
 
-			// Build LeaderboardUpdate GameEvent with resolved usernames
+			// Build LeaderboardUpdate GameEvent with resolved usernames + plan
 			entries := make([]*pb.LeaderboardEntry, 0, len(event.Entries))
 			for i, e := range event.Entries {
 				userID := fmt.Sprintf("%v", e.Member)
 				username := userID
+				entryPlan := "free"
 				if playerJSON, err := keys.GetPlayer(ctx, s.rdb, event.RoomID, userID); err == nil {
 					var info struct {
 						Username string `json:"username"`
+						Plan     string `json:"plan"`
 					}
-					if json.Unmarshal([]byte(playerJSON), &info) == nil && info.Username != "" {
-						username = info.Username
+					if json.Unmarshal([]byte(playerJSON), &info) == nil {
+						if info.Username != "" {
+							username = info.Username
+						}
+						if info.Plan != "" {
+							entryPlan = info.Plan
+						}
 					}
 				}
 				entries = append(entries, &pb.LeaderboardEntry{
@@ -999,6 +1070,7 @@ func (s *quizServer) consumeLeaderboardUpdated(ctx context.Context) {
 					Username: username,
 					Score:    e.Score,
 					Rank:     int32(i + 1),
+					Plan:     entryPlan,
 				})
 			}
 

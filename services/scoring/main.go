@@ -133,14 +133,21 @@ func (s *scoringServer) GetLeaderboard(ctx context.Context, req *pb.GetLeaderboa
 	pbEntries := make([]*pb.LeaderboardEntry, len(entries))
 	for i, e := range entries {
 		userID := e.Member.(string)
-		// Resolve real username from Redis player info
+		// Resolve real username + plan from Redis player info
 		username := userID
+		ePlan := "free"
 		if playerJSON, err := keys.GetPlayer(ctx, s.rdb, req.RoomId, userID); err == nil {
 			var info struct {
 				Username string `json:"username"`
+				Plan     string `json:"plan"`
 			}
-			if json.Unmarshal([]byte(playerJSON), &info) == nil && info.Username != "" {
-				username = info.Username
+			if json.Unmarshal([]byte(playerJSON), &info) == nil {
+				if info.Username != "" {
+					username = info.Username
+				}
+				if info.Plan != "" {
+					ePlan = info.Plan
+				}
 			}
 		}
 		pbEntries[i] = &pb.LeaderboardEntry{
@@ -148,6 +155,7 @@ func (s *scoringServer) GetLeaderboard(ctx context.Context, req *pb.GetLeaderboa
 			Username: username,
 			Score:    e.Score,
 			Rank:     int32(i + 1),
+			Plan:     ePlan,
 		}
 	}
 
@@ -312,11 +320,16 @@ func (s *scoringServer) GetHomeScreenData(ctx context.Context, _ *pb.GetHomeScre
 			if r, ok := u["rating"].(int32); ok {
 				rating = r
 			}
+			uplan, _ := u["plan"].(string)
+			if uplan == "" {
+				uplan = "free"
+			}
 			lbPreview = append(lbPreview, &pb.LeaderboardEntry{
 				UserId:   uid,
 				Username: uname,
 				Score:    float64(rating),
 				Rank:     rank,
+				Plan:     uplan,
 			})
 			rank++
 		}
@@ -365,6 +378,150 @@ func (s *scoringServer) GetHomeScreenData(ctx context.Context, _ *pb.GetHomeScre
 		QuotaLimit:        quotaLimit,
 		LeaderboardPreview: lbPreview,
 	}, nil
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3: GetGlobalLeaderboard — time-filtered, plan-gated
+// ---------------------------------------------------------------------------
+
+func (s *scoringServer) GetGlobalLeaderboard(ctx context.Context, req *pb.GetGlobalLeaderboardRequest) (*pb.GetGlobalLeaderboardResponse, error) {
+	userID, err := auth.UserIDFromContext(ctx)
+	if err != nil {
+		return nil, status.Error(codes.Unauthenticated, "not authenticated")
+	}
+
+	// Get user plan for result limiting
+	plan, _ := keys.GetPlan(ctx, s.rdb, userID)
+	if plan == "" {
+		var doc bson.M
+		if err := s.mongoDB.Collection("users").FindOne(ctx, bson.M{"_id": userID}).Decode(&doc); err == nil {
+			if p, ok := doc["plan"].(string); ok {
+				plan = p
+			}
+		}
+		if plan == "" {
+			plan = "free"
+		}
+		keys.SetPlan(ctx, s.rdb, userID, plan)
+	}
+
+	limit := int64(3)
+	if plan == "premium" {
+		limit = 50
+	}
+
+	filter := req.TimeFilter
+	if filter == "" {
+		filter = "alltime"
+	}
+
+	var entries []*pb.LeaderboardEntry
+
+	switch filter {
+	case "daily", "weekly":
+		// Aggregate wins from match_history within time window
+		var since time.Time
+		now := time.Now()
+		if filter == "daily" {
+			since = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+		} else {
+			// Start of current week (Monday)
+			weekday := int(now.Weekday())
+			if weekday == 0 {
+				weekday = 7
+			}
+			since = time.Date(now.Year(), now.Month(), now.Day()-(weekday-1), 0, 0, 0, 0, now.Location())
+		}
+
+		pipeline := mongo.Pipeline{
+			{{Key: "$match", Value: bson.M{"createdAt": bson.M{"$gte": since}}}},
+			{{Key: "$unwind", Value: "$players"}},
+			{{Key: "$group", Value: bson.M{
+				"_id":        "$players.userId",
+				"username":   bson.M{"$last": "$players.username"},
+				"totalScore": bson.M{"$sum": "$players.finalScore"},
+				"wins":       bson.M{"$sum": bson.M{"$cond": bson.A{bson.M{"$eq": bson.A{"$winner", "$players.userId"}}, 1, 0}}},
+			}}},
+			{{Key: "$sort", Value: bson.D{{Key: "totalScore", Value: -1}}}},
+			{{Key: "$limit", Value: limit}},
+		}
+
+		cursor, err := s.mongoDB.Collection("match_history").Aggregate(ctx, pipeline)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "aggregation failed: %v", err)
+		}
+		defer cursor.Close(ctx)
+
+		rank := int32(1)
+		for cursor.Next(ctx) {
+			var doc struct {
+				UserID     string  `bson:"_id"`
+				Username   string  `bson:"username"`
+				TotalScore float64 `bson:"totalScore"`
+			}
+			if cursor.Decode(&doc) != nil {
+				continue
+			}
+			// Resolve plan for badge display
+			userPlan := "free"
+			if p, err := keys.GetPlan(ctx, s.rdb, doc.UserID); err == nil && p != "" {
+				userPlan = p
+			} else {
+				var u bson.M
+				if s.mongoDB.Collection("users").FindOne(ctx, bson.M{"_id": doc.UserID}).Decode(&u) == nil {
+					if p, ok := u["plan"].(string); ok && p != "" {
+						userPlan = p
+					}
+				}
+			}
+			entries = append(entries, &pb.LeaderboardEntry{
+				UserId:   doc.UserID,
+				Username: doc.Username,
+				Score:    doc.TotalScore,
+				Rank:     rank,
+				Plan:     userPlan,
+			})
+			rank++
+		}
+
+	default: // alltime — by rating
+		cursor, err := s.mongoDB.Collection("users").Find(ctx,
+			bson.M{},
+			options.Find().SetSort(bson.D{{Key: "rating", Value: -1}}).SetLimit(limit),
+		)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "query failed: %v", err)
+		}
+		defer cursor.Close(ctx)
+
+		rank := int32(1)
+		for cursor.Next(ctx) {
+			var u bson.M
+			if cursor.Decode(&u) != nil {
+				continue
+			}
+			uid, _ := u["_id"].(string)
+			uname, _ := u["username"].(string)
+			rating := int32(1200)
+			if r, ok := u["rating"].(int32); ok {
+				rating = r
+			}
+			userPlan, _ := u["plan"].(string)
+			if userPlan == "" {
+				userPlan = "free"
+			}
+			entries = append(entries, &pb.LeaderboardEntry{
+				UserId:   uid,
+				Username: uname,
+				Score:    float64(rating),
+				Rank:     rank,
+				Plan:     userPlan,
+			})
+			rank++
+		}
+	}
+
+	return &pb.GetGlobalLeaderboardResponse{Entries: entries}, nil
 }
 
 // ---------------------------------------------------------------------------
