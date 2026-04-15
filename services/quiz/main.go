@@ -863,16 +863,21 @@ func (s *quizServer) tournamentReminderTicker(ctx context.Context) {
 					}
 				}
 
-				payload, _ := json.Marshal(map[string]interface{}{
-					"event":            "notif.tournament.remind",
-					"userIds":          userIDs,
-					"tournamentName":   tourName,
-					"startsInMinutes":  30,
-				})
-				s.amqpCh.PublishWithContext(ctx, "sx", "notif.tournament.remind", false, false, amqp.Publishing{
-					ContentType: "application/json",
-					Body:        payload,
-				})
+				// Fan out: one message per participant. Keeps the notification
+				// worker per-user (no implicit fan-out inside the consumer) and
+				// keeps payloads uniform across all notif.* events.
+				for _, uid := range userIDs {
+					payload, _ := json.Marshal(map[string]interface{}{
+						"event":           "notif.tournament.remind",
+						"userId":          uid,
+						"tournamentName":  tourName,
+						"startsInMinutes": 30,
+					})
+					s.amqpCh.PublishWithContext(ctx, "sx", "notif.tournament.remind", false, false, amqp.Publishing{
+						ContentType: "application/json",
+						Body:        payload,
+					})
+				}
 
 				s.mongoDB.Collection("tournaments").UpdateOne(ctx,
 					bson.M{"_id": doc["_id"]},
