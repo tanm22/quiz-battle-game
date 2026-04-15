@@ -1120,10 +1120,16 @@ func (s *scoringServer) consumePaymentCaptured(ctx context.Context) {
 			}
 			expiresAt := base.Add(duration)
 
-			// Upgrade user plan in MongoDB
+			// Upgrade user plan in MongoDB. Clear premiumExpiryWarned so the
+			// payment service's pre-warning worker will fire again against the
+			// new (extended) expiry date — otherwise a renewing user would
+			// never be reminded about the new expiry.
 			_, err := s.mongoDB.Collection("users").UpdateOne(ctx,
 				bson.M{"_id": event.UserID},
-				bson.M{"$set": bson.M{"plan": "premium", "planExpiresAt": expiresAt}},
+				bson.M{
+					"$set":   bson.M{"plan": "premium", "planExpiresAt": expiresAt},
+					"$unset": bson.M{"premiumExpiryWarned": ""},
+				},
 			)
 			if err != nil {
 				log.Printf("[payment-consumer] plan upgrade failed for %s: %v", event.UserID, err)

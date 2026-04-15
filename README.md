@@ -71,6 +71,7 @@ notification service runs in stub mode (logs only). See
 | `notif.daily.reward` | Auth (cron) | Notification | FCM push: unclaimed reward |
 | `notif.tournament.remind` | Quiz (ticker) | Notification | FCM push: tournament starting soon |
 | `notif.premium.activated` | Scoring | Notification | FCM push: plan upgraded |
+| `notif.premium.expiry` | Payment (cron) | Notification | FCM push: 3-day pre-warning before plan expiry |
 | `premium.expired` | Payment (cron) | Notification | FCM push: plan downgraded |
 
 ## Redis Key Schema

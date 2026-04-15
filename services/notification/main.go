@@ -246,6 +246,12 @@ func buildMessage(event string, payload map[string]any) (string, string, map[str
 			"Your premium plan has ended. Renew to keep unlimited access.",
 			data
 
+	case "notif.premium.expiry":
+		// 3-day pre-warning fired by payment service's expiry-warning worker.
+		return "⏳ Premium expires soon",
+			"Your premium plan ends in 3 days. Renew now to keep unlimited access.",
+			data
+
 	case "notif.daily.reward":
 		return "🎁 Your daily reward is ready",
 			"Claim your daily coins before midnight.",

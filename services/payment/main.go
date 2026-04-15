@@ -386,10 +386,14 @@ func (s *paymentServer) checkExpiredPlans(ctx context.Context) {
 			continue
 		}
 
-		// Downgrade to free
+		// Downgrade to free. Also clear premiumExpiryWarned so a future
+		// re-subscription can receive a fresh 3-day pre-warning.
 		s.mongoDB.Collection("users").UpdateOne(ctx,
 			bson.M{"_id": userID},
-			bson.M{"$set": bson.M{"plan": "free", "planExpiresAt": nil}},
+			bson.M{
+				"$set":   bson.M{"plan": "free", "planExpiresAt": nil},
+				"$unset": bson.M{"premiumExpiryWarned": ""},
+			},
 		)
 		// Invalidate Redis cache
 		keys.DelPlan(ctx, s.rdb, userID)
@@ -404,6 +408,112 @@ func (s *paymentServer) checkExpiredPlans(ctx context.Context) {
 			log.Printf("[payment] failed to publish expiry for user %s: %v", userID, err)
 		}
 		log.Printf("[payment] downgraded user %s from premium to free", userID)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Background: Premium expiry 3-day pre-warning worker (24-hour ticker)
+// ---------------------------------------------------------------------------
+
+// premiumExpiryWarningWorker runs once a day and emits notif.premium.expiry for
+// users whose planExpiresAt is ~3 days out. Each user is warned at most once
+// per plan — the premiumExpiryWarned flag is set here and cleared on upgrade
+// (scoring service) or downgrade (checkExpiredPlans) so renewals get a fresh
+// warning cycle.
+//
+// Window (71h..73h) is narrower than the ticker interval (24h). With the
+// premiumExpiryWarned dedupe flag in place, a wider window would cause the
+// same user to match for multiple consecutive days — the flag short-circuits
+// repeats, but the extra Mongo scans are wasted work. If the service restarts
+// right as a user's expiry is crossing the window, they may be missed; that's
+// acceptable because the pre-warning is a non-critical nudge (the actual
+// downgrade still happens on time via planExpiryWorker).
+func (s *paymentServer) premiumExpiryWarningWorker(ctx context.Context) {
+	// Initial sweep after a short delay so RabbitMQ declarations and Mongo
+	// indexes have time to settle before we start scanning users.
+	initialDelay := time.NewTimer(30 * time.Second)
+	defer initialDelay.Stop()
+	select {
+	case <-ctx.Done():
+		return
+	case <-initialDelay.C:
+		s.sendPremiumExpiryWarnings(ctx)
+	}
+
+	ticker := time.NewTicker(24 * time.Hour)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			s.sendPremiumExpiryWarnings(ctx)
+		}
+	}
+}
+
+func (s *paymentServer) sendPremiumExpiryWarnings(ctx context.Context) {
+	now := time.Now()
+	windowStart := now.Add(71 * time.Hour)
+	windowEnd := now.Add(73 * time.Hour)
+
+	cursor, err := s.mongoDB.Collection("users").Find(ctx, bson.M{
+		"plan": "premium",
+		"planExpiresAt": bson.M{
+			"$gte": windowStart,
+			"$lte": windowEnd,
+		},
+		"premiumExpiryWarned": bson.M{"$ne": true},
+	})
+	if err != nil {
+		log.Printf("[payment] expiry-warning query error: %v", err)
+		return
+	}
+	defer cursor.Close(ctx)
+
+	count := 0
+	for cursor.Next(ctx) {
+		var user bson.M
+		if err := cursor.Decode(&user); err != nil {
+			continue
+		}
+		userID, ok := user["_id"].(string)
+		if !ok {
+			continue
+		}
+		expiresAt, _ := user["planExpiresAt"].(time.Time)
+
+		// Mark warned BEFORE publishing — on publish failure we miss one
+		// user on the next tick rather than risking duplicate sends.
+		if _, err := s.mongoDB.Collection("users").UpdateOne(ctx,
+			bson.M{"_id": userID},
+			bson.M{"$set": bson.M{"premiumExpiryWarned": true}},
+		); err != nil {
+			log.Printf("[payment] failed to mark user %s as warned: %v", userID, err)
+			continue
+		}
+
+		eventJSON, _ := json.Marshal(map[string]interface{}{
+			"event":     "notif.premium.expiry",
+			"userId":    userID,
+			"expiresAt": expiresAt.Format(time.RFC3339),
+			"timestamp": now.Format(time.RFC3339),
+		})
+		if err := s.publish(ctx, "notif.premium.expiry", eventJSON); err != nil {
+			log.Printf("[payment] failed to publish expiry warning for user %s: %v", userID, err)
+			// Roll back the warned flag so the next tick retries this user.
+			s.mongoDB.Collection("users").UpdateOne(ctx,
+				bson.M{"_id": userID},
+				bson.M{"$unset": bson.M{"premiumExpiryWarned": ""}},
+			)
+			continue
+		}
+		count++
+		log.Printf("[payment] queued premium expiry warning for user %s (expires %s)",
+			userID, expiresAt.Format(time.RFC3339))
+	}
+	if count > 0 {
+		log.Printf("[payment] sent %d premium expiry warning(s)", count)
 	}
 }
 
@@ -502,8 +612,10 @@ func main() {
 		webhookSecret:  os.Getenv("RAZORPAY_WEBHOOK_SECRET"),
 	}
 
-	// Background: plan expiry worker
+	// Background: plan expiry worker (downgrade on expiry)
 	go srv.planExpiryWorker(ctx)
+	// Background: 3-day premium expiry pre-warning worker
+	go srv.premiumExpiryWarningWorker(ctx)
 
 	// gRPC server on :50055
 	grpcServer := grpc.NewServer(
