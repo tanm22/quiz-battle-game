@@ -20,6 +20,12 @@ flutter/.flutter-plugins
 # Misc
 .DS_Store
 
+# Claude Code local project state (settings, logs, etc.)
+.claude/
+
+# Stray duplicate of CLAUDE.md (created by double-download with " (1)" suffix)
+CLAUDE (1).md
+
 # Firebase Admin SDK service-account key (real credentials — never commit).
 # The committed secrets/firebase-admin.example.json is a reference template.
 secrets/firebase-admin.json
