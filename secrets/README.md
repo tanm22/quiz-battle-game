@@ -1,20 +1,27 @@
 # secrets/
 
-Runtime secrets mounted read-only into service containers.
+Runtime secrets mounted read-only into service containers. The whole
+directory is bind-mounted to `/run/secrets` in the notification container.
 
-## firebase-admin.json
+## firebase-admin.json (real key — gitignored)
 
-The notification service (Go) reads this as a Firebase Admin SDK service
-account to deliver FCM pushes. The file checked into git is a **placeholder**
-— replace it with a real service account JSON to enable push delivery.
+The notification service reads this as a Firebase Admin SDK service account
+to deliver FCM pushes. It is **not** committed — `.gitignore` excludes
+`secrets/firebase-admin.json`. Without it, the service falls back to stub
+mode (logs the push, skips FCM).
 
-### How to generate a real key
+## firebase-admin.example.json (template — committed)
+
+A placeholder JSON that documents the expected shape of the real key. Use
+it as a reference; never edit it with real credentials.
+
+## How to enable real FCM delivery
 
 1. Open the Firebase Console → Project settings → **Service accounts**.
    https://console.firebase.google.com/project/quiz-battle-app-fd09b/settings/serviceaccounts/adminsdk
 2. Click **Generate new private key** and download the JSON.
-3. Save it over `secrets/firebase-admin.json` in this repo.
-4. Rebuild the notification service so the new file is picked up:
+3. Save it as `secrets/firebase-admin.json` (gitignored, so this is safe).
+4. Recreate the notification container so the new file is picked up:
 
    ```bash
    docker compose up -d --force-recreate notification
@@ -22,15 +29,14 @@ account to deliver FCM pushes. The file checked into git is a **placeholder**
 
    On startup the log should switch from:
 
-   > WARN GOOGLE_APPLICATION_CREDENTIALS not set — running in stub mode
+   > WARN firebase init failed: … — running in stub mode
 
    to:
 
    > [notification] Firebase Admin SDK initialized
 
-### Never commit real credentials
+## Never commit real credentials
 
-Before `git commit`, double-check `git diff secrets/firebase-admin.json`.
-If you see a `private_key` field, you have real credentials staged — revert
-the change (`git checkout secrets/firebase-admin.json`) and keep the key
-local-only.
+The `.gitignore` rule blocks accidental commits. If you ever see
+`secrets/firebase-admin.json` appear in `git status` as staged, stop and
+remove it (`git rm --cached secrets/firebase-admin.json`) before committing.

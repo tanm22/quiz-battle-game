@@ -364,9 +364,15 @@ func main() {
 	// the failure mode observable in the service logs rather than crashing.
 	//
 	// The Admin SDK picks up GOOGLE_APPLICATION_CREDENTIALS automatically via
-	// Application Default Credentials, so we don't need to pass it explicitly.
+	// Application Default Credentials. FIREBASE_PROJECT_ID is only needed
+	// when the service-account JSON lacks a project_id field — the Go SDK
+	// doesn't read that env var itself, so we forward it via firebase.Config.
 	if os.Getenv("GOOGLE_APPLICATION_CREDENTIALS") != "" {
-		app, err := firebase.NewApp(ctx, nil)
+		cfg := &firebase.Config{}
+		if pid := os.Getenv("FIREBASE_PROJECT_ID"); pid != "" {
+			cfg.ProjectID = pid
+		}
+		app, err := firebase.NewApp(ctx, cfg)
 		if err != nil {
 			log.Printf("[notification] WARN firebase init failed: %v — running in stub mode", err)
 		} else {

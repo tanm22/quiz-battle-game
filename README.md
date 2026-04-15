@@ -49,6 +49,12 @@ Starts all 9 containers. Seed service runs first (questions, test users, indexes
 | `RAZORPAY_WEBHOOK_SECRET` | Payment | For payments | Webhook HMAC verification |
 | `RESEND_API_KEY` | Auth | For email codes | Resend.com API key |
 | `JWT_SECRET` | All | Yes | JWT signing secret |
+| `FIREBASE_PROJECT_ID` | Notification | For FCM push | Firebase project id (default set in compose) |
+
+**Firebase push notifications:** drop a real service-account JSON at
+`secrets/firebase-admin.json` to enable FCM delivery. Without it, the
+notification service runs in stub mode (logs only). See
+[`secrets/README.md`](secrets/README.md) for setup.
 
 ## RabbitMQ Event Flow
 

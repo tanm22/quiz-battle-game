@@ -19,3 +19,7 @@ flutter/.flutter-plugins
 
 # Misc
 .DS_Store
+
+# Firebase Admin SDK service-account key (real credentials — never commit).
+# The committed secrets/firebase-admin.example.json is a reference template.
+secrets/firebase-admin.json
