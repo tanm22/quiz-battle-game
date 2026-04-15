@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'providers/game_state.dart';
@@ -8,10 +10,15 @@ import 'screens/gameplay_screen.dart';
 import 'screens/leaderboard_screen.dart';
 import 'screens/results_screen.dart';
 import 'services/auth_service.dart';
+import 'services/fcm_service.dart';
 import 'services/quiz_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Initialize Firebase early so FCM is ready before any auth flow starts.
+  // Failures are logged inside — the app still boots if init throws (e.g. in
+  // environments without google-services.json).
+  await FcmService.instance.initializeFirebase();
   runApp(const ProviderScope(child: QuizBattleApp()));
 }
 
@@ -66,6 +73,10 @@ class _AppShellState extends ConsumerState<AppShell> {
             email: auth.email,
             isGuest: auth.isGuest,
           );
+      // Auth restored — register this device's FCM token so push notifications
+      // can reach the user. Non-blocking: notification failures must not gate
+      // the UI swap from splash to home.
+      unawaited(FcmService.instance.registerForUser());
     }
     setState(() => _checkedAuth = true);
   }

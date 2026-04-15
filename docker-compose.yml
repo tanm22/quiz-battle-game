@@ -162,6 +162,15 @@ services:
     environment:
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
       - MONGO_URI=mongodb://mongo:27017/quizbattle
+      # Firebase Admin SDK auto-discovers credentials at this path via ADC.
+      # Drop the service-account JSON into ./secrets/firebase-admin.json on the
+      # host (download from Firebase Console → Service accounts → Generate key).
+      # A placeholder file ships with the repo so the bind mount always works;
+      # when it's the placeholder, firebase.NewApp fails validation and the
+      # worker cleanly falls back to stub mode (logs only, no FCM traffic).
+      - GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/firebase-admin.json
+    volumes:
+      - ./secrets:/run/secrets:ro
 
 volumes:
   redis_data:

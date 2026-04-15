@@ -185,6 +185,16 @@ class QuizService {
     );
   }
 
+  /// Registers the device's FCM token with the backend so push notifications
+  /// (streak, referral, tournament, match invite, premium) can reach this user.
+  /// Uses $addToSet server-side — calling repeatedly with the same token is a no-op.
+  Future<UpdateFCMTokenResponse> updateFCMToken(String token) {
+    return scoring.updateFCMToken(
+      UpdateFCMTokenRequest()..token = token,
+      options: _opts(),
+    );
+  }
+
   Future<void> shutdown() async {
     await _matchmakingChannel.shutdown();
     await _quizChannel.shutdown();

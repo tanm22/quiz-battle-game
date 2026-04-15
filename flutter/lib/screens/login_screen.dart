@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:grpc/grpc.dart';
 import '../providers/game_state.dart';
 import '../services/auth_service.dart';
+import '../services/fcm_service.dart';
 import '../services/quiz_service.dart';
 import 'email_code_screen.dart';
 
@@ -96,6 +97,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       auth.userId!, auth.token!, auth.rating,
       email: auth.email, isGuest: auth.isGuest,
     );
+    // Fire-and-forget: register FCM token so push notifications reach this user.
+    // Handler is internally idempotent and never throws.
+    unawaited(FcmService.instance.registerForUser());
   }
 
   Future<void> _googleSignIn() async {
@@ -226,6 +230,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                 auth.userId!, auth.token!, auth.rating,
                 email: auth.email, isGuest: auth.isGuest,
               );
+              unawaited(FcmService.instance.registerForUser());
             }
             if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
           },
