@@ -10,10 +10,15 @@ import 'screens/login_screen.dart';
 import 'screens/matchmaking_screen.dart';
 import 'screens/gameplay_screen.dart';
 import 'screens/leaderboard_screen.dart';
+import 'screens/referral_screen.dart';
 import 'screens/results_screen.dart';
 import 'services/auth_service.dart';
 import 'services/fcm_service.dart';
 import 'services/quiz_service.dart';
+
+/// Global navigator key so the FCM tap handler can push screens
+/// (ReferralScreen, etc.) from outside any widget's BuildContext.
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
 /// FCM background isolate entry point. Android runs this in a fresh isolate
 /// when a push arrives while the app is terminated or backgrounded, so it
@@ -47,6 +52,7 @@ class QuizBattleApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Quiz Battle',
+      navigatorKey: rootNavigatorKey,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
@@ -76,7 +82,51 @@ class _AppShellState extends ConsumerState<AppShell> {
   @override
   void initState() {
     super.initState();
+    // Register the FCM tap router before `registerForUser()` runs inside
+    // `_tryRestoreSession`, so a notification that opened a terminated app
+    // (delivered via getInitialMessage) reaches our handler.
+    FcmService.instance.addTapHandler(_handleFcmTap);
     _tryRestoreSession();
+  }
+
+  @override
+  void dispose() {
+    FcmService.instance.removeTapHandler(_handleFcmTap);
+    super.dispose();
+  }
+
+  /// Route the user to the most relevant screen for the tapped notification.
+  /// Ignored when the user isn't authenticated — tapping a push while logged
+  /// out should just open the login screen, which is already the default.
+  void _handleFcmTap(String event, Map<String, dynamic> data) {
+    final notifier = ref.read(gameStateProvider.notifier);
+    final state = ref.read(gameStateProvider);
+    if (state.userId == null) return;
+
+    switch (event) {
+      case 'notif.match.invite':
+        notifier.navigateToMatchmaking();
+      case 'notif.streak.warning':
+      case 'notif.daily.reward':
+      case 'notif.tournament.remind':
+        // Tournament/streak/daily-reward UI all live on the home screen; the
+        // user can tap the relevant card from there. Routing directly to
+        // TournamentScreen would require the user's plan, which isn't in
+        // the FCM payload.
+        notifier.navigateToHome();
+      case 'notif.referral.converted':
+        notifier.navigateToHome();
+        // Push ReferralScreen on top so the tap lands the user directly on
+        // the reward list. Uses rootNavigatorKey because _handleFcmTap can
+        // fire from outside a widget build context.
+        rootNavigatorKey.currentState?.push(
+          MaterialPageRoute(builder: (_) => const ReferralScreen()),
+        );
+      default:
+        // Unknown event — best-effort fallback to home so the user isn't
+        // stranded on a stale screen.
+        notifier.navigateToHome();
+    }
   }
 
   Future<void> _tryRestoreSession() async {

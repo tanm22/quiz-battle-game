@@ -8,6 +8,12 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'quiz_service.dart';
 
+/// Callback invoked when the user taps a push notification. `event` is the
+/// `data['event']` field that the Go backend stamps into every message
+/// (e.g. "notif.match.invite"); `data` is the full data map for handlers
+/// that need extra fields (e.g. inviter name, tournament id).
+typedef FcmTapHandler = void Function(String event, Map<String, dynamic> data);
+
 /// Push notification plumbing for the 4 compulsory event types:
 ///  - notif.streak.warning
 ///  - notif.referral.converted
@@ -21,7 +27,8 @@ import 'quiz_service.dart';
 ///  4. Re-register when the token rotates.
 ///  5. Render foreground messages as local notifications so the user sees them
 ///     while the app is open (FCM only auto-displays when the app is backgrounded).
-///  6. Surface background taps to a route callback.
+///  6. Dispatch notification taps to registered handlers (AppShell wires
+///     routing via [addTapHandler]).
 class FcmService {
   FcmService._();
   static final FcmService instance = FcmService._();
@@ -31,6 +38,13 @@ class FcmService {
   StreamSubscription<String>? _tokenRefreshSub;
   StreamSubscription<RemoteMessage>? _messageSub;
   StreamSubscription<RemoteMessage>? _openedAppSub;
+  final Set<FcmTapHandler> _tapHandlers = {};
+
+  /// Register a callback that fires when the user taps a notification.
+  /// Callers must call [removeTapHandler] with the same function when the
+  /// listener goes out of scope (e.g. in widget dispose) to avoid leaks.
+  void addTapHandler(FcmTapHandler handler) => _tapHandlers.add(handler);
+  void removeTapHandler(FcmTapHandler handler) => _tapHandlers.remove(handler);
 
   /// Called once at app startup before runApp (so Firebase is ready early).
   Future<void> initializeFirebase() async {
@@ -162,10 +176,25 @@ class FcmService {
   }
 
   void _handleTap(RemoteMessage msg) {
-    // Hook for future navigation: inspect msg.data['event'] and route.
-    // Left as a debug log for now; wiring into GoRouter/Navigator is out of
-    // scope for the notification phase and can be added when tap routing is
-    // a product requirement.
-    debugPrint('[fcm] notification tapped: event=${msg.data['event']}');
+    final event = (msg.data['event'] ?? '').toString();
+    if (event.isEmpty) {
+      debugPrint('[fcm] notification tapped without event field; dropping');
+      return;
+    }
+    // Normalize dynamic values to a plain string-keyed map so handlers don't
+    // have to cast every lookup.
+    final data = <String, dynamic>{
+      for (final entry in msg.data.entries) entry.key.toString(): entry.value,
+    };
+    debugPrint('[fcm] notification tapped: event=$event');
+    // Iterate over a snapshot so handlers removing themselves mid-dispatch
+    // don't trigger ConcurrentModificationError.
+    for (final handler in List<FcmTapHandler>.from(_tapHandlers)) {
+      try {
+        handler(event, data);
+      } catch (e, st) {
+        debugPrint('[fcm] tap handler threw: $e\n$st');
+      }
+    }
   }
 }
