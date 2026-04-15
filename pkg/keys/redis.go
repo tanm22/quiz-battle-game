@@ -351,3 +351,16 @@ const WebhookIdempotencyTTL = 72 * time.Hour
 func SetWebhookIdem(ctx context.Context, rdb *redis.Client, paymentID string) (bool, error) {
 	return rdb.SetNX(ctx, WebhookIdem(paymentID), "1", WebhookIdempotencyTTL).Result()
 }
+
+// ---------------------------------------------------------------------------
+// Notifications: match invite throttle (30-min window per inviter→opponent)
+// ---------------------------------------------------------------------------
+
+const MatchInviteThrottleTTL = 30 * time.Minute
+
+// TrySetMatchInviteThrottle returns true if we won the SETNX race — i.e. no
+// notif.match.invite has been dispatched from `fromUserID` to `toUserID` in the
+// last MatchInviteThrottleTTL. Returns false when the throttle is still active.
+func TrySetMatchInviteThrottle(ctx context.Context, rdb *redis.Client, fromUserID, toUserID string) (bool, error) {
+	return rdb.SetNX(ctx, MatchInviteThrottle(fromUserID, toUserID), "1", MatchInviteThrottleTTL).Result()
+}

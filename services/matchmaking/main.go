@@ -100,8 +100,107 @@ func (s *matchmakingServer) JoinMatchmaking(ctx context.Context, req *pb.JoinMat
 		return nil, status.Errorf(codes.Internal, "failed to add to pool: %v", err)
 	}
 
+	// Fan out notif.match.invite to recent opponents (throttled per pair).
+	// Runs asynchronously on a fresh ctx so the RPC can return immediately
+	// and the Mongo/Rabbit work isn't cancelled when the caller disconnects.
+	// A 10s deadline guards against a hung Mongo leaking the goroutine.
+	inviterName := ""
+	if u, ok := userDoc["username"].(string); ok {
+		inviterName = u
+	}
+	go func(uid, uname string, r int64) {
+		inviteCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		s.publishMatchInvite(inviteCtx, uid, uname, r)
+	}(userID, inviterName, int64(rating))
+
 	log.Printf("[matchmaking] player %s joined pool (rating=%.0f)", userID, rating)
 	return &pb.JoinMatchmakingResponse{Status: pb.MatchmakingStatus_QUEUED}, nil
+}
+
+// publishMatchInvite finds the inviter's last 5 opponents in match_history,
+// dedupes them, applies a 30-minute per-pair throttle, and publishes a
+// `notif.match.invite` event per eligible opponent. Errors are logged only —
+// the caller's RPC must not be blocked by notification delivery.
+func (s *matchmakingServer) publishMatchInvite(ctx context.Context, fromUserID, fromUsername string, fromRating int64) {
+	if fromUsername == "" {
+		fromUsername = "A player"
+	}
+
+	// Query the 5 most recent matches this user participated in.
+	cursor, err := s.mongoDB.Collection("match_history").Find(ctx,
+		bson.M{"players.userId": fromUserID},
+		options.Find().
+			SetSort(bson.D{{Key: "createdAt", Value: -1}}).
+			SetLimit(5).
+			SetProjection(bson.M{"players.userId": 1}),
+	)
+	if err != nil {
+		log.Printf("[matchmaking] match_history query failed for %s: %v", fromUserID, err)
+		return
+	}
+	defer cursor.Close(ctx)
+
+	seen := make(map[string]struct{})
+	for cursor.Next(ctx) {
+		var doc struct {
+			Players []struct {
+				UserID string `bson:"userId"`
+			} `bson:"players"`
+		}
+		if err := cursor.Decode(&doc); err != nil {
+			continue
+		}
+		for _, p := range doc.Players {
+			if p.UserID == "" || p.UserID == fromUserID {
+				continue
+			}
+			seen[p.UserID] = struct{}{}
+		}
+	}
+	if err := cursor.Err(); err != nil {
+		log.Printf("[matchmaking] match_history cursor error for %s: %v", fromUserID, err)
+	}
+	if len(seen) == 0 {
+		return
+	}
+
+	for opponentID := range seen {
+		ok, err := keys.TrySetMatchInviteThrottle(ctx, s.rdb, fromUserID, opponentID)
+		if err != nil {
+			log.Printf("[matchmaking] match invite throttle check failed (%s→%s): %v", fromUserID, opponentID, err)
+			continue
+		}
+		if !ok {
+			// Throttled — a previous invite from this inviter to this opponent
+			// is still within the 30-minute cooldown.
+			continue
+		}
+
+		payload, err := json.Marshal(map[string]interface{}{
+			"event":         "notif.match.invite",
+			"userId":        opponentID,
+			"inviterId":     fromUserID,
+			"inviterName":   fromUsername,
+			"inviterRating": fromRating,
+		})
+		if err != nil {
+			log.Printf("[matchmaking] match invite marshal failed: %v", err)
+			continue
+		}
+
+		if err := s.amqpCh.PublishWithContext(ctx,
+			"sx",
+			"notif.match.invite",
+			false,
+			false,
+			amqp.Publishing{ContentType: "application/json", Body: payload},
+		); err != nil {
+			log.Printf("[matchmaking] match invite publish failed (%s→%s): %v", fromUserID, opponentID, err)
+			continue
+		}
+		log.Printf("[matchmaking] match invite queued %s→%s", fromUserID, opponentID)
+	}
 }
 
 // ---------------------------------------------------------------------------

@@ -21,6 +21,8 @@ const (
 	UserPlan           = "user:%s:plan"
 	ReferralCodeKey    = "referral:code:%s"
 	WebhookIdempotency = "webhook:idempotency:%s"
+	// Notifications
+	MatchInviteThrottleKey = "match_invite:%s:%s" // fromUserID, toUserID
 )
 
 // Key helper functions — one function per key to prevent fmt.Sprintf typos.
@@ -79,4 +81,10 @@ func RefCode(code string) string {
 
 func WebhookIdem(paymentID string) string {
 	return fmt.Sprintf(WebhookIdempotency, paymentID)
+}
+
+// MatchInviteThrottle builds the Redis key guarding an inviter→opponent
+// notif.match.invite push. Held for 30 min to avoid spamming the same opponent.
+func MatchInviteThrottle(fromUserID, toUserID string) string {
+	return fmt.Sprintf(MatchInviteThrottleKey, fromUserID, toUserID)
 }
