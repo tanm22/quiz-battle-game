@@ -213,11 +213,28 @@ func (s *matchmakingServer) LeaveMatchmaking(ctx context.Context, req *pb.LeaveM
 		return nil, status.Error(codes.Unauthenticated, "not authenticated")
 	}
 
-	if err := keys.RemoveFromPool(ctx, s.rdb, userID); err != nil {
+	removed, err := keys.RemoveFromPool(ctx, s.rdb, userID)
+	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to remove from pool: %v", err)
 	}
-	log.Printf("[matchmaking] player %s left pool", userID)
-	return &pb.LeaveMatchmakingResponse{Removed: true}, nil
+
+	// If we actually pulled the user out of the pool (removed > 0), they
+	// cancelled before the poller could match them — no quiz was played,
+	// so refund the daily-quota INCR we did back in JoinMatchmaking.
+	// `removed == 0` means the poller already popped them into a room;
+	// in that case the quota was "spent" on a real match and must stay.
+	// RefundQuota is guarded to be a no-op for premium users (whose
+	// counter was never incremented) and for stale-key edge cases.
+	if removed > 0 {
+		if refunded, rerr := keys.RefundQuota(ctx, s.rdb, userID); rerr != nil {
+			log.Printf("[matchmaking] quota refund failed for %s: %v", userID, rerr)
+		} else if refunded {
+			log.Printf("[matchmaking] refunded daily quota for %s on cancel", userID)
+		}
+	}
+
+	log.Printf("[matchmaking] player %s left pool (removed=%d)", userID, removed)
+	return &pb.LeaveMatchmakingResponse{Removed: removed > 0}, nil
 }
 
 // ---------------------------------------------------------------------------

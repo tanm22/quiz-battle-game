@@ -45,9 +45,13 @@ func IsInPool(ctx context.Context, rdb *redis.Client, userID string) (bool, erro
 	return true, nil
 }
 
-// RemoveFromPool removes a player from the matchmaking pool.
-func RemoveFromPool(ctx context.Context, rdb *redis.Client, userID string) error {
-	return rdb.ZRem(ctx, MatchmakingPool, userID).Err()
+// RemoveFromPool removes a player from the matchmaking pool. Returns the
+// number of members actually removed (0 or 1). Callers rely on this count to
+// tell "we took the user out of the queue" (1) apart from "the poller had
+// already matched them out before our ZRem reached Redis" (0) — that
+// distinction drives the daily-quota refund in LeaveMatchmaking.
+func RemoveFromPool(ctx context.Context, rdb *redis.Client, userID string) (int64, error) {
+	return rdb.ZRem(ctx, MatchmakingPool, userID).Result()
 }
 
 // PoolSize returns the number of players waiting in the pool.
@@ -295,6 +299,32 @@ func GetQuotaUsed(ctx context.Context, rdb *redis.Client, userID string) (int64,
 		return 0, nil
 	}
 	return val, err
+}
+
+// RefundQuotaScript decrements the daily quota counter, but only if the
+// current value is > 0. The guard prevents a stray refund (e.g. one triggered
+// after the IST-midnight EXPIREAT fired and the key was reset) from landing
+// on a fresh counter and making it negative. Returns 1 if a refund happened,
+// 0 if the counter was already at zero or missing.
+var RefundQuotaScript = redis.NewScript(`
+local current = redis.call('GET', KEYS[1])
+if current and tonumber(current) > 0 then
+  redis.call('DECR', KEYS[1])
+  return 1
+end
+return 0
+`)
+
+// RefundQuota reverses a previous CheckQuota INCR when the user aborts before
+// actually playing (e.g. cancelling out of matchmaking before a match is
+// made). Safe to call unconditionally — the Lua guard turns it into a no-op
+// for premium users (whose counter is never touched) or after quota reset.
+func RefundQuota(ctx context.Context, rdb *redis.Client, userID string) (bool, error) {
+	result, err := RefundQuotaScript.Run(ctx, rdb, []string{DailyQuota(userID)}).Int64()
+	if err != nil {
+		return false, err
+	}
+	return result == 1, nil
 }
 
 // ---------------------------------------------------------------------------
