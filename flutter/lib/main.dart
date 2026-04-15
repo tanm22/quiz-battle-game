@@ -15,6 +15,7 @@ import 'screens/results_screen.dart';
 import 'services/auth_service.dart';
 import 'services/fcm_service.dart';
 import 'services/quiz_service.dart';
+import 'theme/app_theme.dart';
 
 /// Global navigator key so the FCM tap handler can push screens
 /// (ReferralScreen, etc.) from outside any widget's BuildContext.
@@ -56,10 +57,10 @@ class QuizBattleApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFFF6B35),
+          seedColor: AppColors.primary,
           brightness: Brightness.dark,
         ),
-        scaffoldBackgroundColor: const Color(0xFF0F0E2E),
+        scaffoldBackgroundColor: AppColors.bgDeep,
         fontFamily: 'Roboto',
       ),
       home: const AppShell(),
@@ -153,7 +154,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   Widget build(BuildContext context) {
     if (!_checkedAuth) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator(color: Color(0xFFFF6B35))),
+        body: Center(child: CircularProgressIndicator(color: AppColors.primary)),
       );
     }
 
@@ -167,7 +168,7 @@ class _AppShellState extends ConsumerState<AppShell> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(next),
-              backgroundColor: const Color(0xFFFF4444),
+              backgroundColor: AppColors.danger,
               behavior: SnackBarBehavior.floating,
               duration: const Duration(seconds: 3),
             ),
@@ -197,11 +198,26 @@ class _AppShellState extends ConsumerState<AppShell> {
     return Stack(
       children: [
         AnimatedSwitcher(
-          duration: const Duration(milliseconds: 300),
-          switchInCurve: Curves.easeOut,
+          duration: AppDurations.medium,
+          switchInCurve: Curves.easeOutCubic,
           switchOutCurve: Curves.easeIn,
           transitionBuilder: (child, animation) {
-            return FadeTransition(opacity: animation, child: child);
+            // Hero-style "fade through": new screen fades in while scaling from
+            // 0.97 → 1.0 and sliding up 12px. Old screen just fades out. Gives
+            // the login→home handoff (and other major screen changes) a sense
+            // of forward motion without being jarring.
+            final slide = Tween<Offset>(
+              begin: const Offset(0, 0.04),
+              end: Offset.zero,
+            ).animate(animation);
+            final scale = Tween<double>(begin: 0.97, end: 1.0).animate(animation);
+            return FadeTransition(
+              opacity: animation,
+              child: SlideTransition(
+                position: slide,
+                child: ScaleTransition(scale: scale, child: child),
+              ),
+            );
           },
           child: KeyedSubtree(
             key: ValueKey(gameState.currentScreen),
@@ -219,7 +235,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [Color(0xFFFF4444), Color(0xFFFF6B35)],
+                    colors: [AppColors.danger, AppColors.primary],
                   ),
                 ),
                 child: const Row(

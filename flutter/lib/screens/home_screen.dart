@@ -6,6 +6,8 @@ import 'package:share_plus/share_plus.dart';
 import '../providers/game_state.dart';
 import '../services/auth_service.dart';
 import '../services/quiz_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/animated_toast.dart';
 import '../proto/quiz.pbgrpc.dart';
 import 'match_history_screen.dart';
 import 'payment_screen.dart';
@@ -184,7 +186,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: _buildLinkEmailPrompt(),
             ),
 
-          // Streak + Quota row
+          // Streak + Quota row — either loaded cards or skeletons while fetching.
           if (_homeData != null) ...[
             Row(
               children: [
@@ -196,22 +198,47 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             const SizedBox(height: 16),
             _buildStatsRow(),
             const SizedBox(height: 24),
+          ] else if (_loading && _error == null) ...[
+            Row(
+              children: [
+                Expanded(child: _skeletonTile(height: 96)),
+                const SizedBox(width: 12),
+                Expanded(child: _skeletonTile(height: 96)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _skeletonTile(height: 62),
+            const SizedBox(height: 24),
           ],
 
-          if (_loading && _homeData == null)
-            const Center(child: Padding(
-              padding: EdgeInsets.all(40),
-              child: CircularProgressIndicator(color: Color(0xFFFF6B35)),
-            )),
-
           if (_error != null)
-            Center(child: Column(
-              children: [
-                Text(_error!, style: const TextStyle(color: Colors.redAccent)),
-                const SizedBox(height: 8),
-                TextButton(onPressed: _loadHomeData, child: const Text('Retry', style: TextStyle(color: Color(0xFFFF6B35)))),
-              ],
-            )),
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.danger.withAlpha(20),
+                borderRadius: AppRadius.card,
+                border: Border.all(color: AppColors.danger.withAlpha(80)),
+              ),
+              child: Column(
+                children: [
+                  const Icon(Icons.cloud_off, color: AppColors.danger, size: 32),
+                  const SizedBox(height: 8),
+                  Text(_error!, style: const TextStyle(color: Colors.white70), textAlign: TextAlign.center),
+                  const SizedBox(height: 12),
+                  ElevatedButton.icon(
+                    onPressed: _loadHomeData,
+                    icon: const Icon(Icons.refresh, size: 18),
+                    label: const Text('Retry'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      shape: const RoundedRectangleBorder(borderRadius: AppRadius.button),
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
           // Play button — disabled when quota exhausted
           SizedBox(
@@ -279,27 +306,91 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             const SizedBox(height: 16),
           ],
 
-          // Leaderboard preview
+          // Leaderboard preview — real rows when loaded, skeleton rows while
+          // fetching, friendly empty state when the list comes back empty.
           if (_homeData != null && _homeData!.leaderboardPreview.isNotEmpty) ...[
-            Row(
-              children: [
-                const Icon(Icons.leaderboard, color: Color(0xFFFFD700), size: 20),
-                const SizedBox(width: 8),
-                const Text('Top Players', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                const Spacer(),
-                GestureDetector(
-                  onTap: () => setState(() => _currentTab = 2),
-                  child: Text('See all', style: TextStyle(color: const Color(0xFFFF6B35).withAlpha(200), fontSize: 13)),
-                ),
-              ],
-            ),
+            _buildLeaderboardHeader(),
             const SizedBox(height: 8),
             ..._homeData!.leaderboardPreview.take(5).map((e) => _leaderboardRow(e)),
+          ] else if (_homeData != null) ...[
+            _buildLeaderboardHeader(),
+            const SizedBox(height: 8),
+            _buildLeaderboardEmpty(),
+          ] else if (_loading && _error == null) ...[
+            _buildLeaderboardHeader(),
+            const SizedBox(height: 8),
+            for (int i = 0; i < 3; i++) _skeletonTile(height: 40, margin: const EdgeInsets.only(bottom: 6)),
           ],
 
           const SizedBox(height: 24),
         ],
       ),
+    );
+  }
+
+  Widget _buildLeaderboardHeader() {
+    return Row(
+      children: [
+        const Icon(Icons.leaderboard, color: AppColors.gold, size: 20),
+        const SizedBox(width: 8),
+        const Text('Top Players', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        const Spacer(),
+        GestureDetector(
+          onTap: () => setState(() => _currentTab = 2),
+          child: Text('See all', style: TextStyle(color: AppColors.primary.withAlpha(200), fontSize: 13)),
+        ),
+      ],
+    );
+  }
+
+  /// Standard-sized shimmer block used for home/leaderboard card skeletons.
+  Widget _skeletonTile({required double height, EdgeInsets? margin}) {
+    return SkeletonBlock(
+      height: height,
+      borderRadius: AppRadius.card,
+      margin: margin ?? EdgeInsets.zero,
+    );
+  }
+
+  /// Illustrated empty state for when the leaderboard has no entries.
+  /// Shared by the home preview and the full leaderboard tab.
+  Widget _buildLeaderboardEmpty() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppColors.gold.withAlpha(20),
+            border: Border.all(color: AppColors.gold.withAlpha(60)),
+          ),
+          child: const Icon(Icons.emoji_events, size: 40, color: AppColors.gold),
+        ),
+        const SizedBox(height: 14),
+        const Text(
+          'No scores yet',
+          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Play your first match to claim the top spot.',
+          style: TextStyle(color: Colors.white.withAlpha(140), fontSize: 13),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 14),
+        ElevatedButton.icon(
+          onPressed: () => ref.read(gameStateProvider.notifier).navigateToMatchmaking(),
+          icon: const Icon(Icons.bolt, size: 18),
+          label: const Text('Start battle'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            shape: const RoundedRectangleBorder(borderRadius: AppRadius.button),
+          ),
+        ),
+      ],
     );
   }
 
@@ -339,7 +430,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
         if (_lbLoading)
-          const Expanded(child: Center(child: CircularProgressIndicator(color: Color(0xFFFF6B35)))),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              children: [
+                for (int i = 0; i < 8; i++)
+                  _skeletonTile(height: 52, margin: const EdgeInsets.only(bottom: 8)),
+              ],
+            ),
+          ),
         if (!_lbLoading && _lbEntries != null && _lbEntries!.isNotEmpty)
           Expanded(
             child: ListView.builder(
@@ -349,7 +448,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ),
         if (!_lbLoading && (_lbEntries == null || _lbEntries!.isEmpty))
-          Expanded(child: Center(child: Text('No leaderboard data yet', style: TextStyle(color: Colors.white.withAlpha(100))))),
+          Expanded(
+            child: Center(child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: _buildLeaderboardEmpty(),
+            )),
+          ),
         // Upsell for free users
         if ((_homeData?.profile.plan ?? 'free') != 'premium' && !_lbLoading && _lbEntries != null)
           Padding(
@@ -623,9 +727,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     tooltip: 'Copy code',
                     onPressed: () {
                       Clipboard.setData(ClipboardData(text: code));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Code copied!'), behavior: SnackBarBehavior.floating, duration: Duration(seconds: 1)),
-                      );
+                      showAnimatedToast(context, message: 'Code copied!');
                     },
                   ),
                 ],

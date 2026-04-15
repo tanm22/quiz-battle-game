@@ -4,6 +4,7 @@ import 'package:grpc/grpc.dart';
 import 'package:share_plus/share_plus.dart';
 import '../services/quiz_service.dart';
 import '../proto/quiz.pbgrpc.dart';
+import '../widgets/animated_toast.dart';
 
 /// Referral dashboard — shows total invites, conversions, coins earned,
 /// the user's own code (copy/share), and an input to apply a friend's code.
@@ -60,9 +61,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
     if (code == null || code.isEmpty) return;
     await Clipboard.setData(ClipboardData(text: code));
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Code copied!'), behavior: SnackBarBehavior.floating, duration: Duration(seconds: 1)),
-      );
+      showAnimatedToast(context, message: 'Code copied!');
     }
   }
 
