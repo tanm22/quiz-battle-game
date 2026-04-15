@@ -108,7 +108,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       _showError(e.message ?? 'Google sign-in failed');
     } catch (e) {
       final msg = e.toString();
-      if (!msg.contains('cancelled')) _showError(msg);
+      if (msg.contains('cancelled')) return;
+      // ApiException 12500 / 12501 = Google Play Services missing or misconfigured
+      if (msg.contains('12500') || msg.contains('12501') || msg.contains('ApiException')) {
+        _showError('Google Play Services not available. Use credentials or Quick Play instead.');
+      } else {
+        _showError(msg);
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
