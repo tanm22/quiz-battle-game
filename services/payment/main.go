@@ -1,16 +1,19 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -30,12 +33,24 @@ import (
 type paymentServer struct {
 	pb.UnimplementedPaymentServiceServer
 	rdb            *redis.Client
+	amqpConn       *amqp.Connection
+	amqpMu         sync.Mutex   // AMQP channels are not thread-safe
 	amqpCh         *amqp.Channel
 	mongoDB        *mongo.Database
 	jwtSecret      string
 	razorpayKeyID  string
 	razorpaySecret string
 	webhookSecret  string
+}
+
+// publish sends a message to the topic exchange with mutex protection.
+func (s *paymentServer) publish(ctx context.Context, routingKey string, body []byte) error {
+	s.amqpMu.Lock()
+	defer s.amqpMu.Unlock()
+	return s.amqpCh.PublishWithContext(ctx, "sx", routingKey, false, false, amqp.Publishing{
+		ContentType: "application/json",
+		Body:        body,
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -48,19 +63,56 @@ func (s *paymentServer) CreateOrder(ctx context.Context, req *pb.CreateOrderRequ
 		return nil, status.Error(codes.Unauthenticated, "not authenticated")
 	}
 
+	if req.PlanDuration != "monthly" && req.PlanDuration != "yearly" {
+		return nil, status.Error(codes.InvalidArgument, "plan_duration must be 'monthly' or 'yearly'")
+	}
+
 	amount := int64(29900) // monthly default, in paise
 	if req.PlanDuration == "yearly" {
 		amount = 299900
 	}
 
-	// TODO CP-5: HTTP POST to Razorpay API to create order
-	// For now, generate a stub order ID
-	orderID := "order_stub_" + userID[:8]
+	// Create order via Razorpay Orders API
+	orderReqBody, _ := json.Marshal(map[string]interface{}{
+		"amount":   amount,
+		"currency": "INR",
+		"receipt":  fmt.Sprintf("rcpt_%s_%d", userID[:8], time.Now().Unix()),
+		"notes": map[string]string{
+			"userId":       userID,
+			"planDuration": req.PlanDuration,
+		},
+	})
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", "https://api.razorpay.com/v1/orders", bytes.NewReader(orderReqBody))
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to build request: %v", err)
+	}
+	httpReq.SetBasicAuth(s.razorpayKeyID, s.razorpaySecret)
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "razorpay API unreachable: %v", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("[payment] razorpay order creation failed (%d): %s", resp.StatusCode, string(respBody))
+		return nil, status.Errorf(codes.Internal, "razorpay order creation failed (%d)", resp.StatusCode)
+	}
+
+	var rzpOrder struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(respBody, &rzpOrder); err != nil || rzpOrder.ID == "" {
+		return nil, status.Error(codes.Internal, "invalid response from razorpay")
+	}
 
 	// Insert payment document
 	_, err = s.mongoDB.Collection("payments").InsertOne(ctx, bson.M{
 		"userId":          userID,
-		"razorpayOrderId": orderID,
+		"razorpayOrderId": rzpOrder.ID,
 		"amount":          amount,
 		"currency":        "INR",
 		"status":          "created",
@@ -72,7 +124,7 @@ func (s *paymentServer) CreateOrder(ctx context.Context, req *pb.CreateOrderRequ
 	}
 
 	return &pb.CreateOrderResponse{
-		OrderId:  orderID,
+		OrderId:  rzpOrder.ID,
 		KeyId:    s.razorpayKeyID,
 		Amount:   amount,
 		Currency: "INR",
@@ -137,12 +189,23 @@ func (s *paymentServer) GetPaymentHistory(ctx context.Context, req *pb.GetPaymen
 		if err := cursor.Decode(&doc); err != nil {
 			continue
 		}
-		rec := &pb.PaymentRecord{
-			OrderId:      doc["razorpayOrderId"].(string),
-			Amount:       doc["amount"].(int64),
-			Currency:     doc["currency"].(string),
-			Status:       doc["status"].(string),
-			PlanDuration: doc["planDuration"].(string),
+		rec := &pb.PaymentRecord{}
+		if v, ok := doc["razorpayOrderId"].(string); ok {
+			rec.OrderId = v
+		}
+		if v, ok := doc["amount"].(int64); ok {
+			rec.Amount = v
+		} else if v, ok := doc["amount"].(int32); ok {
+			rec.Amount = int64(v)
+		}
+		if v, ok := doc["currency"].(string); ok {
+			rec.Currency = v
+		}
+		if v, ok := doc["status"].(string); ok {
+			rec.Status = v
+		}
+		if v, ok := doc["planDuration"].(string); ok {
+			rec.PlanDuration = v
 		}
 		if t, ok := doc["createdAt"].(time.Time); ok {
 			rec.CreatedAt = t.Unix()
@@ -163,10 +226,11 @@ func (s *paymentServer) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Step 1: Read raw body BEFORE any JSON parsing (HMAC needs raw bytes)
+	// Step 1: Read raw body with 1 MB size cap (prevent memory exhaustion)
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	rawBody, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "failed to read body", http.StatusBadRequest)
+		http.Error(w, "request too large or unreadable", http.StatusRequestEntityTooLarge)
 		return
 	}
 
@@ -195,13 +259,19 @@ func (s *paymentServer) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Step 4: Only process payment.captured events — acknowledge others silently
+	if payload.Event != "payment.captured" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	paymentID := payload.Payload.Payment.Entity.ID
 	if paymentID == "" {
 		http.Error(w, "missing payment ID", http.StatusBadRequest)
 		return
 	}
 
-	// Step 4: SETNX idempotency check
+	// Step 5: SETNX idempotency check
 	ctx := context.Background()
 	isNew, err := keys.SetWebhookIdem(ctx, s.rdb, paymentID)
 	if err != nil {
@@ -210,12 +280,11 @@ func (s *paymentServer) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !isNew {
-		// Duplicate webhook — return 200 silently
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 
-	// Step 5: Update payment document
+	// Step 6: Update payment document
 	orderID := payload.Payload.Payment.Entity.OrderID
 	now := time.Now()
 	if _, err := s.mongoDB.Collection("payments").UpdateOne(ctx,
@@ -227,19 +296,20 @@ func (s *paymentServer) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		}},
 	); err != nil {
 		log.Printf("[payment] failed to update payment doc for order %s: %v", orderID, err)
+		s.rdb.Del(ctx, keys.WebhookIdem(paymentID)) // rollback so Razorpay can retry
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
-	// Step 6: Look up userId from payment doc
+	// Step 7: Look up userId from payment doc
 	var payDoc bson.M
 	if err := s.mongoDB.Collection("payments").FindOne(ctx, bson.M{"razorpayOrderId": orderID}).Decode(&payDoc); err != nil {
 		log.Printf("[payment] payment doc not found for order %s: %v", orderID, err)
-		w.WriteHeader(http.StatusOK) // still return 200 to Razorpay
+		w.WriteHeader(http.StatusOK) // no matching order — don't retry
 		return
 	}
 
-	// Step 7: Publish payment.captured to RabbitMQ
+	// Step 8: Publish payment.captured to RabbitMQ (must succeed or rollback)
 	eventJSON, err := json.Marshal(map[string]interface{}{
 		"event":        "payment.captured",
 		"userId":       payDoc["userId"],
@@ -249,11 +319,18 @@ func (s *paymentServer) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		"planDuration": payDoc["planDuration"],
 		"timestamp":    now.Format(time.RFC3339),
 	})
-	if err == nil {
-		s.amqpCh.PublishWithContext(ctx, "sx", "payment.captured", false, false, amqp.Publishing{
-			ContentType: "application/json",
-			Body:        eventJSON,
-		})
+	if err != nil {
+		log.Printf("[payment] failed to marshal event for order %s: %v", orderID, err)
+		s.rdb.Del(ctx, keys.WebhookIdem(paymentID))
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	if err := s.publish(ctx, "payment.captured", eventJSON); err != nil {
+		log.Printf("[payment] failed to publish event for order %s: %v", orderID, err)
+		s.rdb.Del(ctx, keys.WebhookIdem(paymentID))
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
 	}
 
 	log.Printf("[payment] webhook processed: payment %s order %s", paymentID, orderID)
@@ -317,16 +394,15 @@ func (s *paymentServer) checkExpiredPlans(ctx context.Context) {
 		// Invalidate Redis cache
 		keys.DelPlan(ctx, s.rdb, userID)
 
-		// Publish notification
+		// Publish notification via thread-safe helper
 		eventJSON, _ := json.Marshal(map[string]interface{}{
 			"event":     "premium.expired",
 			"userId":    userID,
 			"timestamp": time.Now().Format(time.RFC3339),
 		})
-		s.amqpCh.PublishWithContext(ctx, "sx", "premium.expired", false, false, amqp.Publishing{
-			ContentType: "application/json",
-			Body:        eventJSON,
-		})
+		if err := s.publish(ctx, "premium.expired", eventJSON); err != nil {
+			log.Printf("[payment] failed to publish expiry for user %s: %v", userID, err)
+		}
 		log.Printf("[payment] downgraded user %s from premium to free", userID)
 	}
 }
@@ -417,6 +493,7 @@ func main() {
 
 	srv := &paymentServer{
 		rdb:            rdb,
+		amqpConn:       conn,
 		amqpCh:         amqpCh,
 		mongoDB:        mongoClient.Database("quizbattle"),
 		jwtSecret:      jwtSecret,

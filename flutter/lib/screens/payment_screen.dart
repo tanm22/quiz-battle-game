@@ -1,6 +1,7 @@
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/material.dart';
 import 'package:grpc/grpc.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../services/quiz_service.dart';
 import '../proto/quiz.pbgrpc.dart';
 
@@ -16,11 +17,22 @@ class _PaymentScreenState extends State<PaymentScreen> {
   bool _loading = false;
   String? _currentPlan;
   Int64? _expiresAt;
+  late final Razorpay _razorpay;
 
   @override
   void initState() {
     super.initState();
+    _razorpay = Razorpay();
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
+    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
     _loadPlanStatus();
+  }
+
+  @override
+  void dispose() {
+    _razorpay.clear();
+    super.dispose();
   }
 
   Future<void> _loadPlanStatus() async {
@@ -48,15 +60,16 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
       if (!mounted) return;
 
-      // TODO CP-5: Open Razorpay checkout with resp.orderId, resp.keyId, resp.amount
-      // For now, show the order details
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Order created: ${resp.orderId} (${resp.amount.toInt() / 100} ${resp.currency})'),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      // Open Razorpay checkout sheet
+      _razorpay.open({
+        'key': resp.keyId,
+        'amount': resp.amount.toInt(),
+        'order_id': resp.orderId,
+        'currency': resp.currency,
+        'name': 'Quiz Battle',
+        'description': _selectedPlan == 'yearly' ? 'Premium Yearly' : 'Premium Monthly',
+        'theme': {'color': '#1A1145'},
+      });
     } on GrpcError catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -66,6 +79,36 @@ class _PaymentScreenState extends State<PaymentScreen> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  void _handlePaymentSuccess(PaymentSuccessResponse response) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Payment successful! Activating Premium...'), backgroundColor: Colors.green, behavior: SnackBarBehavior.floating),
+    );
+    // Reload plan status — the webhook + RabbitMQ consumer will have upgraded the plan
+    Future.delayed(const Duration(seconds: 2), _loadPlanStatus);
+  }
+
+  void _handlePaymentError(PaymentFailureResponse response) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Payment failed: ${response.message ?? 'Unknown error'}'),
+        backgroundColor: Colors.redAccent,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _handleExternalWallet(ExternalWalletResponse response) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Redirecting to ${response.walletName}...'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override

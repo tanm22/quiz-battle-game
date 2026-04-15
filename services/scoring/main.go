@@ -181,6 +181,10 @@ func (s *scoringServer) GetMatchHistory(ctx context.Context, req *pb.GetMatchHis
 				plan = p
 			}
 		}
+		if plan == "" {
+			plan = "free"
+		}
+		keys.SetPlan(ctx, s.rdb, userID, plan)
 	}
 
 	limit := int64(req.Limit)
@@ -591,10 +595,27 @@ func (s *scoringServer) ApplyReferralCode(ctx context.Context, req *pb.ApplyRefe
 		return nil, status.Error(codes.AlreadyExists, "already referred by someone")
 	}
 
+	// Anti-abuse: guest accounts cannot be referred (farmable)
+	if user.IsGuest {
+		return nil, status.Error(codes.FailedPrecondition, "link an email before applying a referral code")
+	}
+
 	// Look up referral code
 	referrerID, err := keys.GetRefCode(ctx, s.rdb, req.Code)
 	if err != nil || referrerID == "" {
 		return nil, status.Error(codes.NotFound, "invalid referral code")
+	}
+
+	// Anti-abuse: reject self-referral
+	if referrerID == userID {
+		return nil, status.Error(codes.InvalidArgument, "cannot refer yourself")
+	}
+
+	// Anti-abuse: max 20 converted referrals per referrer
+	count, _ := s.mongoDB.Collection("referrals").CountDocuments(ctx,
+		bson.M{"referrerId": referrerID, "status": "converted"})
+	if count >= 20 {
+		return nil, status.Error(codes.ResourceExhausted, "referrer has reached the referral cap")
 	}
 
 	// Create referral doc + set referredBy
@@ -1083,14 +1104,21 @@ func (s *scoringServer) consumePaymentCaptured(ctx context.Context) {
 				continue
 			}
 
-			// Calculate plan expiry
+			// Calculate plan expiry — extend from current expiry if still active
 			var duration time.Duration
 			if event.PlanDuration == "yearly" {
 				duration = 365 * 24 * time.Hour
 			} else {
 				duration = 30 * 24 * time.Hour // monthly
 			}
-			expiresAt := time.Now().Add(duration)
+			base := time.Now()
+			var existingUser bson.M
+			if err := s.mongoDB.Collection("users").FindOne(ctx, bson.M{"_id": event.UserID}).Decode(&existingUser); err == nil {
+				if t, ok := existingUser["planExpiresAt"].(time.Time); ok && t.After(base) {
+					base = t // don't lose remaining premium days on renewal
+				}
+			}
+			expiresAt := base.Add(duration)
 
 			// Upgrade user plan in MongoDB
 			_, err := s.mongoDB.Collection("users").UpdateOne(ctx,

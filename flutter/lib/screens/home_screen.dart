@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:grpc/grpc.dart';
+import 'package:share_plus/share_plus.dart';
 import '../providers/game_state.dart';
 import '../services/auth_service.dart';
 import '../services/quiz_service.dart';
@@ -10,6 +11,7 @@ import 'match_history_screen.dart';
 import 'payment_screen.dart';
 import 'link_email_screen.dart';
 import 'tournament_screen.dart';
+import 'referral_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -443,6 +445,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           _profileActionButton(Icons.share, 'Invite Friends', () {
             _showShareDialog(gameState);
           }),
+          const SizedBox(height: 8),
+          _profileActionButton(Icons.card_giftcard, 'Your Referrals', () {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const ReferralScreen()));
+          }),
 
           const SizedBox(height: 32),
 
@@ -571,30 +577,50 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void _showShareDialog(GameState gs) {
     final code = _homeData?.profile.referralCode ?? '';
     if (code.isEmpty) return;
-    showDialog(
+    final shareText = 'Join me on Quiz Battle! Use my referral code $code when signing up — we both earn coins. https://quizbattle.app';
+
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF2A1F5E),
-        title: const Text('Invite Friends', style: TextStyle(color: Colors.white)),
-        content: Column(
+      backgroundColor: const Color(0xFF2A1F5E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+        child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Share your referral code:', style: TextStyle(color: Colors.white70)),
-            const SizedBox(height: 12),
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            const Text('Invite Friends',
+              style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
                 color: Colors.white.withAlpha(10),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFFFF6B35).withAlpha(80)),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(code, style: const TextStyle(color: Color(0xFFFF6B35), fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 2)),
+                  Text(code, style: const TextStyle(color: Color(0xFFFF6B35), fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 2)),
                   const SizedBox(width: 12),
                   IconButton(
                     icon: const Icon(Icons.copy, color: Colors.white54, size: 20),
+                    tooltip: 'Copy code',
                     onPressed: () {
                       Clipboard.setData(ClipboardData(text: code));
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -606,13 +632,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            const Text('Friends get 50 coins, you get 100 coins when they complete their first quiz!',
-              style: TextStyle(color: Colors.white54, fontSize: 12), textAlign: TextAlign.center),
+            const Text(
+              'Friends get 50 coins, you get 100 coins when they complete their first quiz!',
+              style: TextStyle(color: Colors.white54, fontSize: 12),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              height: 48,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.share),
+                label: const Text('Share', style: TextStyle(fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF6B35),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  await Share.share(shareText, subject: 'Join me on Quiz Battle');
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              style: TextButton.styleFrom(foregroundColor: Colors.white54),
+              child: const Text('Close'),
+            ),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
-        ],
       ),
     );
   }

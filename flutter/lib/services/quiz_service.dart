@@ -171,6 +171,20 @@ class QuizService {
     );
   }
 
+  Future<GetReferralDashboardResponse> getReferralDashboard() {
+    return scoring.getReferralDashboard(
+      GetReferralDashboardRequest(),
+      options: _opts(),
+    );
+  }
+
+  Future<ApplyReferralCodeResponse> applyReferralCode(String code) {
+    return scoring.applyReferralCode(
+      ApplyReferralCodeRequest()..code = code,
+      options: _opts(),
+    );
+  }
+
   Future<void> shutdown() async {
     await _matchmakingChannel.shutdown();
     await _quizChannel.shutdown();

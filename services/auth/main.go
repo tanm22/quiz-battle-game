@@ -81,7 +81,7 @@ func (s *authServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb
 	}
 
 	userID := uuid.New().String()
-	refCode := generateReferralCode()
+	refCode := s.generateUniqueReferralCode(ctx, userID)
 	user := models.User{
 		ID:            userID,
 		Username:      req.Username,
@@ -100,9 +100,6 @@ func (s *authServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb
 	if _, err := s.users().InsertOne(ctx, user); err != nil {
 		return nil, status.Errorf(codes.Internal, "insert error: %v", err)
 	}
-
-	// Store referral code in Redis
-	keys.SetRefCode(ctx, s.rdb, refCode, userID)
 
 	// Apply referral code if provided
 	if req.ReferralCode != "" {
@@ -197,12 +194,17 @@ func (s *authServer) GuestLogin(ctx context.Context, _ *pb.GuestLoginRequest) (*
 	shortID := userID[:8]
 	username := "Guest_" + shortID
 
+	// Generate referral code even for guests, so linking their email later preserves the code.
+	// Note: guests CANNOT be referred (applyReferral blocks it), but they CAN refer others.
+	refCode := s.generateUniqueReferralCode(ctx, userID)
+
 	user := models.User{
-		ID:        userID,
-		Username:  username,
-		IsGuest:   true,
-		Rating:    1200,
-		CreatedAt: time.Now().Unix(),
+		ID:           userID,
+		Username:     username,
+		IsGuest:      true,
+		Rating:       1200,
+		ReferralCode: refCode,
+		CreatedAt:    time.Now().Unix(),
 	}
 	if _, err := s.users().InsertOne(ctx, user); err != nil {
 		return nil, status.Errorf(codes.Internal, "insert error: %v", err)
@@ -216,7 +218,7 @@ func (s *authServer) GuestLogin(ctx context.Context, _ *pb.GuestLoginRequest) (*
 	log.Printf("[auth] guest login %s (%s)", username, userID)
 	return &pb.AuthResponse{
 		UserId: userID, Username: username, Token: token,
-		Rating: 1200, IsGuest: true,
+		Rating: 1200, IsGuest: true, ReferralCode: refCode,
 	}, nil
 }
 
@@ -487,8 +489,7 @@ func (s *authServer) GoogleSignIn(ctx context.Context, req *pb.GoogleSignInReque
 
 	// New user only: generate referral code + apply referral if provided (ISSUE-12)
 	if isNewUser {
-		refCode := generateReferralCode()
-		keys.SetRefCode(ctx, s.rdb, refCode, user.ID)
+		refCode := s.generateUniqueReferralCode(ctx, user.ID)
 		s.users().UpdateOne(ctx, bson.M{"_id": user.ID}, bson.M{"$set": bson.M{"referralCode": refCode}})
 		user.ReferralCode = refCode
 
@@ -655,10 +656,39 @@ func generateReferralCode() string {
 	return "REF" + strings.ToUpper(hex.EncodeToString(b))
 }
 
+// generateUniqueReferralCode retries on Redis SETNX collision (max 5 tries).
+// Uses SETNX so two concurrent signups can't be assigned the same code.
+func (s *authServer) generateUniqueReferralCode(ctx context.Context, userID string) string {
+	for i := 0; i < 5; i++ {
+		code := generateReferralCode()
+		ok, err := s.rdb.SetNX(ctx, keys.RefCode(code), userID, 0).Result()
+		if err == nil && ok {
+			return code
+		}
+	}
+	// Vanishingly rare; fall back to last attempt (force set).
+	code := generateReferralCode()
+	keys.SetRefCode(ctx, s.rdb, code, userID)
+	return code
+}
+
 func (s *authServer) applyReferral(ctx context.Context, refereeID, code string) {
 	referrerID, err := keys.GetRefCode(ctx, s.rdb, code)
 	if err != nil || referrerID == "" {
 		log.Printf("[auth] invalid referral code %s", code)
+		return
+	}
+
+	// Anti-abuse: reject self-referral
+	if referrerID == refereeID {
+		log.Printf("[auth] rejected self-referral: user %s", refereeID)
+		return
+	}
+
+	// Anti-abuse: refuse to reward referrals of guest accounts (farmable)
+	var referee models.User
+	if err := s.users().FindOne(ctx, bson.M{"_id": refereeID}).Decode(&referee); err == nil && referee.IsGuest {
+		log.Printf("[auth] rejected referral: referee %s is a guest", refereeID)
 		return
 	}
 
