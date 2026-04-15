@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'providers/game_state.dart';
@@ -13,12 +15,28 @@ import 'services/auth_service.dart';
 import 'services/fcm_service.dart';
 import 'services/quiz_service.dart';
 
+/// FCM background isolate entry point. Android runs this in a fresh isolate
+/// when a push arrives while the app is terminated or backgrounded, so it
+/// must be a top-level function annotated with `vm:entry-point`. We leave
+/// the body empty because the backend always sends a `notification` payload
+/// alongside the data — Android auto-renders that via the default channel
+/// declared in AndroidManifest.xml. This handler just needs to exist so
+/// FirebaseMessaging can wake the isolate for data-only messages.
+@pragma('vm:entry-point')
+Future<void> _fcmBackgroundHandler(RemoteMessage message) async {}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Initialize Firebase early so FCM is ready before any auth flow starts.
   // Failures are logged inside — the app still boots if init throws (e.g. in
   // environments without google-services.json).
   await FcmService.instance.initializeFirebase();
+  // Register the background handler only after Firebase has initialized;
+  // calling this when Firebase.apps is empty throws. If init failed the app
+  // still boots, just without background push wake-up.
+  if (Firebase.apps.isNotEmpty) {
+    FirebaseMessaging.onBackgroundMessage(_fcmBackgroundHandler);
+  }
   runApp(const ProviderScope(child: QuizBattleApp()));
 }
 
