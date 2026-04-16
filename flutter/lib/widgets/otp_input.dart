@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../theme/app_theme.dart';
 
 /// Reusable 6-digit OTP code input widget.
 ///
@@ -83,24 +84,26 @@ class OtpInputState extends State<OtpInput> {
               keyboardType: TextInputType.number,
               maxLength: 1,
               style: const TextStyle(
-                color: Colors.white,
+                color: AppColors.text,
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
               ),
               decoration: InputDecoration(
                 counterText: '',
                 contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                filled: true,
+                fillColor: AppColors.surface,
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Colors.white24),
+                  borderSide: const BorderSide(color: AppColors.border),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Colors.amber, width: 2),
+                  borderSide: const BorderSide(color: AppColors.accent, width: 2),
                 ),
                 disabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Colors.white12),
+                  borderSide: BorderSide(color: AppColors.border.withAlpha(100)),
                 ),
               ),
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/game_state.dart';
+import '../theme/app_theme.dart';
 
 class ResultsScreen extends ConsumerStatefulWidget {
   const ResultsScreen({super.key});
@@ -45,7 +46,7 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen>
     final match = gameState.matchResult;
 
     if (match == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFFFF6B35))));
+      return const Scaffold(body: Center(child: CircularProgressIndicator(color: AppColors.primary)));
     }
 
     final myResult = match.players.where((p) => p.userId == gameState.userId).firstOrNull;
@@ -59,14 +60,7 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen>
         : match.winner;
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF1A1145), Color(0xFF0F0E2E)],
-          ),
-        ),
+      body: ScaffoldGradientBackground(
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -86,15 +80,15 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen>
                           shape: BoxShape.circle,
                           gradient: LinearGradient(
                             colors: opponentLeft
-                                ? [const Color(0xFFFF6B35), const Color(0xFFFF8F5E)]
+                                ? [AppColors.primarySoft, AppColors.primary]
                                 : isWinner
-                                    ? [const Color(0xFFFFD700), const Color(0xFFFFA000)]
-                                    : [Colors.white.withAlpha(20), Colors.white.withAlpha(10)],
+                                    ? [const Color(0xFFF59E0B), AppColors.gold]
+                                    : [AppColors.border, AppColors.border],
                           ),
                           boxShadow: isWinner || opponentLeft
                               ? [BoxShadow(
-                                  color: (isWinner ? const Color(0xFFFFD700) : const Color(0xFFFF6B35))
-                                      .withAlpha((80 * _glowAnimation.value).toInt()),
+                                  color: (isWinner ? AppColors.gold : AppColors.primary)
+                                      .withAlpha((60 * _glowAnimation.value).toInt()),
                                   blurRadius: 40 + 20 * _glowAnimation.value,
                                   spreadRadius: 5 * _glowAnimation.value,
                                 )]
@@ -103,7 +97,7 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen>
                         child: Icon(
                           opponentLeft ? Icons.person_off : isWinner ? Icons.emoji_events : Icons.sports_score,
                           size: 56,
-                          color: isWinner || opponentLeft ? Colors.white : Colors.white54,
+                          color: isWinner || opponentLeft ? Colors.white : AppColors.textMuted,
                         ),
                       ),
                     );
@@ -115,14 +109,14 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen>
                   style: TextStyle(
                     fontSize: 34,
                     fontWeight: FontWeight.w900,
-                    color: opponentLeft ? const Color(0xFFFF6B35) : isWinner ? const Color(0xFFFFD700) : Colors.white70,
+                    color: opponentLeft ? AppColors.primary : isWinner ? AppColors.gold : AppColors.textMuted,
                     letterSpacing: 2,
                   ),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   opponentLeft ? 'You win by default!' : 'Winner: $winnerName',
-                  style: TextStyle(color: Colors.white.withAlpha(120), fontSize: 15),
+                  style: const TextStyle(color: AppColors.textMuted, fontSize: 15),
                 ),
 
                 const SizedBox(height: 32),
@@ -132,17 +126,12 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen>
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withAlpha(8),
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: Colors.white.withAlpha(15)),
-                    ),
+                    decoration: appCardDecoration(),
                     child: Column(
                       children: [
-                        _StatRow('Final Score', '${myResult.finalScore.toInt()}', const Color(0xFFFFD700)),
-                        _StatRow('Rank', '#${myResult.rank}', const Color(0xFF00E5FF)),
-                        _StatRow('Correct', '${myResult.answersCorrect}', const Color(0xFF4CAF50)),
-                        _StatRow('Avg Speed', '${myResult.avgResponseTimeMs.toInt()} ms', const Color(0xFFFF6B35)),
+                        _StatRow('Final Score', '${myResult.finalScore.toInt()}', AppColors.gold),
+                        _StatRow('Rank', '#${myResult.rank}', AppColors.secondary),
+                        _StatRow('Correct', '${myResult.answersCorrect}', AppColors.success),
                       ],
                     ),
                   ),
@@ -160,9 +149,11 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen>
                         margin: const EdgeInsets.only(bottom: 8),
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         decoration: BoxDecoration(
-                          color: isSelf ? const Color(0xFFFF6B35).withAlpha(15) : Colors.white.withAlpha(5),
-                          borderRadius: BorderRadius.circular(12),
-                          border: isSelf ? Border.all(color: const Color(0xFFFF6B35).withAlpha(60)) : null,
+                          color: isSelf ? AppColors.accentBg : AppColors.surface,
+                          borderRadius: AppRadius.card,
+                          border: Border.all(
+                            color: isSelf ? AppColors.accent.withAlpha(60) : AppColors.border,
+                          ),
                         ),
                         child: Row(
                           children: [
@@ -170,12 +161,12 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen>
                               width: 36, height: 36,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: index == 0 ? const Color(0xFFFFD700).withAlpha(30) : Colors.white.withAlpha(10),
+                                color: index == 0 ? AppColors.goldBg : AppColors.cardTint,
                               ),
                               child: Center(child: Text(
                                 '#${p.rank}',
                                 style: TextStyle(
-                                  color: index == 0 ? const Color(0xFFFFD700) : Colors.white54,
+                                  color: index == 0 ? AppColors.gold : AppColors.textMuted,
                                   fontWeight: FontWeight.bold,
                                 ),
                               )),
@@ -186,7 +177,11 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen>
                                 children: [
                                   Flexible(child: Text(
                                     p.username.isEmpty ? p.userId : p.username,
-                                    style: TextStyle(color: isSelf ? Colors.white : Colors.white70, fontSize: 15, fontWeight: isSelf ? FontWeight.bold : FontWeight.normal),
+                                    style: TextStyle(
+                                      color: isSelf ? AppColors.text : AppColors.textSecondary,
+                                      fontSize: 15,
+                                      fontWeight: isSelf ? FontWeight.bold : FontWeight.normal,
+                                    ),
                                     overflow: TextOverflow.ellipsis,
                                   )),
                                   if (p.plan == 'premium') ...[
@@ -194,11 +189,13 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen>
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFFFFD700).withAlpha(30),
+                                        gradient: AppGradients.primary,
                                         borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(color: const Color(0xFFFFD700).withAlpha(80)),
                                       ),
-                                      child: const Text('PRO', style: TextStyle(color: Color(0xFFFFD700), fontSize: 9, fontWeight: FontWeight.w700)),
+                                      child: const Text(
+                                        'PRO',
+                                        style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700),
+                                      ),
                                     ),
                                   ],
                                 ],
@@ -207,7 +204,7 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen>
                             Text(
                               '${p.finalScore.toInt()}',
                               style: TextStyle(
-                                color: index == 0 ? const Color(0xFFFFD700) : Colors.white,
+                                color: index == 0 ? AppColors.gold : AppColors.text,
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -225,9 +222,9 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen>
                   height: 56,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(colors: [Color(0xFFFF6B35), Color(0xFFFF8F5E)]),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [BoxShadow(color: const Color(0xFFFF6B35).withAlpha(100), blurRadius: 20, offset: const Offset(0, 6))],
+                      gradient: AppGradients.primary,
+                      borderRadius: AppRadius.hero,
+                      boxShadow: [BoxShadow(color: AppColors.primary.withAlpha(80), blurRadius: 20, offset: const Offset(0, 6))],
                     ),
                     child: ElevatedButton.icon(
                       onPressed: () => ref.read(gameStateProvider.notifier).playAgain(),
@@ -237,7 +234,7 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen>
                         backgroundColor: Colors.transparent,
                         shadowColor: Colors.transparent,
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        shape: RoundedRectangleBorder(borderRadius: AppRadius.hero),
                       ),
                     ),
                   ),
@@ -264,7 +261,7 @@ class _StatRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.white.withAlpha(150), fontSize: 15)),
+          Text(label, style: const TextStyle(color: AppColors.textMuted, fontSize: 15)),
           Text(value, style: TextStyle(color: valueColor, fontSize: 20, fontWeight: FontWeight.bold)),
         ],
       ),

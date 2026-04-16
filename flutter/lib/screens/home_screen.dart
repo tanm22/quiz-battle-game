@@ -97,38 +97,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final auth = AuthService();
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF1A1145), Color(0xFF0F0E2E)],
-          ),
-        ),
+      body: ScaffoldGradientBackground(
         child: SafeArea(
           child: _buildTabContent(auth, gameState),
         ),
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentTab,
-        onTap: (index) {
-          if (index == 1) {
-            // Play — trigger matchmaking directly
-            ref.read(gameStateProvider.notifier).navigateToMatchmaking();
-          } else {
-            setState(() => _currentTab = index);
-          }
-        },
+        onTap: (index) => setState(() => _currentTab = index),
         type: BottomNavigationBarType.fixed,
-        backgroundColor: const Color(0xFF150F35),
-        selectedItemColor: const Color(0xFFFF6B35),
-        unselectedItemColor: Colors.white38,
+        backgroundColor: AppColors.bgNav,
+        selectedItemColor: AppColors.accent,
+        unselectedItemColor: AppColors.textDim,
         showUnselectedLabels: true,
         selectedFontSize: 12,
         unselectedFontSize: 11,
+        elevation: 8,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.play_circle_filled, size: 32), label: 'Play'),
           BottomNavigationBarItem(icon: Icon(Icons.leaderboard_rounded), label: 'Leaderboard'),
           BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Profile'),
         ],
@@ -138,9 +124,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Widget _buildTabContent(AuthService auth, GameState gs) {
     switch (_currentTab) {
-      case 2:
+      case 1:
         return _buildLeaderboardTab();
-      case 3:
+      case 2:
         return _buildProfileTab(auth, gs);
       default:
         return _buildHomeTab(auth, gs);
@@ -158,14 +144,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return RefreshIndicator(
       onRefresh: _loadHomeData,
-      color: const Color(0xFFFF6B35),
+      color: AppColors.primary,
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
           // Title
           ShaderMask(
             shaderCallback: (bounds) => const LinearGradient(
-              colors: [Color(0xFFFF6B35), Color(0xFFFFD700)],
+              colors: [AppColors.primary, AppColors.gold],
             ).createShader(bounds),
             child: const Text(
               'QUIZ BATTLE',
@@ -216,7 +202,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               margin: const EdgeInsets.only(bottom: 16),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppColors.danger.withAlpha(20),
+                color: AppColors.roseBg,
                 borderRadius: AppRadius.card,
                 border: Border.all(color: AppColors.danger.withAlpha(80)),
               ),
@@ -224,7 +210,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 children: [
                   const Icon(Icons.cloud_off, color: AppColors.danger, size: 32),
                   const SizedBox(height: 8),
-                  Text(_error!, style: const TextStyle(color: Colors.white70), textAlign: TextAlign.center),
+                  Text(_error!, style: const TextStyle(color: AppColors.textSecondary), textAlign: TextAlign.center),
                   const SizedBox(height: 12),
                   ElevatedButton.icon(
                     onPressed: _loadHomeData,
@@ -247,12 +233,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: quotaExhausted
-                    ? LinearGradient(colors: [Colors.grey.shade700, Colors.grey.shade600])
-                    : const LinearGradient(colors: [Color(0xFFFF6B35), Color(0xFFFF8F5E)]),
+                    ? LinearGradient(colors: [Colors.grey.shade400, Colors.grey.shade300])
+                    : const LinearGradient(colors: [Color(0xFFF97316), Color(0xFFEA580C)]),
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: quotaExhausted
                     ? []
-                    : [BoxShadow(color: const Color(0xFFFF6B35).withAlpha(100), blurRadius: 20, offset: const Offset(0, 6))],
+                    : [BoxShadow(color: AppColors.primary.withAlpha(80), blurRadius: 20, offset: const Offset(0, 6))],
               ),
               child: ElevatedButton.icon(
                 onPressed: quotaExhausted
@@ -277,24 +263,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           // Action row: History, Tournaments, Premium, Invite
           Row(
             children: [
-              Expanded(child: _actionButton(Icons.history, 'History', () {
+              Expanded(child: _actionButton('📜', 'History', () {
                 Navigator.push(context, MaterialPageRoute(
                   builder: (_) => MatchHistoryScreen(currentUserId: gameState.userId ?? ''),
                 ));
               })),
               const SizedBox(width: 8),
-              Expanded(child: _actionButton(Icons.emoji_events, 'Tourneys', () {
+              Expanded(child: _actionButton('🏆', 'Tourneys', () {
                 Navigator.push(context, MaterialPageRoute(
                   builder: (_) => TournamentScreen(currentPlan: _homeData?.profile.plan ?? 'free'),
                 ));
               })),
               const SizedBox(width: 8),
-              Expanded(child: _actionButton(Icons.workspace_premium, 'Premium', () {
+              Expanded(child: _actionButton('👑', 'Premium', () {
                 Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentScreen()));
-              }, color: const Color(0xFFFFD700))),
-              const SizedBox(width: 8),
-              Expanded(child: _actionButton(Icons.share, 'Invite', () {
-                _showShareDialog(gameState);
               })),
             ],
           ),
@@ -306,12 +288,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             const SizedBox(height: 16),
           ],
 
-          // Leaderboard preview — real rows when loaded, skeleton rows while
-          // fetching, friendly empty state when the list comes back empty.
+          // Leaderboard preview
           if (_homeData != null && _homeData!.leaderboardPreview.isNotEmpty) ...[
             _buildLeaderboardHeader(),
             const SizedBox(height: 8),
-            ..._homeData!.leaderboardPreview.take(5).map((e) => _leaderboardRow(e)),
+            Container(
+              decoration: appCardDecoration(),
+              child: Column(
+                children: _homeData!.leaderboardPreview.take(5).toList().asMap().entries.map((entry) {
+                  final isLast = entry.key == (_homeData!.leaderboardPreview.length > 5 ? 4 : _homeData!.leaderboardPreview.length - 1);
+                  return _leaderboardRow(entry.value, showBorder: !isLast);
+                }).toList(),
+              ),
+            ),
           ] else if (_homeData != null) ...[
             _buildLeaderboardHeader(),
             const SizedBox(height: 8),
@@ -333,11 +322,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       children: [
         const Icon(Icons.leaderboard, color: AppColors.gold, size: 20),
         const SizedBox(width: 8),
-        const Text('Top Players', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        const Text('Top Players', style: TextStyle(color: AppColors.text, fontSize: 16, fontWeight: FontWeight.bold)),
         const Spacer(),
         GestureDetector(
-          onTap: () => setState(() => _currentTab = 2),
-          child: Text('See all', style: TextStyle(color: AppColors.primary.withAlpha(200), fontSize: 13)),
+          onTap: () => setState(() => _currentTab = 1),
+          child: Text('See all', style: TextStyle(color: AppColors.accent.withAlpha(200), fontSize: 13, fontWeight: FontWeight.w600)),
         ),
       ],
     );
@@ -362,7 +351,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: AppColors.gold.withAlpha(20),
+            color: AppColors.goldBg,
             border: Border.all(color: AppColors.gold.withAlpha(60)),
           ),
           child: const Icon(Icons.emoji_events, size: 40, color: AppColors.gold),
@@ -370,12 +359,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         const SizedBox(height: 14),
         const Text(
           'No scores yet',
-          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+          style: TextStyle(color: AppColors.text, fontSize: 16, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 4),
-        Text(
+        const Text(
           'Play your first match to claim the top spot.',
-          style: TextStyle(color: Colors.white.withAlpha(140), fontSize: 13),
+          style: TextStyle(color: AppColors.textMuted, fontSize: 13),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 14),
@@ -410,9 +399,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
           child: Row(
             children: [
-              const Icon(Icons.leaderboard, color: Color(0xFFFFD700), size: 28),
+              const Icon(Icons.leaderboard, color: AppColors.gold, size: 28),
               const SizedBox(width: 10),
-              const Text('Leaderboard', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+              const Text('Leaderboard', style: TextStyle(color: AppColors.text, fontSize: 22, fontWeight: FontWeight.bold)),
             ],
           ),
         ),
@@ -441,10 +430,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         if (!_lbLoading && _lbEntries != null && _lbEntries!.isNotEmpty)
           Expanded(
-            child: ListView.builder(
+            child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              itemCount: _lbEntries!.length,
-              itemBuilder: (_, i) => _leaderboardRow(_lbEntries![i]),
+              child: Container(
+                decoration: appCardDecoration(),
+                child: ListView.builder(
+                  padding: EdgeInsets.zero,
+                  itemCount: _lbEntries!.length,
+                  itemBuilder: (_, i) => _leaderboardRow(_lbEntries![i], showBorder: i < _lbEntries!.length - 1),
+                ),
+              ),
             ),
           ),
         if (!_lbLoading && (_lbEntries == null || _lbEntries!.isEmpty))
@@ -464,16 +459,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFD700).withAlpha(15),
+                  color: AppColors.goldBg,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFFFD700).withAlpha(40)),
+                  border: Border.all(color: AppColors.gold.withAlpha(60)),
                 ),
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.lock_open, color: Color(0xFFFFD700), size: 16),
+                    Icon(Icons.lock_open, color: AppColors.gold, size: 16),
                     SizedBox(width: 8),
-                    Text('Upgrade to see the full leaderboard', style: TextStyle(color: Color(0xFFFFD700), fontSize: 13, fontWeight: FontWeight.w600)),
+                    Text('Upgrade to see the full leaderboard', style: TextStyle(color: AppColors.goldDeep, fontSize: 13, fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
@@ -490,12 +485,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFFFF6B35).withAlpha(30) : Colors.white.withAlpha(6),
+          color: selected ? AppColors.accentBg : AppColors.cardTint,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: selected ? const Color(0xFFFF6B35) : Colors.white.withAlpha(20)),
+          border: Border.all(color: selected ? AppColors.accent : AppColors.border),
         ),
         child: Text(label, style: TextStyle(
-          color: selected ? const Color(0xFFFF6B35) : Colors.white54,
+          color: selected ? AppColors.accent : AppColors.textMuted,
           fontSize: 13, fontWeight: selected ? FontWeight.bold : FontWeight.normal,
         )),
       ),
@@ -511,11 +506,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return RefreshIndicator(
       onRefresh: _loadHomeData,
-      color: const Color(0xFFFF6B35),
+      color: AppColors.primary,
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          const Text('Profile', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+          const Text('Profile', style: TextStyle(color: AppColors.text, fontSize: 22, fontWeight: FontWeight.bold)),
           const SizedBox(height: 20),
 
           _buildProfileCard(auth, gameState),
@@ -530,9 +525,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           // Info rows
           if (auth.email != null && auth.email!.isNotEmpty)
             _profileInfoRow(Icons.email, 'Email', auth.email!),
-          if (profile?.referralCode.isNotEmpty == true)
-            _profileInfoRow(Icons.card_giftcard, 'Referral Code', profile!.referralCode),
-
           const SizedBox(height: 16),
 
           // Actions
@@ -544,7 +536,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           const SizedBox(height: 8),
           _profileActionButton(Icons.workspace_premium, 'Premium', () {
             Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentScreen()));
-          }, color: const Color(0xFFFFD700)),
+          }, color: AppColors.gold),
           const SizedBox(height: 8),
           _profileActionButton(Icons.share, 'Invite Friends', () {
             _showShareDialog(gameState);
@@ -567,14 +559,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 },
                 icon: const Icon(Icons.logout, size: 16),
                 label: const Text('Logout'),
-                style: TextButton.styleFrom(foregroundColor: Colors.white38),
+                style: TextButton.styleFrom(foregroundColor: AppColors.textDim),
               ),
               const SizedBox(width: 16),
               TextButton.icon(
                 onPressed: () => _confirmDeleteAccount(auth),
                 icon: const Icon(Icons.delete_forever, size: 16),
                 label: const Text('Delete Account'),
-                style: TextButton.styleFrom(foregroundColor: Colors.redAccent.withAlpha(150)),
+                style: TextButton.styleFrom(foregroundColor: AppColors.danger.withAlpha(180)),
               ),
             ],
           ),
@@ -587,19 +579,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white.withAlpha(6),
-        borderRadius: BorderRadius.circular(12),
-      ),
+      decoration: appCardDecoration(),
       child: Row(
         children: [
-          Icon(icon, color: Colors.white54, size: 20),
+          Icon(icon, color: AppColors.textMuted, size: 20),
           const SizedBox(width: 12),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: TextStyle(color: Colors.white.withAlpha(100), fontSize: 11)),
-              Text(value, style: const TextStyle(color: Colors.white, fontSize: 14)),
+              Text(label, style: const TextStyle(color: AppColors.textMuted, fontSize: 11)),
+              Text(value, style: const TextStyle(color: AppColors.text, fontSize: 14)),
             ],
           ),
         ],
@@ -615,8 +604,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         icon: Icon(icon, size: 18),
         label: Text(label),
         style: OutlinedButton.styleFrom(
-          foregroundColor: color ?? Colors.white70,
-          side: BorderSide(color: (color ?? Colors.white).withAlpha(30)),
+          foregroundColor: color ?? AppColors.textSecondary,
+          side: BorderSide(color: AppColors.border),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
           alignment: Alignment.centerLeft,
@@ -629,21 +618,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   // Shared widgets
   // ---------------------------------------------------------------------------
 
-  Widget _actionButton(IconData icon, String label, VoidCallback onTap, {Color? color}) {
-    return OutlinedButton(
-      onPressed: onTap,
-      style: OutlinedButton.styleFrom(
-        foregroundColor: color ?? Colors.white70,
-        side: BorderSide(color: (color ?? Colors.white).withAlpha(30)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  Widget _actionButton(String emoji, String label, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
         padding: const EdgeInsets.symmetric(vertical: 14),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, size: 20),
-          const SizedBox(height: 4),
-          Text(label, style: const TextStyle(fontSize: 12)),
-        ],
+        decoration: appCardDecoration(),
+        child: Column(
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 22)),
+            const SizedBox(height: 4),
+            Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w500)),
+          ],
+        ),
       ),
     );
   }
@@ -653,21 +640,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF00E5FF).withAlpha(60)),
-        color: const Color(0xFF00E5FF).withAlpha(10),
+        border: Border.all(color: AppColors.secondary.withAlpha(60)),
+        color: AppColors.cyanBg,
       ),
       child: Row(
         children: [
-          const Icon(Icons.email_outlined, color: Color(0xFF00E5FF), size: 26),
+          const Icon(Icons.email_outlined, color: AppColors.secondary, size: 26),
           const SizedBox(width: 12),
-          const Expanded(child: Text('Link your email to save progress', style: TextStyle(color: Colors.white70, fontSize: 13))),
+          const Expanded(child: Text('Link your email to save progress', style: TextStyle(color: AppColors.textSecondary, fontSize: 13))),
           ElevatedButton(
             onPressed: () => showModalBottomSheet(
               context: context, isScrollControlled: true,
               backgroundColor: Colors.transparent, builder: (_) => const LinkEmailScreen(),
             ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00E5FF), foregroundColor: Colors.black,
+              backgroundColor: AppColors.secondary, foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
@@ -685,7 +672,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF2A1F5E),
+      backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -699,31 +686,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: Container(
                 width: 40, height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white24,
+                  color: AppColors.border,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
             const SizedBox(height: 18),
             const Text('Invite Friends',
-              style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+              style: TextStyle(color: AppColors.text, fontSize: 20, fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
-                color: Colors.white.withAlpha(10),
+                color: AppColors.orangeBg,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFFF6B35).withAlpha(80)),
+                border: Border.all(color: AppColors.primary.withAlpha(80)),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(code, style: const TextStyle(color: Color(0xFFFF6B35), fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 2)),
+                  Text(code, style: const TextStyle(color: AppColors.primary, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 2)),
                   const SizedBox(width: 12),
                   IconButton(
-                    icon: const Icon(Icons.copy, color: Colors.white54, size: 20),
+                    icon: const Icon(Icons.copy, color: AppColors.textMuted, size: 20),
                     tooltip: 'Copy code',
                     onPressed: () {
                       Clipboard.setData(ClipboardData(text: code));
@@ -736,7 +723,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             const SizedBox(height: 12),
             const Text(
               'Friends get 50 coins, you get 100 coins when they complete their first quiz!',
-              style: TextStyle(color: Colors.white54, fontSize: 12),
+              style: TextStyle(color: AppColors.textMuted, fontSize: 12),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
@@ -746,7 +733,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 icon: const Icon(Icons.share),
                 label: const Text('Share', style: TextStyle(fontWeight: FontWeight.bold)),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFF6B35),
+                  backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
@@ -759,7 +746,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             const SizedBox(height: 8),
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              style: TextButton.styleFrom(foregroundColor: Colors.white54),
+              style: TextButton.styleFrom(foregroundColor: AppColors.textMuted),
               child: const Text('Close'),
             ),
           ],
@@ -772,9 +759,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF2A1F5E),
-        title: const Text('Delete Account?', style: TextStyle(color: Colors.white)),
-        content: const Text('This will permanently delete your account and all progress.', style: TextStyle(color: Colors.white70)),
+        backgroundColor: AppColors.surface,
+        title: const Text('Delete Account?', style: TextStyle(color: AppColors.text)),
+        content: const Text('This will permanently delete your account and all progress.', style: TextStyle(color: AppColors.textSecondary)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           TextButton(
@@ -783,7 +770,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               await auth.deleteAccount();
               if (mounted) ref.read(gameStateProvider.notifier).logout();
             },
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            child: const Text('Delete', style: TextStyle(color: AppColors.danger)),
           ),
         ],
       ),
@@ -800,29 +787,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ? profile!.displayName
         : (profile?.username.isNotEmpty == true ? profile!.username : (auth.username ?? ''));
     final plan = profile?.plan ?? 'free';
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
 
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [Colors.white.withAlpha(15), Colors.white.withAlpha(5)]),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withAlpha(25)),
-      ),
+      decoration: appCardDecoration(),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(3),
             decoration: const BoxDecoration(
               shape: BoxShape.circle,
-              gradient: LinearGradient(colors: [Color(0xFFFF6B35), Color(0xFFFFD700)]),
+              gradient: LinearGradient(colors: [AppColors.primarySoft, AppColors.gold]),
             ),
             child: CircleAvatar(
               radius: 24,
-              backgroundColor: const Color(0xFF1A1145),
+              backgroundColor: AppColors.surface,
               child: profile?.avatarUrl.isNotEmpty == true
                   ? ClipOval(child: Image.network(profile!.avatarUrl, width: 48, height: 48, fit: BoxFit.cover,
-                      errorBuilder: (_, e, s) => const Icon(Icons.person, color: Colors.white, size: 26)))
-                  : const Icon(Icons.person, color: Colors.white, size: 26),
+                      errorBuilder: (_, e, s) => Text(initial, style: const TextStyle(color: AppColors.accent, fontSize: 22, fontWeight: FontWeight.bold))))
+                  : Text(initial, style: const TextStyle(color: AppColors.accent, fontSize: 22, fontWeight: FontWeight.bold)),
             ),
           ),
           const SizedBox(width: 14),
@@ -832,31 +816,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               children: [
                 Row(
                   children: [
-                    Flexible(child: Text(name, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
+                    Flexible(child: Text(name, style: const TextStyle(color: AppColors.text, fontSize: 17, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
                     if (gameState.isGuest) ...[
                       const SizedBox(width: 8),
-                      _badge('Guest', const Color(0xFF00E5FF)),
+                      _badge('Guest', AppColors.secondary),
                     ],
                     if (plan == 'premium') ...[
                       const SizedBox(width: 8),
-                      _badge('PRO', const Color(0xFFFFD700)),
+                      _badge('PRO', AppColors.gold),
                     ],
                   ],
                 ),
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    const Icon(Icons.star, size: 14, color: Color(0xFFFFD700)),
+                    const Icon(Icons.star, size: 14, color: AppColors.gold),
                     const SizedBox(width: 3),
-                    Text('${profile?.rating ?? gameState.rating}', style: const TextStyle(color: Color(0xFFFFD700), fontSize: 13, fontWeight: FontWeight.w600)),
+                    Text('${profile?.rating ?? gameState.rating}', style: const TextStyle(color: AppColors.goldDeep, fontSize: 13, fontWeight: FontWeight.w600)),
                     if (profile != null) ...[
                       const SizedBox(width: 12),
                       Text('${profile.wins}W/${profile.matchesPlayed - profile.wins}L',
-                        style: TextStyle(color: Colors.white.withAlpha(150), fontSize: 13, fontWeight: FontWeight.w600)),
+                        style: const TextStyle(color: AppColors.textMuted, fontSize: 13, fontWeight: FontWeight.w600)),
                       const SizedBox(width: 12),
-                      const Icon(Icons.monetization_on, size: 14, color: Color(0xFFFF6B35)),
+                      const Icon(Icons.monetization_on, size: 14, color: AppColors.primary),
                       const SizedBox(width: 3),
-                      Text('${profile.coins}', style: const TextStyle(color: Color(0xFFFF6B35), fontSize: 13, fontWeight: FontWeight.w600)),
+                      Text('${profile.coins}', style: const TextStyle(color: AppColors.primary, fontSize: 13, fontWeight: FontWeight.w600)),
                     ],
                   ],
                 ),
@@ -872,7 +856,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withAlpha(30), borderRadius: BorderRadius.circular(8),
+        color: color.withAlpha(25), borderRadius: BorderRadius.circular(8),
         border: Border.all(color: color.withAlpha(80)),
       ),
       child: Text(text, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700)),
@@ -884,16 +868,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFFF6B35).withAlpha(15),
+        color: AppColors.orangeBg,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFFF6B35).withAlpha(50)),
+        border: Border.all(color: AppColors.primary.withAlpha(50)),
       ),
       child: Column(
         children: [
-          const Icon(Icons.local_fire_department, color: Color(0xFFFF6B35), size: 28),
+          const Icon(Icons.local_fire_department, color: AppColors.primary, size: 28),
           const SizedBox(height: 4),
-          Text('${streak?.current ?? 0}', style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900)),
-          Text('day streak', style: TextStyle(color: Colors.white.withAlpha(120), fontSize: 12)),
+          Text('${streak?.current ?? 0}', style: const TextStyle(color: AppColors.text, fontSize: 22, fontWeight: FontWeight.w900)),
+          const Text('day streak', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
         ],
       ),
     );
@@ -909,17 +893,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: const Color(0xFF00E5FF).withAlpha(15),
+          color: AppColors.cyanBg,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFF00E5FF).withAlpha(50)),
+          border: Border.all(color: AppColors.secondary.withAlpha(50)),
         ),
         child: Column(
           children: [
-            Icon(isPremium ? Icons.all_inclusive : Icons.play_circle_outline, color: const Color(0xFF00E5FF), size: 28),
+            Icon(isPremium ? Icons.all_inclusive : Icons.play_circle_outline, color: AppColors.secondary, size: 28),
             const SizedBox(height: 4),
             Text(isPremium ? 'Unlimited' : '$remaining/$limit',
-              style: TextStyle(color: Colors.white, fontSize: isPremium ? 16 : 22, fontWeight: FontWeight.w900)),
-            Text(isPremium ? 'premium' : 'quizzes left', style: TextStyle(color: Colors.white.withAlpha(120), fontSize: 12)),
+              style: TextStyle(color: AppColors.text, fontSize: isPremium ? 16 : 22, fontWeight: FontWeight.w900)),
+            Text(isPremium ? 'premium' : 'quizzes left', style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
           ],
         ),
       ),
@@ -935,13 +919,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-      decoration: BoxDecoration(color: Colors.white.withAlpha(6), borderRadius: BorderRadius.circular(14)),
+      decoration: appCardDecoration(),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _Stat(Icons.today, '$matchesToday', 'Today', Colors.white70),
-          _Stat(Icons.local_fire_department, '$streak', 'Streak', const Color(0xFFFF6B35)),
-          _Stat(Icons.track_changes, '${accuracy.toStringAsFixed(0)}%', 'Accuracy', const Color(0xFF00E5FF)),
+          _Stat(Icons.today, '$matchesToday', 'Today', AppColors.accent, AppColors.accentBg),
+          _Stat(Icons.local_fire_department, '$streak', 'Streak', AppColors.primary, AppColors.orangeBg),
+          _Stat(Icons.track_changes, '${accuracy.toStringAsFixed(0)}%', 'Accuracy', AppColors.success, AppColors.emeraldBg),
         ],
       ),
     );
@@ -951,20 +935,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [const Color(0xFFFFD700).withAlpha(20), const Color(0xFFFF6B35).withAlpha(15)],
-        ),
+        color: AppColors.goldBg,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFFFD700).withAlpha(50)),
+        border: Border.all(color: AppColors.gold.withAlpha(60)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          const Row(
             children: [
-              const Icon(Icons.workspace_premium, color: Color(0xFFFFD700), size: 24),
-              const SizedBox(width: 10),
-              const Text('Go Premium', style: TextStyle(color: Color(0xFFFFD700), fontSize: 16, fontWeight: FontWeight.bold)),
+              Icon(Icons.workspace_premium, color: AppColors.gold, size: 24),
+              SizedBox(width: 10),
+              Text('Go Premium', style: TextStyle(color: AppColors.goldDeep, fontSize: 16, fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 10),
@@ -977,8 +959,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: ElevatedButton(
               onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentScreen())),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFFD700),
-                foregroundColor: Colors.black,
+                backgroundColor: AppColors.gold,
+                foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
@@ -995,24 +977,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         children: [
-          Icon(icon, color: Colors.white60, size: 16),
+          Icon(icon, color: AppColors.goldDeep.withAlpha(180), size: 16),
           const SizedBox(width: 8),
-          Text(text, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+          Text(text, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
         ],
       ),
     );
   }
 
-  Widget _leaderboardRow(LeaderboardEntry e) {
+  Widget _leaderboardRow(LeaderboardEntry e, {bool showBorder = true}) {
     final isMedal = e.rank <= 3;
-    const medalColors = [Color(0xFFFFD700), Color(0xFFC0C0C0), Color(0xFFCD7F32)];
-    final color = isMedal ? medalColors[e.rank - 1] : Colors.white54;
+    const medalColors = [AppColors.medalGold, AppColors.medalSilver, AppColors.medalBronze];
+    final color = isMedal ? medalColors[e.rank - 1] : AppColors.textMuted;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(5), borderRadius: BorderRadius.circular(10),
+        border: showBorder ? const Border(bottom: BorderSide(color: AppColors.border, width: 0.5)) : null,
       ),
       child: Row(
         children: [
@@ -1020,10 +1001,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           const SizedBox(width: 8),
           Expanded(child: Row(
             children: [
-              Flexible(child: Text(e.username.isEmpty ? e.userId : e.username, style: const TextStyle(color: Colors.white70, fontSize: 14), overflow: TextOverflow.ellipsis)),
+              Flexible(child: Text(e.username.isEmpty ? e.userId : e.username, style: const TextStyle(color: AppColors.text, fontSize: 14), overflow: TextOverflow.ellipsis)),
               if (e.plan == 'premium') ...[
                 const SizedBox(width: 6),
-                _badge('PRO', const Color(0xFFFFD700)),
+                _badge('PRO', AppColors.gold),
               ],
             ],
           )),
@@ -1039,16 +1020,24 @@ class _Stat extends StatelessWidget {
   final String value;
   final String label;
   final Color color;
-  const _Stat(this.icon, this.value, this.label, this.color);
+  final Color bgColor;
+  const _Stat(this.icon, this.value, this.label, this.color, this.bgColor);
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Icon(icon, size: 18, color: color),
-        const SizedBox(height: 2),
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: bgColor,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 16, color: color),
+        ),
+        const SizedBox(height: 4),
         Text(value, style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.bold)),
-        Text(label, style: TextStyle(color: Colors.white.withAlpha(100), fontSize: 11)),
+        Text(label, style: const TextStyle(color: AppColors.textMuted, fontSize: 11)),
       ],
     );
   }
@@ -1088,7 +1077,7 @@ class _DailyRewardDialogState extends State<_DailyRewardDialog>
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: const Color(0xFF2A1F5E),
+      backgroundColor: AppColors.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(
         padding: const EdgeInsets.all(28),
@@ -1103,19 +1092,19 @@ class _DailyRewardDialogState extends State<_DailyRewardDialog>
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: const LinearGradient(colors: [Color(0xFFFFD700), Color(0xFFFFA000)]),
-                    boxShadow: [BoxShadow(color: const Color(0xFFFFD700).withAlpha(80), blurRadius: 30)],
+                    gradient: const LinearGradient(colors: [Color(0xFFF59E0B), AppColors.primary]),
+                    boxShadow: [BoxShadow(color: AppColors.gold.withAlpha(60), blurRadius: 30)],
                   ),
                   child: const Icon(Icons.local_fire_department, size: 44, color: Colors.white),
                 ),
               ),
             ),
             const SizedBox(height: 20),
-            Text('Day ${widget.streakDay}!', style: const TextStyle(color: Color(0xFFFFD700), fontSize: 28, fontWeight: FontWeight.w900)),
+            Text('Day ${widget.streakDay}!', style: const TextStyle(color: AppColors.goldDeep, fontSize: 28, fontWeight: FontWeight.w900)),
             const SizedBox(height: 8),
-            Text('+${widget.coins} coins', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+            Text('+${widget.coins} coins', style: const TextStyle(color: AppColors.text, fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
-            Text('Keep your streak alive!', style: TextStyle(color: Colors.white.withAlpha(120), fontSize: 14)),
+            const Text('Keep your streak alive!', style: TextStyle(color: AppColors.textMuted, fontSize: 14)),
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
@@ -1127,7 +1116,7 @@ class _DailyRewardDialogState extends State<_DailyRewardDialog>
                   if (context.mounted) Navigator.pop(context);
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFFD700), foregroundColor: Colors.black,
+                  backgroundColor: AppColors.gold, foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),

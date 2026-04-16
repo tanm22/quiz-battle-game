@@ -4,6 +4,7 @@ import 'package:grpc/grpc.dart';
 import '../services/auth_service.dart';
 import '../providers/game_state.dart';
 import '../widgets/otp_input.dart';
+import '../theme/app_theme.dart';
 
 /// Bottom-sheet widget allowing guest users to link an email address.
 ///
@@ -111,7 +112,7 @@ class _LinkEmailScreenState extends ConsumerState<LinkEmailScreen> {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: Color(0xFF1A1A2E),
+        color: AppColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: EdgeInsets.only(
@@ -129,20 +130,28 @@ class _LinkEmailScreenState extends ConsumerState<LinkEmailScreen> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white24,
+                color: AppColors.border,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             const SizedBox(height: 20),
 
             // Header
-            const Icon(Icons.email_outlined, color: Colors.amber, size: 40),
+            Container(
+              width: 56,
+              height: 56,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.accentBg,
+              ),
+              child: const Icon(Icons.email_outlined, color: AppColors.accent, size: 28),
+            ),
             const SizedBox(height: 12),
             const Text(
               'Link your email to save your progress',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white,
+                color: AppColors.text,
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
@@ -150,11 +159,19 @@ class _LinkEmailScreenState extends ConsumerState<LinkEmailScreen> {
             const SizedBox(height: 24),
 
             if (_isSuccess) ...[
-              const Icon(Icons.check_circle, color: Colors.greenAccent, size: 56),
+              Container(
+                width: 56,
+                height: 56,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.emeraldBg,
+                ),
+                child: const Icon(Icons.check_circle, color: AppColors.success, size: 32),
+              ),
               const SizedBox(height: 12),
               const Text(
                 'Email linked successfully!',
-                style: TextStyle(color: Colors.greenAccent, fontSize: 18),
+                style: TextStyle(color: AppColors.success, fontSize: 18, fontWeight: FontWeight.w600),
               ),
             ] else ...[
               // Email field
@@ -162,22 +179,24 @@ class _LinkEmailScreenState extends ConsumerState<LinkEmailScreen> {
                 controller: _emailController,
                 enabled: !_codeSent,
                 keyboardType: TextInputType.emailAddress,
-                style: const TextStyle(color: Colors.white),
+                style: const TextStyle(color: AppColors.text),
                 decoration: InputDecoration(
                   labelText: 'Email',
-                  labelStyle: const TextStyle(color: Colors.white54),
-                  prefixIcon: const Icon(Icons.email, color: Colors.white54),
+                  labelStyle: const TextStyle(color: AppColors.textMuted),
+                  prefixIcon: const Icon(Icons.email, color: AppColors.textMuted),
+                  filled: true,
+                  fillColor: AppColors.cardTint,
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Colors.white24),
+                    borderSide: const BorderSide(color: AppColors.border),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Colors.amber),
+                    borderSide: const BorderSide(color: AppColors.accent),
                   ),
                   disabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Colors.white12),
+                    borderSide: BorderSide(color: AppColors.border.withAlpha(100)),
                   ),
                 ),
               ),
@@ -188,39 +207,45 @@ class _LinkEmailScreenState extends ConsumerState<LinkEmailScreen> {
                 SizedBox(
                   width: double.infinity,
                   height: 48,
-                  child: ElevatedButton(
-                    onPressed: _isSendingCode ? null : _sendCode,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.amber,
-                      foregroundColor: Colors.black,
-                      disabledBackgroundColor: Colors.amber.withAlpha(100),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: _isSendingCode ? null : AppGradients.primary,
+                      color: _isSendingCode ? AppColors.border : null,
+                      borderRadius: AppRadius.button,
                     ),
-                    child: _isSendingCode
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.black54,
+                    child: ElevatedButton(
+                      onPressed: _isSendingCode ? null : _sendCode,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: AppColors.border,
+                        shape: RoundedRectangleBorder(borderRadius: AppRadius.button),
+                      ),
+                      child: _isSendingCode
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.textMuted,
+                              ),
+                            )
+                          : const Text(
+                              'Send Code',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          )
-                        : const Text(
-                            'Send Code',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                    ),
                   ),
                 ),
               ] else ...[
                 // Code sent info
                 const Text(
                   'Enter the 6-digit code sent to your email',
-                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
                 ),
                 const SizedBox(height: 16),
 
@@ -235,32 +260,38 @@ class _LinkEmailScreenState extends ConsumerState<LinkEmailScreen> {
                 SizedBox(
                   width: double.infinity,
                   height: 48,
-                  child: ElevatedButton(
-                    onPressed: _isVerifying ? null : _verifyAndLink,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.amber,
-                      foregroundColor: Colors.black,
-                      disabledBackgroundColor: Colors.amber.withAlpha(100),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: _isVerifying ? null : AppGradients.primary,
+                      color: _isVerifying ? AppColors.border : null,
+                      borderRadius: AppRadius.button,
                     ),
-                    child: _isVerifying
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.black54,
+                    child: ElevatedButton(
+                      onPressed: _isVerifying ? null : _verifyAndLink,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: AppColors.border,
+                        shape: RoundedRectangleBorder(borderRadius: AppRadius.button),
+                      ),
+                      child: _isVerifying
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.textMuted,
+                              ),
+                            )
+                          : const Text(
+                              'Verify & Link',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          )
-                        : const Text(
-                            'Verify & Link',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -270,7 +301,7 @@ class _LinkEmailScreenState extends ConsumerState<LinkEmailScreen> {
                   onPressed: _isSendingCode ? null : _sendCode,
                   child: const Text(
                     'Resend code',
-                    style: TextStyle(color: Colors.amber, fontSize: 14),
+                    style: TextStyle(color: AppColors.accent, fontSize: 14),
                   ),
                 ),
               ],
@@ -281,7 +312,7 @@ class _LinkEmailScreenState extends ConsumerState<LinkEmailScreen> {
                 Text(
                   _error!,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.redAccent, fontSize: 14),
+                  style: const TextStyle(color: AppColors.danger, fontSize: 14),
                 ),
               ],
             ],

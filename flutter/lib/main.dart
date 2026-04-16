@@ -57,10 +57,10 @@ class QuizBattleApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: AppColors.primary,
-          brightness: Brightness.dark,
+          seedColor: AppColors.accent,
+          brightness: Brightness.light,
         ),
-        scaffoldBackgroundColor: AppColors.bgDeep,
+        scaffoldBackgroundColor: AppColors.bg,
         fontFamily: 'Roboto',
       ),
       home: const AppShell(),

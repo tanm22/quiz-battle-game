@@ -5,6 +5,7 @@ import 'package:share_plus/share_plus.dart';
 import '../services/quiz_service.dart';
 import '../proto/quiz.pbgrpc.dart';
 import '../widgets/animated_toast.dart';
+import '../theme/app_theme.dart';
 
 /// Referral dashboard — shows total invites, conversions, coins earned,
 /// the user's own code (copy/share), and an input to apply a friend's code.
@@ -75,7 +76,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Referral applied! Play your first quiz to earn 50 coins.'),
-          backgroundColor: Colors.green,
+          backgroundColor: AppColors.success,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -86,7 +87,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(e.message ?? 'Failed to apply code'),
-            backgroundColor: Colors.redAccent,
+            backgroundColor: AppColors.danger,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -94,7 +95,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: Colors.redAccent, behavior: SnackBarBehavior.floating),
+          SnackBar(content: Text(e.toString()), backgroundColor: AppColors.danger, behavior: SnackBarBehavior.floating),
         );
       }
     } finally {
@@ -106,21 +107,14 @@ class _ReferralScreenState extends State<ReferralScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1A1145),
-        foregroundColor: Colors.white,
+        backgroundColor: AppColors.bg,
+        foregroundColor: AppColors.text,
         title: const Text('Referrals'),
         elevation: 0,
       ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF1A1145), Color(0xFF0F0E2E)],
-          ),
-        ),
+      body: ScaffoldGradientBackground(
         child: _loading
-            ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF6B35)))
+            ? const Center(child: CircularProgressIndicator(color: AppColors.accent))
             : _error != null
                 ? _buildError()
                 : _buildContent(),
@@ -135,13 +129,13 @@ class _ReferralScreenState extends State<ReferralScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.white54),
+            const Icon(Icons.error_outline, size: 48, color: AppColors.textMuted),
             const SizedBox(height: 12),
-            Text(_error!, style: const TextStyle(color: Colors.white70), textAlign: TextAlign.center),
+            Text(_error!, style: const TextStyle(color: AppColors.textSecondary), textAlign: TextAlign.center),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _load,
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF6B35)),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
               child: const Text('Retry'),
             ),
           ],
@@ -154,37 +148,40 @@ class _ReferralScreenState extends State<ReferralScreen> {
     final d = _data!;
     return RefreshIndicator(
       onRefresh: _load,
-      color: const Color(0xFFFF6B35),
+      color: AppColors.accent,
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
           // Stat cards
           Row(
             children: [
-              Expanded(child: _statCard('Invites', d.totalInvites.toString(), Icons.people, const Color(0xFF00E5FF))),
+              Expanded(child: _statCard('Invites', d.totalInvites.toString(), Icons.people, AppColors.secondary, AppColors.cyanBg)),
               const SizedBox(width: 10),
-              Expanded(child: _statCard('Converted', d.conversions.toString(), Icons.check_circle, const Color(0xFF4CAF50))),
+              Expanded(child: _statCard('Converted', d.conversions.toString(), Icons.check_circle, AppColors.success, AppColors.emeraldBg)),
               const SizedBox(width: 10),
-              Expanded(child: _statCard('Coins', d.coinsEarned.toString(), Icons.monetization_on, const Color(0xFFFFD700))),
+              Expanded(child: _statCard('Coins', d.coinsEarned.toString(), Icons.monetization_on, AppColors.gold, AppColors.goldBg)),
             ],
           ),
           const SizedBox(height: 24),
 
           // Your code
-          const Text('Your referral code', style: TextStyle(color: Colors.white70, fontSize: 13)),
+          const Text('Your referral code', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: const Color(0xFFFF6B35).withAlpha(15),
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFFF6B35).withAlpha(80)),
+              border: Border.all(color: AppColors.accent.withAlpha(100)),
+              boxShadow: const [
+                BoxShadow(color: Color(0x0F000000), blurRadius: 4, offset: Offset(0, 1)),
+              ],
             ),
             child: Column(
               children: [
                 Text(
                   d.referralCode.isEmpty ? 'Not generated yet' : d.referralCode,
-                  style: const TextStyle(color: Color(0xFFFF6B35), fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: 3),
+                  style: const TextStyle(color: AppColors.accent, fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: 3),
                 ),
                 const SizedBox(height: 14),
                 Row(
@@ -195,8 +192,8 @@ class _ReferralScreenState extends State<ReferralScreen> {
                         icon: const Icon(Icons.copy, size: 18),
                         label: const Text('Copy'),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: BorderSide(color: Colors.white.withAlpha(60)),
+                          foregroundColor: AppColors.textSecondary,
+                          side: const BorderSide(color: AppColors.border),
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
@@ -209,7 +206,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
                         icon: const Icon(Icons.share, size: 18),
                         label: const Text('Share'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFFF6B35),
+                          backgroundColor: AppColors.accent,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -227,17 +224,18 @@ class _ReferralScreenState extends State<ReferralScreen> {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.white.withAlpha(6),
+              color: AppColors.cardTint,
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
             ),
             child: const Row(
               children: [
-                Icon(Icons.info_outline, color: Colors.white54, size: 20),
+                Icon(Icons.info_outline, color: AppColors.textMuted, size: 20),
                 SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     'Friends get 50 coins, you get 100 coins — paid when they complete their first quiz. Cap: 20 conversions.',
-                    style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 12, height: 1.4),
                   ),
                 ),
               ],
@@ -246,24 +244,24 @@ class _ReferralScreenState extends State<ReferralScreen> {
           const SizedBox(height: 24),
 
           // Apply someone else's code
-          const Text('Have a friend\'s code?', style: TextStyle(color: Colors.white70, fontSize: 13)),
+          const Text('Have a friend\'s code?', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
           const SizedBox(height: 8),
           TextField(
             controller: _codeController,
-            style: const TextStyle(color: Colors.white, letterSpacing: 2),
+            style: const TextStyle(color: AppColors.text, letterSpacing: 2),
             textCapitalization: TextCapitalization.characters,
             decoration: InputDecoration(
               hintText: 'REFXXXXXXXX',
-              hintStyle: const TextStyle(color: Colors.white38),
+              hintStyle: const TextStyle(color: AppColors.textDim),
               filled: true,
-              fillColor: Colors.white.withAlpha(10),
+              fillColor: AppColors.surface,
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.white.withAlpha(30)),
+                borderSide: const BorderSide(color: AppColors.border),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFFFF6B35), width: 2),
+                borderSide: const BorderSide(color: AppColors.accent, width: 2),
               ),
             ),
           ),
@@ -274,12 +272,12 @@ class _ReferralScreenState extends State<ReferralScreen> {
             child: ElevatedButton(
               onPressed: _applying ? null : _applyCode,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00E5FF),
-                foregroundColor: Colors.black,
+                backgroundColor: AppColors.secondary,
+                foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               child: _applying
-                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                   : const Text('Apply code', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
             ),
           ),
@@ -288,11 +286,11 @@ class _ReferralScreenState extends State<ReferralScreen> {
     );
   }
 
-  Widget _statCard(String label, String value, IconData icon, Color color) {
+  Widget _statCard(String label, String value, IconData icon, Color color, Color bgColor) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: color.withAlpha(15),
+        color: bgColor,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: color.withAlpha(60)),
       ),
@@ -302,7 +300,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
           const SizedBox(height: 6),
           Text(value, style: TextStyle(color: color, fontSize: 22, fontWeight: FontWeight.w900)),
           const SizedBox(height: 2),
-          Text(label, style: const TextStyle(color: Colors.white54, fontSize: 11)),
+          Text(label, style: const TextStyle(color: AppColors.textMuted, fontSize: 11)),
         ],
       ),
     );

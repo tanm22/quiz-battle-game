@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:grpc/grpc.dart';
 import '../services/auth_service.dart';
 import '../widgets/otp_input.dart';
+import '../theme/app_theme.dart';
 
 /// Screen for entering 6-digit email verification codes.
 /// Used by email login, email linking, and password reset flows.
@@ -132,7 +133,7 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Code resent'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.success,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -142,7 +143,7 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(e.message ?? 'Failed to resend code'),
-            backgroundColor: Colors.redAccent,
+            backgroundColor: AppColors.danger,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -179,7 +180,7 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Password reset successfully. Please log in.'),
-          backgroundColor: Colors.green,
+          backgroundColor: AppColors.success,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -200,15 +201,17 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
   InputDecoration _inputDecoration(String label, IconData icon) {
     return InputDecoration(
       labelText: label,
-      labelStyle: const TextStyle(color: Colors.white54),
-      prefixIcon: Icon(icon, color: Colors.white54),
+      labelStyle: const TextStyle(color: AppColors.textMuted),
+      prefixIcon: Icon(icon, color: AppColors.textMuted),
+      filled: true,
+      fillColor: AppColors.surface,
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.white24),
+        borderSide: const BorderSide(color: AppColors.border),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.amber),
+        borderSide: const BorderSide(color: AppColors.accent),
       ),
     );
   }
@@ -217,15 +220,15 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
+        const Text(
           'Enter the code sent to',
-          style: const TextStyle(color: Colors.white70, fontSize: 16),
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
         ),
         const SizedBox(height: 4),
         Text(
           widget.email,
           style: const TextStyle(
-            color: Colors.amber,
+            color: AppColors.primary,
             fontSize: 16,
             fontWeight: FontWeight.bold,
           ),
@@ -246,7 +249,7 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
             padding: const EdgeInsets.only(bottom: 12),
             child: Text(
               _error!,
-              style: const TextStyle(color: Colors.redAccent, fontSize: 14),
+              style: const TextStyle(color: AppColors.danger, fontSize: 14),
               textAlign: TextAlign.center,
             ),
           ),
@@ -259,7 +262,7 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
                 ? 'Resend code in ${_resendCountdown}s'
                 : 'Resend code',
             style: TextStyle(
-              color: _resendCountdown > 0 ? Colors.white38 : Colors.amber,
+              color: _resendCountdown > 0 ? AppColors.textDim : AppColors.accent,
               fontSize: 14,
             ),
           ),
@@ -271,26 +274,32 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
         SizedBox(
           width: double.infinity,
           height: 48,
-          child: ElevatedButton(
-            onPressed: _isVerifying ? null : _verifyCode,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.amber,
-              foregroundColor: Colors.black,
-              disabledBackgroundColor: Colors.amber.withAlpha(100),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: _isVerifying ? null : AppGradients.primary,
+              color: _isVerifying ? AppColors.border : null,
+              borderRadius: AppRadius.button,
             ),
-            child: _isVerifying
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text(
-                    'Verify',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
+            child: ElevatedButton(
+              onPressed: _isVerifying ? null : _verifyCode,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: AppColors.border,
+                shape: RoundedRectangleBorder(borderRadius: AppRadius.button),
+              ),
+              child: _isVerifying
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.textMuted),
+                    )
+                  : const Text(
+                      'Verify',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+            ),
           ),
         ),
       ],
@@ -301,25 +310,25 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.check_circle, color: Colors.green, size: 48),
+        const Icon(Icons.check_circle, color: AppColors.success, size: 48),
         const SizedBox(height: 12),
         const Text(
           'Code verified! Set your new password.',
-          style: TextStyle(color: Colors.white70, fontSize: 16),
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 24),
         TextField(
           controller: _newPasswordController,
           obscureText: true,
-          style: const TextStyle(color: Colors.white),
+          style: const TextStyle(color: AppColors.text),
           decoration: _inputDecoration('New Password', Icons.lock),
         ),
         const SizedBox(height: 16),
         TextField(
           controller: _confirmPasswordController,
           obscureText: true,
-          style: const TextStyle(color: Colors.white),
+          style: const TextStyle(color: AppColors.text),
           decoration: _inputDecoration('Confirm Password', Icons.lock_outline),
           onSubmitted: (_) => _submitPasswordReset(),
         ),
@@ -330,7 +339,7 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
               _error!,
-              style: const TextStyle(color: Colors.redAccent, fontSize: 14),
+              style: const TextStyle(color: AppColors.danger, fontSize: 14),
               textAlign: TextAlign.center,
             ),
           ),
@@ -339,26 +348,32 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
         SizedBox(
           width: double.infinity,
           height: 48,
-          child: ElevatedButton(
-            onPressed: _isResetting ? null : _submitPasswordReset,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.amber,
-              foregroundColor: Colors.black,
-              disabledBackgroundColor: Colors.amber.withAlpha(100),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: _isResetting ? null : AppGradients.primary,
+              color: _isResetting ? AppColors.border : null,
+              borderRadius: AppRadius.button,
             ),
-            child: _isResetting
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text(
-                    'Reset Password',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
+            child: ElevatedButton(
+              onPressed: _isResetting ? null : _submitPasswordReset,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: AppColors.border,
+                shape: RoundedRectangleBorder(borderRadius: AppRadius.button),
+              ),
+              child: _isResetting
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.textMuted),
+                    )
+                  : const Text(
+                      'Reset Password',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+            ),
           ),
         ),
       ],
@@ -380,18 +395,20 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF1A1A2E),
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1A1A2E),
-        foregroundColor: Colors.white,
+        backgroundColor: AppColors.bg,
+        foregroundColor: AppColors.text,
         title: Text(title),
         elevation: 0,
       ),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(32),
-            child: _showPasswordReset ? _buildPasswordReset() : _buildCodeEntry(),
+      body: ScaffoldGradientBackground(
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(32),
+              child: _showPasswordReset ? _buildPasswordReset() : _buildCodeEntry(),
+            ),
           ),
         ),
       ),

@@ -27,7 +27,7 @@ class LeaderboardScreen extends ConsumerWidget {
                     const Icon(Icons.leaderboard, color: AppColors.gold, size: 28),
                     const SizedBox(width: 10),
                     const Text('Leaderboard',
-                        style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                        style: TextStyle(color: AppColors.text, fontSize: 22, fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),
@@ -101,7 +101,7 @@ class _EmptyLeaderboard extends StatelessWidget {
               height: 96,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.gold.withAlpha(20),
+                color: AppColors.goldBg,
                 border: Border.all(color: AppColors.gold.withAlpha(80), width: 2),
               ),
               child: const Icon(Icons.emoji_events, color: AppColors.gold, size: 44),
@@ -109,13 +109,13 @@ class _EmptyLeaderboard extends StatelessWidget {
             const SizedBox(height: 20),
             const Text(
               'No scores yet',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
+              style: TextStyle(color: AppColors.text, fontSize: 18, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
-            Text(
+            const Text(
               'First correct answer puts you on the board.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white.withAlpha(160), fontSize: 14, height: 1.4),
+              style: TextStyle(color: AppColors.textMuted, fontSize: 14, height: 1.4),
             ),
           ],
         ),
@@ -125,6 +125,13 @@ class _EmptyLeaderboard extends StatelessWidget {
 }
 
 class _LeaderboardRow extends StatelessWidget {
+  // Podium background tints for top 3
+  static const _podiumBg = [
+    AppColors.goldBg,           // 1st – gold tint
+    Color(0xFFF1F5F9),          // 2nd – light grey
+    Color(0xFFFFF7ED),          // 3rd – warm tint
+  ];
+
   static const _medalColors = [
     AppColors.medalGold,
     AppColors.medalSilver,
@@ -139,6 +146,7 @@ class _LeaderboardRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final isMedal = position <= 3;
     final medalColor = isMedal ? _medalColors[position - 1] : null;
+    final bgColor = isMedal ? _podiumBg[position - 1] : AppColors.surface;
 
     return AnimatedContainer(
       duration: AppDurations.medium,
@@ -146,9 +154,12 @@ class _LeaderboardRow extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: isMedal ? medalColor!.withAlpha(20) : Colors.white.withAlpha(6),
+        color: bgColor,
         borderRadius: AppRadius.card,
-        border: isMedal ? Border.all(color: medalColor!.withAlpha(60)) : null,
+        border: Border.all(color: isMedal ? medalColor!.withAlpha(80) : AppColors.border),
+        boxShadow: const [
+          BoxShadow(color: Color(0x0F000000), blurRadius: 4, offset: Offset(0, 1)),
+        ],
       ),
       child: Row(
         children: [
@@ -158,14 +169,14 @@ class _LeaderboardRow extends StatelessWidget {
             height: 36,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: isMedal ? medalColor!.withAlpha(40) : Colors.white.withAlpha(10),
+              color: isMedal ? medalColor!.withAlpha(40) : AppColors.cardTint,
             ),
             child: Center(
               child: isMedal && position == 1
                   ? Icon(Icons.emoji_events, color: medalColor, size: 20)
                   : Text('#$position',
                       style: TextStyle(
-                          color: medalColor ?? Colors.white54,
+                          color: medalColor ?? AppColors.textMuted,
                           fontSize: 15,
                           fontWeight: FontWeight.bold)),
             ),
@@ -176,7 +187,7 @@ class _LeaderboardRow extends StatelessWidget {
           Expanded(
             child: Text(
               entry.username.isEmpty ? entry.userId : entry.username,
-              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+              style: const TextStyle(color: AppColors.text, fontSize: 16, fontWeight: FontWeight.w500),
             ),
           ),
 
@@ -188,7 +199,7 @@ class _LeaderboardRow extends StatelessWidget {
               '${entry.score.toInt()}',
               key: ValueKey(entry.score.toInt()),
               style: TextStyle(
-                color: isMedal ? medalColor : Colors.white,
+                color: isMedal ? medalColor : AppColors.text,
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),

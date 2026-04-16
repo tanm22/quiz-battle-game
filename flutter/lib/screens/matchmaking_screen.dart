@@ -108,31 +108,42 @@ class _SearchingView extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: AppColors.secondary.withValues(alpha: 1.0 - pulseController.value),
+                  color: AppColors.accent.withValues(alpha: 1.0 - pulseController.value),
                   width: 3,
                 ),
               ),
               child: Center(
                 child: Container(
                   padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     shape: BoxShape.circle,
-                    color: AppColors.secondary.withAlpha(20),
+                    color: AppColors.accentBg,
                   ),
-                  child: const Icon(Icons.search, color: AppColors.secondary, size: 44),
+                  child: const Icon(Icons.search, color: AppColors.accent, size: 44),
                 ),
               ),
             );
           },
         ),
         const SizedBox(height: 24),
-        const Text('Finding opponent...', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
+        const Text(
+          'Finding opponent...',
+          style: TextStyle(color: AppColors.text, fontSize: 18, fontWeight: FontWeight.w600),
+        ),
         const SizedBox(height: 8),
-        Text('Searching for a worthy challenger', style: TextStyle(color: Colors.white.withAlpha(100), fontSize: 14)),
+        const Text(
+          'Searching for a worthy challenger',
+          style: TextStyle(color: AppColors.textMuted, fontSize: 14),
+        ),
         const SizedBox(height: 28),
         TextButton(
           onPressed: onCancel,
-          child: const Text('Cancel', style: TextStyle(color: Colors.redAccent, fontSize: 15)),
+          style: TextButton.styleFrom(
+            backgroundColor: AppColors.roseBg,
+            shape: const RoundedRectangleBorder(borderRadius: AppRadius.button),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+          ),
+          child: const Text('Cancel', style: TextStyle(color: AppColors.danger, fontSize: 15)),
         ),
       ],
     );
@@ -154,55 +165,59 @@ class _ErrorView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white.withAlpha(8),
-        borderRadius: AppRadius.hero,
-        border: Border.all(color: AppColors.danger.withAlpha(80)),
-      ),
+      decoration: appCardDecoration(borderColor: AppColors.danger.withAlpha(80)),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               shape: BoxShape.circle,
-              color: AppColors.danger.withAlpha(30),
+              color: AppColors.roseBg,
             ),
             child: const Icon(Icons.error_outline, color: AppColors.danger, size: 40),
           ),
           const SizedBox(height: 20),
           const Text(
             "Couldn't start the match",
-            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+            style: TextStyle(color: AppColors.text, fontSize: 18, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 10),
           Text(
             message,
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white.withAlpha(180), fontSize: 14, height: 1.4),
+            style: const TextStyle(color: AppColors.textSecondary, fontSize: 14, height: 1.4),
           ),
           const SizedBox(height: 24),
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Try again'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: const RoundedRectangleBorder(borderRadius: AppRadius.button),
-                textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: AppGradients.primary,
+                borderRadius: AppRadius.button,
+                boxShadow: [BoxShadow(color: AppColors.primary.withAlpha(60), blurRadius: 12, offset: const Offset(0, 4))],
+              ),
+              child: ElevatedButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Try again'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: const RoundedRectangleBorder(borderRadius: AppRadius.button),
+                  textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                ),
               ),
             ),
           ),
           const SizedBox(height: 8),
           TextButton(
             onPressed: onCancel,
-            child: Text(
+            child: const Text(
               'Back to home',
-              style: TextStyle(color: Colors.white.withAlpha(180), fontSize: 14),
+              style: TextStyle(color: AppColors.textMuted, fontSize: 14),
             ),
           ),
         ],

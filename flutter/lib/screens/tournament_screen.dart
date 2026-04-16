@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:grpc/grpc.dart';
 import '../services/quiz_service.dart';
 import '../proto/quiz.pbgrpc.dart';
+import '../theme/app_theme.dart';
 import 'payment_screen.dart';
 
 class TournamentScreen extends StatefulWidget {
@@ -42,7 +43,7 @@ class _TournamentScreenState extends State<TournamentScreen> {
       await QuizService().joinTournament(t.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Joined "${t.name}"!'), backgroundColor: Colors.green, behavior: SnackBarBehavior.floating),
+          SnackBar(content: Text('Joined "${t.name}"!'), backgroundColor: AppColors.success, behavior: SnackBarBehavior.floating),
         );
         _load(); // refresh count
       }
@@ -52,7 +53,7 @@ class _TournamentScreenState extends State<TournamentScreen> {
           _showUpgradeDialog();
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(e.message ?? 'Failed to join'), backgroundColor: Colors.redAccent, behavior: SnackBarBehavior.floating),
+            SnackBar(content: Text(e.message ?? 'Failed to join'), backgroundColor: AppColors.danger, behavior: SnackBarBehavior.floating),
           );
         }
       }
@@ -63,17 +64,18 @@ class _TournamentScreenState extends State<TournamentScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF2A1F5E),
-        title: const Text('Premium Required', style: TextStyle(color: Colors.white)),
-        content: const Text('Upgrade to Premium to join tournaments and compete for prizes!', style: TextStyle(color: Colors.white70)),
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.hero),
+        title: const Text('Premium Required', style: TextStyle(color: AppColors.text)),
+        content: const Text('Upgrade to Premium to join tournaments and compete for prizes!', style: TextStyle(color: AppColors.textSecondary)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Later')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Later', style: TextStyle(color: AppColors.textMuted))),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
               Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentScreen()));
             },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFD700), foregroundColor: Colors.black),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
             child: const Text('Upgrade'),
           ),
         ],
@@ -85,44 +87,47 @@ class _TournamentScreenState extends State<TournamentScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1A1145),
-        foregroundColor: Colors.white,
+        backgroundColor: AppColors.bg,
+        foregroundColor: AppColors.text,
         title: const Text('Tournaments'),
         elevation: 0,
       ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF1A1145), Color(0xFF0F0E2E)],
-          ),
-        ),
+      body: ScaffoldGradientBackground(
         child: _loading
-            ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF6B35)))
+            ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
             : _error != null
                 ? Center(child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(_error!, style: const TextStyle(color: Colors.redAccent)),
+                      Container(
+                        width: 48, height: 48,
+                        decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.roseBg),
+                        child: const Icon(Icons.error_outline, color: AppColors.danger, size: 24),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(_error!, style: const TextStyle(color: AppColors.textMuted), textAlign: TextAlign.center),
                       const SizedBox(height: 8),
-                      TextButton(onPressed: _load, child: const Text('Retry', style: TextStyle(color: Color(0xFFFF6B35)))),
+                      TextButton(onPressed: _load, child: const Text('Retry', style: TextStyle(color: AppColors.primary))),
                     ],
                   ))
                 : _tournaments == null || _tournaments!.isEmpty
                     ? Center(child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.emoji_events, color: Colors.white.withAlpha(40), size: 64),
+                          Container(
+                            width: 64, height: 64,
+                            decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.goldBg),
+                            child: const Icon(Icons.emoji_events, color: AppColors.gold, size: 32),
+                          ),
                           const SizedBox(height: 12),
-                          Text('No tournaments right now', style: TextStyle(color: Colors.white.withAlpha(100), fontSize: 16)),
+                          const Text('No tournaments right now', style: TextStyle(color: AppColors.textMuted, fontSize: 16)),
                           const SizedBox(height: 4),
-                          Text('Check back soon!', style: TextStyle(color: Colors.white.withAlpha(60), fontSize: 13)),
+                          const Text('Check back soon!', style: TextStyle(color: AppColors.textDim, fontSize: 13)),
                         ],
                       ))
                     : RefreshIndicator(
                         onRefresh: _load,
-                        color: const Color(0xFFFF6B35),
+                        color: AppColors.primary,
                         child: ListView.builder(
                           padding: const EdgeInsets.all(20),
                           itemCount: _tournaments!.length,
@@ -148,36 +153,47 @@ class _TournamentScreenState extends State<TournamentScreen> {
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(8),
-        borderRadius: BorderRadius.circular(16),
+        color: AppColors.surface,
+        borderRadius: AppRadius.card,
         border: Border.all(
-          color: isActive ? const Color(0xFF4CAF50).withAlpha(60) : Colors.white.withAlpha(15),
+          color: isActive ? AppColors.success.withAlpha(80) : AppColors.border,
         ),
+        boxShadow: const [
+          BoxShadow(color: Color(0x0F000000), blurRadius: 4, offset: Offset(0, 1)),
+          BoxShadow(color: Color(0x14000000), blurRadius: 1),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(
-                Icons.emoji_events,
-                color: isActive ? const Color(0xFF4CAF50) : const Color(0xFFFFD700),
-                size: 24,
+              Container(
+                width: 36, height: 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isActive ? AppColors.emeraldBg : AppColors.goldBg,
+                ),
+                child: Icon(
+                  Icons.emoji_events,
+                  color: isActive ? AppColors.success : AppColors.gold,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: Text(t.name, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
+                child: Text(t.name, style: const TextStyle(color: AppColors.text, fontSize: 17, fontWeight: FontWeight.bold)),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: isActive ? const Color(0xFF4CAF50).withAlpha(25) : const Color(0xFFFF6B35).withAlpha(20),
+                  color: isActive ? AppColors.emeraldBg : AppColors.orangeBg,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
                   isActive ? 'LIVE' : 'UPCOMING',
                   style: TextStyle(
-                    color: isActive ? const Color(0xFF4CAF50) : const Color(0xFFFF6B35),
+                    color: isActive ? AppColors.success : AppColors.primary,
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                   ),
@@ -189,22 +205,22 @@ class _TournamentScreenState extends State<TournamentScreen> {
           // Info row
           Row(
             children: [
-              Icon(Icons.schedule, color: Colors.white.withAlpha(100), size: 14),
+              const Icon(Icons.schedule, color: AppColors.textDim, size: 14),
               const SizedBox(width: 4),
-              Text(timeLabel, style: TextStyle(color: Colors.white.withAlpha(120), fontSize: 12)),
+              Text(timeLabel, style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
               const SizedBox(width: 16),
-              Icon(Icons.people, color: Colors.white.withAlpha(100), size: 14),
+              const Icon(Icons.people, color: AppColors.textDim, size: 14),
               const SizedBox(width: 4),
-              Text('${t.participantCount} joined', style: TextStyle(color: Colors.white.withAlpha(120), fontSize: 12)),
+              Text('${t.participantCount} joined', style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
             ],
           ),
           if (t.prizeDescription.isNotEmpty) ...[
             const SizedBox(height: 8),
             Row(
               children: [
-                const Icon(Icons.card_giftcard, color: Color(0xFFFFD700), size: 14),
+                const Icon(Icons.card_giftcard, color: AppColors.gold, size: 14),
                 const SizedBox(width: 6),
-                Expanded(child: Text(t.prizeDescription, style: const TextStyle(color: Color(0xFFFFD700), fontSize: 13))),
+                Expanded(child: Text(t.prizeDescription, style: const TextStyle(color: AppColors.gold, fontSize: 13))),
               ],
             ),
           ],
@@ -212,26 +228,34 @@ class _TournamentScreenState extends State<TournamentScreen> {
             const SizedBox(height: 6),
             Row(
               children: [
-                const Icon(Icons.workspace_premium, color: Color(0xFFFFD700), size: 14),
+                const Icon(Icons.workspace_premium, color: AppColors.gold, size: 14),
                 const SizedBox(width: 6),
-                const Text('Premium only', style: TextStyle(color: Color(0xFFFFD700), fontSize: 12, fontWeight: FontWeight.w600)),
+                const Text('Premium only', style: TextStyle(color: AppColors.gold, fontSize: 12, fontWeight: FontWeight.w600)),
               ],
             ),
           ],
           const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () => _join(t),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: canJoin ? const Color(0xFFFF6B35) : Colors.grey.shade700,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                padding: const EdgeInsets.symmetric(vertical: 12),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: canJoin ? AppGradients.primary : null,
+                color: canJoin ? null : AppColors.border,
+                borderRadius: AppRadius.button,
               ),
-              child: Text(
-                canJoin ? 'Join Tournament' : 'Upgrade to Join',
-                style: const TextStyle(fontWeight: FontWeight.bold),
+              child: ElevatedButton(
+                onPressed: () => _join(t),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: AppRadius.button),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                child: Text(
+                  canJoin ? 'Join Tournament' : 'Upgrade to Join',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
             ),
           ),

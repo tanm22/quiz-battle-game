@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../proto/quiz.pb.dart';
 import '../services/quiz_service.dart';
+import '../theme/app_theme.dart';
 
 class MatchHistoryScreen extends StatefulWidget {
   final String currentUserId;
@@ -34,14 +35,7 @@ class _MatchHistoryScreenState extends State<MatchHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF1A1145), Color(0xFF0F0E2E)],
-          ),
-        ),
+      body: ScaffoldGradientBackground(
         child: SafeArea(
           child: Column(
             children: [
@@ -51,12 +45,12 @@ class _MatchHistoryScreenState extends State<MatchHistoryScreen> {
                 child: Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.white70),
+                      icon: const Icon(Icons.arrow_back, color: AppColors.textSecondary),
                       onPressed: () => Navigator.pop(context),
                     ),
-                    const Icon(Icons.history, color: Color(0xFFFF6B35), size: 26),
+                    const Icon(Icons.history, color: AppColors.primary, size: 26),
                     const SizedBox(width: 10),
-                    const Text('Match History', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                    const Text('Match History', style: TextStyle(color: AppColors.text, fontSize: 22, fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),
@@ -64,15 +58,15 @@ class _MatchHistoryScreenState extends State<MatchHistoryScreen> {
               // Content
               Expanded(
                 child: _loading
-                    ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF6B35)))
+                    ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
                     : _error != null
                         ? Center(
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
+                                const Icon(Icons.error_outline, color: AppColors.danger, size: 48),
                                 const SizedBox(height: 12),
-                                Text(_error!, style: const TextStyle(color: Colors.white54), textAlign: TextAlign.center),
+                                Text(_error!, style: const TextStyle(color: AppColors.textMuted), textAlign: TextAlign.center),
                                 const SizedBox(height: 16),
                                 TextButton(onPressed: _loadHistory, child: const Text('Retry')),
                               ],
@@ -83,17 +77,17 @@ class _MatchHistoryScreenState extends State<MatchHistoryScreen> {
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.sports_esports, color: Colors.white.withAlpha(60), size: 64),
+                                    Icon(Icons.sports_esports, color: AppColors.textDim.withAlpha(100), size: 64),
                                     const SizedBox(height: 16),
-                                    Text('No matches yet', style: TextStyle(color: Colors.white.withAlpha(100), fontSize: 18)),
+                                    const Text('No matches yet', style: TextStyle(color: AppColors.textMuted, fontSize: 18)),
                                     const SizedBox(height: 8),
-                                    Text('Play a match to see your history here!', style: TextStyle(color: Colors.white.withAlpha(60), fontSize: 14)),
+                                    const Text('Play a match to see your history here!', style: TextStyle(color: AppColors.textDim, fontSize: 14)),
                                   ],
                                 ),
                               )
                             : RefreshIndicator(
                                 onRefresh: _loadHistory,
-                                color: const Color(0xFFFF6B35),
+                                color: AppColors.primary,
                                 child: ListView.builder(
                                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                   itemCount: _matches.length,
@@ -125,14 +119,17 @@ class _MatchCard extends StatelessWidget {
     final date = DateTime.fromMillisecondsSinceEpoch(match.createdAt.toInt() * 1000);
     final timeAgo = _timeAgo(date);
 
+    final borderColor = isWinner ? AppColors.success : AppColors.danger;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(8),
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isWinner ? const Color(0xFF4CAF50).withAlpha(50) : const Color(0xFFFF4444).withAlpha(50),
-        ),
+        border: Border.all(color: borderColor.withAlpha(100)),
+        boxShadow: const [
+          BoxShadow(color: Color(0x0F000000), blurRadius: 4, offset: Offset(0, 1)),
+        ],
       ),
       child: ExpansionTile(
         tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -143,11 +140,11 @@ class _MatchCard extends StatelessWidget {
           width: 44, height: 44,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: isWinner ? const Color(0xFF4CAF50).withAlpha(30) : const Color(0xFFFF4444).withAlpha(30),
+            color: isWinner ? AppColors.emeraldBg : AppColors.roseBg,
           ),
           child: Icon(
             isWinner ? Icons.emoji_events : Icons.close,
-            color: isWinner ? const Color(0xFF4CAF50) : const Color(0xFFFF4444),
+            color: isWinner ? AppColors.success : AppColors.danger,
             size: 22,
           ),
         ),
@@ -156,7 +153,7 @@ class _MatchCard extends StatelessWidget {
             Text(
               isWinner ? 'Victory' : 'Defeat',
               style: TextStyle(
-                color: isWinner ? const Color(0xFF4CAF50) : const Color(0xFFFF4444),
+                color: isWinner ? AppColors.success : AppColors.danger,
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
               ),
@@ -165,7 +162,7 @@ class _MatchCard extends StatelessWidget {
             if (myResult != null)
               Text(
                 '${myResult.finalScore.toInt()} pts',
-                style: const TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold, fontSize: 15),
+                style: const TextStyle(color: AppColors.gold, fontWeight: FontWeight.bold, fontSize: 15),
               ),
           ],
         ),
@@ -173,29 +170,28 @@ class _MatchCard extends StatelessWidget {
           children: [
             Text(
               'vs ${opponent?.username ?? opponent?.userId ?? "Unknown"}',
-              style: TextStyle(color: Colors.white.withAlpha(120), fontSize: 13),
+              style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
             ),
             const Spacer(),
-            Text(timeAgo, style: TextStyle(color: Colors.white.withAlpha(60), fontSize: 12)),
+            Text(timeAgo, style: const TextStyle(color: AppColors.textDim, fontSize: 12)),
           ],
         ),
-        iconColor: Colors.white38,
-        collapsedIconColor: Colors.white38,
+        iconColor: AppColors.textDim,
+        collapsedIconColor: AppColors.textDim,
         children: [
           // Expanded details
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.white.withAlpha(5),
+              color: AppColors.cardTint,
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
             ),
             child: Column(
               children: [
                 _DetailRow('Rounds', '${match.rounds}'),
-                _DetailRow('Duration', '${match.duration}s'),
                 if (myResult != null) ...[
                   _DetailRow('Correct Answers', '${myResult.answersCorrect}'),
-                  _DetailRow('Avg Response', '${myResult.avgResponseTimeMs.toInt()} ms'),
                   _DetailRow('Rank', '#${myResult.rank}'),
                 ],
                 const SizedBox(height: 10),
@@ -210,20 +206,20 @@ class _MatchCard extends StatelessWidget {
                           width: 24, height: 24,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: p.rank == 1 ? const Color(0xFFFFD700).withAlpha(30) : Colors.white.withAlpha(10),
+                            color: p.rank == 1 ? AppColors.goldBg : AppColors.cardTint,
                           ),
                           child: Center(child: Text('#${p.rank}', style: TextStyle(
-                            color: p.rank == 1 ? const Color(0xFFFFD700) : Colors.white54,
+                            color: p.rank == 1 ? AppColors.gold : AppColors.textMuted,
                             fontSize: 11, fontWeight: FontWeight.bold,
                           ))),
                         ),
                         const SizedBox(width: 10),
                         Expanded(child: Text(
                           p.username.isEmpty ? p.userId : p.username,
-                          style: TextStyle(color: isSelf ? Colors.white : Colors.white70, fontSize: 14, fontWeight: isSelf ? FontWeight.bold : FontWeight.normal),
+                          style: TextStyle(color: isSelf ? AppColors.text : AppColors.textSecondary, fontSize: 14, fontWeight: isSelf ? FontWeight.bold : FontWeight.normal),
                         )),
                         Text('${p.finalScore.toInt()}', style: TextStyle(
-                          color: p.rank == 1 ? const Color(0xFFFFD700) : Colors.white,
+                          color: p.rank == 1 ? AppColors.success : AppColors.text,
                           fontWeight: FontWeight.bold,
                         )),
                       ],
@@ -260,8 +256,8 @@ class _DetailRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.white.withAlpha(100), fontSize: 13)),
-          Text(value, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
+          Text(label, style: const TextStyle(color: AppColors.textMuted, fontSize: 13)),
+          Text(value, style: const TextStyle(color: AppColors.text, fontSize: 13, fontWeight: FontWeight.w500)),
         ],
       ),
     );

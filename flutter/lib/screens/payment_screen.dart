@@ -69,7 +69,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         'currency': resp.currency,
         'name': 'Quiz Battle',
         'description': _selectedPlan == 'yearly' ? 'Premium Yearly' : 'Premium Monthly',
-        'theme': {'color': '#1A1145'},
+        'theme': {'color': '#6D59C4'},
       });
     } on GrpcError catch (e) {
       if (mounted) {
@@ -126,8 +126,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: AppColors.bgMid,
-        foregroundColor: Colors.white,
+        backgroundColor: AppColors.bg,
+        foregroundColor: AppColors.text,
         title: const Text('Premium'),
         elevation: 0,
       ),
@@ -138,27 +138,28 @@ class _PaymentScreenState extends State<PaymentScreen> {
             if (isPremium) ...[
               Container(
                 padding: const EdgeInsets.all(20),
-                decoration: const BoxDecoration(
-                  gradient: AppGradients.gold,
+                decoration: BoxDecoration(
+                  color: AppColors.emeraldBg,
                   borderRadius: AppRadius.hero,
+                  border: Border.all(color: AppColors.success.withAlpha(60)),
                 ),
                 child: Column(
                   children: [
-                    const Icon(Icons.workspace_premium, size: 48, color: Colors.white),
+                    const Icon(Icons.workspace_premium, size: 48, color: AppColors.success),
                     const SizedBox(height: 8),
                     const Text('You are Premium!',
-                        style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                        style: TextStyle(color: AppColors.text, fontSize: 22, fontWeight: FontWeight.bold)),
                     if (_expiresAt != null && _expiresAt! > Int64.ZERO)
                       Text(
                         'Expires: ${DateTime.fromMillisecondsSinceEpoch(_expiresAt!.toInt() * 1000).toString().split(' ')[0]}',
-                        style: const TextStyle(color: Colors.white70, fontSize: 14),
+                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
                       ),
                   ],
                 ),
               ),
             ] else ...[
               const Text('Upgrade to Premium',
-                  style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: AppColors.text, fontSize: 24, fontWeight: FontWeight.bold),
                   textAlign: TextAlign.center),
               const SizedBox(height: 24),
 
@@ -184,17 +185,24 @@ class _PaymentScreenState extends State<PaymentScreen> {
               SizedBox(
                 width: double.infinity,
                 height: 52,
-                child: ElevatedButton(
-                  onPressed: _loading ? null : _createOrder,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.gold,
-                    foregroundColor: Colors.black,
-                    shape: const RoundedRectangleBorder(borderRadius: AppRadius.card),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: AppGradients.primary,
+                    borderRadius: AppRadius.card,
                   ),
-                  child: _loading
-                      ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('Upgrade Now',
-                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                  child: ElevatedButton(
+                    onPressed: _loading ? null : _createOrder,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      foregroundColor: Colors.white,
+                      shape: const RoundedRectangleBorder(borderRadius: AppRadius.card),
+                    ),
+                    child: _loading
+                        ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Text('Upgrade Now',
+                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                  ),
                 ),
               ),
             ],
@@ -209,15 +217,15 @@ class _PaymentScreenState extends State<PaymentScreen> {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Icon(icon, color: AppColors.gold, size: 22),
+          Icon(icon, color: AppColors.primary, size: 22),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(premium,
-                    style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
-                Text(free, style: TextStyle(color: Colors.white.withAlpha(80), fontSize: 12)),
+                    style: const TextStyle(color: AppColors.text, fontSize: 15, fontWeight: FontWeight.w600)),
+                Text(free, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
               ],
             ),
           ),
@@ -233,20 +241,23 @@ class _PaymentScreenState extends State<PaymentScreen> {
         duration: AppDurations.medium,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: selected ? AppColors.gold.withAlpha(20) : Colors.white.withAlpha(6),
+          color: selected ? AppColors.accentBg : AppColors.surface,
           borderRadius: AppRadius.card,
           border: Border.all(
-            color: selected ? AppColors.gold : Colors.white.withAlpha(20),
+            color: selected ? AppColors.accent : AppColors.border,
             width: selected ? 2 : 1,
           ),
+          boxShadow: const [
+            BoxShadow(color: Color(0x0F000000), blurRadius: 4, offset: Offset(0, 1)),
+          ],
         ),
         child: Column(
           children: [
             Text(plan[0].toUpperCase() + plan.substring(1),
-                style: TextStyle(color: selected ? AppColors.gold : Colors.white70, fontSize: 14)),
+                style: TextStyle(color: selected ? AppColors.accent : AppColors.textMuted, fontSize: 14)),
             const SizedBox(height: 4),
             Text(price,
-                style: TextStyle(color: selected ? Colors.white : Colors.white54, fontSize: 20, fontWeight: FontWeight.bold)),
+                style: TextStyle(color: selected ? AppColors.text : AppColors.textSecondary, fontSize: 20, fontWeight: FontWeight.bold)),
             if (plan == 'yearly')
               Text('Save 17%',
                   style: TextStyle(color: AppColors.success.withAlpha(200), fontSize: 11, fontWeight: FontWeight.w600)),
@@ -301,7 +312,7 @@ class _PaymentSuccessDialogState extends State<_PaymentSuccessDialog>
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: AppColors.bgTop,
+      backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(borderRadius: AppRadius.hero),
       child: Padding(
         padding: const EdgeInsets.all(28),
@@ -325,7 +336,7 @@ class _PaymentSuccessDialogState extends State<_PaymentSuccessDialog>
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: AppColors.gold.withValues(alpha: 1.0 - t),
+                            color: AppColors.success.withValues(alpha: 1.0 - t),
                             width: 3,
                           ),
                         ),
@@ -339,7 +350,9 @@ class _PaymentSuccessDialogState extends State<_PaymentSuccessDialog>
                       height: 80,
                       decoration: const BoxDecoration(
                         shape: BoxShape.circle,
-                        gradient: AppGradients.gold,
+                        gradient: LinearGradient(
+                          colors: [AppColors.success, Color(0xFF10B981)],
+                        ),
                       ),
                       child: const Icon(Icons.check_rounded, color: Colors.white, size: 48),
                     ),
@@ -350,27 +363,34 @@ class _PaymentSuccessDialogState extends State<_PaymentSuccessDialog>
             const SizedBox(height: 20),
             const Text(
               'Payment successful!',
-              style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
+              style: TextStyle(color: AppColors.text, fontSize: 20, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
-            Text(
+            const Text(
               "Your Premium perks are activating now.\nWe'll update your status in a moment.",
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white.withAlpha(180), fontSize: 14, height: 1.4),
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 14, height: 1.4),
             ),
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.gold,
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: const RoundedRectangleBorder(borderRadius: AppRadius.button),
-                  textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: AppGradients.primary,
+                  borderRadius: AppRadius.button,
                 ),
-                child: const Text('Awesome'),
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: const RoundedRectangleBorder(borderRadius: AppRadius.button),
+                    textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                  ),
+                  child: const Text('Awesome'),
+                ),
               ),
             ),
           ],

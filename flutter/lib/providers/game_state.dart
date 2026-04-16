@@ -112,6 +112,7 @@ class GameStateNotifier extends Notifier<GameState> {
   StreamSubscription? _gameSub;
   int _reconnectAttempt = 0;
   Map<String, double> _pendingScores = {};
+  List<LeaderboardEntry> _pendingLeaderboard = [];
   Timer? _highlightResetTimer;
   bool _disposed = false;
 
@@ -229,12 +230,15 @@ class GameStateNotifier extends Notifier<GameState> {
       case GameEvent_Event.leaderboard:
         final entries = event.leaderboard.entries;
         _pendingScores = {for (final e in entries) e.userId: e.score};
-        state = state.copyWith(leaderboard: entries);
+        _pendingLeaderboard = entries;
       case GameEvent_Event.roundResult:
-        // Apply buffered scores at round end, then show correct/wrong
+        // Flush buffered leaderboard + scores together with the correct
+        // answer reveal — updating the leaderboard earlier would spoil
+        // who answered correctly before the result is shown.
         state = state.copyWith(
           correctIndex: event.roundResult.correctIndex,
           scores: _pendingScores.isNotEmpty ? Map.of(_pendingScores) : null,
+          leaderboard: _pendingLeaderboard.isNotEmpty ? _pendingLeaderboard : null,
         );
         // Auto-reset answer highlight after 1.5s (cancellable on dispose)
         _highlightResetTimer?.cancel();

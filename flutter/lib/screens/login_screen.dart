@@ -6,6 +6,7 @@ import '../providers/game_state.dart';
 import '../services/auth_service.dart';
 import '../services/fcm_service.dart';
 import '../services/quiz_service.dart';
+import '../theme/app_theme.dart';
 import 'email_code_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -87,7 +88,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   void _showError(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.redAccent, behavior: SnackBarBehavior.floating),
+      SnackBar(content: Text(message), backgroundColor: AppColors.danger, behavior: SnackBarBehavior.floating),
     );
   }
 
@@ -242,18 +243,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   InputDecoration _inputDecoration(String label, IconData icon, {Widget? suffix}) {
     return InputDecoration(
       labelText: label,
-      labelStyle: const TextStyle(color: Colors.white60),
-      prefixIcon: Icon(icon, color: Colors.white60),
+      labelStyle: const TextStyle(color: AppColors.textMuted),
+      prefixIcon: Icon(icon, color: AppColors.textMuted),
       suffixIcon: suffix,
       filled: true,
-      fillColor: Colors.white.withAlpha(15),
+      fillColor: AppColors.surface,
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: Colors.white.withAlpha(30)),
+        borderSide: const BorderSide(color: AppColors.border),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: Color(0xFFFF6B35), width: 2),
+        borderSide: const BorderSide(color: AppColors.accent, width: 2),
       ),
     );
   }
@@ -266,7 +267,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       children: [
         TextField(
           controller: _loginIdentityController,
-          style: const TextStyle(color: Colors.white),
+          style: const TextStyle(color: AppColors.text),
           decoration: _inputDecoration('Username or Email', Icons.person),
           onSubmitted: (_) => _showLoginPassword ? null : _submitLogin(),
         ),
@@ -275,7 +276,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           TextField(
             controller: _loginPasswordController,
             obscureText: true,
-            style: const TextStyle(color: Colors.white),
+            style: const TextStyle(color: AppColors.text),
             decoration: _inputDecoration('Password', Icons.lock),
             onSubmitted: (_) => _submitLogin(),
           ),
@@ -285,7 +286,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           alignment: Alignment.centerRight,
           child: TextButton(
             onPressed: _isLoading ? null : _forgotPassword,
-            child: const Text('Forgot password?', style: TextStyle(color: Colors.white38, fontSize: 13)),
+            child: const Text('Forgot password?', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
           ),
         ),
         const SizedBox(height: 12),
@@ -302,12 +303,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     if (_checkingUsername) {
       usernameSuffix = const Padding(
         padding: EdgeInsets.all(12),
-        child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54)),
+        child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.textMuted)),
       );
     } else if (_usernameAvailable == true) {
-      usernameSuffix = const Icon(Icons.check_circle, color: Colors.greenAccent);
+      usernameSuffix = const Icon(Icons.check_circle, color: AppColors.success);
     } else if (_usernameAvailable == false) {
-      usernameSuffix = const Icon(Icons.cancel, color: Colors.redAccent);
+      usernameSuffix = const Icon(Icons.cancel, color: AppColors.danger);
     }
 
     return Column(
@@ -315,27 +316,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       children: [
         TextField(
           controller: _regUsernameController,
-          style: const TextStyle(color: Colors.white),
+          style: const TextStyle(color: AppColors.text),
           decoration: _inputDecoration('Username', Icons.person, suffix: usernameSuffix),
         ),
         const SizedBox(height: 16),
         TextField(
           controller: _regPasswordController,
           obscureText: true,
-          style: const TextStyle(color: Colors.white),
+          style: const TextStyle(color: AppColors.text),
           decoration: _inputDecoration('Password', Icons.lock),
         ),
         const SizedBox(height: 16),
         TextField(
           controller: _regEmailController,
-          style: const TextStyle(color: Colors.white),
+          style: const TextStyle(color: AppColors.text),
           decoration: _inputDecoration('Email (optional)', Icons.email),
           keyboardType: TextInputType.emailAddress,
         ),
         const SizedBox(height: 16),
         TextField(
           controller: _regReferralController,
-          style: const TextStyle(color: Colors.white),
+          style: const TextStyle(color: AppColors.text),
           decoration: _inputDecoration('Referral code (optional)', Icons.card_giftcard),
           textCapitalization: TextCapitalization.characters,
         ),
@@ -354,9 +355,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       height: 52,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          gradient: const LinearGradient(colors: [Color(0xFFFF6B35), Color(0xFFFF8F5E)]),
+          gradient: AppGradients.primary,
           borderRadius: BorderRadius.circular(14),
-          boxShadow: [BoxShadow(color: const Color(0xFFFF6B35).withAlpha(80), blurRadius: 12, offset: const Offset(0, 4))],
+          boxShadow: [BoxShadow(color: AppColors.primary.withAlpha(60), blurRadius: 12, offset: const Offset(0, 4))],
         ),
         child: ElevatedButton(
           onPressed: onPressed,
@@ -377,14 +378,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF1A1145), Color(0xFF0F0E2E)],
-          ),
-        ),
+      body: ScaffoldGradientBackground(
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
@@ -397,50 +391,54 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      gradient: const LinearGradient(colors: [Color(0xFFFF6B35), Color(0xFFFF8F5E)]),
-                      boxShadow: [BoxShadow(color: const Color(0xFFFF6B35).withAlpha(100), blurRadius: 30)],
+                      color: AppColors.accentBg,
+                      boxShadow: [BoxShadow(color: AppColors.accent.withAlpha(40), blurRadius: 30)],
                     ),
-                    child: const Icon(Icons.bolt, size: 48, color: Colors.white),
+                    child: const Icon(Icons.bolt, size: 48, color: AppColors.accent),
                   ),
                   const SizedBox(height: 20),
                   const Text(
                     'QUIZ BATTLE',
-                    style: TextStyle(fontSize: 34, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 2),
+                    style: TextStyle(fontSize: 34, fontWeight: FontWeight.w900, color: AppColors.accent, letterSpacing: 2),
                   ),
                   const SizedBox(height: 4),
-                  Text(
+                  const Text(
                     'Challenge your mind',
-                    style: TextStyle(fontSize: 14, color: Colors.white.withAlpha(120), letterSpacing: 1),
+                    style: TextStyle(fontSize: 14, color: AppColors.textMuted, letterSpacing: 1),
                   ),
                   const SizedBox(height: 36),
 
-                  // Google Sign-In — primary auth
+                  // Google Sign-In -- primary auth
                   SizedBox(
                     width: double.infinity,
                     height: 52,
-                    child: ElevatedButton.icon(
-                      onPressed: _isLoading ? null : _googleSignIn,
-                      icon: Container(
-                        width: 24, height: 24,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(4),
+                    child: Container(
+                      decoration: appCardDecoration(),
+                      child: ElevatedButton.icon(
+                        onPressed: _isLoading ? null : _googleSignIn,
+                        icon: Container(
+                          width: 24, height: 24,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Center(
+                            child: Text('G', style: TextStyle(
+                              color: Color(0xFF4285F4),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                              height: 1,
+                            )),
+                          ),
                         ),
-                        child: const Center(
-                          child: Text('G', style: TextStyle(
-                            color: Color(0xFF4285F4),
-                            fontWeight: FontWeight.w700,
-                            fontSize: 16,
-                            height: 1,
-                          )),
+                        label: const Text('Sign in with Google', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          foregroundColor: AppColors.text,
+                          shape: RoundedRectangleBorder(borderRadius: AppRadius.card),
+                          elevation: 0,
                         ),
-                      ),
-                      label: const Text('Sign in with Google', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.black87,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        elevation: 2,
                       ),
                     ),
                   ),
@@ -451,13 +449,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   SizedBox(
                     width: double.infinity,
                     height: 52,
-                    child: OutlinedButton.icon(
+                    child: TextButton.icon(
                       onPressed: _isLoading ? null : _guestLogin,
-                      icon: const Icon(Icons.flash_on),
-                      label: const Text('Quick Play', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF00E5FF),
-                        side: const BorderSide(color: Color(0xFF00E5FF), width: 2),
+                      icon: const Icon(Icons.flash_on, color: AppColors.textMuted),
+                      label: const Text('Quick Play', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textMuted)),
+                      style: TextButton.styleFrom(
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
                     ),
@@ -466,12 +462,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   const SizedBox(height: 28),
                   Row(
                     children: [
-                      Expanded(child: Divider(color: Colors.white.withAlpha(40))),
+                      const Expanded(child: Divider(color: AppColors.border)),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text('or use credentials', style: TextStyle(color: Colors.white.withAlpha(80))),
+                        child: Text('or use credentials', style: TextStyle(color: AppColors.textDim)),
                       ),
-                      Expanded(child: Divider(color: Colors.white.withAlpha(40))),
+                      const Expanded(child: Divider(color: AppColors.border)),
                     ],
                   ),
                   const SizedBox(height: 20),
@@ -479,18 +475,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   // Tab bar
                   Container(
                     decoration: BoxDecoration(
-                      color: Colors.white.withAlpha(10),
+                      color: AppColors.cardTint,
                       borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.border),
                     ),
                     child: TabBar(
                       controller: _tabController,
                       indicatorSize: TabBarIndicatorSize.tab,
                       indicator: BoxDecoration(
-                        gradient: LinearGradient(colors: [const Color(0xFFFF6B35).withAlpha(80), const Color(0xFFFF6B35).withAlpha(40)]),
+                        color: AppColors.accentBg,
                         borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.accent.withAlpha(60)),
                       ),
-                      labelColor: const Color(0xFFFF8F5E),
-                      unselectedLabelColor: Colors.white54,
+                      labelColor: AppColors.accent,
+                      unselectedLabelColor: AppColors.textMuted,
                       dividerColor: Colors.transparent,
                       tabs: const [Tab(text: 'Login'), Tab(text: 'Register')],
                     ),

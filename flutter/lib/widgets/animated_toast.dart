@@ -158,12 +158,12 @@ class _AnimatedToastState extends State<_AnimatedToast>
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                     decoration: BoxDecoration(
-                      color: AppColors.bgTop,
+                      color: AppColors.surface,
                       borderRadius: AppRadius.pill,
                       border: Border.all(color: widget.accent.withAlpha(80)),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withAlpha(120),
+                          color: Colors.black.withAlpha(40),
                           blurRadius: 18,
                           offset: const Offset(0, 6),
                         ),
@@ -178,7 +178,7 @@ class _AnimatedToastState extends State<_AnimatedToast>
                           child: Text(
                             widget.message,
                             style: const TextStyle(
-                              color: Colors.white,
+                              color: AppColors.text,
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
                             ),

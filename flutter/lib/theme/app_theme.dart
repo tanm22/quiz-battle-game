@@ -1,97 +1,91 @@
 import 'package:flutter/material.dart';
 
-/// App-wide design tokens. Everything here is a const or near-const so the
-/// values can be used inside const expressions. Colors that need `.withAlpha`
-/// variants are exposed as factory helpers.
-///
-/// Guidelines:
-///  - Screen backgrounds: wrap content in [ScaffoldGradientBackground].
-///  - Card surfaces: `decoration: BoxDecoration(borderRadius: AppRadius.card, ...)`.
-///  - Implicit animations: prefer [AppDurations.medium] (300ms) unless a
-///    specific UX reason calls for quick/slow.
+/// Light-theme design tokens inspired by the quiz-battle-ui.jsx reference.
+/// Palette: white backgrounds, purple accent, orange CTA, clean borders.
 
 class AppColors {
   AppColors._();
 
   // -- Brand ----------------------------------------------------------------
-  /// Primary CTA, active states, streak flame.
-  static const primary = Color(0xFFFF6B35);
-  /// Lighter shade for primary gradients.
-  static const primarySoft = Color(0xFFFF8F5E);
-  /// Secondary (cyan) for neutral highlights, info callouts, quota card.
-  static const secondary = Color(0xFF00E5FF);
-  /// Premium accent.
-  static const gold = Color(0xFFFFD700);
-  static const goldDeep = Color(0xFFFFA000);
+  static const primary = Color(0xFFEA580C);       // orange CTA
+  static const primarySoft = Color(0xFFF97316);    // lighter orange
+  static const secondary = Color(0xFF0891B2);      // cyan
+  static const accent = Color(0xFF6D59C4);         // purple accent
+  static const accentLight = Color(0xFF8B7BD4);
+  static const gold = Color(0xFFE8940A);
+  static const goldDeep = Color(0xFFD97706);
 
   // -- Background stack -----------------------------------------------------
-  /// Deepest layer — scaffold bottom of gradient.
-  static const bgDeep = Color(0xFF0F0E2E);
-  /// Mid layer — scaffold top of gradient, AppBar background.
-  static const bgMid = Color(0xFF1A1145);
-  /// Elevated surfaces (modal sheets, dialogs).
-  static const bgTop = Color(0xFF2A1F5E);
-  /// Bottom nav background.
-  static const bgNav = Color(0xFF150F35);
+  static const bg = Color(0xFFFFFFFF);             // scaffold base
+  static const surface = Color(0xFFFFFFFF);        // surface/card
+  static const cardTint = Color(0xFFF8FAFC);       // subtle card fill
+  static const bgTop = Color(0xFFF8FAFC);          // elevated (dialogs)
+  static const bgNav = Color(0xFFFFFFFF);          // bottom nav
+  // Legacy aliases (used by existing code)
+  static const bgDeep = bg;
+  static const bgMid = bg;
+
+  // -- Borders & dividers ---------------------------------------------------
+  static const border = Color(0xFFE8E5F0);
+  static const borderBright = Color(0xFFD4CFE6);
+
+  // -- Text -----------------------------------------------------------------
+  static const text = Color(0xFF1A1632);
+  static const textSecondary = Color(0xFF4A4560);
+  static const textMuted = Color(0xFF8A8599);
+  static const textDim = Color(0xFFB5B0C4);
 
   // -- Semantic -------------------------------------------------------------
-  static const success = Color(0xFF4CAF50);
-  static const danger = Color(0xFFFF4444);
+  static const success = Color(0xFF059669);        // emerald
+  static const danger = Color(0xFFE11D48);         // rose
+
+  // -- Tinted backgrounds ---------------------------------------------------
+  static const accentBg = Color(0xFFF0EDF9);
+  static const goldBg = Color(0xFFFEF7E8);
+  static const cyanBg = Color(0xFFECFEFF);
+  static const emeraldBg = Color(0xFFECFDF5);
+  static const roseBg = Color(0xFFFFF1F2);
+  static const orangeBg = Color(0xFFFFF4ED);
 
   // -- Medals (leaderboard) -------------------------------------------------
   static const medalGold = gold;
-  static const medalSilver = Color(0xFFC0C0C0);
+  static const medalSilver = Color(0xFF94A3B8);
   static const medalBronze = Color(0xFFCD7F32);
 }
 
-/// Standard border radii. Use these instead of raw `BorderRadius.circular(14)`.
 class AppRadius {
   AppRadius._();
-  /// Rounded buttons, input fields, small cards.
   static const BorderRadius button = BorderRadius.all(Radius.circular(12));
-  /// Default card container.
   static const BorderRadius card = BorderRadius.all(Radius.circular(14));
-  /// Hero cards / plan selector / empty-state illustrations.
   static const BorderRadius hero = BorderRadius.all(Radius.circular(16));
-  /// Pill-shaped (filter chips).
   static const BorderRadius pill = BorderRadius.all(Radius.circular(20));
 }
 
-/// Standard animation durations. Keeps motion consistent.
 class AppDurations {
   AppDurations._();
-  /// Quick feedback (hover, small tap pulses).
   static const Duration quick = Duration(milliseconds: 150);
-  /// Default for AnimatedContainer, AnimatedSwitcher, page transitions.
   static const Duration medium = Duration(milliseconds: 300);
-  /// Big motion — reward pop, confetti, leaderboard row reorder.
   static const Duration slow = Duration(milliseconds: 500);
 }
 
-/// Reusable gradients.
 class AppGradients {
   AppGradients._();
 
-  /// Scaffold background — used by every screen.
   static const LinearGradient scaffold = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
-    colors: [AppColors.bgMid, AppColors.bgDeep],
+    colors: [Color(0xFFF8FAFC), Color(0xFFFFFFFF)],
   );
 
-  /// Primary CTA button gradient.
   static const LinearGradient primary = LinearGradient(
-    colors: [AppColors.primary, AppColors.primarySoft],
+    colors: [Color(0xFFF97316), Color(0xFFEA580C)],
   );
 
-  /// Gold / premium gradient.
   static const LinearGradient gold = LinearGradient(
-    colors: [AppColors.gold, AppColors.goldDeep],
+    colors: [Color(0xFFF59E0B), Color(0xFFEA580C)],
   );
 }
 
-/// Wraps a screen in the standard gradient background. Prefer this over
-/// re-declaring `Container(decoration: BoxDecoration(gradient: ...))`.
 class ScaffoldGradientBackground extends StatelessWidget {
   final Widget child;
   const ScaffoldGradientBackground({super.key, required this.child});
@@ -105,16 +99,18 @@ class ScaffoldGradientBackground extends StatelessWidget {
   }
 }
 
-/// A shimmering placeholder block — used in skeleton loaders on screens that
-/// fetch data asynchronously. Wraps a rounded rectangle with an animated
-/// gradient that pulses left-to-right.
-///
-/// Example:
-///
-///   const SkeletonBlock(height: 20, width: 120)
-///
-/// The shimmer is non-indicative (i.e. doesn't convey progress percentage)
-/// which matches the loading contract we want: "something is coming, hold on".
+/// Card decoration matching the JSX reference: white, subtle border, soft shadow.
+BoxDecoration appCardDecoration({Color? borderColor}) => BoxDecoration(
+  color: AppColors.surface,
+  borderRadius: AppRadius.card,
+  border: Border.all(color: borderColor ?? AppColors.border),
+  boxShadow: const [
+    BoxShadow(color: Color(0x0F000000), blurRadius: 4, offset: Offset(0, 1)),
+    BoxShadow(color: Color(0x14000000), blurRadius: 1),
+  ],
+);
+
+/// Skeleton loader (shimmer on light base).
 class SkeletonBlock extends StatefulWidget {
   final double? width;
   final double height;
@@ -157,7 +153,6 @@ class _SkeletonBlockState extends State<SkeletonBlock>
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, _) {
-        // Slide a soft highlight left→right across the dark base.
         final t = _controller.value;
         return Container(
           width: widget.width,
@@ -168,10 +163,10 @@ class _SkeletonBlockState extends State<SkeletonBlock>
             gradient: LinearGradient(
               begin: Alignment(-1.0 + t * 2, 0),
               end: Alignment(1.0 + t * 2, 0),
-              colors: [
-                Colors.white.withAlpha(8),
-                Colors.white.withAlpha(26),
-                Colors.white.withAlpha(8),
+              colors: const [
+                Color(0xFFEEECF3),
+                Color(0xFFE0DDE8),
+                Color(0xFFEEECF3),
               ],
               stops: const [0.35, 0.5, 0.65],
             ),
