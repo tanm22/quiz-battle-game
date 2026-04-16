@@ -527,6 +527,7 @@ func (s *authServer) GoogleSignIn(ctx context.Context, req *pb.GoogleSignInReque
 			Streak:       streakInfo,
 			ReferralCode: user.ReferralCode,
 			IsGuest:      false,
+			WinStreak:    user.WinStreak,
 		},
 	}, nil
 }
@@ -561,7 +562,16 @@ func (s *authServer) processStreak(ctx context.Context, user *models.User) (*pb.
 		streak.LastClaimedDate = today
 	}
 
-	s.users().UpdateOne(ctx, bson.M{"_id": user.ID}, bson.M{"$set": bson.M{"streak": streak}})
+	res, err := s.users().UpdateOne(ctx,
+		bson.M{"_id": user.ID, "streak.lastClaimedDate": bson.M{"$ne": today}},
+		bson.M{"$set": bson.M{"streak": streak}})
+	if err != nil {
+		log.Printf("[auth] streak update error for %s: %v", user.ID, err)
+	}
+	if res != nil && res.ModifiedCount == 0 {
+		// Race: another request already claimed today
+		return toStreakInfo(user.Streak), nil, false
+	}
 	user.Streak = streak
 
 	reward := rewardForDay(streak.Current)
@@ -971,7 +981,6 @@ func main() {
 		"/quiz.AuthService/GoogleSignIn",
 	}
 
-	_ = strings.Join(nil, "") // ensure strings import used
 
 	grpcServer := grpc.NewServer(
 		grpc.UnaryInterceptor(auth.UnaryInterceptor(jwtSecret, skipMethods)),

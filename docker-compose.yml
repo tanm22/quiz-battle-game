@@ -126,6 +126,7 @@ services:
       - MONGO_URI=mongodb://mongo:27017/quizbattle
       - JWT_SECRET=change-me-in-production
       - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
 
   payment:
     build: .

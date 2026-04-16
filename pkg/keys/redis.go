@@ -185,18 +185,18 @@ func GetLeaderboardEntries(ctx context.Context, rdb *redis.Client, roomID string
 
 // --- Answer tracking ---
 
-// SetAnswer records a player's answer for idempotency checking.
-func SetAnswer(ctx context.Context, rdb *redis.Client, roomID string, round int, userID, answerJSON string) error {
-	pipe := rdb.Pipeline()
-	pipe.HSet(ctx, Answers(roomID, round), userID, answerJSON)
-	pipe.Expire(ctx, Answers(roomID, round), RoomTTL)
-	_, err := pipe.Exec(ctx)
-	return err
-}
-
-// HasAnswer checks if a player already submitted an answer for a round (idempotency check).
-func HasAnswer(ctx context.Context, rdb *redis.Client, roomID string, round int, userID string) (bool, error) {
-	return rdb.HExists(ctx, Answers(roomID, round), userID).Result()
+// TrySetAnswer atomically records a player's answer using HSETNX.
+// Returns true if the answer was set (first submission), false if it already existed (duplicate).
+func TrySetAnswer(ctx context.Context, rdb *redis.Client, roomID string, round int, userID, answerJSON string) (bool, error) {
+	key := Answers(roomID, round)
+	set, err := rdb.HSetNX(ctx, key, userID, answerJSON).Result()
+	if err != nil {
+		return false, err
+	}
+	if set {
+		rdb.Expire(ctx, key, RoomTTL)
+	}
+	return set, nil
 }
 
 // --- Round close guard ---

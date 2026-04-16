@@ -410,6 +410,7 @@ message UserProfile {
   string     referral_code    = 12;
   bool       is_guest         = 13;
   float      accuracy_percent = 14; // lifetime accuracy: correct_answers / total_answers * 100
+  int32      win_streak       = 15; // current consecutive wins
 }
 
 // ---------------------------------------------------------------------------

@@ -389,6 +389,7 @@ func (s *scoringServer) GetHomeScreenData(ctx context.Context, _ *pb.GetHomeScre
 			ReferralCode:    user.ReferralCode,
 			IsGuest:         user.IsGuest,
 			AccuracyPercent: accuracy,
+			WinStreak:       user.WinStreak,
 		},
 		QuotaRemaining:    int32(int64(quotaLimit) - quotaUsed),
 		QuotaLimit:        quotaLimit,
@@ -690,19 +691,6 @@ func (s *scoringServer) processAnswer(ctx context.Context, msg amqp.Delivery) {
 		return
 	}
 
-	// Step 12/48: Idempotency check — HEXISTS room:{id}:answers:{round} {userId}
-	exists, err := keys.HasAnswer(ctx, s.rdb, answer.RoomID, answer.Round, answer.UserID)
-	if err != nil {
-		log.Printf("[scoring] idempotency check error: %v", err)
-		msg.Nack(false, true) // requeue for transient errors
-		return
-	}
-	if exists {
-		log.Printf("[scoring] duplicate answer from %s for room %s round %d — skipping", answer.UserID, answer.RoomID, answer.Round)
-		msg.Ack(false) // ACK without processing
-		return
-	}
-
 	// Call CalculateScore gRPC to compute the score (spec: must use gRPC, not in-process)
 	answerTimeMs := answer.ServerTimestamp - answer.ClientTimestamp
 	if answerTimeMs < 0 {
@@ -730,7 +718,7 @@ func (s *scoringServer) processAnswer(ctx context.Context, msg amqp.Delivery) {
 	correct := calcResp.Correct
 	score := calcResp.Score
 
-	// Record answer in Redis (for idempotency on future deliveries)
+	// Step 12/48: Atomic idempotency — HSETNX room:{id}:answers:{round} {userId}
 	answerJSON, err := json.Marshal(map[string]interface{}{
 		"optionIndex":     answer.OptionIndex,
 		"correct":         correct,
@@ -743,9 +731,15 @@ func (s *scoringServer) processAnswer(ctx context.Context, msg amqp.Delivery) {
 		msg.Nack(false, true)
 		return
 	}
-	if err := keys.SetAnswer(ctx, s.rdb, answer.RoomID, answer.Round, answer.UserID, string(answerJSON)); err != nil {
-		log.Printf("[scoring] failed to record answer: %v", err)
+	wasSet, err := keys.TrySetAnswer(ctx, s.rdb, answer.RoomID, answer.Round, answer.UserID, string(answerJSON))
+	if err != nil {
+		log.Printf("[scoring] TrySetAnswer error: %v", err)
 		msg.Nack(false, true)
+		return
+	}
+	if !wasSet {
+		log.Printf("[scoring] duplicate answer from %s for room %s round %d — skipping", answer.UserID, answer.RoomID, answer.Round)
+		msg.Ack(false)
 		return
 	}
 
@@ -1064,14 +1058,30 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 		}
 		delta := int32(math.Round(K * (actual - avgExpected)))
 
-		update := bson.M{"$inc": bson.M{
-			"matchesPlayed":  1,
+		// Read current win streak to compute new value
+		var curUser models.User
+		_ = usersColl.FindOne(ctx, bson.M{"_id": userID}).Decode(&curUser)
+
+		inc := bson.M{
+			"matchesPlayed":  int32(1),
 			"rating":         delta,
 			"correctAnswers": playerCorrect[userID],
 			"totalAnswers":   playerTotal[userID],
-		}}
+		}
+		set := bson.M{}
 		if isWinner {
-			update["$inc"].(bson.M)["wins"] = 1
+			inc["wins"] = int32(1)
+			newWS := curUser.WinStreak + 1
+			set["winStreak"] = newWS
+			if newWS > curUser.LongestWinStreak {
+				set["longestWinStreak"] = newWS
+			}
+		} else {
+			set["winStreak"] = int32(0)
+		}
+		update := bson.M{"$inc": inc}
+		if len(set) > 0 {
+			update["$set"] = set
 		}
 		_, err := usersColl.UpdateOne(ctx, bson.M{"_id": userID}, update, options.UpdateOne().SetUpsert(true))
 		if err != nil {

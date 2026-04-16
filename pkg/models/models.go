@@ -47,7 +47,9 @@ type User struct {
 	IsGuest       bool       `bson:"isGuest"`
 	Rating        int32      `bson:"rating"`
 	MatchesPlayed int32      `bson:"matchesPlayed"`
-	Wins          int32      `bson:"wins"`
+	Wins             int32      `bson:"wins"`
+	WinStreak        int32      `bson:"winStreak"`
+	LongestWinStreak int32      `bson:"longestWinStreak"`
 	Plan          string     `bson:"plan"`          // "free" or "premium"
 	PlanExpiresAt *time.Time `bson:"planExpiresAt,omitempty"`
 	Coins         int64      `bson:"coins"`

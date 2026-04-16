@@ -3185,6 +3185,7 @@ type UserProfile struct {
 	ReferralCode    string                 `protobuf:"bytes,12,opt,name=referral_code,json=referralCode,proto3" json:"referral_code,omitempty"`
 	IsGuest         bool                   `protobuf:"varint,13,opt,name=is_guest,json=isGuest,proto3" json:"is_guest,omitempty"`
 	AccuracyPercent float32                `protobuf:"fixed32,14,opt,name=accuracy_percent,json=accuracyPercent,proto3" json:"accuracy_percent,omitempty"` // lifetime accuracy: correct_answers / total_answers * 100
+	WinStreak       int32                  `protobuf:"varint,15,opt,name=win_streak,json=winStreak,proto3" json:"win_streak,omitempty"`                    // current consecutive wins
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -3313,6 +3314,13 @@ func (x *UserProfile) GetIsGuest() bool {
 func (x *UserProfile) GetAccuracyPercent() float32 {
 	if x != nil {
 		return x.AccuracyPercent
+	}
+	return 0
+}
+
+func (x *UserProfile) GetWinStreak() int32 {
+	if x != nil {
+		return x.WinStreak
 	}
 	return 0
 }
@@ -4821,7 +4829,7 @@ const file_proto_quiz_proto_rawDesc = "" +
 	"\fuser_profile\x18\x02 \x01(\v2\x11.quiz.UserProfileR\vuserProfile\x12\x1e\n" +
 	"\vis_new_user\x18\x03 \x01(\bR\tisNewUser\x12%\n" +
 	"\x0estreak_updated\x18\x04 \x01(\bR\rstreakUpdated\x12)\n" +
-	"\x06reward\x18\x05 \x01(\v2\x11.quiz.RewardGrantR\x06reward\"\xac\x03\n" +
+	"\x06reward\x18\x05 \x01(\v2\x11.quiz.RewardGrantR\x06reward\"\xcb\x03\n" +
 	"\vUserProfile\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1a\n" +
 	"\busername\x18\x02 \x01(\tR\busername\x12!\n" +
@@ -4838,7 +4846,9 @@ const file_proto_quiz_proto_rawDesc = "" +
 	"\x06streak\x18\v \x01(\v2\x10.quiz.StreakInfoR\x06streak\x12#\n" +
 	"\rreferral_code\x18\f \x01(\tR\freferralCode\x12\x19\n" +
 	"\bis_guest\x18\r \x01(\bR\aisGuest\x12)\n" +
-	"\x10accuracy_percent\x18\x0e \x01(\x02R\x0faccuracyPercent\"\x19\n" +
+	"\x10accuracy_percent\x18\x0e \x01(\x02R\x0faccuracyPercent\x12\x1d\n" +
+	"\n" +
+	"win_streak\x18\x0f \x01(\x05R\twinStreak\"\x19\n" +
 	"\x17ClaimDailyRewardRequest\"o\n" +
 	"\x18ClaimDailyRewardResponse\x12)\n" +
 	"\x06reward\x18\x01 \x01(\v2\x11.quiz.RewardGrantR\x06reward\x12(\n" +

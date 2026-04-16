@@ -217,7 +217,7 @@ func buildMessage(event string, payload map[string]any) (string, string, map[str
 		}
 		data["tournamentName"] = tname
 		return "⏰ Tournament starting soon",
-			fmt.Sprintf("%q begins in %d minutes.", tname, mins),
+			fmt.Sprintf("%s begins in %d minutes.", tname, mins),
 			data
 
 	case "notif.match.invite":
