@@ -8,6 +8,7 @@ import (
 	"math"
 	"net"
 	"os"
+	"sync"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -48,9 +49,20 @@ type scoringServer struct {
 	rdb          *redis.Client
 	amqpConn     *amqp.Connection
 	amqpCh       *amqp.Channel // for publishing only
+	amqpMu       sync.Mutex    // AMQP channels are not thread-safe
 	mongoDB      *mongo.Database
 	jwtSecret    string
 	selfClient   pb.ScoringServiceClient // gRPC loopback client for CalculateScore
+}
+
+// publish sends a message to the topic exchange with mutex protection.
+func (s *scoringServer) publish(ctx context.Context, routingKey string, body []byte) error {
+	s.amqpMu.Lock()
+	defer s.amqpMu.Unlock()
+	return s.amqpCh.PublishWithContext(ctx, "sx", routingKey, false, false, amqp.Publishing{
+		ContentType: "application/json",
+		Body:        body,
+	})
 }
 
 // newChannel creates a dedicated AMQP channel per consumer (channels are not thread-safe).
@@ -693,6 +705,11 @@ func (s *scoringServer) processAnswer(ctx context.Context, msg amqp.Delivery) {
 
 	// Call CalculateScore gRPC to compute the score (spec: must use gRPC, not in-process)
 	answerTimeMs := answer.ServerTimestamp - answer.ClientTimestamp
+	if answerTimeMs < 0 {
+		answerTimeMs = 15000
+	} else if answerTimeMs > 15000 {
+		answerTimeMs = 15000
+	}
 	calcResp, err := s.selfClient.CalculateScore(ctx, &pb.CalculateScoreRequest{
 		RoomId:      answer.RoomID,
 		UserId:      answer.UserID,
@@ -748,10 +765,7 @@ func (s *scoringServer) processAnswer(ctx context.Context, msg amqp.Delivery) {
 		"roomId":  answer.RoomID,
 		"entries": entries,
 	})
-	s.amqpCh.PublishWithContext(ctx, "sx", "leaderboard.updated", false, false, amqp.Publishing{
-		ContentType: "application/json",
-		Body:        leaderboardEvent,
-	})
+	s.publish(ctx, "leaderboard.updated", leaderboardEvent)
 
 	msg.Ack(false)
 }
@@ -836,31 +850,35 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 	// Build match_history document from room:{id}:leaderboard and room metadata
 	entries, _ := keys.GetLeaderboardEntries(ctx, s.rdb, event.RoomID)
 
+	// Authoritative participant list — room:{id}:players is populated on room
+	// creation, independent of whether the player ever submitted an answer. The
+	// leaderboard ZSET only contains players who answered at least once, so an
+	// abandoning player who left before round 1 would be missing from history
+	// entirely if we built the players array from leaderboard alone.
+	allPlayers, _ := keys.GetAllPlayers(ctx, s.rdb, event.RoomID)
+
+	// The caller passes event.Rounds = -1 on opponent-abandon and 0 on
+	// zero-connected. Those are status signals, not actual round counts — use
+	// room:{id}:round (the current-round counter) as the tally upper bound so
+	// answersCorrect stays accurate in abandonment cases.
+	roundsPlayed, err := keys.GetRoomRound(ctx, s.rdb, event.RoomID)
+	if err != nil {
+		roundsPlayed = 0
+	}
+
 	// Compute per-player stats from answer records in Redis
-	players := make([]bson.M, 0, len(entries))
+	players := make([]bson.M, 0, len(allPlayers))
 	playerCorrect := make(map[string]int32)
 	playerTotal := make(map[string]int32)
+	scored := make(map[string]bool, len(entries))
 	var winner string
-	for i, e := range entries {
-		userID := e.Member.(string)
-		if i == 0 {
-			winner = userID
-		}
 
-		// Look up real username from MongoDB
-		username := userID
-		var userDoc bson.M
-		if err := s.mongoDB.Collection("users").FindOne(ctx, bson.M{"_id": userID}).Decode(&userDoc); err == nil {
-			if u, ok := userDoc["username"].(string); ok && u != "" {
-				username = u
-			}
-		}
-
-		// Tally answersCorrect and avgResponseTimeMs from per-round answer records
-		var answersCorrect int
+	// Helper: tally a single player's round-by-round stats from Redis.
+	tallyStats := func(userID string) (int, int, float64) {
+		var correct int
 		var totalResponseMs int64
-		var answeredRounds int
-		for round := 1; round <= event.Rounds; round++ {
+		var answered int
+		for round := 1; round <= roundsPlayed; round++ {
 			answerJSON, err := s.rdb.HGet(ctx, keys.Answers(event.RoomID, round), userID).Result()
 			if err != nil {
 				continue
@@ -868,37 +886,90 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 			var rec struct {
 				Correct         bool  `json:"correct"`
 				Timestamp       int64 `json:"timestamp"`
-				ClientTimestamp int64  `json:"clientTimestamp"`
+				ClientTimestamp int64 `json:"clientTimestamp"`
 			}
 			if json.Unmarshal([]byte(answerJSON), &rec) == nil {
-				answeredRounds++
+				answered++
 				if rec.Correct {
-					answersCorrect++
+					correct++
 				}
-				// responseTime = serverTimestamp - clientTimestamp
 				if rec.Timestamp > 0 && rec.ClientTimestamp > 0 {
 					totalResponseMs += rec.Timestamp - rec.ClientTimestamp
 				}
 			}
 		}
+		var avg float64
+		if answered > 0 {
+			avg = float64(totalResponseMs) / float64(answered)
+		}
+		return correct, answered, avg
+	}
 
-		var avgResponseTimeMs float64
-		if answeredRounds > 0 {
-			avgResponseTimeMs = float64(totalResponseMs) / float64(answeredRounds)
+	// Helper: resolve username, preferring the username stored in the room
+	// players hash (captured at join time) over the users collection.
+	resolveUsername := func(userID string) string {
+		if raw, ok := allPlayers[userID]; ok {
+			var info struct {
+				Username string `json:"username"`
+			}
+			if json.Unmarshal([]byte(raw), &info) == nil && info.Username != "" {
+				return info.Username
+			}
+		}
+		var userDoc bson.M
+		if err := s.mongoDB.Collection("users").FindOne(ctx, bson.M{"_id": userID}).Decode(&userDoc); err == nil {
+			if u, ok := userDoc["username"].(string); ok && u != "" {
+				return u
+			}
+		}
+		return userID
+	}
+
+	// First pass: leaderboard entries (already ranked by score desc).
+	for i, e := range entries {
+		userID := e.Member.(string)
+		scored[userID] = true
+		if i == 0 {
+			winner = userID
 		}
 
-		playerCorrect[userID] = int32(answersCorrect)
-		playerTotal[userID] = int32(answeredRounds)
+		correct, answered, avgMs := tallyStats(userID)
+		playerCorrect[userID] = int32(correct)
+		playerTotal[userID] = int32(answered)
 
 		players = append(players, bson.M{
 			"userId":            userID,
-			"username":          username,
+			"username":          resolveUsername(userID),
 			"finalScore":        e.Score,
 			"rank":              i + 1,
-			"answersCorrect":    answersCorrect,
-			"avgResponseTimeMs": avgResponseTimeMs,
+			"answersCorrect":    correct,
+			"avgResponseTimeMs": avgMs,
 		})
 	}
+
+	// Second pass: participants who never scored (abandoned before answering
+	// round 1). Append them with zero score at the bottom of the ranking so
+	// their match history still surfaces this room.
+	nextRank := len(entries) + 1
+	for userID := range allPlayers {
+		if scored[userID] {
+			continue
+		}
+		correct, answered, avgMs := tallyStats(userID)
+		playerCorrect[userID] = int32(correct)
+		playerTotal[userID] = int32(answered)
+
+		players = append(players, bson.M{
+			"userId":            userID,
+			"username":          resolveUsername(userID),
+			"finalScore":        0.0,
+			"rank":              nextRank,
+			"answersCorrect":    correct,
+			"avgResponseTimeMs": avgMs,
+		})
+		nextRank++
+	}
+
 	if winner == "" {
 		winner = event.Winner
 	}
@@ -1028,10 +1099,7 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 				"refereeId":   userID,
 				"refereeName": user.Username,
 			})
-			s.amqpCh.PublishWithContext(ctx, "sx", "referral.first_quiz_completed", false, false, amqp.Publishing{
-				ContentType: "application/json",
-				Body:        refEvent,
-			})
+			s.publish(ctx, "referral.first_quiz_completed", refEvent)
 			log.Printf("[persistence] published referral.first_quiz_completed for user %s", userID)
 		}
 	}
@@ -1145,10 +1213,7 @@ func (s *scoringServer) consumePaymentCaptured(ctx context.Context) {
 				"event":  "notif.premium.activated",
 				"userId": event.UserID,
 			})
-			s.amqpCh.PublishWithContext(ctx, "sx", "notif.premium.activated", false, false, amqp.Publishing{
-				ContentType: "application/json",
-				Body:        notifJSON,
-			})
+			s.publish(ctx, "notif.premium.activated", notifJSON)
 
 			log.Printf("[payment-consumer] upgraded user %s to premium (expires %s)", event.UserID, expiresAt.Format("2006-01-02"))
 			msg.Ack(false)
@@ -1225,10 +1290,7 @@ func (s *scoringServer) consumeReferralEvents(ctx context.Context) {
 				"refereeName": event.RefereeName,
 				"coinsEarned": 100,
 			})
-			s.amqpCh.PublishWithContext(ctx, "sx", "notif.referral.converted", false, false, amqp.Publishing{
-				ContentType: "application/json",
-				Body:        notifJSON,
-			})
+			s.publish(ctx, "notif.referral.converted", notifJSON)
 
 			log.Printf("[referral-consumer] referral converted: %s referred %s, coins granted", event.ReferrerID, event.RefereeID)
 			msg.Ack(false)

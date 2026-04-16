@@ -49,6 +49,7 @@ type quizServer struct {
 	rdb          *redis.Client
 	amqpConn     *amqp.Connection
 	amqpCh       *amqp.Channel // for publishing only
+	amqpMu       sync.Mutex    // AMQP channels are not thread-safe
 	mongoDB      *mongo.Database
 	jwtSecret    string
 	gameStreams  sync.Map // "roomId:userId" -> chan *pb.GameEvent
@@ -56,6 +57,16 @@ type quizServer struct {
 	seqCounters sync.Map // roomId -> *atomic.Int64
 	roomDeadlines  sync.Map // roomId -> int64 (current round deadline_unix)
 	roomQuestions  sync.Map // roomId -> []Question
+}
+
+// publish sends a message to the topic exchange with mutex protection.
+func (s *quizServer) publish(ctx context.Context, routingKey string, body []byte) error {
+	s.amqpMu.Lock()
+	defer s.amqpMu.Unlock()
+	return s.amqpCh.PublishWithContext(ctx, "sx", routingKey, false, false, amqp.Publishing{
+		ContentType: "application/json",
+		Body:        body,
+	})
 }
 
 // newChannel creates a dedicated AMQP channel per consumer (channels are not thread-safe).
@@ -160,6 +171,21 @@ func (s *quizServer) consumeMatchCreated(ctx context.Context) {
 		log.Fatalf("[quiz] failed to open channel for match-created: %v", err)
 	}
 	defer ch.Close()
+
+	// Declare the exchange, queue, and binding ourselves so startup doesn't
+	// race with matchmaking. All three calls are idempotent — if matchmaking
+	// already declared them we just no-op. Without this, a RabbitMQ volume
+	// wipe followed by quiz starting before matchmaking causes a 404 on the
+	// Consume below and the service exits 1.
+	if err := ch.ExchangeDeclare("sx", "topic", true, false, false, false, nil); err != nil {
+		log.Fatalf("[quiz] failed to declare sx exchange: %v", err)
+	}
+	if _, err := ch.QueueDeclare("match-created-queue", true, false, false, false, nil); err != nil {
+		log.Fatalf("[quiz] failed to declare match-created-queue: %v", err)
+	}
+	if err := ch.QueueBind("match-created-queue", "match.created", "sx", false, nil); err != nil {
+		log.Fatalf("[quiz] failed to bind match-created-queue: %v", err)
+	}
 
 	msgs, err := ch.Consume("match-created-queue", "", false, false, false, false, nil)
 	if err != nil {
@@ -377,10 +403,7 @@ func (s *quizServer) closeRound(ctx context.Context, roomID string, round int) {
 		log.Printf("[quiz] failed to marshal round.completed: %v", err)
 		return
 	}
-	if err := s.amqpCh.PublishWithContext(ctx, "sx", "round.completed", false, false, amqp.Publishing{
-		ContentType: "application/json",
-		Body:        roundEvent,
-	}); err != nil {
+	if err := s.publish(ctx, "round.completed", roundEvent); err != nil {
 		log.Printf("[quiz] failed to publish round.completed: %v", err)
 	}
 
@@ -397,39 +420,99 @@ func (s *quizServer) finishMatch(ctx context.Context, roomID string, totalRounds
 	// Get leaderboard from Redis for final results
 	entries, _ := keys.GetLeaderboardEntries(ctx, s.rdb, roomID)
 
-	var winner string
-	playerResults := make([]*pb.PlayerResult, 0, len(entries))
-	for i, e := range entries {
-		userID := e.Member.(string)
-		if i == 0 {
-			winner = userID
-		}
+	// Authoritative participant list — the leaderboard ZSET only contains
+	// players who answered at least once. Without pulling the full roster,
+	// an opponent who abandoned before round 1 would be missing from the
+	// MatchEnd event and match_history.
+	allPlayers, _ := keys.GetAllPlayers(ctx, s.rdb, roomID)
 
-		// Resolve real username + plan from Redis player info
+	// Resolve how many rounds actually have answer records. `totalRounds` is a
+	// status signal from the caller — it's -1 on opponent-abandon and 0 on
+	// zero-connected — so it can't be used as the tally upper bound. The
+	// authoritative source is room:{id}:round, which tracks the current round.
+	roundsPlayed, err := keys.GetRoomRound(ctx, s.rdb, roomID)
+	if err != nil {
+		roundsPlayed = 0
+	}
+
+	// Helper: count correct answers for a userID across rounds 1..roundsPlayed.
+	tallyCorrect := func(userID string) int32 {
+		var n int32
+		for round := 1; round <= roundsPlayed; round++ {
+			answerJSON, err := s.rdb.HGet(ctx, keys.Answers(roomID, round), userID).Result()
+			if err != nil {
+				continue
+			}
+			var rec struct {
+				Correct bool `json:"correct"`
+			}
+			if json.Unmarshal([]byte(answerJSON), &rec) == nil && rec.Correct {
+				n++
+			}
+		}
+		return n
+	}
+
+	// Helper: resolve username + plan from the room players hash.
+	resolveInfo := func(userID string) (string, string) {
 		username := userID
-		pPlan := "free"
-		if playerJSON, err := keys.GetPlayer(ctx, s.rdb, roomID, userID); err == nil {
+		plan := "free"
+		if raw, ok := allPlayers[userID]; ok {
 			var info struct {
 				Username string `json:"username"`
 				Plan     string `json:"plan"`
 			}
-			if json.Unmarshal([]byte(playerJSON), &info) == nil {
+			if json.Unmarshal([]byte(raw), &info) == nil {
 				if info.Username != "" {
 					username = info.Username
 				}
 				if info.Plan != "" {
-					pPlan = info.Plan
+					plan = info.Plan
 				}
 			}
 		}
+		return username, plan
+	}
 
+	var winner string
+	playerResults := make([]*pb.PlayerResult, 0, len(allPlayers))
+	scored := make(map[string]bool, len(entries))
+
+	// First pass: leaderboard-ranked players (by score desc).
+	for i, e := range entries {
+		userID := e.Member.(string)
+		scored[userID] = true
+		if i == 0 {
+			winner = userID
+		}
+		username, pPlan := resolveInfo(userID)
 		playerResults = append(playerResults, &pb.PlayerResult{
-			UserId:     userID,
-			Username:   username,
-			FinalScore: e.Score,
-			Rank:       int32(i + 1),
-			Plan:       pPlan,
+			UserId:         userID,
+			Username:       username,
+			FinalScore:     e.Score,
+			Rank:           int32(i + 1),
+			AnswersCorrect: tallyCorrect(userID),
+			Plan:           pPlan,
 		})
+	}
+
+	// Second pass: participants who never scored — append with zero score so
+	// both players are represented in the abandonment case.
+	nextRank := int32(len(entries) + 1)
+	for userID := range allPlayers {
+		if scored[userID] {
+			continue
+		}
+		username, pPlan := resolveInfo(userID)
+		playerResults = append(playerResults, &pb.PlayerResult{
+			UserId:         userID,
+			Username:       username,
+			FinalScore:     0,
+			Rank:           nextRank,
+			AnswersCorrect: tallyCorrect(userID),
+			Plan:           pPlan,
+		})
+		nextRank++
 	}
 
 	// Broadcast MatchEnd GameEvent
@@ -456,10 +539,7 @@ func (s *quizServer) finishMatch(ctx context.Context, roomID string, totalRounds
 	})
 	if err != nil {
 		log.Printf("[quiz] failed to marshal match.finished: %v", err)
-	} else if err := s.amqpCh.PublishWithContext(ctx, "sx", "match.finished", false, false, amqp.Publishing{
-		ContentType: "application/json",
-		Body:        finishEvent,
-	}); err != nil {
+	} else if err := s.publish(ctx, "match.finished", finishEvent); err != nil {
 		log.Printf("[quiz] failed to publish match.finished: %v", err)
 	}
 
@@ -807,10 +887,7 @@ func (s *quizServer) SubmitAnswer(ctx context.Context, req *pb.SubmitAnswerReque
 		return nil, status.Errorf(codes.Internal, "failed to marshal answer: %v", err)
 	}
 
-	if err := s.amqpCh.PublishWithContext(ctx, "sx", "answer.submitted", false, false, amqp.Publishing{
-		ContentType: "application/json",
-		Body:        eventPayload,
-	}); err != nil {
+	if err := s.publish(ctx, "answer.submitted", eventPayload); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to publish answer: %v", err)
 	}
 
@@ -873,10 +950,7 @@ func (s *quizServer) tournamentReminderTicker(ctx context.Context) {
 						"tournamentName":  tourName,
 						"startsInMinutes": 30,
 					})
-					s.amqpCh.PublishWithContext(ctx, "sx", "notif.tournament.remind", false, false, amqp.Publishing{
-						ContentType: "application/json",
-						Body:        payload,
-					})
+					s.publish(ctx, "notif.tournament.remind", payload)
 				}
 
 				s.mongoDB.Collection("tournaments").UpdateOne(ctx,

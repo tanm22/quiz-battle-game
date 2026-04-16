@@ -31,7 +31,8 @@ type AnswerRecord struct {
 type Streak struct {
 	Current         int    `bson:"current" json:"current"`
 	Longest         int    `bson:"longest" json:"longest"`
-	LastClaimedDate string `bson:"lastClaimedDate" json:"lastClaimedDate"` // YYYY-MM-DD IST
+	LastClaimedDate   string `bson:"lastClaimedDate" json:"lastClaimedDate"`     // YYYY-MM-DD IST
+	RewardClaimedDate string `bson:"rewardClaimedDate" json:"rewardClaimedDate"` // YYYY-MM-DD IST
 }
 
 // User is the MongoDB document in the users collection.

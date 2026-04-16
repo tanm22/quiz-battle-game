@@ -203,6 +203,7 @@ func (s *authServer) GuestLogin(ctx context.Context, _ *pb.GuestLoginRequest) (*
 		Username:     username,
 		IsGuest:      true,
 		Rating:       1200,
+		Plan:         "free",
 		ReferralCode: refCode,
 		CreatedAt:    time.Now().Unix(),
 	}
@@ -614,12 +615,32 @@ func (s *authServer) ClaimDailyReward(ctx context.Context, _ *pb.ClaimDailyRewar
 	if user.Streak.LastClaimedDate != today {
 		return nil, status.Error(codes.FailedPrecondition, "login first to update streak")
 	}
+	if user.Streak.RewardClaimedDate == today {
+		// Already claimed today — return the reward info without granting again
+		return &pb.ClaimDailyRewardResponse{
+			Reward: rewardForDay(user.Streak.Current),
+			Streak: toStreakInfo(user.Streak),
+		}, nil
+	}
 
 	reward := rewardForDay(user.Streak.Current)
 
-	// Grant coins
-	if reward.Coins > 0 {
-		s.users().UpdateOne(ctx, bson.M{"_id": userID}, bson.M{"$inc": bson.M{"coins": reward.Coins}})
+	// Atomically grant coins and mark reward as claimed for today
+	res, err := s.users().UpdateOne(ctx,
+		bson.M{"_id": userID, "streak.rewardClaimedDate": bson.M{"$ne": today}},
+		bson.M{
+			"$inc": bson.M{"coins": reward.Coins},
+			"$set": bson.M{"streak.rewardClaimedDate": today},
+		})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to claim reward: %v", err)
+	}
+	if res.ModifiedCount == 0 {
+		// Race: another request already claimed
+		return &pb.ClaimDailyRewardResponse{
+			Reward: reward,
+			Streak: toStreakInfo(user.Streak),
+		}, nil
 	}
 
 	return &pb.ClaimDailyRewardResponse{

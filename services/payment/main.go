@@ -90,7 +90,8 @@ func (s *paymentServer) CreateOrder(ctx context.Context, req *pb.CreateOrderRequ
 	httpReq.SetBasicAuth(s.razorpayKeyID, s.razorpaySecret)
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(httpReq)
+	httpClient := &http.Client{Timeout: 10 * time.Second}
+	resp, err := httpClient.Do(httpReq)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "razorpay API unreachable: %v", err)
 	}
