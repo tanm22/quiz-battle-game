@@ -288,29 +288,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             const SizedBox(height: 16),
           ],
 
-          // Leaderboard preview
-          if (_homeData != null && _homeData!.leaderboardPreview.isNotEmpty) ...[
-            _buildLeaderboardHeader(),
-            const SizedBox(height: 8),
-            Container(
-              decoration: appCardDecoration(),
-              child: Column(
-                children: _homeData!.leaderboardPreview.take(5).toList().asMap().entries.map((entry) {
-                  final isLast = entry.key == (_homeData!.leaderboardPreview.length > 5 ? 4 : _homeData!.leaderboardPreview.length - 1);
-                  return _leaderboardRow(entry.value, showBorder: !isLast);
-                }).toList(),
-              ),
-            ),
-          ] else if (_homeData != null) ...[
-            _buildLeaderboardHeader(),
-            const SizedBox(height: 8),
-            _buildLeaderboardEmpty(),
-          ] else if (_loading && _error == null) ...[
-            _buildLeaderboardHeader(),
-            const SizedBox(height: 8),
-            for (int i = 0; i < 3; i++) _skeletonTile(height: 40, margin: const EdgeInsets.only(bottom: 6)),
-          ],
-
           const SizedBox(height: 24),
         ],
       ),
@@ -502,8 +479,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   // ---------------------------------------------------------------------------
 
   Widget _buildProfileTab(AuthService auth, GameState gameState) {
-    final profile = _homeData?.profile;
-
     return RefreshIndicator(
       onRefresh: _loadHomeData,
       color: AppColors.primary,
@@ -912,7 +887,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Widget _buildStatsRow() {
     final profile = _homeData?.profile;
-    final streak = profile?.streak.current ?? 0;
+    final winStreak = profile?.winStreak ?? 0;
     final accuracy = profile?.accuracyPercent ?? 0.0;
     // Matches today = quotaUsed = quotaLimit - quotaRemaining
     final matchesToday = (_homeData?.quotaLimit ?? 0) - (_homeData?.quotaRemaining ?? 0);
@@ -924,7 +899,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _Stat(Icons.today, '$matchesToday', 'Today', AppColors.accent, AppColors.accentBg),
-          _Stat(Icons.local_fire_department, '$streak', 'Streak', AppColors.primary, AppColors.orangeBg),
+          _Stat(Icons.local_fire_department, '$winStreak', 'Win Streak', AppColors.primary, AppColors.orangeBg),
           _Stat(Icons.track_changes, '${accuracy.toStringAsFixed(0)}%', 'Accuracy', AppColors.success, AppColors.emeraldBg),
         ],
       ),

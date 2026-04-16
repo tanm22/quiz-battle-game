@@ -3995,6 +3995,7 @@ class UserProfile extends $pb.GeneratedMessage {
     $core.String? referralCode,
     $core.bool? isGuest,
     $core.double? accuracyPercent,
+    $core.int? winStreak,
   }) {
     final result = create();
     if (userId != null) result.userId = userId;
@@ -4011,6 +4012,7 @@ class UserProfile extends $pb.GeneratedMessage {
     if (referralCode != null) result.referralCode = referralCode;
     if (isGuest != null) result.isGuest = isGuest;
     if (accuracyPercent != null) result.accuracyPercent = accuracyPercent;
+    if (winStreak != null) result.winStreak = winStreak;
     return result;
   }
 
@@ -4043,6 +4045,7 @@ class UserProfile extends $pb.GeneratedMessage {
     ..aOB(13, _omitFieldNames ? '' : 'isGuest')
     ..aD(14, _omitFieldNames ? '' : 'accuracyPercent',
         fieldType: $pb.PbFieldType.OF)
+    ..aI(15, _omitFieldNames ? '' : 'winStreak')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4191,6 +4194,15 @@ class UserProfile extends $pb.GeneratedMessage {
   $core.bool hasAccuracyPercent() => $_has(13);
   @$pb.TagNumber(14)
   void clearAccuracyPercent() => $_clearField(14);
+
+  @$pb.TagNumber(15)
+  $core.int get winStreak => $_getIZ(14);
+  @$pb.TagNumber(15)
+  set winStreak($core.int value) => $_setSignedInt32(14, value);
+  @$pb.TagNumber(15)
+  $core.bool hasWinStreak() => $_has(14);
+  @$pb.TagNumber(15)
+  void clearWinStreak() => $_clearField(15);
 }
 
 class ClaimDailyRewardRequest extends $pb.GeneratedMessage {
