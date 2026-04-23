@@ -8,6 +8,7 @@ import '../services/auth_service.dart';
 import '../services/quiz_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/animated_toast.dart';
+import '../widgets/streak_calendar.dart';
 import '../proto/quiz.pbgrpc.dart';
 import 'match_history_screen.dart';
 import 'payment_screen.dart';
@@ -527,7 +528,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           const SizedBox(height: 20),
 
           _buildProfileCard(auth, gameState),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
+
+          // Streak calendar (30-day history, derived from StreakInfo).
+          if (_homeData != null && _homeData!.profile.streak.current > 0) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: appCardDecoration(),
+              child: StreakCalendar(
+                currentStreak: _homeData!.profile.streak.current,
+                lastClaimedDate: _homeData!.profile.streak.lastClaimedDate,
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
 
           // Guest email-link prompt
           if (gameState.isGuest) ...[
