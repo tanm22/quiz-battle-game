@@ -831,6 +831,20 @@ func (s *scoringServer) consumeMatchFinished(ctx context.Context) {
 	}
 }
 
+// resolveRoundsForHistory returns the best available round count for
+// persisting a finished match. finishMatch uses eventRounds = -1 when the
+// opponent abandons and 0 when all players disconnect; those sentinels
+// would corrupt match_history (Phase-1 spec item 4 requires a real value).
+// When the sentinel is non-positive, fall back to roundsPlayed which the
+// caller reads from the authoritative room:{id}:round key. If both are
+// zero (match ended before round 1 dispatch), 0 is the truthful answer.
+func resolveRoundsForHistory(eventRounds, roundsPlayed int) int {
+	if eventRounds <= 0 {
+		return roundsPlayed
+	}
+	return eventRounds
+}
+
 func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 	var event matchFinishedEvent
 	if err := json.Unmarshal(msg.Body, &event); err != nil {
@@ -980,10 +994,12 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 		}
 	}
 
+	roundsForHistory := resolveRoundsForHistory(event.Rounds, roundsPlayed)
+
 	matchDoc := bson.M{
 		"roomId":    event.RoomID,
 		"players":   players,
-		"rounds":    event.Rounds,
+		"rounds":    roundsForHistory,
 		"winner":    winner,
 		"createdAt": time.Now(),
 		"duration":  durationMs,
