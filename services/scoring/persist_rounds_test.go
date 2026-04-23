@@ -2,11 +2,10 @@ package main
 
 import "testing"
 
-// TestRoundsForHistory verifies that negative or zero sentinel values from
-// the abandonment path get replaced with the authoritative roundsPlayed
-// count before persisting to match_history. Regression guard for the bug
-// where abandoned matches stored rounds=-1 in MongoDB.
-func TestRoundsForHistory(t *testing.T) {
+// TestResolveRoundsForHistory verifies the guard that prevents the -1/0
+// sentinels from finishMatch from landing in match_history. Exercises the
+// production helper directly so a regression in the guard flips the test.
+func TestResolveRoundsForHistory(t *testing.T) {
 	cases := []struct {
 		name         string
 		eventRounds  int
@@ -22,12 +21,10 @@ func TestRoundsForHistory(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := tc.eventRounds
-			if got <= 0 {
-				got = tc.roundsPlayed
-			}
+			got := resolveRoundsForHistory(tc.eventRounds, tc.roundsPlayed)
 			if got != tc.want {
-				t.Errorf("roundsForHistory=%d want %d", got, tc.want)
+				t.Errorf("resolveRoundsForHistory(%d, %d) = %d, want %d",
+					tc.eventRounds, tc.roundsPlayed, got, tc.want)
 			}
 		})
 	}
