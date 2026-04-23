@@ -308,14 +308,18 @@ class GameStateNotifier extends Notifier<GameState> {
   }
 
   void _reconnectWithBackoff() {
+    // Exponential backoff per spec: 500ms → 1s → 2s → 4s (4 tries). After the
+    // last delay fires and the reconnect still fails, _reconnectAttempt exceeds
+    // delays.length and the catch-all block below returns the user to home.
     const delays = [
       Duration(milliseconds: 500),
       Duration(seconds: 1),
       Duration(seconds: 2),
+      Duration(seconds: 4),
     ];
 
     if (_reconnectAttempt > delays.length) {
-      // After 3 failed retries, show match abandoned and return to lobby
+      // After 4 failed retries, show match abandoned and return to lobby
       _reconnectAttempt = 0;
       state = state.copyWith(
         currentScreen: GameScreen.home,

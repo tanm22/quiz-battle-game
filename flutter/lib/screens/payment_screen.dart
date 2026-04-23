@@ -18,6 +18,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
   bool _loading = false;
   String? _currentPlan;
   Int64? _expiresAt;
+  List<PaymentRecord>? _paymentHistory;
+  bool _historyLoading = false;
   late final Razorpay _razorpay;
 
   @override
@@ -28,6 +30,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
     _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
     _loadPlanStatus();
+    _loadPaymentHistory();
   }
 
   @override
@@ -49,6 +52,26 @@ class _PaymentScreenState extends State<PaymentScreen> {
         });
       }
     } catch (_) {}
+  }
+
+  Future<void> _loadPaymentHistory() async {
+    if (!mounted) return;
+    setState(() => _historyLoading = true);
+    try {
+      final resp = await QuizService().payment.getPaymentHistory(
+        GetPaymentHistoryRequest()..limit = 20,
+        options: QuizService().authCallOptions,
+      );
+      if (mounted) {
+        setState(() {
+          _paymentHistory = resp.payments;
+          _historyLoading = false;
+        });
+      }
+    } catch (_) {
+      // Non-fatal — upgrade flow still works without history.
+      if (mounted) setState(() => _historyLoading = false);
+    }
   }
 
   Future<void> _createOrder() async {
@@ -96,7 +119,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
       barrierDismissible: false,
       builder: (ctx) => const _PaymentSuccessDialog(),
     );
-    Future.delayed(const Duration(seconds: 2), _loadPlanStatus);
+    Future.delayed(const Duration(seconds: 2), () {
+      _loadPlanStatus();
+      _loadPaymentHistory();
+    });
   }
 
   void _handlePaymentError(PaymentFailureResponse response) {
@@ -206,8 +232,112 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 ),
               ),
             ],
+            // Payment history — shown regardless of current plan so users can
+            // see past renewals/failures. GetPaymentHistory caps at 20 records.
+            const SizedBox(height: 32),
+            _buildPaymentHistory(),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildPaymentHistory() {
+    if (_historyLoading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: Center(
+          child: SizedBox(
+            width: 20, height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.textMuted),
+          ),
+        ),
+      );
+    }
+    if (_paymentHistory == null || _paymentHistory!.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        child: Column(
+          children: [
+            const Icon(Icons.receipt_long, size: 40, color: AppColors.textMuted),
+            const SizedBox(height: 8),
+            const Text(
+              'No payments yet',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Your first upgrade will appear here.',
+              style: TextStyle(color: AppColors.textMuted.withAlpha(200), fontSize: 12),
+            ),
+          ],
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Payment history',
+            style: TextStyle(color: AppColors.text, fontSize: 16, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 12),
+        ..._paymentHistory!.map(_paymentRow),
+      ],
+    );
+  }
+
+  Widget _paymentRow(PaymentRecord p) {
+    final date = p.createdAt.toInt() > 0
+        ? DateTime.fromMillisecondsSinceEpoch(p.createdAt.toInt() * 1000)
+            .toLocal()
+            .toString()
+            .split(' ')[0]
+        : '--';
+    final amountRupees = (p.amount.toInt() / 100).toStringAsFixed(2);
+
+    Color statusColor;
+    IconData statusIcon;
+    switch (p.status) {
+      case 'captured':
+        statusColor = AppColors.success;
+        statusIcon = Icons.check_circle;
+        break;
+      case 'failed':
+        statusColor = AppColors.danger;
+        statusIcon = Icons.cancel;
+        break;
+      default: // "created" / "pending"
+        statusColor = AppColors.textMuted;
+        statusIcon = Icons.hourglass_bottom;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Icon(statusIcon, color: statusColor, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${p.planDuration.isEmpty ? 'Plan' : '${p.planDuration[0].toUpperCase()}${p.planDuration.substring(1)}'} — ₹$amountRupees',
+                  style: const TextStyle(color: AppColors.text, fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 2),
+                Text(date, style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
+              ],
+            ),
+          ),
+          Text(p.status,
+              style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.w600)),
+        ],
       ),
     );
   }

@@ -8,6 +8,7 @@ import '../services/auth_service.dart';
 import '../services/quiz_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/animated_toast.dart';
+import '../widgets/streak_calendar.dart';
 import '../proto/quiz.pbgrpc.dart';
 import 'match_history_screen.dart';
 import 'payment_screen.dart';
@@ -115,6 +116,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         elevation: 8,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.bolt_rounded), label: 'Play'),
           BottomNavigationBarItem(icon: Icon(Icons.leaderboard_rounded), label: 'Leaderboard'),
           BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Profile'),
         ],
@@ -125,11 +127,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildTabContent(AuthService auth, GameState gs) {
     switch (_currentTab) {
       case 1:
-        return _buildLeaderboardTab();
+        // "Play" is a stateless action tab — we don't render a page, we fire
+        // the Play action and snap back to Home so the user sees the match
+        // in progress (or the upgrade prompt if their quota is exhausted).
+        WidgetsBinding.instance.addPostFrameCallback((_) => _handlePlayTab());
+        return _buildHomeTab(auth, gs);
       case 2:
+        return _buildLeaderboardTab();
+      case 3:
         return _buildProfileTab(auth, gs);
       default:
         return _buildHomeTab(auth, gs);
+    }
+  }
+
+  /// Called when the user taps the Play tab. If they have quota, route to
+  /// matchmaking. If not, push the upgrade screen. Always reset the tab index
+  /// back to Home so the Play tab acts like an action, not a destination.
+  void _handlePlayTab() {
+    setState(() => _currentTab = 0); // snap back to Home
+
+    // Don't route anywhere if the home data hasn't loaded — the quota gate
+    // depends on it. A brief snackbar is less confusing than silently
+    // sending the user into matchmaking with stale defaults.
+    if (_homeData == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Loading your stats… try again in a moment.'),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final isPremium = _homeData!.profile.plan == 'premium';
+    final remaining = _homeData!.quotaRemaining;
+    final quotaExhausted = !isPremium && remaining <= 0;
+
+    if (quotaExhausted) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentScreen()));
+    } else {
+      ref.read(gameStateProvider.notifier).navigateToMatchmaking();
     }
   }
 
@@ -489,7 +528,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           const SizedBox(height: 20),
 
           _buildProfileCard(auth, gameState),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
+
+          // Streak calendar (30-day history, derived from StreakInfo).
+          if (_homeData != null && _homeData!.profile.streak.current > 0) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: appCardDecoration(),
+              child: StreakCalendar(
+                currentStreak: _homeData!.profile.streak.current,
+                lastClaimedDate: _homeData!.profile.streak.lastClaimedDate,
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
 
           // Guest email-link prompt
           if (gameState.isGuest) ...[
