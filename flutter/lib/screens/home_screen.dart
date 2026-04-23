@@ -144,11 +144,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// matchmaking. If not, push the upgrade screen. Always reset the tab index
   /// back to Home so the Play tab acts like an action, not a destination.
   void _handlePlayTab() {
-    final isPremium = (_homeData?.profile.plan ?? 'free') == 'premium';
-    final remaining = _homeData?.quotaRemaining ?? 0;
-    final quotaExhausted = !isPremium && _homeData != null && remaining <= 0;
-
     setState(() => _currentTab = 0); // snap back to Home
+
+    // Don't route anywhere if the home data hasn't loaded — the quota gate
+    // depends on it. A brief snackbar is less confusing than silently
+    // sending the user into matchmaking with stale defaults.
+    if (_homeData == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Loading your stats… try again in a moment.'),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final isPremium = _homeData!.profile.plan == 'premium';
+    final remaining = _homeData!.quotaRemaining;
+    final quotaExhausted = !isPremium && remaining <= 0;
+
     if (quotaExhausted) {
       Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentScreen()));
     } else {
