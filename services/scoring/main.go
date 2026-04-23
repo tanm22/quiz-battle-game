@@ -980,10 +980,19 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 		}
 	}
 
+	// Use the authoritative roundsPlayed from Redis when the caller passed a
+	// sentinel (-1 on opponent-abandon, 0 on zero-connected) so match_history
+	// never stores a negative/zero round count. Spec item 4 requires this
+	// field to reflect the actual number of rounds played.
+	roundsForHistory := event.Rounds
+	if roundsForHistory <= 0 {
+		roundsForHistory = roundsPlayed
+	}
+
 	matchDoc := bson.M{
 		"roomId":    event.RoomID,
 		"players":   players,
-		"rounds":    event.Rounds,
+		"rounds":    roundsForHistory,
 		"winner":    winner,
 		"createdAt": time.Now(),
 		"duration":  durationMs,
