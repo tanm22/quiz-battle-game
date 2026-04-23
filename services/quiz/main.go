@@ -453,6 +453,33 @@ func (s *quizServer) finishMatch(ctx context.Context, roomID string, totalRounds
 		return n
 	}
 
+	// Helper: compute average response time (ms) for a userID across rounds.
+	// Mirrors the persistence worker's logic so MatchEnd broadcast and
+	// match_history agree on avg_response_time_ms.
+	tallyAvgMs := func(userID string) float64 {
+		var totalMs int64
+		var answered int
+		for round := 1; round <= roundsPlayed; round++ {
+			answerJSON, err := s.rdb.HGet(ctx, keys.Answers(roomID, round), userID).Result()
+			if err != nil {
+				continue
+			}
+			var rec struct {
+				Timestamp       int64 `json:"timestamp"`
+				ClientTimestamp int64 `json:"clientTimestamp"`
+			}
+			if json.Unmarshal([]byte(answerJSON), &rec) == nil &&
+				rec.Timestamp > 0 && rec.ClientTimestamp > 0 {
+				totalMs += rec.Timestamp - rec.ClientTimestamp
+				answered++
+			}
+		}
+		if answered == 0 {
+			return 0
+		}
+		return float64(totalMs) / float64(answered)
+	}
+
 	// Helper: resolve username + plan from the room players hash.
 	resolveInfo := func(userID string) (string, string) {
 		username := userID
@@ -487,12 +514,13 @@ func (s *quizServer) finishMatch(ctx context.Context, roomID string, totalRounds
 		}
 		username, pPlan := resolveInfo(userID)
 		playerResults = append(playerResults, &pb.PlayerResult{
-			UserId:         userID,
-			Username:       username,
-			FinalScore:     e.Score,
-			Rank:           int32(i + 1),
-			AnswersCorrect: tallyCorrect(userID),
-			Plan:           pPlan,
+			UserId:            userID,
+			Username:          username,
+			FinalScore:        e.Score,
+			Rank:              int32(i + 1),
+			AnswersCorrect:    tallyCorrect(userID),
+			AvgResponseTimeMs: tallyAvgMs(userID),
+			Plan:              pPlan,
 		})
 	}
 
@@ -505,12 +533,13 @@ func (s *quizServer) finishMatch(ctx context.Context, roomID string, totalRounds
 		}
 		username, pPlan := resolveInfo(userID)
 		playerResults = append(playerResults, &pb.PlayerResult{
-			UserId:         userID,
-			Username:       username,
-			FinalScore:     0,
-			Rank:           nextRank,
-			AnswersCorrect: tallyCorrect(userID),
-			Plan:           pPlan,
+			UserId:            userID,
+			Username:          username,
+			FinalScore:        0,
+			Rank:              nextRank,
+			AnswersCorrect:    tallyCorrect(userID),
+			AvgResponseTimeMs: tallyAvgMs(userID),
+			Plan:              pPlan,
 		})
 		nextRank++
 	}
