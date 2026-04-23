@@ -115,6 +115,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         elevation: 8,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.bolt_rounded), label: 'Play'),
           BottomNavigationBarItem(icon: Icon(Icons.leaderboard_rounded), label: 'Leaderboard'),
           BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Profile'),
         ],
@@ -125,11 +126,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildTabContent(AuthService auth, GameState gs) {
     switch (_currentTab) {
       case 1:
-        return _buildLeaderboardTab();
+        // "Play" is a stateless action tab — we don't render a page, we fire
+        // the Play action and snap back to Home so the user sees the match
+        // in progress (or the upgrade prompt if their quota is exhausted).
+        WidgetsBinding.instance.addPostFrameCallback((_) => _handlePlayTab());
+        return _buildHomeTab(auth, gs);
       case 2:
+        return _buildLeaderboardTab();
+      case 3:
         return _buildProfileTab(auth, gs);
       default:
         return _buildHomeTab(auth, gs);
+    }
+  }
+
+  /// Called when the user taps the Play tab. If they have quota, route to
+  /// matchmaking. If not, push the upgrade screen. Always reset the tab index
+  /// back to Home so the Play tab acts like an action, not a destination.
+  void _handlePlayTab() {
+    final isPremium = (_homeData?.profile.plan ?? 'free') == 'premium';
+    final remaining = _homeData?.quotaRemaining ?? 0;
+    final quotaExhausted = !isPremium && _homeData != null && remaining <= 0;
+
+    setState(() => _currentTab = 0); // snap back to Home
+    if (quotaExhausted) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentScreen()));
+    } else {
+      ref.read(gameStateProvider.notifier).navigateToMatchmaking();
     }
   }
 
