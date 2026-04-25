@@ -20,6 +20,9 @@ class AuthService {
   int _rating = 1200;
   int _matchesPlayed = 0;
   int _wins = 0;
+  bool _onboardingCompleted = false;
+  List<String> _preferredTopics = const [];
+  String? _avatarUrl;
 
   static const _backendHost = String.fromEnvironment('BACKEND_HOST', defaultValue: 'localhost');
   // Web (server) client ID — used on Android to request an idToken, and by the backend to verify it.
@@ -45,6 +48,9 @@ class AuthService {
   int get rating => _rating;
   int get matchesPlayed => _matchesPlayed;
   int get wins => _wins;
+  bool get onboardingCompleted => _onboardingCompleted;
+  List<String> get preferredTopics => _preferredTopics;
+  String? get avatarUrl => _avatarUrl;
 
   /// Load stored auth state from SharedPreferences on app start.
   Future<bool> tryRestoreSession() async {
@@ -57,6 +63,7 @@ class AuthService {
     _rating = prefs.getInt('auth_rating') ?? 1200;
     _matchesPlayed = prefs.getInt('auth_matches_played') ?? 0;
     _wins = prefs.getInt('auth_wins') ?? 0;
+    _onboardingCompleted = prefs.getBool('auth_onboarding_completed') ?? false;
 
     if (_token == null || _userId == null) return false;
 
@@ -71,6 +78,9 @@ class AuthService {
       _wins = profile.wins;
       if (profile.email.isNotEmpty) _email = profile.email;
       _isGuest = profile.isGuest;
+      _onboardingCompleted = profile.onboardingCompleted;
+      _preferredTopics = List<String>.from(profile.preferredTopics);
+      if (profile.avatarUrl.isNotEmpty) _avatarUrl = profile.avatarUrl;
       await _saveToPrefs();
       return true;
     } catch (_) {
@@ -98,6 +108,7 @@ class AuthService {
     _matchesPlayed = resp.matchesPlayed;
     _wins = resp.wins;
     _isGuest = resp.isGuest;
+    _onboardingCompleted = resp.onboardingCompleted;
     if (resp.email.isNotEmpty) _email = resp.email;
     await _saveToPrefs();
   }
@@ -116,6 +127,7 @@ class AuthService {
     _matchesPlayed = resp.matchesPlayed;
     _wins = resp.wins;
     _isGuest = resp.isGuest;
+    _onboardingCompleted = resp.onboardingCompleted;
     if (resp.email.isNotEmpty) _email = resp.email;
     await _saveToPrefs();
   }
@@ -129,6 +141,7 @@ class AuthService {
     _isGuest = resp.isGuest;
     _matchesPlayed = resp.matchesPlayed;
     _wins = resp.wins;
+    _onboardingCompleted = resp.onboardingCompleted;
     if (resp.email.isNotEmpty) _email = resp.email;
     await _saveToPrefs();
   }
@@ -166,6 +179,9 @@ class AuthService {
     _rating = profile.rating;
     _matchesPlayed = profile.matchesPlayed;
     _wins = profile.wins;
+    _onboardingCompleted = profile.onboardingCompleted;
+    _preferredTopics = List<String>.from(profile.preferredTopics);
+    if (profile.avatarUrl.isNotEmpty) _avatarUrl = profile.avatarUrl;
     await _saveToPrefs();
 
     return resp;
@@ -285,6 +301,36 @@ class AuthService {
     );
   }
 
+  /// Persist onboarding data to the backend.
+  /// Any null/empty argument is omitted (partial update on the server).
+  Future<void> updateProfile({
+    String? displayName,
+    String? avatarUrl,
+    List<String>? preferredTopics,
+    bool markOnboardingCompleted = false,
+  }) async {
+    final req = UpdateProfileRequest();
+    if (displayName != null && displayName.isNotEmpty) {
+      req.displayName = displayName;
+    }
+    if (avatarUrl != null && avatarUrl.isNotEmpty) {
+      req.avatarUrl = avatarUrl;
+    }
+    if (preferredTopics != null && preferredTopics.isNotEmpty) {
+      req.preferredTopics.addAll(preferredTopics);
+    }
+    if (markOnboardingCompleted) {
+      req.onboardingCompleted = true;
+    }
+    await _client.updateProfile(req, options: authOptions);
+    if (markOnboardingCompleted) _onboardingCompleted = true;
+    if (preferredTopics != null) {
+      _preferredTopics = List.unmodifiable(preferredTopics);
+    }
+    if (avatarUrl != null && avatarUrl.isNotEmpty) _avatarUrl = avatarUrl;
+    await _saveToPrefs();
+  }
+
   Future<void> logout() async {
     try { await GoogleSignIn().signOut(); } catch (_) {}
     _token = null;
@@ -309,5 +355,6 @@ class AuthService {
     prefs.setInt('auth_rating', _rating);
     prefs.setInt('auth_matches_played', _matchesPlayed);
     prefs.setInt('auth_wins', _wins);
+    prefs.setBool('auth_onboarding_completed', _onboardingCompleted);
   }
 }
