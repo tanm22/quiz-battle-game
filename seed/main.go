@@ -166,6 +166,8 @@ func main() {
 			"coins":         int64(0),
 			"referralCode":  refCode,
 			"streak":        bson.M{"current": 0, "longest": 0, "lastClaimedDate": ""},
+			"onboardingCompleted": true,
+			"preferredTopics":     []string{"science", "history", "geography"},
 			"createdAt":     time.Now().Unix(),
 		}
 		_, err := usersColl.UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$setOnInsert": doc}, options.UpdateOne().SetUpsert(true))
@@ -175,6 +177,20 @@ func main() {
 	}
 	userCount, _ := usersColl.CountDocuments(ctx, bson.M{})
 	log.Printf("[seed] %d users in database", userCount)
+
+	// One-shot migration for existing users that pre-date the onboarding flag.
+	// Anyone with matchesPlayed > 0 has implicitly "onboarded" — mark them
+	// so they don't get thrown into the onboarding flow on next app open.
+	migRes, err := usersColl.UpdateMany(ctx,
+		bson.M{
+			"onboardingCompleted": bson.M{"$exists": false},
+			"matchesPlayed":       bson.M{"$gt": 0},
+		},
+		bson.M{"$set": bson.M{"onboardingCompleted": true}},
+	)
+	if err == nil && migRes.ModifiedCount > 0 {
+		log.Printf("[seed] migrated %d existing users to onboardingCompleted=true", migRes.ModifiedCount)
+	}
 
 	// --- Seed tournaments ---
 	tournamentsColl := db.Collection("tournaments")
