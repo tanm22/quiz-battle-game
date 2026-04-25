@@ -1,6 +1,6 @@
 // This is a generated file - do not edit.
 //
-// Generated from quiz.proto.
+// Generated from proto/quiz.proto.
 
 // @dart = 3.3
 
@@ -1843,6 +1843,7 @@ class AuthResponse extends $pb.GeneratedMessage {
     $core.String? referralCode,
     $core.bool? streakUpdated,
     RewardGrant? reward,
+    $core.bool? onboardingCompleted,
   }) {
     final result = create();
     if (userId != null) result.userId = userId;
@@ -1859,6 +1860,8 @@ class AuthResponse extends $pb.GeneratedMessage {
     if (referralCode != null) result.referralCode = referralCode;
     if (streakUpdated != null) result.streakUpdated = streakUpdated;
     if (reward != null) result.reward = reward;
+    if (onboardingCompleted != null)
+      result.onboardingCompleted = onboardingCompleted;
     return result;
   }
 
@@ -1891,6 +1894,7 @@ class AuthResponse extends $pb.GeneratedMessage {
     ..aOB(13, _omitFieldNames ? '' : 'streakUpdated')
     ..aOM<RewardGrant>(14, _omitFieldNames ? '' : 'reward',
         subBuilder: RewardGrant.create)
+    ..aOB(15, _omitFieldNames ? '' : 'onboardingCompleted')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2041,6 +2045,15 @@ class AuthResponse extends $pb.GeneratedMessage {
   void clearReward() => $_clearField(14);
   @$pb.TagNumber(14)
   RewardGrant ensureReward() => $_ensure(13);
+
+  @$pb.TagNumber(15)
+  $core.bool get onboardingCompleted => $_getBF(14);
+  @$pb.TagNumber(15)
+  set onboardingCompleted($core.bool value) => $_setBool(14, value);
+  @$pb.TagNumber(15)
+  $core.bool hasOnboardingCompleted() => $_has(14);
+  @$pb.TagNumber(15)
+  void clearOnboardingCompleted() => $_clearField(15);
 }
 
 class GetProfileRequest extends $pb.GeneratedMessage {
@@ -2094,6 +2107,10 @@ class ProfileResponse extends $pb.GeneratedMessage {
     $fixnum.Int64? coins,
     StreakInfo? streak,
     $core.String? referralCode,
+    $core.String? displayName,
+    $core.String? avatarUrl,
+    $core.Iterable<$core.String>? preferredTopics,
+    $core.bool? onboardingCompleted,
   }) {
     final result = create();
     if (userId != null) result.userId = userId;
@@ -2107,6 +2124,11 @@ class ProfileResponse extends $pb.GeneratedMessage {
     if (coins != null) result.coins = coins;
     if (streak != null) result.streak = streak;
     if (referralCode != null) result.referralCode = referralCode;
+    if (displayName != null) result.displayName = displayName;
+    if (avatarUrl != null) result.avatarUrl = avatarUrl;
+    if (preferredTopics != null) result.preferredTopics.addAll(preferredTopics);
+    if (onboardingCompleted != null)
+      result.onboardingCompleted = onboardingCompleted;
     return result;
   }
 
@@ -2135,6 +2157,10 @@ class ProfileResponse extends $pb.GeneratedMessage {
     ..aOM<StreakInfo>(10, _omitFieldNames ? '' : 'streak',
         subBuilder: StreakInfo.create)
     ..aOS(11, _omitFieldNames ? '' : 'referralCode')
+    ..aOS(12, _omitFieldNames ? '' : 'displayName')
+    ..aOS(13, _omitFieldNames ? '' : 'avatarUrl')
+    ..pPS(14, _omitFieldNames ? '' : 'preferredTopics')
+    ..aOB(15, _omitFieldNames ? '' : 'onboardingCompleted')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2256,6 +2282,36 @@ class ProfileResponse extends $pb.GeneratedMessage {
   $core.bool hasReferralCode() => $_has(10);
   @$pb.TagNumber(11)
   void clearReferralCode() => $_clearField(11);
+
+  @$pb.TagNumber(12)
+  $core.String get displayName => $_getSZ(11);
+  @$pb.TagNumber(12)
+  set displayName($core.String value) => $_setString(11, value);
+  @$pb.TagNumber(12)
+  $core.bool hasDisplayName() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearDisplayName() => $_clearField(12);
+
+  @$pb.TagNumber(13)
+  $core.String get avatarUrl => $_getSZ(12);
+  @$pb.TagNumber(13)
+  set avatarUrl($core.String value) => $_setString(12, value);
+  @$pb.TagNumber(13)
+  $core.bool hasAvatarUrl() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearAvatarUrl() => $_clearField(13);
+
+  @$pb.TagNumber(14)
+  $pb.PbList<$core.String> get preferredTopics => $_getList(13);
+
+  @$pb.TagNumber(15)
+  $core.bool get onboardingCompleted => $_getBF(14);
+  @$pb.TagNumber(15)
+  set onboardingCompleted($core.bool value) => $_setBool(14, value);
+  @$pb.TagNumber(15)
+  $core.bool hasOnboardingCompleted() => $_has(14);
+  @$pb.TagNumber(15)
+  void clearOnboardingCompleted() => $_clearField(15);
 }
 
 class GuestLoginRequest extends $pb.GeneratedMessage {
@@ -3070,6 +3126,147 @@ class DeleteAccountResponse extends $pb.GeneratedMessage {
   $core.bool hasDeleted() => $_has(0);
   @$pb.TagNumber(1)
   void clearDeleted() => $_clearField(1);
+}
+
+/// Phase 3: Onboarding profile update
+class UpdateProfileRequest extends $pb.GeneratedMessage {
+  factory UpdateProfileRequest({
+    $core.String? displayName,
+    $core.String? avatarUrl,
+    $core.Iterable<$core.String>? preferredTopics,
+    $core.bool? onboardingCompleted,
+  }) {
+    final result = create();
+    if (displayName != null) result.displayName = displayName;
+    if (avatarUrl != null) result.avatarUrl = avatarUrl;
+    if (preferredTopics != null) result.preferredTopics.addAll(preferredTopics);
+    if (onboardingCompleted != null)
+      result.onboardingCompleted = onboardingCompleted;
+    return result;
+  }
+
+  UpdateProfileRequest._();
+
+  factory UpdateProfileRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory UpdateProfileRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UpdateProfileRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'displayName')
+    ..aOS(2, _omitFieldNames ? '' : 'avatarUrl')
+    ..pPS(3, _omitFieldNames ? '' : 'preferredTopics')
+    ..aOB(4, _omitFieldNames ? '' : 'onboardingCompleted')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateProfileRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateProfileRequest copyWith(void Function(UpdateProfileRequest) updates) =>
+      super.copyWith((message) => updates(message as UpdateProfileRequest))
+          as UpdateProfileRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static UpdateProfileRequest create() => UpdateProfileRequest._();
+  @$core.override
+  UpdateProfileRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static UpdateProfileRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UpdateProfileRequest>(create);
+  static UpdateProfileRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get displayName => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set displayName($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasDisplayName() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearDisplayName() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get avatarUrl => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set avatarUrl($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasAvatarUrl() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearAvatarUrl() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $pb.PbList<$core.String> get preferredTopics => $_getList(2);
+
+  @$pb.TagNumber(4)
+  $core.bool get onboardingCompleted => $_getBF(3);
+  @$pb.TagNumber(4)
+  set onboardingCompleted($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasOnboardingCompleted() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearOnboardingCompleted() => $_clearField(4);
+}
+
+class UpdateProfileResponse extends $pb.GeneratedMessage {
+  factory UpdateProfileResponse({
+    $core.bool? success,
+  }) {
+    final result = create();
+    if (success != null) result.success = success;
+    return result;
+  }
+
+  UpdateProfileResponse._();
+
+  factory UpdateProfileResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory UpdateProfileResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UpdateProfileResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'success')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateProfileResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateProfileResponse copyWith(
+          void Function(UpdateProfileResponse) updates) =>
+      super.copyWith((message) => updates(message as UpdateProfileResponse))
+          as UpdateProfileResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static UpdateProfileResponse create() => UpdateProfileResponse._();
+  @$core.override
+  UpdateProfileResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static UpdateProfileResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UpdateProfileResponse>(create);
+  static UpdateProfileResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get success => $_getBF(0);
+  @$pb.TagNumber(1)
+  set success($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSuccess() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSuccess() => $_clearField(1);
 }
 
 class CalculateScoreRequest extends $pb.GeneratedMessage {
@@ -3996,6 +4193,8 @@ class UserProfile extends $pb.GeneratedMessage {
     $core.bool? isGuest,
     $core.double? accuracyPercent,
     $core.int? winStreak,
+    $core.Iterable<$core.String>? preferredTopics,
+    $core.bool? onboardingCompleted,
   }) {
     final result = create();
     if (userId != null) result.userId = userId;
@@ -4013,6 +4212,9 @@ class UserProfile extends $pb.GeneratedMessage {
     if (isGuest != null) result.isGuest = isGuest;
     if (accuracyPercent != null) result.accuracyPercent = accuracyPercent;
     if (winStreak != null) result.winStreak = winStreak;
+    if (preferredTopics != null) result.preferredTopics.addAll(preferredTopics);
+    if (onboardingCompleted != null)
+      result.onboardingCompleted = onboardingCompleted;
     return result;
   }
 
@@ -4046,6 +4248,8 @@ class UserProfile extends $pb.GeneratedMessage {
     ..aD(14, _omitFieldNames ? '' : 'accuracyPercent',
         fieldType: $pb.PbFieldType.OF)
     ..aI(15, _omitFieldNames ? '' : 'winStreak')
+    ..pPS(16, _omitFieldNames ? '' : 'preferredTopics')
+    ..aOB(17, _omitFieldNames ? '' : 'onboardingCompleted')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4203,6 +4407,18 @@ class UserProfile extends $pb.GeneratedMessage {
   $core.bool hasWinStreak() => $_has(14);
   @$pb.TagNumber(15)
   void clearWinStreak() => $_clearField(15);
+
+  @$pb.TagNumber(16)
+  $pb.PbList<$core.String> get preferredTopics => $_getList(15);
+
+  @$pb.TagNumber(17)
+  $core.bool get onboardingCompleted => $_getBF(16);
+  @$pb.TagNumber(17)
+  set onboardingCompleted($core.bool value) => $_setBool(16, value);
+  @$pb.TagNumber(17)
+  $core.bool hasOnboardingCompleted() => $_has(16);
+  @$pb.TagNumber(17)
+  void clearOnboardingCompleted() => $_clearField(17);
 }
 
 class ClaimDailyRewardRequest extends $pb.GeneratedMessage {

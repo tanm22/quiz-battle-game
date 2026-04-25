@@ -1,6 +1,6 @@
 // This is a generated file - do not edit.
 //
-// Generated from quiz.proto.
+// Generated from proto/quiz.proto.
 
 // @dart = 3.3
 
@@ -686,6 +686,14 @@ class AuthServiceClient extends $grpc.Client {
     return $createUnaryCall(_$getStreakInfo, request, options: options);
   }
 
+  /// Phase 3
+  $grpc.ResponseFuture<$0.UpdateProfileResponse> updateProfile(
+    $0.UpdateProfileRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$updateProfile, request, options: options);
+  }
+
   // method descriptors
 
   static final _$register =
@@ -757,6 +765,11 @@ class AuthServiceClient extends $grpc.Client {
           '/quiz.AuthService/GetStreakInfo',
           ($0.GetStreakInfoRequest value) => value.writeToBuffer(),
           $0.GetStreakInfoResponse.fromBuffer);
+  static final _$updateProfile =
+      $grpc.ClientMethod<$0.UpdateProfileRequest, $0.UpdateProfileResponse>(
+          '/quiz.AuthService/UpdateProfile',
+          ($0.UpdateProfileRequest value) => value.writeToBuffer(),
+          $0.UpdateProfileResponse.fromBuffer);
 }
 
 @$pb.GrpcServiceName('quiz.AuthService')
@@ -880,6 +893,15 @@ abstract class AuthServiceBase extends $grpc.Service {
             ($core.List<$core.int> value) =>
                 $0.GetStreakInfoRequest.fromBuffer(value),
             ($0.GetStreakInfoResponse value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.UpdateProfileRequest, $0.UpdateProfileResponse>(
+            'UpdateProfile',
+            updateProfile_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.UpdateProfileRequest.fromBuffer(value),
+            ($0.UpdateProfileResponse value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.AuthResponse> register_Pre($grpc.ServiceCall $call,
@@ -1002,6 +1024,15 @@ abstract class AuthServiceBase extends $grpc.Service {
 
   $async.Future<$0.GetStreakInfoResponse> getStreakInfo(
       $grpc.ServiceCall call, $0.GetStreakInfoRequest request);
+
+  $async.Future<$0.UpdateProfileResponse> updateProfile_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.UpdateProfileRequest> $request) async {
+    return updateProfile($call, await $request);
+  }
+
+  $async.Future<$0.UpdateProfileResponse> updateProfile(
+      $grpc.ServiceCall call, $0.UpdateProfileRequest request);
 }
 
 @$pb.GrpcServiceName('quiz.PaymentService')
