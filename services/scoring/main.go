@@ -1109,6 +1109,13 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 
 	log.Printf("[persistence] match %s persisted — winner: %s, %d players", event.RoomID, winner, len(entries))
 
+	// Phase 3 (4.2): roll the match score into any active tournaments the
+	// participants are currently entered in. Points-based ranking — every
+	// completed match contributes its raw score to the participant's
+	// tournament standing. The quiz service's finalization worker reads
+	// from tournament_standings to compute top-N when the window closes.
+	s.updateTournamentStandings(ctx, entries, resolveUsername)
+
 	// Phase 2: Detect first quiz completion for referred users → trigger referral reward
 	for _, e := range entries {
 		userID := e.Member.(string)
@@ -1327,6 +1334,182 @@ func (s *scoringServer) consumeReferralEvents(ctx context.Context) {
 }
 
 // ---------------------------------------------------------------------------
+// Phase 3 (4.2): Tournament standings + finished-event consumer
+// ---------------------------------------------------------------------------
+
+// updateTournamentStandings rolls each participant's match score into their
+// row in the tournament_standings collection for every tournament whose
+// scoring window is currently open. Called from persistMatch after Elo /
+// user stats have been written so a single match contributes to global
+// ranking and tournament ranking in one unit of work.
+//
+// Window semantics: a tournament counts a match if status="active" AND
+// startTime <= now <= endTime AND the user is in participants[]. A tournament
+// can be in status="upcoming" and still have endTime in the future — those
+// don't count yet. Once the finalization worker flips status="completed",
+// further matches don't accumulate.
+//
+// $inc + upsert is the entire concurrency story: two simultaneous match
+// finishes for the same user in the same tournament both add safely.
+func (s *scoringServer) updateTournamentStandings(
+	ctx context.Context,
+	entries []redis.Z,
+	resolveUsername func(string) string,
+) {
+	if len(entries) == 0 {
+		return
+	}
+
+	userIDs := make([]string, 0, len(entries))
+	scoreByUser := make(map[string]int64, len(entries))
+	for _, e := range entries {
+		uid, ok := e.Member.(string)
+		if !ok || uid == "" {
+			continue
+		}
+		userIDs = append(userIDs, uid)
+		// Per-match score is float (speed multiplier produces fractional
+		// points); tournament aggregate stays int64. Round to nearest so
+		// totals don't drift on long-running tournaments.
+		scoreByUser[uid] = int64(math.Round(e.Score))
+	}
+	if len(userIDs) == 0 {
+		return
+	}
+
+	now := time.Now()
+	cursor, err := s.mongoDB.Collection("tournaments").Find(ctx, bson.M{
+		"status":       "active",
+		"startTime":    bson.M{"$lte": now},
+		"endTime":      bson.M{"$gt": now},
+		"participants": bson.M{"$in": userIDs},
+	})
+	if err != nil {
+		log.Printf("[tournament-standings] tournament lookup failed: %v", err)
+		return
+	}
+	defer cursor.Close(ctx)
+
+	standings := s.mongoDB.Collection("tournament_standings")
+	for cursor.Next(ctx) {
+		var t models.Tournament
+		if err := cursor.Decode(&t); err != nil {
+			log.Printf("[tournament-standings] decode failed: %v", err)
+			continue
+		}
+
+		// Fan out per participating user. Skip users not in this tournament's
+		// roster — the $in filter above is across all returned tournaments,
+		// so a single user might match one tournament but not another.
+		members := make(map[string]struct{}, len(t.Participants))
+		for _, p := range t.Participants {
+			members[p] = struct{}{}
+		}
+
+		for _, uid := range userIDs {
+			if _, in := members[uid]; !in {
+				continue
+			}
+			delta := scoreByUser[uid]
+			_, err := standings.UpdateOne(ctx,
+				bson.M{"tournamentId": t.ID, "userId": uid},
+				bson.M{
+					"$inc": bson.M{
+						"score":         delta,
+						"matchesPlayed": int32(1),
+					},
+					"$set": bson.M{
+						"username":  resolveUsername(uid),
+						"updatedAt": now,
+					},
+					"$setOnInsert": bson.M{
+						"tournamentId": t.ID,
+						"userId":       uid,
+						"createdAt":    now,
+					},
+				},
+				options.UpdateOne().SetUpsert(true),
+			)
+			if err != nil {
+				log.Printf("[tournament-standings] upsert failed for tournament=%s user=%s: %v", t.ID, uid, err)
+			}
+		}
+	}
+}
+
+// consumeTournamentFinished handles tournament.finished events (one per
+// winner) emitted by the quiz service finalization worker. Awards prize
+// coins via $inc and emits a per-user push notification.
+//
+// The quiz service is responsible for idempotency on the publish side
+// (Tournament.WinnersAwarded flag), so this consumer doesn't need its own
+// dedup — a duplicate would only reach us if the publish-side guard fails,
+// in which case the user has bigger problems than a double-coin grant.
+func (s *scoringServer) consumeTournamentFinished(ctx context.Context) {
+	ch, err := s.newChannel()
+	if err != nil {
+		log.Fatalf("[tournament-finished] failed to open channel: %v", err)
+	}
+	defer ch.Close()
+
+	msgs, err := ch.Consume("tournament-finished-queue", "", false, false, false, false, nil)
+	if err != nil {
+		log.Fatalf("[tournament-finished] failed to consume: %v", err)
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case msg, ok := <-msgs:
+			if !ok {
+				return
+			}
+
+			var event struct {
+				TournamentID   string `json:"tournamentId"`
+				TournamentName string `json:"tournamentName"`
+				UserID         string `json:"userId"`
+				Rank           int    `json:"rank"`
+				CoinsAwarded   int64  `json:"coinsAwarded"`
+				FinalScore     int64  `json:"finalScore"`
+			}
+			if err := json.Unmarshal(msg.Body, &event); err != nil {
+				log.Printf("[tournament-finished] bad payload: %v", err)
+				msg.Nack(false, false)
+				continue
+			}
+
+			if event.CoinsAwarded > 0 {
+				_, err := s.mongoDB.Collection("users").UpdateOne(ctx,
+					bson.M{"_id": event.UserID},
+					bson.M{"$inc": bson.M{"coins": event.CoinsAwarded}},
+				)
+				if err != nil {
+					log.Printf("[tournament-finished] coin grant failed for user=%s: %v", event.UserID, err)
+					msg.Nack(false, true)
+					continue
+				}
+			}
+
+			notifJSON, _ := json.Marshal(map[string]interface{}{
+				"event":          "notif.tournament.finished",
+				"userId":         event.UserID,
+				"tournamentId":   event.TournamentID,
+				"tournamentName": event.TournamentName,
+				"rank":           event.Rank,
+				"coinsAwarded":   event.CoinsAwarded,
+				"finalScore":     event.FinalScore,
+			})
+			s.publish(ctx, "notif.tournament.finished", notifJSON)
+
+			log.Printf("[tournament-finished] user=%s tournament=%s rank=%d coins=%d", event.UserID, event.TournamentID, event.Rank, event.CoinsAwarded)
+			msg.Ack(false)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
 // RabbitMQ setup
 // ---------------------------------------------------------------------------
 
@@ -1367,6 +1550,16 @@ func setupRabbitMQ(ch *amqp.Channel) error {
 	}
 	if err := ch.QueueBind("push-notification-queue", "notif.#", "sx", false, nil); err != nil {
 		return fmt.Errorf("push-notification queue bind: %w", err)
+	}
+
+	// Phase 3 (4.2): tournament-finished-queue. Quiz service publishes
+	// tournament.finished once per top-N winner when the finalization
+	// worker closes a tournament. We consume to award coins + emit FCM.
+	if _, err := ch.QueueDeclare("tournament-finished-queue", true, false, false, false, nil); err != nil {
+		return fmt.Errorf("tournament-finished queue declare: %w", err)
+	}
+	if err := ch.QueueBind("tournament-finished-queue", "tournament.finished", "sx", false, nil); err != nil {
+		return fmt.Errorf("tournament-finished queue bind: %w", err)
 	}
 
 	return nil
@@ -1475,11 +1668,12 @@ func main() {
 	srv.selfClient = pb.NewScoringServiceClient(selfConn)
 
 	// Start RabbitMQ consumers (3 goroutines)
-	go srv.consumeAnswers(ctx)          // 9.5: answer scoring
-	go srv.consumeMatchFinished(ctx)    // 9.6: persistence worker
-	go srv.consumeAnalytics(ctx)        // 9.6 note: analytics stub
-	go srv.consumePaymentCaptured(ctx)  // Phase 2: plan upgrade on payment
-	go srv.consumeReferralEvents(ctx)   // Phase 2: referral reward chain (ISSUE-06)
+	go srv.consumeAnswers(ctx)              // 9.5: answer scoring
+	go srv.consumeMatchFinished(ctx)        // 9.6: persistence worker
+	go srv.consumeAnalytics(ctx)            // 9.6 note: analytics stub
+	go srv.consumePaymentCaptured(ctx)      // Phase 2: plan upgrade on payment
+	go srv.consumeReferralEvents(ctx)       // Phase 2: referral reward chain (ISSUE-06)
+	go srv.consumeTournamentFinished(ctx)   // Phase 3 (4.2): tournament prize coin awards
 
 	// Block forever (gRPC server runs in background goroutine)
 	select {}
