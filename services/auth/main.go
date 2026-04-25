@@ -119,7 +119,8 @@ func (s *authServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb
 		UserId: userID, Username: req.Username, Token: token,
 		Rating: 1200, MatchesPlayed: 0, Wins: 0, Email: req.Email, IsGuest: false,
 		Plan: "free", ReferralCode: refCode, Streak: streakInfo, Reward: reward,
-		StreakUpdated: true,
+		StreakUpdated:       true,
+		OnboardingCompleted: false,
 	}, nil
 }
 
@@ -160,6 +161,7 @@ func (s *authServer) Login(ctx context.Context, req *pb.LoginRequest) (*pb.AuthR
 		Email: user.Email, IsGuest: user.IsGuest,
 		Plan: user.Plan, Coins: user.Coins, Streak: streakInfo,
 		ReferralCode: user.ReferralCode, StreakUpdated: streakUpdated, Reward: reward,
+		OnboardingCompleted: user.OnboardingCompleted,
 	}, nil
 }
 
@@ -182,6 +184,10 @@ func (s *authServer) GetProfile(ctx context.Context, _ *pb.GetProfileRequest) (*
 		UserId: user.ID, Username: user.Username, Rating: user.Rating,
 		MatchesPlayed: user.MatchesPlayed, Wins: user.Wins,
 		Email: user.Email, IsGuest: user.IsGuest,
+		DisplayName:         user.DisplayName,
+		AvatarUrl:           user.AvatarUrl,
+		PreferredTopics:     user.PreferredTopics,
+		OnboardingCompleted: user.OnboardingCompleted,
 	}, nil
 }
 
@@ -220,6 +226,7 @@ func (s *authServer) GuestLogin(ctx context.Context, _ *pb.GuestLoginRequest) (*
 	return &pb.AuthResponse{
 		UserId: userID, Username: username, Token: token,
 		Rating: 1200, IsGuest: true, ReferralCode: refCode,
+		OnboardingCompleted: false,
 	}, nil
 }
 
@@ -429,6 +436,74 @@ func (s *authServer) DeleteAccount(ctx context.Context, _ *pb.DeleteAccountReque
 }
 
 // ---------------------------------------------------------------------------
+// UpdateProfile — onboarding completion (display name, avatar, topics, flag)
+// ---------------------------------------------------------------------------
+
+// Accepts partial updates: empty string / empty slice leaves the field
+// untouched. The OnboardingCompleted bool is one-way: once true, the
+// handler also stamps OnboardingCompletedAt.
+func (s *authServer) UpdateProfile(ctx context.Context, req *pb.UpdateProfileRequest) (*pb.UpdateProfileResponse, error) {
+	userID, err := auth.UserIDFromContext(ctx)
+	if err != nil {
+		return nil, status.Error(codes.Unauthenticated, "not authenticated")
+	}
+
+	set := bson.M{}
+	if req.DisplayName != "" {
+		if len(req.DisplayName) > 40 {
+			return nil, status.Error(codes.InvalidArgument, "display name too long")
+		}
+		set["displayName"] = sanitizeText(req.DisplayName)
+	}
+	if req.AvatarUrl != "" {
+		if len(req.AvatarUrl) > 500 {
+			return nil, status.Error(codes.InvalidArgument, "avatar url too long")
+		}
+		// Enforce http(s) scheme — defends against javascript: / data: URIs
+		// that a future web client could render as an <img src> XSS vector.
+		if !strings.HasPrefix(req.AvatarUrl, "https://") && !strings.HasPrefix(req.AvatarUrl, "http://") {
+			return nil, status.Error(codes.InvalidArgument, "avatar url must be http(s)")
+		}
+		set["avatarUrl"] = req.AvatarUrl
+	}
+	if len(req.PreferredTopics) > 0 {
+		if len(req.PreferredTopics) > 10 {
+			return nil, status.Error(codes.InvalidArgument, "too many topics")
+		}
+		set["preferredTopics"] = req.PreferredTopics
+	}
+	if req.OnboardingCompleted {
+		set["onboardingCompleted"] = true
+		set["onboardingCompletedAt"] = time.Now()
+	}
+
+	if len(set) == 0 {
+		return &pb.UpdateProfileResponse{Success: true}, nil
+	}
+
+	if _, err := s.users().UpdateOne(ctx,
+		bson.M{"_id": userID},
+		bson.M{"$set": set},
+	); err != nil {
+		return nil, status.Errorf(codes.Internal, "update failed: %v", err)
+	}
+	return &pb.UpdateProfileResponse{Success: true}, nil
+}
+
+// sanitizeText trims whitespace and strips ASCII control characters.
+// UTF-8 letters/digits/punctuation/emoji pass through.
+func sanitizeText(s string) string {
+	s = strings.TrimSpace(s)
+	out := make([]rune, 0, len(s))
+	for _, r := range s {
+		if r >= 0x20 || r == '\n' {
+			out = append(out, r)
+		}
+	}
+	return string(out)
+}
+
+// ---------------------------------------------------------------------------
 // GoogleSignIn — verify Google ID token, upsert user, issue JWT (Phase 2)
 // ---------------------------------------------------------------------------
 
@@ -528,6 +603,8 @@ func (s *authServer) GoogleSignIn(ctx context.Context, req *pb.GoogleSignInReque
 			ReferralCode: user.ReferralCode,
 			IsGuest:      false,
 			WinStreak:    user.WinStreak,
+			PreferredTopics:     user.PreferredTopics,
+			OnboardingCompleted: user.OnboardingCompleted,
 		},
 	}, nil
 }
