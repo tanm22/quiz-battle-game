@@ -8,10 +8,12 @@ import '../services/auth_service.dart';
 import '../services/quiz_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/animated_toast.dart';
+import '../widgets/local_avatar.dart';
 import '../widgets/streak_calendar.dart';
 import '../proto/quiz.pbgrpc.dart';
 import 'match_history_screen.dart';
 import 'payment_screen.dart';
+import 'profile/edit_profile_screen.dart';
 import 'link_email_screen.dart';
 import 'tournament_screen.dart';
 import 'referral_screen.dart';
@@ -562,6 +564,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           const SizedBox(height: 16),
 
           // Actions
+          _profileActionButton(Icons.edit, 'Edit Profile', () async {
+            final profile = _homeData?.profile;
+            final saved = await Navigator.push<bool>(
+              context,
+              MaterialPageRoute(
+                builder: (_) => EditProfileScreen(
+                  displayName: profile?.displayName ?? auth.username ?? '',
+                  avatarUrl: profile?.avatarUrl ?? '',
+                  preferredTopics: profile?.preferredTopics.toList() ?? <String>[],
+                ),
+              ),
+            );
+            if (saved == true) {
+              // Pull fresh values from the server so the profile card,
+              // home avatar, and any other surfaces re-render with the
+              // user's edits without requiring an app restart.
+              await _loadHomeData();
+            }
+          }, color: AppColors.accent),
+          const SizedBox(height: 8),
           _profileActionButton(Icons.history, 'Match History', () {
             Navigator.push(context, MaterialPageRoute(
               builder: (_) => MatchHistoryScreen(currentUserId: gameState.userId ?? ''),
@@ -822,6 +844,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         : (profile?.username.isNotEmpty == true ? profile!.username : (auth.username ?? ''));
     final plan = profile?.plan ?? 'free';
     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+    // Resolve to a local emoji preset when the saved URL matches one
+    // of the onboarding presets — gives consistent visuals across the
+    // setup picker and the home card without depending on network.
+    final preset = profile?.avatarUrl.isNotEmpty == true
+        ? presetFromAvatarUrl(profile!.avatarUrl)
+        : null;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -834,14 +862,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               shape: BoxShape.circle,
               gradient: LinearGradient(colors: [AppColors.primarySoft, AppColors.gold]),
             ),
-            child: CircleAvatar(
-              radius: 24,
-              backgroundColor: AppColors.surface,
-              child: profile?.avatarUrl.isNotEmpty == true
-                  ? ClipOval(child: Image.network(profile!.avatarUrl, width: 48, height: 48, fit: BoxFit.cover,
-                      errorBuilder: (_, e, s) => Text(initial, style: const TextStyle(color: AppColors.accent, fontSize: 22, fontWeight: FontWeight.bold))))
-                  : Text(initial, style: const TextStyle(color: AppColors.accent, fontSize: 22, fontWeight: FontWeight.bold)),
-            ),
+            child: preset != null
+                ? LocalAvatar(glyph: preset.glyph, background: preset.color, size: 48)
+                : CircleAvatar(
+                    radius: 24,
+                    backgroundColor: AppColors.surface,
+                    child: profile?.avatarUrl.isNotEmpty == true
+                        ? ClipOval(child: Image.network(profile!.avatarUrl, width: 48, height: 48, fit: BoxFit.cover,
+                            errorBuilder: (_, e, s) => Text(initial, style: const TextStyle(color: AppColors.accent, fontSize: 22, fontWeight: FontWeight.bold))))
+                        : Text(initial, style: const TextStyle(color: AppColors.accent, fontSize: 22, fontWeight: FontWeight.bold)),
+                  ),
           ),
           const SizedBox(width: 14),
           Expanded(
