@@ -1,6 +1,6 @@
 // This is a generated file - do not edit.
 //
-// Generated from quiz.proto.
+// Generated from proto/quiz.proto.
 
 // @dart = 3.3
 

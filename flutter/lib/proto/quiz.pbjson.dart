@@ -1,6 +1,6 @@
 // This is a generated file - do not edit.
 //
-// Generated from quiz.proto.
+// Generated from proto/quiz.proto.
 
 // @dart = 3.3
 
@@ -509,6 +509,13 @@ const AuthResponse$json = {
       '6': '.quiz.RewardGrant',
       '10': 'reward'
     },
+    {
+      '1': 'onboarding_completed',
+      '3': 15,
+      '4': 1,
+      '5': 8,
+      '10': 'onboardingCompleted'
+    },
   ],
 };
 
@@ -521,7 +528,8 @@ final $typed_data.Uint8List authResponseDescriptor = $convert.base64Decode(
     'EgoEcGxhbhgJIAEoCVIEcGxhbhIUCgVjb2lucxgKIAEoA1IFY29pbnMSKAoGc3RyZWFrGAsgAS'
     'gLMhAucXVpei5TdHJlYWtJbmZvUgZzdHJlYWsSIwoNcmVmZXJyYWxfY29kZRgMIAEoCVIMcmVm'
     'ZXJyYWxDb2RlEiUKDnN0cmVha191cGRhdGVkGA0gASgIUg1zdHJlYWtVcGRhdGVkEikKBnJld2'
-    'FyZBgOIAEoCzIRLnF1aXouUmV3YXJkR3JhbnRSBnJld2FyZA==');
+    'FyZBgOIAEoCzIRLnF1aXouUmV3YXJkR3JhbnRSBnJld2FyZBIxChRvbmJvYXJkaW5nX2NvbXBs'
+    'ZXRlZBgPIAEoCFITb25ib2FyZGluZ0NvbXBsZXRlZA==');
 
 @$core.Deprecated('Use getProfileRequestDescriptor instead')
 const GetProfileRequest$json = {
@@ -554,6 +562,16 @@ const ProfileResponse$json = {
       '10': 'streak'
     },
     {'1': 'referral_code', '3': 11, '4': 1, '5': 9, '10': 'referralCode'},
+    {'1': 'display_name', '3': 12, '4': 1, '5': 9, '10': 'displayName'},
+    {'1': 'avatar_url', '3': 13, '4': 1, '5': 9, '10': 'avatarUrl'},
+    {'1': 'preferred_topics', '3': 14, '4': 3, '5': 9, '10': 'preferredTopics'},
+    {
+      '1': 'onboarding_completed',
+      '3': 15,
+      '4': 1,
+      '5': 8,
+      '10': 'onboardingCompleted'
+    },
   ],
 };
 
@@ -564,7 +582,10 @@ final $typed_data.Uint8List profileResponseDescriptor = $convert.base64Decode(
     'ZBgEIAEoBVINbWF0Y2hlc1BsYXllZBISCgR3aW5zGAUgASgFUgR3aW5zEhQKBWVtYWlsGAYgAS'
     'gJUgVlbWFpbBIZCghpc19ndWVzdBgHIAEoCFIHaXNHdWVzdBISCgRwbGFuGAggASgJUgRwbGFu'
     'EhQKBWNvaW5zGAkgASgDUgVjb2lucxIoCgZzdHJlYWsYCiABKAsyEC5xdWl6LlN0cmVha0luZm'
-    '9SBnN0cmVhaxIjCg1yZWZlcnJhbF9jb2RlGAsgASgJUgxyZWZlcnJhbENvZGU=');
+    '9SBnN0cmVhaxIjCg1yZWZlcnJhbF9jb2RlGAsgASgJUgxyZWZlcnJhbENvZGUSIQoMZGlzcGxh'
+    'eV9uYW1lGAwgASgJUgtkaXNwbGF5TmFtZRIdCgphdmF0YXJfdXJsGA0gASgJUglhdmF0YXJVcm'
+    'wSKQoQcHJlZmVycmVkX3RvcGljcxgOIAMoCVIPcHJlZmVycmVkVG9waWNzEjEKFG9uYm9hcmRp'
+    'bmdfY29tcGxldGVkGA8gASgIUhNvbmJvYXJkaW5nQ29tcGxldGVk');
 
 @$core.Deprecated('Use guestLoginRequestDescriptor instead')
 const GuestLoginRequest$json = {
@@ -745,6 +766,43 @@ const DeleteAccountResponse$json = {
 final $typed_data.Uint8List deleteAccountResponseDescriptor =
     $convert.base64Decode(
         'ChVEZWxldGVBY2NvdW50UmVzcG9uc2USGAoHZGVsZXRlZBgBIAEoCFIHZGVsZXRlZA==');
+
+@$core.Deprecated('Use updateProfileRequestDescriptor instead')
+const UpdateProfileRequest$json = {
+  '1': 'UpdateProfileRequest',
+  '2': [
+    {'1': 'display_name', '3': 1, '4': 1, '5': 9, '10': 'displayName'},
+    {'1': 'avatar_url', '3': 2, '4': 1, '5': 9, '10': 'avatarUrl'},
+    {'1': 'preferred_topics', '3': 3, '4': 3, '5': 9, '10': 'preferredTopics'},
+    {
+      '1': 'onboarding_completed',
+      '3': 4,
+      '4': 1,
+      '5': 8,
+      '10': 'onboardingCompleted'
+    },
+  ],
+};
+
+/// Descriptor for `UpdateProfileRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List updateProfileRequestDescriptor = $convert.base64Decode(
+    'ChRVcGRhdGVQcm9maWxlUmVxdWVzdBIhCgxkaXNwbGF5X25hbWUYASABKAlSC2Rpc3BsYXlOYW'
+    '1lEh0KCmF2YXRhcl91cmwYAiABKAlSCWF2YXRhclVybBIpChBwcmVmZXJyZWRfdG9waWNzGAMg'
+    'AygJUg9wcmVmZXJyZWRUb3BpY3MSMQoUb25ib2FyZGluZ19jb21wbGV0ZWQYBCABKAhSE29uYm'
+    '9hcmRpbmdDb21wbGV0ZWQ=');
+
+@$core.Deprecated('Use updateProfileResponseDescriptor instead')
+const UpdateProfileResponse$json = {
+  '1': 'UpdateProfileResponse',
+  '2': [
+    {'1': 'success', '3': 1, '4': 1, '5': 8, '10': 'success'},
+  ],
+};
+
+/// Descriptor for `UpdateProfileResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List updateProfileResponseDescriptor =
+    $convert.base64Decode(
+        'ChVVcGRhdGVQcm9maWxlUmVzcG9uc2USGAoHc3VjY2VzcxgBIAEoCFIHc3VjY2Vzcw==');
 
 @$core.Deprecated('Use calculateScoreRequestDescriptor instead')
 const CalculateScoreRequest$json = {
@@ -995,6 +1053,14 @@ const UserProfile$json = {
     {'1': 'is_guest', '3': 13, '4': 1, '5': 8, '10': 'isGuest'},
     {'1': 'accuracy_percent', '3': 14, '4': 1, '5': 2, '10': 'accuracyPercent'},
     {'1': 'win_streak', '3': 15, '4': 1, '5': 5, '10': 'winStreak'},
+    {'1': 'preferred_topics', '3': 16, '4': 3, '5': 9, '10': 'preferredTopics'},
+    {
+      '1': 'onboarding_completed',
+      '3': 17,
+      '4': 1,
+      '5': 8,
+      '10': 'onboardingCompleted'
+    },
   ],
 };
 
@@ -1008,7 +1074,8 @@ final $typed_data.Uint8List userProfileDescriptor = $convert.base64Decode(
     '5zEigKBnN0cmVhaxgLIAEoCzIQLnF1aXouU3RyZWFrSW5mb1IGc3RyZWFrEiMKDXJlZmVycmFs'
     'X2NvZGUYDCABKAlSDHJlZmVycmFsQ29kZRIZCghpc19ndWVzdBgNIAEoCFIHaXNHdWVzdBIpCh'
     'BhY2N1cmFjeV9wZXJjZW50GA4gASgCUg9hY2N1cmFjeVBlcmNlbnQSHQoKd2luX3N0cmVhaxgP'
-    'IAEoBVIJd2luU3RyZWFr');
+    'IAEoBVIJd2luU3RyZWFrEikKEHByZWZlcnJlZF90b3BpY3MYECADKAlSD3ByZWZlcnJlZFRvcG'
+    'ljcxIxChRvbmJvYXJkaW5nX2NvbXBsZXRlZBgRIAEoCFITb25ib2FyZGluZ0NvbXBsZXRlZA==');
 
 @$core.Deprecated('Use claimDailyRewardRequestDescriptor instead')
 const ClaimDailyRewardRequest$json = {
