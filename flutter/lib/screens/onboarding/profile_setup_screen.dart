@@ -19,43 +19,6 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   bool _saving = false;
   String? _error;
 
-  // Preset avatars are rendered locally as colored letter circles —
-  // no network required, so previews are instant on any device. The
-  // backend still receives a real URL (the matching ui-avatars.com
-  // entry) so future clients that want a fetchable image can use it.
-  static const _presets = <_PresetAvatar>[
-    _PresetAvatar(
-      'F',
-      Color(0xFFEA580C),
-      'https://ui-avatars.com/api/?name=Fox&background=EA580C&color=fff&size=128&bold=true',
-    ),
-    _PresetAvatar(
-      'O',
-      Color(0xFF6D59C4),
-      'https://ui-avatars.com/api/?name=Owl&background=6D59C4&color=fff&size=128&bold=true',
-    ),
-    _PresetAvatar(
-      'P',
-      Color(0xFF059669),
-      'https://ui-avatars.com/api/?name=Panda&background=059669&color=fff&size=128&bold=true',
-    ),
-    _PresetAvatar(
-      'T',
-      Color(0xFFE11D48),
-      'https://ui-avatars.com/api/?name=Tiger&background=E11D48&color=fff&size=128&bold=true',
-    ),
-    _PresetAvatar(
-      'K',
-      Color(0xFF0891B2),
-      'https://ui-avatars.com/api/?name=Koala&background=0891B2&color=fff&size=128&bold=true',
-    ),
-    _PresetAvatar(
-      'P',
-      Color(0xFFE8940A),
-      'https://ui-avatars.com/api/?name=Penguin&background=E8940A&color=fff&size=128&bold=true',
-    ),
-  ];
-
   // Becomes true when the user signed in with Google and has a real
   // photo URL — that goes at index 0 and is rendered via Image.network
   // (with a LocalAvatar fallback if the photo fails to load).
@@ -65,7 +28,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
 
   String _avatarUrlAt(int index) {
     if (_hasGooglePhoto && index == 0) return _googlePhotoUrl!;
-    return _presets[index - (_hasGooglePhoto ? 1 : 0)].url;
+    return kPresetAvatars[index - (_hasGooglePhoto ? 1 : 0)].url;
   }
 
   @override
@@ -83,7 +46,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
     } else {
       _hasGooglePhoto = false;
     }
-    _avatarCount = _presets.length + (_hasGooglePhoto ? 1 : 0);
+    _avatarCount = kPresetAvatars.length + (_hasGooglePhoto ? 1 : 0);
   }
 
   @override
@@ -277,20 +240,13 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
           _googlePhotoUrl!,
           fit: BoxFit.cover,
           errorBuilder: (_, _, _) => const LocalAvatar(
-            letter: 'G',
+            glyph: '👤',
             background: AppColors.accent,
           ),
         ),
       );
     }
-    final preset = _presets[i - (_hasGooglePhoto ? 1 : 0)];
-    return LocalAvatar(letter: preset.letter, background: preset.background);
+    final preset = kPresetAvatars[i - (_hasGooglePhoto ? 1 : 0)];
+    return LocalAvatar(glyph: preset.glyph, background: preset.color);
   }
-}
-
-class _PresetAvatar {
-  final String letter;
-  final Color background;
-  final String url;
-  const _PresetAvatar(this.letter, this.background, this.url);
 }
