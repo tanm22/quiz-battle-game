@@ -59,6 +59,9 @@ type User struct {
 	Streak         Streak     `bson:"streak"`
 	CorrectAnswers int32      `bson:"correctAnswers"`
 	TotalAnswers   int32      `bson:"totalAnswers"`
+	PreferredTopics       []string   `bson:"preferredTopics,omitempty" json:"preferredTopics,omitempty"`
+	OnboardingCompleted   bool       `bson:"onboardingCompleted" json:"onboardingCompleted"`
+	OnboardingCompletedAt *time.Time `bson:"onboardingCompletedAt,omitempty" json:"onboardingCompletedAt,omitempty"`
 	CreatedAt      int64      `bson:"createdAt"`
 }
 
