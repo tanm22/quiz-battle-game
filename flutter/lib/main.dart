@@ -140,21 +140,36 @@ class _AppShellState extends ConsumerState<AppShell> {
     final restored = await auth.tryRestoreSession();
     if (restored) {
       QuizService().setAuthToken(auth.token!);
-      ref.read(gameStateProvider.notifier).setAuth(
+      final notifier = ref.read(gameStateProvider.notifier);
+      notifier.setAuth(
             auth.userId!,
             auth.token!,
             auth.rating,
             email: auth.email,
             isGuest: auth.isGuest,
           );
-      // Auth restored — register this device's FCM token so push notifications
-      // can reach the user. Non-blocking: notification failures must not gate
-      // the UI swap from splash to home.
-      unawaited(FcmService.instance.registerForUser());
-      // If signed in but onboarding not completed (e.g. installed, signed up,
-      // killed app before finishing), resume at the right step.
-      if (!auth.onboardingCompleted) {
-        ref.read(gameStateProvider.notifier).navigateToOnboardingProfileSetup();
+      if (auth.onboardingCompleted) {
+        // Onboarded users get FCM registered immediately so push reaches
+        // them. The OS dialog (if not previously answered) appears here,
+        // which is fine for established accounts.
+        unawaited(FcmService.instance.registerForUser());
+      } else {
+        // Resume mid-onboarding — defer FCM registration to the prime
+        // screen so the OS permission dialog only appears after the
+        // user sees the explanatory context. Route to whichever step
+        // the user actually got to based on the partial state already
+        // saved on the server.
+        if (auth.preferredTopics.isNotEmpty) {
+          // Topics already saved → only the prime screen is left.
+          notifier.navigateToOnboardingPermissionPrime();
+        } else if ((auth.avatarUrl ?? '').isNotEmpty ||
+            (auth.displayName ?? '').isNotEmpty) {
+          // Display name / avatar saved → resume at topic picker.
+          notifier.navigateToOnboardingTopicPicker();
+        } else {
+          // Nothing saved → start at profile setup.
+          notifier.navigateToOnboardingProfileSetup();
+        }
       }
     } else {
       // No session — if the user has never seen the intro, show it first.

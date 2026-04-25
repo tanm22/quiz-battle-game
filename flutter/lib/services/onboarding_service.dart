@@ -1,10 +1,12 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Tracks onboarding progress locally so the app can resume the flow even
-/// before the backend round-trip (faster perceived startup).
+/// Tracks whether the pre-signup intro carousel has been seen on this
+/// device. The "onboarding completed" state intentionally does NOT
+/// live here — that flag is owned by the server (via the user record's
+/// `onboardingCompleted` field) and mirrored on AuthService. Keeping a
+/// parallel local flag here would be a desync risk.
 class OnboardingService {
   static const _kCarouselSeen = 'onboarding_carousel_seen';
-  static const _kCompleted    = 'onboarding_completed';
 
   static Future<bool> hasSeenCarousel() async {
     final p = await SharedPreferences.getInstance();
@@ -16,19 +18,8 @@ class OnboardingService {
     await p.setBool(_kCarouselSeen, true);
   }
 
-  static Future<bool> isCompleted() async {
-    final p = await SharedPreferences.getInstance();
-    return p.getBool(_kCompleted) ?? false;
-  }
-
-  static Future<void> markCompleted() async {
-    final p = await SharedPreferences.getInstance();
-    await p.setBool(_kCompleted, true);
-  }
-
   static Future<void> reset() async {
     final p = await SharedPreferences.getInstance();
     await p.remove(_kCarouselSeen);
-    await p.remove(_kCompleted);
   }
 }

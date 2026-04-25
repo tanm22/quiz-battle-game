@@ -104,14 +104,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     unawaited(FcmService.instance.registerForUser());
   }
 
-  /// Used after register / Google sign-in: route to onboarding profile setup
-  /// if the server says the user hasn't onboarded. Login flows skip this —
-  /// existing accounts have already onboarded (or the server flag is false
-  /// and tryRestoreSession on next launch handles it).
+  /// Used after register / Google sign-in. If onboarding is incomplete,
+  /// routes to profile setup AND deliberately skips FCM registration —
+  /// the OS notification permission dialog must wait until the prime
+  /// screen fires it, otherwise the prime screen has nothing left to
+  /// ask for. Already-onboarded users (e.g. a returning Google account)
+  /// take the same path as Login.
   void _navigateAfterSignup(AuthService auth) {
-    _navigateToMatchmaking(auth);
     if (!auth.onboardingCompleted) {
-      ref.read(gameStateProvider.notifier).navigateToOnboardingProfileSetup();
+      QuizService().setAuthToken(auth.token!);
+      final notifier = ref.read(gameStateProvider.notifier);
+      notifier.setAuth(
+        auth.userId!, auth.token!, auth.rating,
+        email: auth.email, isGuest: auth.isGuest,
+      );
+      // Intentionally NOT calling FcmService.registerForUser() —
+      // permission ask is deferred to the prime screen so the OS
+      // dialog fires after the user has seen the explanatory context.
+      notifier.navigateToOnboardingProfileSetup();
+    } else {
+      _navigateToMatchmaking(auth);
     }
   }
 

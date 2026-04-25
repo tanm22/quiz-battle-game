@@ -56,28 +56,16 @@ class FcmService {
     }
   }
 
-  /// Trigger the OS notification permission dialog. Safe to call any time —
-  /// iOS returns the prior answer, Android 13+ remembers the user's choice.
-  /// Used by the onboarding permission-prime screen so the system dialog
-  /// fires *after* the user has seen explanatory context.
+  /// Called after the user is authenticated — asks the OS for notification
+  /// permission, registers the FCM token with the backend, and wires up
+  /// foreground/background handlers. Safe to call more than once;
+  /// subsequent calls are no-ops via the [_initialized] guard.
   ///
-  /// Returns true if the user is authorized (full or provisional). When the
-  /// caller doesn't care about the outcome (e.g. educational primer), it can
-  /// safely ignore the result and proceed.
-  Future<bool> requestPermission() async {
-    if (Firebase.apps.isEmpty) return false;
-    final settings = await FirebaseMessaging.instance.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
-    return settings.authorizationStatus == AuthorizationStatus.authorized
-        || settings.authorizationStatus == AuthorizationStatus.provisional;
-  }
-
-  /// Called after the user is authenticated — registers the token with the
-  /// backend and wires up foreground/background handlers. Safe to call more
-  /// than once; subsequent calls are no-ops.
+  /// Permission ownership lives entirely in this method — there is no
+  /// separate `requestPermission()` entry point, so callers can't trigger
+  /// the OS dialog at the wrong time. To delay the dialog (e.g. behind
+  /// the onboarding permission-prime screen), the caller should defer
+  /// invoking [registerForUser] until the right moment.
   Future<void> registerForUser() async {
     if (_initialized) return;
     if (Firebase.apps.isEmpty) {

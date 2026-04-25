@@ -22,25 +22,13 @@ void main() {
       expect(await OnboardingService.hasSeenCarousel(), isTrue);
     });
 
-    test('isCompleted defaults to false on a fresh install', () async {
-      expect(await OnboardingService.isCompleted(), isFalse);
-    });
-
-    test('markCompleted flips the flag', () async {
-      await OnboardingService.markCompleted();
-      expect(await OnboardingService.isCompleted(), isTrue);
-    });
-
-    test('reset clears both flags', () async {
+    test('reset clears the carousel flag', () async {
       await OnboardingService.markCarouselSeen();
-      await OnboardingService.markCompleted();
       expect(await OnboardingService.hasSeenCarousel(), isTrue);
-      expect(await OnboardingService.isCompleted(), isTrue);
 
       await OnboardingService.reset();
 
       expect(await OnboardingService.hasSeenCarousel(), isFalse);
-      expect(await OnboardingService.isCompleted(), isFalse);
     });
   });
 }

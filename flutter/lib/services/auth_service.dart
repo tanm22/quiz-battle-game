@@ -23,6 +23,7 @@ class AuthService {
   bool _onboardingCompleted = false;
   List<String> _preferredTopics = const [];
   String? _avatarUrl;
+  String? _displayName;
 
   static const _backendHost = String.fromEnvironment('BACKEND_HOST', defaultValue: 'localhost');
   // Web (server) client ID — used on Android to request an idToken, and by the backend to verify it.
@@ -51,6 +52,7 @@ class AuthService {
   bool get onboardingCompleted => _onboardingCompleted;
   List<String> get preferredTopics => _preferredTopics;
   String? get avatarUrl => _avatarUrl;
+  String? get displayName => _displayName;
 
   /// Load stored auth state from SharedPreferences on app start.
   Future<bool> tryRestoreSession() async {
@@ -64,6 +66,8 @@ class AuthService {
     _matchesPlayed = prefs.getInt('auth_matches_played') ?? 0;
     _wins = prefs.getInt('auth_wins') ?? 0;
     _onboardingCompleted = prefs.getBool('auth_onboarding_completed') ?? false;
+    _displayName = prefs.getString('auth_display_name');
+    _avatarUrl = prefs.getString('auth_avatar_url');
 
     if (_token == null || _userId == null) return false;
 
@@ -81,6 +85,7 @@ class AuthService {
       _onboardingCompleted = profile.onboardingCompleted;
       _preferredTopics = List<String>.from(profile.preferredTopics);
       if (profile.avatarUrl.isNotEmpty) _avatarUrl = profile.avatarUrl;
+      if (profile.displayName.isNotEmpty) _displayName = profile.displayName;
       await _saveToPrefs();
       return true;
     } catch (_) {
@@ -182,6 +187,7 @@ class AuthService {
     _onboardingCompleted = profile.onboardingCompleted;
     _preferredTopics = List<String>.from(profile.preferredTopics);
     if (profile.avatarUrl.isNotEmpty) _avatarUrl = profile.avatarUrl;
+    if (profile.displayName.isNotEmpty) _displayName = profile.displayName;
     await _saveToPrefs();
 
     return resp;
@@ -328,6 +334,7 @@ class AuthService {
       _preferredTopics = List.unmodifiable(preferredTopics);
     }
     if (avatarUrl != null && avatarUrl.isNotEmpty) _avatarUrl = avatarUrl;
+    if (displayName != null && displayName.isNotEmpty) _displayName = displayName;
     await _saveToPrefs();
   }
 
@@ -341,6 +348,10 @@ class AuthService {
     _rating = 1200;
     _matchesPlayed = 0;
     _wins = 0;
+    _onboardingCompleted = false;
+    _preferredTopics = const [];
+    _avatarUrl = null;
+    _displayName = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
   }
@@ -356,5 +367,7 @@ class AuthService {
     prefs.setInt('auth_matches_played', _matchesPlayed);
     prefs.setInt('auth_wins', _wins);
     prefs.setBool('auth_onboarding_completed', _onboardingCompleted);
+    if (_displayName != null) prefs.setString('auth_display_name', _displayName!);
+    if (_avatarUrl != null) prefs.setString('auth_avatar_url', _avatarUrl!);
   }
 }
