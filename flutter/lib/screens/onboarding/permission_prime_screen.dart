@@ -29,10 +29,12 @@ class _PermissionPrimeScreenState extends ConsumerState<PermissionPrimeScreen> {
       _error = null;
     });
     try {
-      // Trigger the OS dialog now that the user has the bullet-list
-      // context. Result is intentionally ignored — denial is fine, user
-      // can flip the switch in Settings later.
-      await FcmService.instance.requestPermission();
+      // Trigger FCM registration NOW (which asks the OS for permission
+      // internally) so the system dialog fires only after the user has
+      // seen the bullet-list context. Earlier signup flows deferred this
+      // call exactly so it would land here. Failures are non-fatal:
+      // denial just means push won't reach this device.
+      await FcmService.instance.registerForUser();
       await AuthService().updateProfile(markOnboardingCompleted: true);
       if (!mounted) return;
       ref.read(gameStateProvider.notifier).navigateToHome();

@@ -43,6 +43,22 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   late int _avatarIndex;
   late Set<String> _selectedTopics;
 
+  // True when the user has a non-preset avatar URL (e.g. their Google
+  // sign-in photo). We render that as the first tile so they can keep
+  // it on Save. If they pick a preset instead, the next Save writes
+  // the preset URL — but the user has explicitly chosen, not had it
+  // overwritten silently with the default Fox.
+  late final bool _hasCustomAvatar;
+  String? _customAvatarUrl;
+
+  int get _avatarCount =>
+      kPresetAvatars.length + (_hasCustomAvatar ? 1 : 0);
+
+  String _avatarUrlAt(int index) {
+    if (_hasCustomAvatar && index == 0) return _customAvatarUrl!;
+    return kPresetAvatars[index - (_hasCustomAvatar ? 1 : 0)].url;
+  }
+
   bool _saving = false;
   String? _error;
 
@@ -51,11 +67,22 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     super.initState();
     _displayNameCtl = TextEditingController(text: widget.displayName);
     _selectedTopics = widget.preferredTopics.toSet();
+
     final preset = presetFromAvatarUrl(widget.avatarUrl);
-    _avatarIndex = preset == null
-        ? 0
-        : kPresetAvatars.indexWhere((p) => p.url == widget.avatarUrl);
-    if (_avatarIndex < 0) _avatarIndex = 0;
+    if (preset != null) {
+      _hasCustomAvatar = false;
+      _avatarIndex = kPresetAvatars.indexWhere((p) => p.url == widget.avatarUrl);
+      if (_avatarIndex < 0) _avatarIndex = 0;
+    } else if (widget.avatarUrl.isNotEmpty) {
+      // Non-preset URL — most commonly a Google sign-in photo. Surface
+      // it as the first tile so the user can keep it.
+      _hasCustomAvatar = true;
+      _customAvatarUrl = widget.avatarUrl;
+      _avatarIndex = 0;
+    } else {
+      _hasCustomAvatar = false;
+      _avatarIndex = 0;
+    }
   }
 
   @override
@@ -81,7 +108,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     try {
       await AuthService().updateProfile(
         displayName: name,
-        avatarUrl: kPresetAvatars[_avatarIndex].url,
+        avatarUrl: _avatarUrlAt(_avatarIndex),
         preferredTopics: _selectedTopics.toList(),
       );
       if (!mounted) return;
@@ -165,10 +192,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 mainAxisSpacing: 12,
                 childAspectRatio: 1,
               ),
-              itemCount: kPresetAvatars.length,
+              itemCount: _avatarCount,
               itemBuilder: (_, i) {
                 final selected = i == _avatarIndex;
-                final preset = kPresetAvatars[i];
                 return GestureDetector(
                   onTap: () => setState(() => _avatarIndex = i),
                   child: AnimatedContainer(
@@ -183,10 +209,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(8),
-                      child: LocalAvatar(
-                        glyph: preset.glyph,
-                        background: preset.color,
-                      ),
+                      child: _renderAvatar(i),
                     ),
                   ),
                 );
@@ -296,6 +319,27 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         ),
       ),
     );
+  }
+
+  /// Renders the i-th avatar tile. The custom slot (index 0 when the
+  /// user has a non-preset URL like a Google photo) uses Image.network
+  /// with a LocalAvatar fallback so a failed photo load still renders
+  /// something. Preset slots are pure-Dart LocalAvatar — no network.
+  Widget _renderAvatar(int i) {
+    if (_hasCustomAvatar && i == 0) {
+      return ClipOval(
+        child: Image.network(
+          _customAvatarUrl!,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => const LocalAvatar(
+            glyph: '👤',
+            background: AppColors.accent,
+          ),
+        ),
+      );
+    }
+    final preset = kPresetAvatars[i - (_hasCustomAvatar ? 1 : 0)];
+    return LocalAvatar(glyph: preset.glyph, background: preset.color);
   }
 }
 

@@ -35,7 +35,12 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   void initState() {
     super.initState();
     final auth = AuthService();
-    _displayNameCtl.text = auth.username ?? '';
+    // Prefer the saved display name (resume case where the user already
+    // typed one before the app was killed). Fall back to login username
+    // for first-time setup.
+    _displayNameCtl.text = (auth.displayName?.isNotEmpty ?? false)
+        ? auth.displayName!
+        : (auth.username ?? '');
     // If the user came in via Google, their photo URL is already on the
     // server-side UserProfile. Prepend it as the default avatar so the
     // spec's "use your Google photo" path is honored.
