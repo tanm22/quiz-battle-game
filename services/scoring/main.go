@@ -1008,7 +1008,7 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 	}
 
 	// Step 53: Upsert with $setOnInsert to prevent double-writes
-	_, err = s.mongoDB.Collection("match_history").UpdateOne(
+	historyRes, err := s.mongoDB.Collection("match_history").UpdateOne(
 		ctx,
 		bson.M{"roomId": event.RoomID},
 		bson.M{"$setOnInsert": matchDoc},
@@ -1019,6 +1019,11 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 		msg.Nack(false, true)
 		return
 	}
+	// firstInsert is the canonical "this is a fresh match.finished, not a
+	// queue redelivery" signal — UpsertedID is non-nil only on the row's
+	// initial insert. Downstream side-effects that aren't naturally
+	// idempotent (tournament standings $inc) gate on this flag.
+	firstInsert := historyRes.UpsertedID != nil
 
 	// Step 54: Update user stats and Elo ratings
 	// Elo formula: K=32, expected = 1/(1+10^((Rb-Ra)/400))
@@ -1114,7 +1119,18 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 	// completed match contributes its raw score to the participant's
 	// tournament standing. The quiz service's finalization worker reads
 	// from tournament_standings to compute top-N when the window closes.
-	s.updateTournamentStandings(ctx, entries, resolveUsername)
+	//
+	// Gated on firstInsert because $inc isn't idempotent — a queue
+	// redelivery of match.finished (consumer crash before ack, channel
+	// drop mid-flight) would otherwise double the participant's standing
+	// score every time. The match_history $setOnInsert is the canonical
+	// dedup point, so we lean on its UpsertedID rather than introducing a
+	// parallel idempotency mechanism.
+	if firstInsert {
+		s.updateTournamentStandings(ctx, entries, resolveUsername)
+	} else {
+		log.Printf("[persistence] match %s redelivery — skipping tournament standings update", event.RoomID)
+	}
 
 	// Phase 2: Detect first quiz completion for referred users → trigger referral reward
 	for _, e := range entries {
@@ -1480,14 +1496,59 @@ func (s *scoringServer) consumeTournamentFinished(ctx context.Context) {
 				continue
 			}
 
+			// Idempotent transition on the tournament_payouts work-list:
+			// "pending" or "published" → "paid". A queue redelivery (or a
+			// drain-worker republish of the same payout) hits an already-
+			// "paid" row, sees ModifiedCount == 0, and ack-skips. Only the
+			// thread that wins this UpdateOne actually grants coins.
+			//
+			// This is the dedup point that lets the producer side
+			// re-publish freely on RabbitMQ failure without double-paying.
+			now := time.Now()
+			res, err := s.mongoDB.Collection("tournament_payouts").UpdateOne(ctx,
+				bson.M{
+					"tournamentId": event.TournamentID,
+					"userId":       event.UserID,
+					"status":       bson.M{"$ne": "paid"},
+				},
+				bson.M{"$set": bson.M{"status": "paid", "paidAt": now}},
+			)
+			if err != nil {
+				log.Printf("[tournament-finished] payout transition failed for user=%s tournament=%s: %v", event.UserID, event.TournamentID, err)
+				msg.Nack(false, true)
+				continue
+			}
+			if res.MatchedCount == 0 {
+				// No payout row exists for this (tournament, user) at all.
+				// Either the producer didn't write one (shouldn't happen
+				// under normal flow) or the row was manually pruned. Ack
+				// without granting coins so we don't pay out a phantom
+				// winner; log loudly so an operator can investigate.
+				log.Printf("[tournament-finished] no payout row for user=%s tournament=%s — discarding event", event.UserID, event.TournamentID)
+				msg.Ack(false)
+				continue
+			}
+			if res.ModifiedCount == 0 {
+				// Row exists but was already in "paid" state — this is the
+				// expected redelivery / drain-worker-republish path. Skip.
+				msg.Ack(false)
+				continue
+			}
+
 			if event.CoinsAwarded > 0 {
 				_, err := s.mongoDB.Collection("users").UpdateOne(ctx,
 					bson.M{"_id": event.UserID},
 					bson.M{"$inc": bson.M{"coins": event.CoinsAwarded}},
 				)
 				if err != nil {
-					log.Printf("[tournament-finished] coin grant failed for user=%s: %v", event.UserID, err)
-					msg.Nack(false, true)
+					// We already flipped the payout row to "paid" above —
+					// requeuing would only retry the $inc behind a row
+					// that the redelivery loop will now skip. Log loud
+					// and ack; manual reconciliation needed in this rare
+					// path. A real outbox would close this gap (out of
+					// scope here).
+					log.Printf("[tournament-finished] coin grant failed AFTER payout transition for user=%s tournament=%s: %v — manual reconciliation required", event.UserID, event.TournamentID, err)
+					msg.Ack(false)
 					continue
 				}
 			}
@@ -1501,7 +1562,14 @@ func (s *scoringServer) consumeTournamentFinished(ctx context.Context) {
 				"coinsAwarded":   event.CoinsAwarded,
 				"finalScore":     event.FinalScore,
 			})
-			s.publish(ctx, "notif.tournament.finished", notifJSON)
+			// The publish error doesn't change the ack decision — the coin
+			// grant is already committed and requeuing would double-pay.
+			// Logging is the floor so prod triage can see push drops;
+			// durable retry of the FCM event would need its own outbox
+			// (out of scope here).
+			if err := s.publish(ctx, "notif.tournament.finished", notifJSON); err != nil {
+				log.Printf("[tournament-finished] notif publish failed for user=%s tournament=%s: %v", event.UserID, event.TournamentID, err)
+			}
 
 			log.Printf("[tournament-finished] user=%s tournament=%s rank=%d coins=%d", event.UserID, event.TournamentID, event.Rank, event.CoinsAwarded)
 			msg.Ack(false)
@@ -1555,7 +1623,19 @@ func setupRabbitMQ(ch *amqp.Channel) error {
 	// Phase 3 (4.2): tournament-finished-queue. Quiz service publishes
 	// tournament.finished once per top-N winner when the finalization
 	// worker closes a tournament. We consume to award coins + emit FCM.
-	if _, err := ch.QueueDeclare("tournament-finished-queue", true, false, false, false, nil); err != nil {
+	//
+	// Mirrors the answer-processing-queue dead-letter pattern: a poison
+	// message (e.g. coin grant fails repeatedly because Mongo is down)
+	// gets diverted to tournament-finished-dlq after 3 redeliveries
+	// instead of head-of-line-blocking the queue forever.
+	if _, err := ch.QueueDeclare("tournament-finished-dlq", true, false, false, false, nil); err != nil {
+		return fmt.Errorf("tournament-finished DLQ declare: %w", err)
+	}
+	if _, err := ch.QueueDeclare("tournament-finished-queue", true, false, false, false, amqp.Table{
+		"x-dead-letter-exchange":    "",
+		"x-dead-letter-routing-key": "tournament-finished-dlq",
+		"x-max-delivery-count":      3,
+	}); err != nil {
 		return fmt.Errorf("tournament-finished queue declare: %w", err)
 	}
 	if err := ch.QueueBind("tournament-finished-queue", "tournament.finished", "sx", false, nil); err != nil {

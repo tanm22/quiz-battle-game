@@ -140,3 +140,41 @@ type TournamentStanding struct {
 	UpdatedAt     time.Time `bson:"updatedAt"`
 	CreatedAt     time.Time `bson:"createdAt"`
 }
+
+// TournamentPayout is a durable work-list row for the tournament prize
+// pipeline. Inserted by the quiz finalization worker right after the
+// atomic winnersAwarded flip, so a RabbitMQ outage between "we know who
+// won" and "publish each tournament.finished" doesn't lose prize coins.
+//
+// State machine:
+//
+//	pending   — row written, publish to RabbitMQ has NOT been confirmed.
+//	            The drain worker re-publishes pending rows on its tick.
+//	published — quiz finalizer (or drain) successfully wrote the message
+//	            to the broker. The consumer hasn't acked yet.
+//	paid      — scoring consumer has incremented user.coins and is done.
+//	            Set via an atomic check-then-set so a queue redelivery
+//	            transitions exactly one row.
+//
+// The (tournamentId, userId) unique index gives us natural dedup: two
+// finalizers racing on the same tournament both attempt $setOnInsert and
+// only one wins. The drain worker's republish + the consumer's transition
+// together give at-least-once delivery with idempotent processing.
+//
+// Indexes (declared in seed/main.go):
+//   - unique compound (tournamentId, userId)
+//   - status (for the drain worker's "find all pending" sweep)
+type TournamentPayout struct {
+	ID             string     `bson:"_id,omitempty"`
+	TournamentID   string     `bson:"tournamentId"`
+	TournamentName string     `bson:"tournamentName"`
+	UserID         string     `bson:"userId"`
+	Username       string     `bson:"username"`
+	Rank           int        `bson:"rank"`
+	CoinsAwarded   int64      `bson:"coinsAwarded"`
+	FinalScore     int64      `bson:"finalScore"`
+	Status         string     `bson:"status"` // "pending" | "published" | "paid"
+	CreatedAt      time.Time  `bson:"createdAt"`
+	PublishedAt    *time.Time `bson:"publishedAt,omitempty"`
+	PaidAt         *time.Time `bson:"paidAt,omitempty"`
+}

@@ -124,6 +124,18 @@ func main() {
 		Keys: bson.D{{Key: "tournamentId", Value: 1}, {Key: "score", Value: -1}},
 	})
 
+	// tournament_payouts: durable work-list that backs the at-least-once
+	// delivery of tournament.finished events. Unique key gives consumer-side
+	// dedup; status index lets the drain worker sweep pending rows fast.
+	payoutsColl := db.Collection("tournament_payouts")
+	payoutsColl.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    bson.D{{Key: "tournamentId", Value: 1}, {Key: "userId", Value: 1}},
+		Options: options.Index().SetUnique(true),
+	})
+	payoutsColl.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "status", Value: 1}},
+	})
+
 	log.Println("[seed] indexes created")
 
 	// --- Seed questions ---

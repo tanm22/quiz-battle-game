@@ -1106,6 +1106,12 @@ func (s *quizServer) finalizeExpiredTournaments(ctx context.Context, now time.Ti
 		// cursor; only one will land the update. The loser sees ModifiedCount=0
 		// and skips this row, leaving payout to the winner. This is the same
 		// pattern the auth service uses for streak claims.
+		//
+		// We persist the per-winner payout rows BEFORE this flip is "real"
+		// for downstream consumers — the row insertion below is what actually
+		// drives the at-least-once delivery (drain worker + consumer
+		// transition). The flip itself just claims this tournament for one
+		// finalizer so we don't double-insert payouts on a parallel run.
 		res, err := s.mongoDB.Collection("tournaments").UpdateOne(ctx,
 			bson.M{"_id": t.ID, "winnersAwarded": false},
 			bson.M{"$set": bson.M{"winnersAwarded": true, "status": "completed"}},
@@ -1139,6 +1145,11 @@ func (s *quizServer) finalizeExpiredTournaments(ctx context.Context, now time.Ti
 			continue
 		}
 
+		// Two-phase commit: persist every winner as a "pending" payout row
+		// FIRST (durable across crashes / RabbitMQ outages), then attempt to
+		// publish each. If publish fails for any row, the drain worker
+		// (tournamentPayoutDrainWorker) re-publishes on its 1-min tick.
+		// $setOnInsert on (tournamentId, userId) keeps re-runs idempotent.
 		rank := 0
 		for standingsCursor.Next(ctx) {
 			var st models.TournamentStanding
@@ -1152,22 +1163,119 @@ func (s *quizServer) finalizeExpiredTournaments(ctx context.Context, now time.Ti
 				coins = t.PrizePool[rank-1]
 			}
 
-			payload, _ := json.Marshal(map[string]interface{}{
-				"event":          "tournament.finished",
-				"tournamentId":   t.ID,
-				"tournamentName": t.Name,
-				"userId":         st.UserID,
-				"rank":           rank,
-				"coinsAwarded":   coins,
-				"finalScore":     st.Score,
-			})
-			if err := s.publish(ctx, "tournament.finished", payload); err != nil {
-				log.Printf("[quiz] finalize: publish failed for tournament=%s user=%s: %v", t.ID, st.UserID, err)
+			payout := models.TournamentPayout{
+				TournamentID:   t.ID,
+				TournamentName: t.Name,
+				UserID:         st.UserID,
+				Username:       st.Username,
+				Rank:           rank,
+				CoinsAwarded:   coins,
+				FinalScore:     st.Score,
+				Status:         "pending",
+				CreatedAt:      now,
 			}
+			if _, err := s.mongoDB.Collection("tournament_payouts").UpdateOne(ctx,
+				bson.M{"tournamentId": t.ID, "userId": st.UserID},
+				bson.M{"$setOnInsert": bson.M{
+					"tournamentId":   payout.TournamentID,
+					"tournamentName": payout.TournamentName,
+					"userId":         payout.UserID,
+					"username":       payout.Username,
+					"rank":           payout.Rank,
+					"coinsAwarded":   payout.CoinsAwarded,
+					"finalScore":     payout.FinalScore,
+					"status":         payout.Status,
+					"createdAt":      payout.CreatedAt,
+				}},
+				options.UpdateOne().SetUpsert(true),
+			); err != nil {
+				log.Printf("[quiz] finalize: payout upsert failed for tournament=%s user=%s: %v", t.ID, st.UserID, err)
+				// Soldier on — the drain worker will eventually try to
+				// publish whatever rows did make it in.
+				continue
+			}
+
+			s.publishTournamentPayout(ctx, payout)
 		}
 		standingsCursor.Close(ctx)
 
-		log.Printf("[quiz] finalized tournament %s (%s): %d winners published", t.ID, t.Name, rank)
+		log.Printf("[quiz] finalized tournament %s (%s): %d payouts persisted", t.ID, t.Name, rank)
+	}
+}
+
+// publishTournamentPayout fires one tournament.finished event for a single
+// payout row and flips its status from "pending" to "published" on
+// successful publish. Used by both the immediate-publish path in
+// finalizeExpiredTournaments and the drain worker's retry path.
+//
+// Idempotency on the consumer side is the scoring service's check-then-set
+// transition (status:{$ne:"paid"} → "paid"). Re-publishing the same payout
+// is therefore safe; this function leaves the row as "pending" if publish
+// fails, ensuring the drain worker retries.
+func (s *quizServer) publishTournamentPayout(ctx context.Context, p models.TournamentPayout) {
+	payload, _ := json.Marshal(map[string]interface{}{
+		"event":          "tournament.finished",
+		"tournamentId":   p.TournamentID,
+		"tournamentName": p.TournamentName,
+		"userId":         p.UserID,
+		"username":       p.Username,
+		"rank":           p.Rank,
+		"coinsAwarded":   p.CoinsAwarded,
+		"finalScore":     p.FinalScore,
+	})
+	if err := s.publish(ctx, "tournament.finished", payload); err != nil {
+		log.Printf("[quiz] tournament.finished publish failed for tournament=%s user=%s: %v", p.TournamentID, p.UserID, err)
+		return
+	}
+
+	// Status flip is best-effort breadcrumb for the drain worker. The
+	// consumer-side transition on tournament_payouts.status is what
+	// actually drives coin grants, so even if this UpdateOne fails the
+	// pipeline still works — at worst the drain worker re-publishes a
+	// message the consumer already handled, which is a no-op due to
+	// the {$ne:"paid"} guard.
+	publishedAt := time.Now()
+	if _, err := s.mongoDB.Collection("tournament_payouts").UpdateOne(ctx,
+		bson.M{"tournamentId": p.TournamentID, "userId": p.UserID, "status": "pending"},
+		bson.M{"$set": bson.M{"status": "published", "publishedAt": publishedAt}},
+	); err != nil {
+		log.Printf("[quiz] payout publish-flag update failed for tournament=%s user=%s: %v", p.TournamentID, p.UserID, err)
+	}
+}
+
+// tournamentPayoutDrainWorker re-publishes any payout still in "pending"
+// state. Drives the at-least-once delivery guarantee for tournament.finished
+// events: if the immediate publish from finalizeExpiredTournaments failed
+// (RabbitMQ blip, channel drop, broker overload), this worker keeps trying
+// every minute until the row transitions to "published".
+func (s *quizServer) tournamentPayoutDrainWorker(ctx context.Context) {
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			s.drainPendingPayouts(ctx)
+		}
+	}
+}
+
+func (s *quizServer) drainPendingPayouts(ctx context.Context) {
+	cursor, err := s.mongoDB.Collection("tournament_payouts").Find(ctx, bson.M{"status": "pending"})
+	if err != nil {
+		log.Printf("[quiz] drain: pending payout lookup failed: %v", err)
+		return
+	}
+	defer cursor.Close(ctx)
+
+	for cursor.Next(ctx) {
+		var p models.TournamentPayout
+		if err := cursor.Decode(&p); err != nil {
+			log.Printf("[quiz] drain: decode failed: %v", err)
+			continue
+		}
+		s.publishTournamentPayout(ctx, p)
 	}
 }
 
@@ -1230,12 +1338,24 @@ func (s *quizServer) ensureCurrentWeekTournament(ctx context.Context, now time.T
 		return
 	}
 
+	// Compute the initial status at write time. Without this, a quiz
+	// service restart inside the active window (e.g. Sat 19:00 IST when
+	// startTime was Sat 18:00 IST) would create a fresh tournament doc
+	// with status="upcoming" — the standings updater filters on
+	// status="active", so any matches played in the gap before
+	// promoteUpcomingTournaments fires (~1 min later) would silently
+	// fail to score against this tournament.
+	initialStatus := "upcoming"
+	if !startTime.After(istNow) && endTime.After(istNow) {
+		initialStatus = "active"
+	}
+
 	doc := models.Tournament{
 		Name:             fmt.Sprintf("Weekly Open — %s", weekKey),
 		StartTime:        startTime,
 		EndTime:          endTime,
 		EntryDeadline:    startTime,
-		Status:           "upcoming",
+		Status:           initialStatus,
 		Participants:     []string{},
 		RequiredPlan:     "free",
 		PrizeDescription: "Top 3 win 500 / 300 / 100 coins",
@@ -1556,6 +1676,7 @@ func main() {
 	go srv.consumeLeaderboardUpdated(ctx)
 	go srv.tournamentReminderTicker(ctx)
 	go srv.tournamentFinalizationWorker(ctx) // Phase 3 (4.2): close expired tournaments
+	go srv.tournamentPayoutDrainWorker(ctx)  // Phase 3 (4.2): retry stuck pending payouts
 	go srv.weeklyTournamentCron(ctx)         // Phase 3 (4.2): spawn weekly free tournament
 
 	grpcServer := grpc.NewServer(
