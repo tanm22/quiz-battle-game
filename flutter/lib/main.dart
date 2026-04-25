@@ -10,10 +10,15 @@ import 'screens/login_screen.dart';
 import 'screens/matchmaking_screen.dart';
 import 'screens/gameplay_screen.dart';
 import 'screens/leaderboard_screen.dart';
+import 'screens/onboarding/carousel_screen.dart';
+import 'screens/onboarding/permission_prime_screen.dart';
+import 'screens/onboarding/profile_setup_screen.dart';
+import 'screens/onboarding/topic_picker_screen.dart';
 import 'screens/referral_screen.dart';
 import 'screens/results_screen.dart';
 import 'services/auth_service.dart';
 import 'services/fcm_service.dart';
+import 'services/onboarding_service.dart';
 import 'services/quiz_service.dart';
 import 'theme/app_theme.dart';
 
@@ -146,6 +151,17 @@ class _AppShellState extends ConsumerState<AppShell> {
       // can reach the user. Non-blocking: notification failures must not gate
       // the UI swap from splash to home.
       unawaited(FcmService.instance.registerForUser());
+      // If signed in but onboarding not completed (e.g. installed, signed up,
+      // killed app before finishing), resume at the right step.
+      if (!auth.onboardingCompleted) {
+        ref.read(gameStateProvider.notifier).navigateToOnboardingProfileSetup();
+      }
+    } else {
+      // No session — if the user has never seen the intro, show it first.
+      final seen = await OnboardingService.hasSeenCarousel();
+      if (!seen) {
+        ref.read(gameStateProvider.notifier).navigateToOnboardingCarousel();
+      }
     }
     setState(() => _checkedAuth = true);
   }
@@ -182,6 +198,14 @@ class _AppShellState extends ConsumerState<AppShell> {
     switch (gameState.currentScreen) {
       case GameScreen.login:
         screen = const LoginScreen();
+      case GameScreen.onboardingCarousel:
+        screen = const OnboardingCarouselScreen();
+      case GameScreen.onboardingProfileSetup:
+        screen = const ProfileSetupScreen();
+      case GameScreen.onboardingTopicPicker:
+        screen = const TopicPickerScreen();
+      case GameScreen.onboardingPermissionPrime:
+        screen = const PermissionPrimeScreen();
       case GameScreen.home:
         screen = const HomeScreen();
       case GameScreen.matchmaking:

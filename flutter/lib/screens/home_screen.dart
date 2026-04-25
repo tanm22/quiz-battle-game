@@ -223,6 +223,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             const SizedBox(height: 16),
             _buildStatsRow(),
             const SizedBox(height: 24),
+            // Day-0 nudge: only fires when the user has never played a match.
+            // Once they have at least one match the existing stats card and
+            // history surfaces are informative enough — no need for a CTA.
+            if ((_homeData?.profile.matchesPlayed ?? 0) == 0) ...[
+              _buildDayZeroCard(),
+              const SizedBox(height: 24),
+            ],
           ] else if (_loading && _error == null) ...[
             Row(
               children: [
@@ -953,6 +960,84 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           _Stat(Icons.today, '$matchesToday', 'Today', AppColors.accent, AppColors.accentBg),
           _Stat(Icons.local_fire_department, '$winStreak', 'Win Streak', AppColors.primary, AppColors.orangeBg),
           _Stat(Icons.track_changes, '${accuracy.toStringAsFixed(0)}%', 'Accuracy', AppColors.success, AppColors.emeraldBg),
+        ],
+      ),
+    );
+  }
+
+  /// Day-0 empty state — shown to users who haven't played their first
+  /// match yet. Friendly nudge with a primary CTA that drops them straight
+  /// into matchmaking, since there's no win-rate / streak / history to
+  /// surface yet.
+  Widget _buildDayZeroCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [AppColors.orangeBg, AppColors.surface],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: AppRadius.card,
+        border: Border.all(color: AppColors.primary.withAlpha(50)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.orangeBg,
+                ),
+                child: const Icon(Icons.bolt_rounded, color: AppColors.primary, size: 24),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Ready for your first match?',
+                  style: TextStyle(
+                    color: AppColors.text,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "Best-of-5 quiz battles, ~2 minutes per match. Win to climb the rating ladder.",
+            style: TextStyle(color: AppColors.textMuted, fontSize: 13, height: 1.4),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: AppGradients.primary,
+                borderRadius: AppRadius.button,
+              ),
+              child: ElevatedButton.icon(
+                onPressed: () => ref.read(gameStateProvider.notifier).navigateToMatchmaking(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: AppRadius.button),
+                ),
+                icon: const Icon(Icons.play_arrow_rounded, size: 22),
+                label: const Text(
+                  'Play your first match',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );

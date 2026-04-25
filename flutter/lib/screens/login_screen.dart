@@ -94,7 +94,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   void _navigateToMatchmaking(AuthService auth) {
     QuizService().setAuthToken(auth.token!);
-    ref.read(gameStateProvider.notifier).setAuth(
+    final notifier = ref.read(gameStateProvider.notifier);
+    notifier.setAuth(
       auth.userId!, auth.token!, auth.rating,
       email: auth.email, isGuest: auth.isGuest,
     );
@@ -103,12 +104,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     unawaited(FcmService.instance.registerForUser());
   }
 
+  /// Used after register / Google sign-in: route to onboarding profile setup
+  /// if the server says the user hasn't onboarded. Login flows skip this —
+  /// existing accounts have already onboarded (or the server flag is false
+  /// and tryRestoreSession on next launch handles it).
+  void _navigateAfterSignup(AuthService auth) {
+    _navigateToMatchmaking(auth);
+    if (!auth.onboardingCompleted) {
+      ref.read(gameStateProvider.notifier).navigateToOnboardingProfileSetup();
+    }
+  }
+
   Future<void> _googleSignIn() async {
     setState(() => _isLoading = true);
     try {
       final auth = AuthService();
       await auth.signInWithGoogle();
-      _navigateToMatchmaking(auth);
+      _navigateAfterSignup(auth);
     } on GrpcError catch (e) {
       _showError(e.message ?? 'Google sign-in failed');
     } catch (e) {
@@ -189,7 +201,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     try {
       final auth = AuthService();
       await auth.register(username, password, email: email.isNotEmpty ? email : null, referralCode: referral.isNotEmpty ? referral : null);
-      _navigateToMatchmaking(auth);
+      _navigateAfterSignup(auth);
     } on GrpcError catch (e) {
       _showError(e.message ?? 'Registration failed');
     } catch (e) {
