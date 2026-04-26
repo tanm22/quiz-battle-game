@@ -26,6 +26,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"quiz-battle/pkg/auth"
+	"quiz-battle/pkg/coins"
 	"quiz-battle/pkg/email"
 	"quiz-battle/pkg/keys"
 	"quiz-battle/pkg/models"
@@ -40,6 +41,7 @@ var (
 type authServer struct {
 	pb.UnimplementedAuthServiceServer
 	mongoDB   *mongo.Database
+	ledger    *coins.Ledger // §4.3 — every coin grant goes through this
 	rdb       *redis.Client
 	amqpConn  *amqp.Connection
 	jwtSecret string
@@ -712,22 +714,20 @@ func (s *authServer) ClaimDailyReward(ctx context.Context, _ *pb.ClaimDailyRewar
 
 	reward := rewardForDay(user.Streak.Current)
 
-	// Atomically grant coins and mark reward as claimed for today
-	res, err := s.users().UpdateOne(ctx,
-		bson.M{"_id": userID, "streak.rewardClaimedDate": bson.M{"$ne": today}},
-		bson.M{
-			"$inc": bson.M{"coins": reward.Coins},
-			"$set": bson.M{"streak.rewardClaimedDate": today},
-		})
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to claim reward: %v", err)
+	// §4.3 invariant: every balance change writes a ledger row in the same
+	// transaction (ADR-0001). Grant is idempotent on (userId, refId, reason),
+	// so concurrent racers and retries after partial failure converge on a
+	// single ledger entry. We Grant FIRST, then mark rewardClaimedDate so a
+	// crash between the two retries safely (Grant returns existing entry).
+	if _, err := s.ledger.Grant(ctx, userID, reward.Coins, coins.ReasonDailyReward,
+		"streak:"+userID+":"+today,
+		map[string]string{"streakDay": fmt.Sprintf("%d", user.Streak.Current)}); err != nil {
+		return nil, status.Errorf(codes.Internal, "grant daily reward: %v", err)
 	}
-	if res.ModifiedCount == 0 {
-		// Race: another request already claimed
-		return &pb.ClaimDailyRewardResponse{
-			Reward: reward,
-			Streak: toStreakInfo(user.Streak),
-		}, nil
+	if _, err := s.users().UpdateOne(ctx,
+		bson.M{"_id": userID},
+		bson.M{"$set": bson.M{"streak.rewardClaimedDate": today}}); err != nil {
+		return nil, status.Errorf(codes.Internal, "mark reward claimed: %v", err)
 	}
 
 	return &pb.ClaimDailyRewardResponse{
@@ -1036,6 +1036,7 @@ func main() {
 
 	srv := &authServer{
 		mongoDB:   db,
+		ledger:    coins.NewLedger(mongoClient, "quizbattle"),
 		rdb:       rdb,
 		amqpConn:  amqpConn,
 		jwtSecret: jwtSecret,
