@@ -48,23 +48,33 @@ type Question struct {
 
 type scoringServer struct {
 	pb.UnimplementedScoringServiceServer
-	rdb        *redis.Client
-	amqpConn   *amqp.Connection
-	amqpCh     *amqp.Channel // for publishing only
-	amqpMu     sync.Mutex    // AMQP channels are not thread-safe
-	mongoDB    *mongo.Database
-	ledger     *coins.Ledger // §4.3 — every balance change goes through Grant
-	jwtSecret  string
-	selfClient pb.ScoringServiceClient // gRPC loopback client for CalculateScore
+	rdb       *redis.Client
+	amqpConn  *amqp.Connection
+	amqpCh    *amqp.Channel // for publishing only
+	amqpMu    sync.Mutex    // AMQP channels are not thread-safe
+	mongoDB   *mongo.Database
+	ledger    *coins.Ledger // §4.3 — every balance change goes through Grant
+	jwtSecret string
+	// publishHook, when non-nil, captures every publish call instead of
+	// sending to amqpCh. Set in tests so we can assert routing keys and
+	// payloads without standing up RabbitMQ. Nil in production.
+	publishHook func(routingKey string, body []byte)
+	selfClient  pb.ScoringServiceClient // gRPC loopback client for CalculateScore
 }
 
-// publish sends a message to the topic exchange with mutex protection. In
-// tests where amqpCh is left nil (we don't stand up RabbitMQ for unit tests
-// that only exercise Mongo state), publish is a no-op so callers don't need
-// to special-case the test seam.
+// publish sends a message to the topic exchange with mutex protection.
+// In tests, two seams short-circuit the broker hop:
+//   - publishHook captures (routingKey, body) so tests can assert what
+//     was published; preferred when the test cares about the wire shape.
+//   - nil amqpCh is a silent no-op so tests that only exercise Mongo
+//     state (where the publish is incidental) don't need any setup.
 func (s *scoringServer) publish(ctx context.Context, routingKey string, body []byte) error {
 	s.amqpMu.Lock()
 	defer s.amqpMu.Unlock()
+	if s.publishHook != nil {
+		s.publishHook(routingKey, body)
+		return nil
+	}
 	if s.amqpCh == nil {
 		return nil
 	}

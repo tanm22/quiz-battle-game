@@ -88,13 +88,38 @@ func (s *scoringServer) handleReferralEvent(ctx context.Context, body []byte) er
 		return nil
 	}
 
-	if _, err := s.ledger.Grant(ctx, event.ReferrerID, referralReferrerCoins,
-		coins.ReasonReferralReferrer, "referral:"+ref.ID+":referrer", nil); err != nil {
-		return fmt.Errorf("grant referrer: %w", err)
+	// §4.3: publish to the unified earn pipeline instead of calling
+	// Grant directly. The earn-consumer in this same service drains
+	// coin-earn-queue and writes the ledger row + balance update via
+	// Ledger.Grant. RefIDs are stable across redeliveries so a duplicate
+	// publish (e.g. retried after rewardGranted flip failed) is a no-op
+	// at the consumer's unique-index check.
+	publishEarn := func(source string, ev coins.EarnEvent) error {
+		ev.Event = coins.EarnRoutingKey(source)
+		body, err := json.Marshal(ev)
+		if err != nil {
+			return fmt.Errorf("marshal %s: %w", ev.Event, err)
+		}
+		if err := s.publish(ctx, ev.Event, body); err != nil {
+			return fmt.Errorf("publish %s: %w", ev.Event, err)
+		}
+		return nil
 	}
-	if _, err := s.ledger.Grant(ctx, event.RefereeID, referralRefereeCoins,
-		coins.ReasonReferralReferee, "referral:"+ref.ID+":referee", nil); err != nil {
-		return fmt.Errorf("grant referee: %w", err)
+	if err := publishEarn(coins.EarnSourceReferralReferrer, coins.EarnEvent{
+		UserID: event.ReferrerID,
+		Amount: referralReferrerCoins,
+		Reason: coins.ReasonReferralReferrer,
+		RefID:  "referral:" + ref.ID + ":referrer",
+	}); err != nil {
+		return err
+	}
+	if err := publishEarn(coins.EarnSourceReferralReferee, coins.EarnEvent{
+		UserID: event.RefereeID,
+		Amount: referralRefereeCoins,
+		Reason: coins.ReasonReferralReferee,
+		RefID:  "referral:" + ref.ID + ":referee",
+	}); err != nil {
+		return err
 	}
 
 	if _, err := s.mongoDB.Collection("referrals").UpdateOne(ctx,
@@ -120,7 +145,7 @@ func (s *scoringServer) handleReferralEvent(ctx context.Context, body []byte) er
 		// also potentially re-fire the notification twice on the next attempt).
 		log.Printf("[referral-consumer] publish notif failed: %v", err)
 	}
-	log.Printf("[referral-consumer] referral converted: %s referred %s, coins granted via ledger",
+	log.Printf("[referral-consumer] referral converted: %s referred %s, earn events published",
 		event.ReferrerID, event.RefereeID)
 	return nil
 }
