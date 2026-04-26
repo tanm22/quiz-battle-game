@@ -175,9 +175,15 @@ services:
         condition: service_healthy
       mongo:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
       - MONGO_URI=mongodb://mongo:27017/quizbattle?replicaSet=rs0
+      # §4.6 policy gate: Redis backs the daily cap, dedup window, and
+      # per-day metric counters. Without a reachable Redis the service
+      # logs a warning and falls back to dispatching unfiltered.
+      - REDIS_ADDR=redis:6379
       # Firebase Admin SDK auto-discovers credentials at this path via ADC.
       # Drop a real service-account JSON into ./secrets/firebase-admin.json
       # (download from Firebase Console → Service accounts → Generate key —

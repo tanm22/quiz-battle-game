@@ -461,27 +461,30 @@ var QuizService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	ScoringService_CalculateScore_FullMethodName         = "/quiz.ScoringService/CalculateScore"
-	ScoringService_GetLeaderboard_FullMethodName         = "/quiz.ScoringService/GetLeaderboard"
-	ScoringService_GetMatchHistory_FullMethodName        = "/quiz.ScoringService/GetMatchHistory"
-	ScoringService_GetHomeScreenData_FullMethodName      = "/quiz.ScoringService/GetHomeScreenData"
-	ScoringService_GetReferralDashboard_FullMethodName   = "/quiz.ScoringService/GetReferralDashboard"
-	ScoringService_ApplyReferralCode_FullMethodName      = "/quiz.ScoringService/ApplyReferralCode"
-	ScoringService_UpdateFCMToken_FullMethodName         = "/quiz.ScoringService/UpdateFCMToken"
-	ScoringService_GetGlobalLeaderboard_FullMethodName   = "/quiz.ScoringService/GetGlobalLeaderboard"
-	ScoringService_GetCoinBalance_FullMethodName         = "/quiz.ScoringService/GetCoinBalance"
-	ScoringService_GetCoinLedger_FullMethodName          = "/quiz.ScoringService/GetCoinLedger"
-	ScoringService_GetShopCatalog_FullMethodName         = "/quiz.ScoringService/GetShopCatalog"
-	ScoringService_GetShopInventory_FullMethodName       = "/quiz.ScoringService/GetShopInventory"
-	ScoringService_PurchaseShopItem_FullMethodName       = "/quiz.ScoringService/PurchaseShopItem"
-	ScoringService_EquipCosmetic_FullMethodName          = "/quiz.ScoringService/EquipCosmetic"
-	ScoringService_ConsumeReroll_FullMethodName          = "/quiz.ScoringService/ConsumeReroll"
-	ScoringService_SendFriendRequest_FullMethodName      = "/quiz.ScoringService/SendFriendRequest"
-	ScoringService_RespondToFriendRequest_FullMethodName = "/quiz.ScoringService/RespondToFriendRequest"
-	ScoringService_GetFriendsList_FullMethodName         = "/quiz.ScoringService/GetFriendsList"
-	ScoringService_GetFriendRequests_FullMethodName      = "/quiz.ScoringService/GetFriendRequests"
-	ScoringService_Heartbeat_FullMethodName              = "/quiz.ScoringService/Heartbeat"
-	ScoringService_ChallengeFriend_FullMethodName        = "/quiz.ScoringService/ChallengeFriend"
+	ScoringService_CalculateScore_FullMethodName          = "/quiz.ScoringService/CalculateScore"
+	ScoringService_GetLeaderboard_FullMethodName          = "/quiz.ScoringService/GetLeaderboard"
+	ScoringService_GetMatchHistory_FullMethodName         = "/quiz.ScoringService/GetMatchHistory"
+	ScoringService_GetHomeScreenData_FullMethodName       = "/quiz.ScoringService/GetHomeScreenData"
+	ScoringService_GetReferralDashboard_FullMethodName    = "/quiz.ScoringService/GetReferralDashboard"
+	ScoringService_ApplyReferralCode_FullMethodName       = "/quiz.ScoringService/ApplyReferralCode"
+	ScoringService_UpdateFCMToken_FullMethodName          = "/quiz.ScoringService/UpdateFCMToken"
+	ScoringService_GetGlobalLeaderboard_FullMethodName    = "/quiz.ScoringService/GetGlobalLeaderboard"
+	ScoringService_GetCoinBalance_FullMethodName          = "/quiz.ScoringService/GetCoinBalance"
+	ScoringService_GetCoinLedger_FullMethodName           = "/quiz.ScoringService/GetCoinLedger"
+	ScoringService_GetShopCatalog_FullMethodName          = "/quiz.ScoringService/GetShopCatalog"
+	ScoringService_GetShopInventory_FullMethodName        = "/quiz.ScoringService/GetShopInventory"
+	ScoringService_PurchaseShopItem_FullMethodName        = "/quiz.ScoringService/PurchaseShopItem"
+	ScoringService_EquipCosmetic_FullMethodName           = "/quiz.ScoringService/EquipCosmetic"
+	ScoringService_ConsumeReroll_FullMethodName           = "/quiz.ScoringService/ConsumeReroll"
+	ScoringService_SendFriendRequest_FullMethodName       = "/quiz.ScoringService/SendFriendRequest"
+	ScoringService_RespondToFriendRequest_FullMethodName  = "/quiz.ScoringService/RespondToFriendRequest"
+	ScoringService_GetFriendsList_FullMethodName          = "/quiz.ScoringService/GetFriendsList"
+	ScoringService_GetFriendRequests_FullMethodName       = "/quiz.ScoringService/GetFriendRequests"
+	ScoringService_Heartbeat_FullMethodName               = "/quiz.ScoringService/Heartbeat"
+	ScoringService_ChallengeFriend_FullMethodName         = "/quiz.ScoringService/ChallengeFriend"
+	ScoringService_GetNotificationPrefs_FullMethodName    = "/quiz.ScoringService/GetNotificationPrefs"
+	ScoringService_UpdateNotificationPrefs_FullMethodName = "/quiz.ScoringService/UpdateNotificationPrefs"
+	ScoringService_MarkNotificationOpened_FullMethodName  = "/quiz.ScoringService/MarkNotificationOpened"
 )
 
 // ScoringServiceClient is the client API for ScoringService service.
@@ -535,6 +538,16 @@ type ScoringServiceClient interface {
 	// both clients can use to enter the game flow. The friend must be in
 	// the caller's accepted friends; otherwise NOT_FRIENDS error code.
 	ChallengeFriend(ctx context.Context, in *ChallengeFriendRequest, opts ...grpc.CallOption) (*ChallengeFriendResponse, error)
+	// §4.6 Notification policy. The caller manages their per-type mute
+	// preferences and timezone. Quiet hours (23:00–08:00 in the user's
+	// timezone) and the daily cap are server-side product defaults — not
+	// exposed here so individual users can't opt out of fatigue protection.
+	GetNotificationPrefs(ctx context.Context, in *GetNotificationPrefsRequest, opts ...grpc.CallOption) (*GetNotificationPrefsResponse, error)
+	UpdateNotificationPrefs(ctx context.Context, in *UpdateNotificationPrefsRequest, opts ...grpc.CallOption) (*UpdateNotificationPrefsResponse, error)
+	// MarkNotificationOpened is fired by the Flutter client when the user
+	// taps a notification. Increments the per-category open counter so we
+	// can compute open-rate offline (sent vs opened, per type, per day).
+	MarkNotificationOpened(ctx context.Context, in *MarkNotificationOpenedRequest, opts ...grpc.CallOption) (*MarkNotificationOpenedResponse, error)
 }
 
 type scoringServiceClient struct {
@@ -755,6 +768,36 @@ func (c *scoringServiceClient) ChallengeFriend(ctx context.Context, in *Challeng
 	return out, nil
 }
 
+func (c *scoringServiceClient) GetNotificationPrefs(ctx context.Context, in *GetNotificationPrefsRequest, opts ...grpc.CallOption) (*GetNotificationPrefsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetNotificationPrefsResponse)
+	err := c.cc.Invoke(ctx, ScoringService_GetNotificationPrefs_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scoringServiceClient) UpdateNotificationPrefs(ctx context.Context, in *UpdateNotificationPrefsRequest, opts ...grpc.CallOption) (*UpdateNotificationPrefsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateNotificationPrefsResponse)
+	err := c.cc.Invoke(ctx, ScoringService_UpdateNotificationPrefs_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scoringServiceClient) MarkNotificationOpened(ctx context.Context, in *MarkNotificationOpenedRequest, opts ...grpc.CallOption) (*MarkNotificationOpenedResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MarkNotificationOpenedResponse)
+	err := c.cc.Invoke(ctx, ScoringService_MarkNotificationOpened_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ScoringServiceServer is the server API for ScoringService service.
 // All implementations must embed UnimplementedScoringServiceServer
 // for forward compatibility.
@@ -806,6 +849,16 @@ type ScoringServiceServer interface {
 	// both clients can use to enter the game flow. The friend must be in
 	// the caller's accepted friends; otherwise NOT_FRIENDS error code.
 	ChallengeFriend(context.Context, *ChallengeFriendRequest) (*ChallengeFriendResponse, error)
+	// §4.6 Notification policy. The caller manages their per-type mute
+	// preferences and timezone. Quiet hours (23:00–08:00 in the user's
+	// timezone) and the daily cap are server-side product defaults — not
+	// exposed here so individual users can't opt out of fatigue protection.
+	GetNotificationPrefs(context.Context, *GetNotificationPrefsRequest) (*GetNotificationPrefsResponse, error)
+	UpdateNotificationPrefs(context.Context, *UpdateNotificationPrefsRequest) (*UpdateNotificationPrefsResponse, error)
+	// MarkNotificationOpened is fired by the Flutter client when the user
+	// taps a notification. Increments the per-category open counter so we
+	// can compute open-rate offline (sent vs opened, per type, per day).
+	MarkNotificationOpened(context.Context, *MarkNotificationOpenedRequest) (*MarkNotificationOpenedResponse, error)
 	mustEmbedUnimplementedScoringServiceServer()
 }
 
@@ -878,6 +931,15 @@ func (UnimplementedScoringServiceServer) Heartbeat(context.Context, *HeartbeatRe
 }
 func (UnimplementedScoringServiceServer) ChallengeFriend(context.Context, *ChallengeFriendRequest) (*ChallengeFriendResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ChallengeFriend not implemented")
+}
+func (UnimplementedScoringServiceServer) GetNotificationPrefs(context.Context, *GetNotificationPrefsRequest) (*GetNotificationPrefsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetNotificationPrefs not implemented")
+}
+func (UnimplementedScoringServiceServer) UpdateNotificationPrefs(context.Context, *UpdateNotificationPrefsRequest) (*UpdateNotificationPrefsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateNotificationPrefs not implemented")
+}
+func (UnimplementedScoringServiceServer) MarkNotificationOpened(context.Context, *MarkNotificationOpenedRequest) (*MarkNotificationOpenedResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method MarkNotificationOpened not implemented")
 }
 func (UnimplementedScoringServiceServer) mustEmbedUnimplementedScoringServiceServer() {}
 func (UnimplementedScoringServiceServer) testEmbeddedByValue()                        {}
@@ -1278,6 +1340,60 @@ func _ScoringService_ChallengeFriend_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ScoringService_GetNotificationPrefs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetNotificationPrefsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScoringServiceServer).GetNotificationPrefs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScoringService_GetNotificationPrefs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScoringServiceServer).GetNotificationPrefs(ctx, req.(*GetNotificationPrefsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScoringService_UpdateNotificationPrefs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateNotificationPrefsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScoringServiceServer).UpdateNotificationPrefs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScoringService_UpdateNotificationPrefs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScoringServiceServer).UpdateNotificationPrefs(ctx, req.(*UpdateNotificationPrefsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScoringService_MarkNotificationOpened_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MarkNotificationOpenedRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScoringServiceServer).MarkNotificationOpened(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScoringService_MarkNotificationOpened_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScoringServiceServer).MarkNotificationOpened(ctx, req.(*MarkNotificationOpenedRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ScoringService_ServiceDesc is the grpc.ServiceDesc for ScoringService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1368,6 +1484,18 @@ var ScoringService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ChallengeFriend",
 			Handler:    _ScoringService_ChallengeFriend_Handler,
+		},
+		{
+			MethodName: "GetNotificationPrefs",
+			Handler:    _ScoringService_GetNotificationPrefs_Handler,
+		},
+		{
+			MethodName: "UpdateNotificationPrefs",
+			Handler:    _ScoringService_UpdateNotificationPrefs_Handler,
+		},
+		{
+			MethodName: "MarkNotificationOpened",
+			Handler:    _ScoringService_MarkNotificationOpened_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -496,6 +496,38 @@ class ScoringServiceClient extends $grpc.Client {
     return $createUnaryCall(_$challengeFriend, request, options: options);
   }
 
+  /// §4.6 Notification policy. The caller manages their per-type mute
+  /// preferences and timezone. Quiet hours (23:00–08:00 in the user's
+  /// timezone) and the daily cap are server-side product defaults — not
+  /// exposed here so individual users can't opt out of fatigue protection.
+  $grpc.ResponseFuture<$0.GetNotificationPrefsResponse> getNotificationPrefs(
+    $0.GetNotificationPrefsRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$getNotificationPrefs, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.UpdateNotificationPrefsResponse>
+      updateNotificationPrefs(
+    $0.UpdateNotificationPrefsRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$updateNotificationPrefs, request,
+        options: options);
+  }
+
+  /// MarkNotificationOpened is fired by the Flutter client when the user
+  /// taps a notification. Increments the per-category open counter so we
+  /// can compute open-rate offline (sent vs opened, per type, per day).
+  $grpc.ResponseFuture<$0.MarkNotificationOpenedResponse>
+      markNotificationOpened(
+    $0.MarkNotificationOpenedRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$markNotificationOpened, request,
+        options: options);
+  }
+
   // method descriptors
 
   static final _$calculateScore =
@@ -603,6 +635,22 @@ class ScoringServiceClient extends $grpc.Client {
           '/quiz.ScoringService/ChallengeFriend',
           ($0.ChallengeFriendRequest value) => value.writeToBuffer(),
           $0.ChallengeFriendResponse.fromBuffer);
+  static final _$getNotificationPrefs = $grpc.ClientMethod<
+          $0.GetNotificationPrefsRequest, $0.GetNotificationPrefsResponse>(
+      '/quiz.ScoringService/GetNotificationPrefs',
+      ($0.GetNotificationPrefsRequest value) => value.writeToBuffer(),
+      $0.GetNotificationPrefsResponse.fromBuffer);
+  static final _$updateNotificationPrefs = $grpc.ClientMethod<
+          $0.UpdateNotificationPrefsRequest,
+          $0.UpdateNotificationPrefsResponse>(
+      '/quiz.ScoringService/UpdateNotificationPrefs',
+      ($0.UpdateNotificationPrefsRequest value) => value.writeToBuffer(),
+      $0.UpdateNotificationPrefsResponse.fromBuffer);
+  static final _$markNotificationOpened = $grpc.ClientMethod<
+          $0.MarkNotificationOpenedRequest, $0.MarkNotificationOpenedResponse>(
+      '/quiz.ScoringService/MarkNotificationOpened',
+      ($0.MarkNotificationOpenedRequest value) => value.writeToBuffer(),
+      $0.MarkNotificationOpenedResponse.fromBuffer);
 }
 
 @$pb.GrpcServiceName('quiz.ScoringService')
@@ -797,6 +845,33 @@ abstract class ScoringServiceBase extends $grpc.Service {
         ($core.List<$core.int> value) =>
             $0.ChallengeFriendRequest.fromBuffer(value),
         ($0.ChallengeFriendResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.GetNotificationPrefsRequest,
+            $0.GetNotificationPrefsResponse>(
+        'GetNotificationPrefs',
+        getNotificationPrefs_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.GetNotificationPrefsRequest.fromBuffer(value),
+        ($0.GetNotificationPrefsResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.UpdateNotificationPrefsRequest,
+            $0.UpdateNotificationPrefsResponse>(
+        'UpdateNotificationPrefs',
+        updateNotificationPrefs_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.UpdateNotificationPrefsRequest.fromBuffer(value),
+        ($0.UpdateNotificationPrefsResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.MarkNotificationOpenedRequest,
+            $0.MarkNotificationOpenedResponse>(
+        'MarkNotificationOpened',
+        markNotificationOpened_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.MarkNotificationOpenedRequest.fromBuffer(value),
+        ($0.MarkNotificationOpenedResponse value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.CalculateScoreResponse> calculateScore_Pre(
@@ -986,6 +1061,33 @@ abstract class ScoringServiceBase extends $grpc.Service {
 
   $async.Future<$0.ChallengeFriendResponse> challengeFriend(
       $grpc.ServiceCall call, $0.ChallengeFriendRequest request);
+
+  $async.Future<$0.GetNotificationPrefsResponse> getNotificationPrefs_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.GetNotificationPrefsRequest> $request) async {
+    return getNotificationPrefs($call, await $request);
+  }
+
+  $async.Future<$0.GetNotificationPrefsResponse> getNotificationPrefs(
+      $grpc.ServiceCall call, $0.GetNotificationPrefsRequest request);
+
+  $async.Future<$0.UpdateNotificationPrefsResponse> updateNotificationPrefs_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.UpdateNotificationPrefsRequest> $request) async {
+    return updateNotificationPrefs($call, await $request);
+  }
+
+  $async.Future<$0.UpdateNotificationPrefsResponse> updateNotificationPrefs(
+      $grpc.ServiceCall call, $0.UpdateNotificationPrefsRequest request);
+
+  $async.Future<$0.MarkNotificationOpenedResponse> markNotificationOpened_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.MarkNotificationOpenedRequest> $request) async {
+    return markNotificationOpened($call, await $request);
+  }
+
+  $async.Future<$0.MarkNotificationOpenedResponse> markNotificationOpened(
+      $grpc.ServiceCall call, $0.MarkNotificationOpenedRequest request);
 }
 
 @$pb.GrpcServiceName('quiz.AuthService')

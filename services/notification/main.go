@@ -12,6 +12,7 @@ import (
 	firebase "firebase.google.com/go/v4"
 	"firebase.google.com/go/v4/messaging"
 	amqp "github.com/rabbitmq/amqp091-go"
+	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
@@ -20,7 +21,9 @@ import (
 type notificationService struct {
 	amqpConn *amqp.Connection
 	mongoDB  *mongo.Database
+	rdb      *redis.Client     // §4.6: cap, dedup, metrics counters
 	fcm      *messaging.Client // nil => stub mode (logs only, no FCM delivery)
+	policy   *policy           // §4.6: mute/quiet/dedup/cap gate; nil disables all gates
 }
 
 func (s *notificationService) newChannel() (*amqp.Channel, error) {
@@ -85,6 +88,22 @@ func (s *notificationService) dispatchNotification(ctx context.Context, msg amqp
 
 	title, body, data := buildMessage(event, payload)
 	for _, uid := range userIDs {
+		// §4.6 policy gate. The gate runs per-recipient because mutes,
+		// timezone, and the daily cap are all user-scoped — a fan-out to
+		// 100 users for a tournament reminder gates each recipient
+		// independently.
+		if s.policy != nil {
+			res := s.policy.allow(ctx, uid, event)
+			if !res.Allowed {
+				log.Printf("[notification] dropped event=%s user=%s reason=%s",
+					event, uid, res.Reason)
+				continue
+			}
+			// Embed the resolved category so the Flutter client can
+			// echo it back via MarkNotificationOpened without having
+			// to redo the routing-key→category mapping.
+			data["category"] = res.Category
+		}
 		s.deliverToUser(ctx, uid, title, body, data)
 	}
 	msg.Ack(false)
@@ -466,9 +485,39 @@ func main() {
 	defer mongoClient.Disconnect(ctx)
 	log.Println("[notification] connected to MongoDB")
 
+	// Redis: §4.6 policy gate stores cap/dedup/metric counters here.
+	// Co-located with the rest of the platform (single redis container in
+	// docker-compose) so we don't need a separate connection budget.
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = "localhost:6379"
+	}
+	rdb := redis.NewClient(&redis.Options{Addr: redisAddr})
+	if err := rdb.Ping(ctx).Err(); err != nil {
+		log.Printf("[notification] WARN redis ping failed: %v — policy gate disabled", err)
+		rdb = nil
+	} else {
+		log.Println("[notification] connected to Redis")
+	}
+
 	svc := &notificationService{
 		amqpConn: conn,
 		mongoDB:  mongoClient.Database("quizbattle"),
+		rdb:      rdb,
+	}
+
+	// §4.6 policy gate. Disabled when Redis isn't reachable — better to
+	// dispatch unfiltered than swallow every push because of an infra
+	// outage. NOTIF_DAILY_CAP overrides the per-user push ceiling.
+	if rdb != nil {
+		dailyCap := 0
+		if v := os.Getenv("NOTIF_DAILY_CAP"); v != "" {
+			if n, err := strconv.Atoi(v); err == nil {
+				dailyCap = n
+			}
+		}
+		svc.policy = newPolicy(rdb, svc.mongoDB, dailyCap)
+		log.Printf("[notification] policy gate enabled (dailyCap=%d)", svc.policy.dailyCap)
 	}
 
 	// Firebase Admin SDK — optional. When GOOGLE_APPLICATION_CREDENTIALS is

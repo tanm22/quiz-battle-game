@@ -74,7 +74,23 @@ type User struct {
 	RerollCharges       int32    `bson:"rerollCharges,omitempty"`
 	StreakFreezeHeld    bool     `bson:"streakFreezeHeld,omitempty"`
 	StreakFreezeWeekISO string   `bson:"streakFreezeWeekISO,omitempty"`
-	CreatedAt           int64    `bson:"createdAt"`
+	// §4.6 Notification policy. Stored as a sub-document so a single
+	// users.FindOne in services/notification's policy gate gives the
+	// full picture without a second collection lookup. Nil means
+	// "defaults" — no muted categories, default Asia/Kolkata timezone.
+	NotificationPrefs *NotificationPrefs `bson:"notificationPrefs,omitempty"`
+	CreatedAt         int64              `bson:"createdAt"`
+}
+
+// NotificationPrefs is the user-configurable slice of the §4.6 policy.
+// Quiet hours and the daily cap are NOT exposed here on purpose — they're
+// product-wide defaults (23:00–08:00, 10/day) so an individual user can't
+// opt out of fatigue protection. MutedTypes lets a user silence specific
+// notification categories; Timezone is an IANA name used to evaluate
+// quiet hours in their local time.
+type NotificationPrefs struct {
+	MutedTypes []string `bson:"mutedTypes,omitempty"`
+	Timezone   string   `bson:"timezone,omitempty"` // IANA, e.g. "Asia/Kolkata"
 }
 
 // Payment is the MongoDB document in the payments collection.

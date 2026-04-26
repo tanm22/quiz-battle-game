@@ -216,6 +216,17 @@ service ScoringService {
   // both clients can use to enter the game flow. The friend must be in
   // the caller's accepted friends; otherwise NOT_FRIENDS error code.
   rpc ChallengeFriend(ChallengeFriendRequest) returns (ChallengeFriendResponse);
+
+  // §4.6 Notification policy. The caller manages their per-type mute
+  // preferences and timezone. Quiet hours (23:00–08:00 in the user's
+  // timezone) and the daily cap are server-side product defaults — not
+  // exposed here so individual users can't opt out of fatigue protection.
+  rpc GetNotificationPrefs(GetNotificationPrefsRequest) returns (GetNotificationPrefsResponse);
+  rpc UpdateNotificationPrefs(UpdateNotificationPrefsRequest) returns (UpdateNotificationPrefsResponse);
+  // MarkNotificationOpened is fired by the Flutter client when the user
+  // taps a notification. Increments the per-category open counter so we
+  // can compute open-rate offline (sent vs opened, per type, per day).
+  rpc MarkNotificationOpened(MarkNotificationOpenedRequest) returns (MarkNotificationOpenedResponse);
 }
 
 // ---------------------------------------------------------------------------
@@ -828,4 +839,49 @@ message ChallengeFriendResponse {
   //   FRIEND_OFFLINE      — target's presence TTL expired (best-effort hint)
   //   THROTTLED           — caller already challenged this friend recently
   string error_code = 3;
+}
+
+// §4.6 Notification policy ----------------------------------------------------
+//
+// Categories — the strings the client sends in muted_types and the policy
+// gate keys dedup/cap counters off:
+//   "friend_request"   — friend.request_received, friend.request_accepted
+//   "friend_challenge" — friend.challenge
+//   "match_invite"     — match.invite
+//   "streak"           — streak.warning
+//   "daily_reward"     — daily.reward
+//   "referral"         — referral.converted
+//   "tournament"       — tournament.remind, .finished, .rank_changed
+//   "premium"          — premium.activated, .expired, .expiry
+//
+// UpdateNotificationPrefs replaces the entire muted_types list (set
+// semantics, not append). Unknown categories are rejected with
+// InvalidArgument so a typo doesn't silently accept and confuse the user.
+
+message GetNotificationPrefsRequest {}
+
+message GetNotificationPrefsResponse {
+  repeated string muted_types = 1;
+  string          timezone    = 2;
+}
+
+message UpdateNotificationPrefsRequest {
+  repeated string muted_types = 1;
+  // IANA timezone name. Empty preserves the existing value; explicitly
+  // setting "" is not supported — clients pass the current value when they
+  // only intend to mutate muted_types.
+  string timezone = 2;
+}
+
+message UpdateNotificationPrefsResponse {
+  bool success = 1;
+}
+
+message MarkNotificationOpenedRequest {
+  // Category as listed above. Unknown categories are rejected.
+  string category = 1;
+}
+
+message MarkNotificationOpenedResponse {
+  bool success = 1;
 }
