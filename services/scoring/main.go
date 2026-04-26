@@ -898,6 +898,12 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 		roundsPlayed = 0
 	}
 
+	// §4.5: build round → topic map up front so the per-answer logging
+	// loop below doesn't query Mongo per round per player. The Redis
+	// questions list orders questionIDs by round (round N = index N-1);
+	// we batch-fetch all matching question docs once per match.
+	topicByRound := s.loadTopicsForMatch(ctx, event.RoomID, roundsPlayed)
+
 	// Compute per-player stats from answer records in Redis
 	players := make([]bson.M, 0, len(allPlayers))
 	playerCorrect := make(map[string]int32)
@@ -906,6 +912,13 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 	var winner string
 
 	// Helper: tally a single player's round-by-round stats from Redis.
+	// §4.5: per-answer log rows accumulated by tallyStats and bulk-inserted
+	// once at the end. Per-row inserts would issue N answers × M players
+	// network round trips; batching keeps persistMatch's wall-clock cost
+	// flat as match length grows.
+	var answerLogDocs []any
+	now := time.Now()
+
 	tallyStats := func(userID string) (int, int, float64) {
 		var correct int
 		var totalResponseMs int64
@@ -925,9 +938,38 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 				if rec.Correct {
 					correct++
 				}
+				// Response time clamp mirrors processAnswer's contract: a
+				// missing-clientTimestamp answer or one whose clocks went
+				// backwards reads as 15 000 ms (the round budget). Better
+				// than 0 ms, which would pollute the percentile bucket
+				// and make the user look superhumanly fast.
+				responseMs := int64(15000)
 				if rec.Timestamp > 0 && rec.ClientTimestamp > 0 {
-					totalResponseMs += rec.Timestamp - rec.ClientTimestamp
+					rt := rec.Timestamp - rec.ClientTimestamp
+					if rt < 0 {
+						rt = 15000
+					} else if rt > 15000 {
+						rt = 15000
+					}
+					responseMs = rt
 				}
+				totalResponseMs += responseMs
+				// §4.5: log this answer for analytics aggregation. Topic
+				// resolves to "" when the question doc was deleted between
+				// match start and this point — extremely unlikely (Redis
+				// holds the questionIDs list for the room TTL) but if it
+				// does, an empty topic falls under "(unknown)" in the
+				// per-topic accuracy chart rather than corrupting another
+				// topic's bucket.
+				answerLogDocs = append(answerLogDocs, bson.M{
+					"userId":         userID,
+					"matchId":        event.RoomID,
+					"round":          int32(round),
+					"topic":          topicByRound[round],
+					"correct":        rec.Correct,
+					"responseTimeMs": responseMs,
+					"createdAt":      now,
+				})
 			}
 		}
 		var avg float64
@@ -1131,6 +1173,38 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 		_, err := usersColl.UpdateOne(ctx, bson.M{"_id": userID}, update, options.UpdateOne().SetUpsert(true))
 		if err != nil {
 			log.Printf("[persistence] user update failed for %s: %v", userID, err)
+			continue
+		}
+
+		// §4.5: snapshot the post-Elo rating for the rating-graph series.
+		// One row per (user × match). The chart aggregates these by UTC
+		// day on read so a user playing many matches in a day collapses
+		// to the last rating of that day. Failures are logged and
+		// dropped — losing a single point doesn't break the rest of
+		// the user's history, and re-deliveries are rare enough that an
+		// extra duplicate row at the same `now` is acceptable.
+		newRating := int32(ra) + delta
+		if _, err := s.mongoDB.Collection("rating_history").InsertOne(ctx, bson.M{
+			"userId":      userID,
+			"matchId":     event.RoomID,
+			"rating":      newRating,
+			"ratingDelta": delta,
+			"createdAt":   now,
+		}); err != nil {
+			log.Printf("[persistence] rating_history insert failed for %s: %v", userID, err)
+		}
+	}
+
+	// §4.5: bulk-insert the answer_log rows accumulated during tallyStats.
+	// One InsertMany per match keeps the per-answer wire cost amortised.
+	// Failures are logged and the rest of persistMatch continues — the
+	// match document is already written, the user's match_history view
+	// works, only the analytics screen will be missing rows for this
+	// match. Better than rolling back the whole consumer for a metrics
+	// failure mode.
+	if len(answerLogDocs) > 0 {
+		if _, err := s.mongoDB.Collection("answer_log").InsertMany(ctx, answerLogDocs); err != nil {
+			log.Printf("[persistence] answer_log insert failed for match %s: %v", event.RoomID, err)
 		}
 	}
 
@@ -1178,6 +1252,76 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 	}
 
 	msg.Ack(false)
+}
+
+// ---------------------------------------------------------------------------
+// §4.5 Deeper analytics — helpers
+// ---------------------------------------------------------------------------
+
+// loadTopicsForMatch returns a round (1-based) → topic map for the given
+// room. The Redis questions list orders questionIDs by round; we
+// batch-fetch the matching question docs from Mongo so the per-answer
+// logging loop in persistMatch can label every answer's topic without
+// per-round Mongo round trips.
+//
+// A best-effort helper — failures (Redis empty, Mongo unreachable) yield
+// an empty map, and the caller falls back to "" for missing topics. The
+// analytics RPCs treat empty topic as "(unknown)" so a degraded path
+// here doesn't poison another topic's accuracy bucket.
+func (s *scoringServer) loadTopicsForMatch(ctx context.Context, roomID string, roundsPlayed int) map[int]string {
+	out := make(map[int]string, roundsPlayed)
+	if roundsPlayed <= 0 {
+		return out
+	}
+	questionIDs, err := keys.GetQuestions(ctx, s.rdb, roomID)
+	if err != nil || len(questionIDs) == 0 {
+		return out
+	}
+
+	// The questions list may be longer than roundsPlayed (Redis stores
+	// all selected questions for the match; an early-abandon match
+	// only played a prefix). Trim so we don't fetch extra rows.
+	if roundsPlayed < len(questionIDs) {
+		questionIDs = questionIDs[:roundsPlayed]
+	}
+
+	// Convert string IDs to ObjectIDs; skip any that don't parse.
+	objIDs := make([]bson.ObjectID, 0, len(questionIDs))
+	idxByObjHex := make(map[string]int, len(questionIDs))
+	for i, idStr := range questionIDs {
+		oid, err := bson.ObjectIDFromHex(idStr)
+		if err != nil {
+			continue
+		}
+		objIDs = append(objIDs, oid)
+		idxByObjHex[oid.Hex()] = i // round = i+1
+	}
+	if len(objIDs) == 0 {
+		return out
+	}
+
+	cursor, err := s.mongoDB.Collection("questions").Find(ctx,
+		bson.M{"_id": bson.M{"$in": objIDs}},
+		options.Find().SetProjection(bson.M{"topic": 1}),
+	)
+	if err != nil {
+		return out
+	}
+	defer cursor.Close(ctx)
+
+	for cursor.Next(ctx) {
+		var doc struct {
+			ID    bson.ObjectID `bson:"_id"`
+			Topic string        `bson:"topic"`
+		}
+		if err := cursor.Decode(&doc); err != nil {
+			continue
+		}
+		if idx, ok := idxByObjHex[doc.ID.Hex()]; ok {
+			out[idx+1] = doc.Topic
+		}
+	}
+	return out
 }
 
 // ---------------------------------------------------------------------------
