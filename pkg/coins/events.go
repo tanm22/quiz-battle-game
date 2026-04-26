@@ -21,11 +21,11 @@ const (
 // part of the wire contract — adding a new source means publishing under a
 // new routing key AND adding a corresponding Reason* in ledger.go.
 const (
-	EarnSourceMatchWin           = "match_win"
-	EarnSourceTournamentPlace    = "tournament_placement"
-	EarnSourceStreak             = "streak"
-	EarnSourceReferralReferrer   = "referral_referrer"
-	EarnSourceReferralReferee    = "referral_referee"
+	EarnSourceMatchWin         = "match_win"
+	EarnSourceTournamentPlace  = "tournament_placement"
+	EarnSourceStreak           = "streak"
+	EarnSourceReferralReferrer = "referral_referrer"
+	EarnSourceReferralReferee  = "referral_referee"
 )
 
 // EarnRoutingKey returns the canonical "coins.earn.<source>" routing key
