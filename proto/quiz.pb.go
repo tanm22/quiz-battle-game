@@ -6565,6 +6565,282 @@ func (x *ChallengeFriendResponse) GetErrorCode() string {
 	return ""
 }
 
+type GetNotificationPrefsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetNotificationPrefsRequest) Reset() {
+	*x = GetNotificationPrefsRequest{}
+	mi := &file_proto_quiz_proto_msgTypes[113]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetNotificationPrefsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetNotificationPrefsRequest) ProtoMessage() {}
+
+func (x *GetNotificationPrefsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[113]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetNotificationPrefsRequest.ProtoReflect.Descriptor instead.
+func (*GetNotificationPrefsRequest) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{113}
+}
+
+type GetNotificationPrefsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	MutedTypes    []string               `protobuf:"bytes,1,rep,name=muted_types,json=mutedTypes,proto3" json:"muted_types,omitempty"`
+	Timezone      string                 `protobuf:"bytes,2,opt,name=timezone,proto3" json:"timezone,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetNotificationPrefsResponse) Reset() {
+	*x = GetNotificationPrefsResponse{}
+	mi := &file_proto_quiz_proto_msgTypes[114]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetNotificationPrefsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetNotificationPrefsResponse) ProtoMessage() {}
+
+func (x *GetNotificationPrefsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[114]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetNotificationPrefsResponse.ProtoReflect.Descriptor instead.
+func (*GetNotificationPrefsResponse) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{114}
+}
+
+func (x *GetNotificationPrefsResponse) GetMutedTypes() []string {
+	if x != nil {
+		return x.MutedTypes
+	}
+	return nil
+}
+
+func (x *GetNotificationPrefsResponse) GetTimezone() string {
+	if x != nil {
+		return x.Timezone
+	}
+	return ""
+}
+
+type UpdateNotificationPrefsRequest struct {
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	MutedTypes []string               `protobuf:"bytes,1,rep,name=muted_types,json=mutedTypes,proto3" json:"muted_types,omitempty"`
+	// IANA timezone name. Empty preserves the existing value; explicitly
+	// setting "" is not supported — clients pass the current value when they
+	// only intend to mutate muted_types.
+	Timezone      string `protobuf:"bytes,2,opt,name=timezone,proto3" json:"timezone,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateNotificationPrefsRequest) Reset() {
+	*x = UpdateNotificationPrefsRequest{}
+	mi := &file_proto_quiz_proto_msgTypes[115]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateNotificationPrefsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateNotificationPrefsRequest) ProtoMessage() {}
+
+func (x *UpdateNotificationPrefsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[115]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateNotificationPrefsRequest.ProtoReflect.Descriptor instead.
+func (*UpdateNotificationPrefsRequest) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{115}
+}
+
+func (x *UpdateNotificationPrefsRequest) GetMutedTypes() []string {
+	if x != nil {
+		return x.MutedTypes
+	}
+	return nil
+}
+
+func (x *UpdateNotificationPrefsRequest) GetTimezone() string {
+	if x != nil {
+		return x.Timezone
+	}
+	return ""
+}
+
+type UpdateNotificationPrefsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateNotificationPrefsResponse) Reset() {
+	*x = UpdateNotificationPrefsResponse{}
+	mi := &file_proto_quiz_proto_msgTypes[116]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateNotificationPrefsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateNotificationPrefsResponse) ProtoMessage() {}
+
+func (x *UpdateNotificationPrefsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[116]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateNotificationPrefsResponse.ProtoReflect.Descriptor instead.
+func (*UpdateNotificationPrefsResponse) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{116}
+}
+
+func (x *UpdateNotificationPrefsResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+type MarkNotificationOpenedRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Category as listed above. Unknown categories are rejected.
+	Category      string `protobuf:"bytes,1,opt,name=category,proto3" json:"category,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MarkNotificationOpenedRequest) Reset() {
+	*x = MarkNotificationOpenedRequest{}
+	mi := &file_proto_quiz_proto_msgTypes[117]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MarkNotificationOpenedRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MarkNotificationOpenedRequest) ProtoMessage() {}
+
+func (x *MarkNotificationOpenedRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[117]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MarkNotificationOpenedRequest.ProtoReflect.Descriptor instead.
+func (*MarkNotificationOpenedRequest) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{117}
+}
+
+func (x *MarkNotificationOpenedRequest) GetCategory() string {
+	if x != nil {
+		return x.Category
+	}
+	return ""
+}
+
+type MarkNotificationOpenedResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MarkNotificationOpenedResponse) Reset() {
+	*x = MarkNotificationOpenedResponse{}
+	mi := &file_proto_quiz_proto_msgTypes[118]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MarkNotificationOpenedResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MarkNotificationOpenedResponse) ProtoMessage() {}
+
+func (x *MarkNotificationOpenedResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[118]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MarkNotificationOpenedResponse.ProtoReflect.Descriptor instead.
+func (*MarkNotificationOpenedResponse) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{118}
+}
+
+func (x *MarkNotificationOpenedResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
 var File_proto_quiz_proto protoreflect.FileDescriptor
 
 const file_proto_quiz_proto_rawDesc = "" +
@@ -7019,7 +7295,22 @@ const file_proto_quiz_proto_rawDesc = "" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x17\n" +
 	"\aroom_id\x18\x02 \x01(\tR\x06roomId\x12\x1d\n" +
 	"\n" +
-	"error_code\x18\x03 \x01(\tR\terrorCode*5\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\"\x1d\n" +
+	"\x1bGetNotificationPrefsRequest\"[\n" +
+	"\x1cGetNotificationPrefsResponse\x12\x1f\n" +
+	"\vmuted_types\x18\x01 \x03(\tR\n" +
+	"mutedTypes\x12\x1a\n" +
+	"\btimezone\x18\x02 \x01(\tR\btimezone\"]\n" +
+	"\x1eUpdateNotificationPrefsRequest\x12\x1f\n" +
+	"\vmuted_types\x18\x01 \x03(\tR\n" +
+	"mutedTypes\x12\x1a\n" +
+	"\btimezone\x18\x02 \x01(\tR\btimezone\";\n" +
+	"\x1fUpdateNotificationPrefsResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\";\n" +
+	"\x1dMarkNotificationOpenedRequest\x12\x1a\n" +
+	"\bcategory\x18\x01 \x01(\tR\bcategory\":\n" +
+	"\x1eMarkNotificationOpenedResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess*5\n" +
 	"\x11MatchmakingStatus\x12\n" +
 	"\n" +
 	"\x06QUEUED\x10\x00\x12\x14\n" +
@@ -7033,7 +7324,7 @@ const file_proto_quiz_proto_rawDesc = "" +
 	"\fSubmitAnswer\x12\x19.quiz.SubmitAnswerRequest\x1a\x1a.quiz.SubmitAnswerResponse\x12D\n" +
 	"\x10StreamGameEvents\x12\x1d.quiz.StreamGameEventsRequest\x1a\x0f.quiz.GameEvent0\x01\x12T\n" +
 	"\x11GetTournamentList\x12\x1e.quiz.GetTournamentListRequest\x1a\x1f.quiz.GetTournamentListResponse\x12K\n" +
-	"\x0eJoinTournament\x12\x1b.quiz.JoinTournamentRequest\x1a\x1c.quiz.JoinTournamentResponse2\xbb\r\n" +
+	"\x0eJoinTournament\x12\x1b.quiz.JoinTournamentRequest\x1a\x1c.quiz.JoinTournamentResponse2\xe7\x0f\n" +
 	"\x0eScoringService\x12K\n" +
 	"\x0eCalculateScore\x12\x1b.quiz.CalculateScoreRequest\x1a\x1c.quiz.CalculateScoreResponse\x12K\n" +
 	"\x0eGetLeaderboard\x12\x1b.quiz.GetLeaderboardRequest\x1a\x1c.quiz.GetLeaderboardResponse\x12N\n" +
@@ -7055,7 +7346,10 @@ const file_proto_quiz_proto_rawDesc = "" +
 	"\x0eGetFriendsList\x12\x1b.quiz.GetFriendsListRequest\x1a\x1c.quiz.GetFriendsListResponse\x12T\n" +
 	"\x11GetFriendRequests\x12\x1e.quiz.GetFriendRequestsRequest\x1a\x1f.quiz.GetFriendRequestsResponse\x12<\n" +
 	"\tHeartbeat\x12\x16.quiz.HeartbeatRequest\x1a\x17.quiz.HeartbeatResponse\x12N\n" +
-	"\x0fChallengeFriend\x12\x1c.quiz.ChallengeFriendRequest\x1a\x1d.quiz.ChallengeFriendResponse2\x9a\b\n" +
+	"\x0fChallengeFriend\x12\x1c.quiz.ChallengeFriendRequest\x1a\x1d.quiz.ChallengeFriendResponse\x12]\n" +
+	"\x14GetNotificationPrefs\x12!.quiz.GetNotificationPrefsRequest\x1a\".quiz.GetNotificationPrefsResponse\x12f\n" +
+	"\x17UpdateNotificationPrefs\x12$.quiz.UpdateNotificationPrefsRequest\x1a%.quiz.UpdateNotificationPrefsResponse\x12c\n" +
+	"\x16MarkNotificationOpened\x12#.quiz.MarkNotificationOpenedRequest\x1a$.quiz.MarkNotificationOpenedResponse2\x9a\b\n" +
 	"\vAuthService\x125\n" +
 	"\bRegister\x12\x15.quiz.RegisterRequest\x1a\x12.quiz.AuthResponse\x12/\n" +
 	"\x05Login\x12\x12.quiz.LoginRequest\x1a\x12.quiz.AuthResponse\x12<\n" +
@@ -7093,124 +7387,130 @@ func file_proto_quiz_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_quiz_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_proto_quiz_proto_msgTypes = make([]protoimpl.MessageInfo, 115)
+var file_proto_quiz_proto_msgTypes = make([]protoimpl.MessageInfo, 121)
 var file_proto_quiz_proto_goTypes = []any{
-	(MatchmakingStatus)(0),                 // 0: quiz.MatchmakingStatus
-	(*JoinMatchmakingRequest)(nil),         // 1: quiz.JoinMatchmakingRequest
-	(*JoinMatchmakingResponse)(nil),        // 2: quiz.JoinMatchmakingResponse
-	(*LeaveMatchmakingRequest)(nil),        // 3: quiz.LeaveMatchmakingRequest
-	(*LeaveMatchmakingResponse)(nil),       // 4: quiz.LeaveMatchmakingResponse
-	(*SubscribeToMatchRequest)(nil),        // 5: quiz.SubscribeToMatchRequest
-	(*MatchEvent)(nil),                     // 6: quiz.MatchEvent
-	(*GetRoomQuestionsRequest)(nil),        // 7: quiz.GetRoomQuestionsRequest
-	(*GetRoomQuestionsResponse)(nil),       // 8: quiz.GetRoomQuestionsResponse
-	(*Question)(nil),                       // 9: quiz.Question
-	(*SubmitAnswerRequest)(nil),            // 10: quiz.SubmitAnswerRequest
-	(*SubmitAnswerResponse)(nil),           // 11: quiz.SubmitAnswerResponse
-	(*StreamGameEventsRequest)(nil),        // 12: quiz.StreamGameEventsRequest
-	(*GameEvent)(nil),                      // 13: quiz.GameEvent
-	(*QuestionBroadcast)(nil),              // 14: quiz.QuestionBroadcast
-	(*LeaderboardUpdate)(nil),              // 15: quiz.LeaderboardUpdate
-	(*LeaderboardEntry)(nil),               // 16: quiz.LeaderboardEntry
-	(*RoundResult)(nil),                    // 17: quiz.RoundResult
-	(*MatchEnd)(nil),                       // 18: quiz.MatchEnd
-	(*PlayerResult)(nil),                   // 19: quiz.PlayerResult
-	(*PlayerJoined)(nil),                   // 20: quiz.PlayerJoined
-	(*TimerSync)(nil),                      // 21: quiz.TimerSync
-	(*RegisterRequest)(nil),                // 22: quiz.RegisterRequest
-	(*LoginRequest)(nil),                   // 23: quiz.LoginRequest
-	(*AuthResponse)(nil),                   // 24: quiz.AuthResponse
-	(*GetProfileRequest)(nil),              // 25: quiz.GetProfileRequest
-	(*ProfileResponse)(nil),                // 26: quiz.ProfileResponse
-	(*GuestLoginRequest)(nil),              // 27: quiz.GuestLoginRequest
-	(*EmailLoginRequest)(nil),              // 28: quiz.EmailLoginRequest
-	(*SendEmailCodeRequest)(nil),           // 29: quiz.SendEmailCodeRequest
-	(*SendEmailCodeResponse)(nil),          // 30: quiz.SendEmailCodeResponse
-	(*VerifyEmailCodeRequest)(nil),         // 31: quiz.VerifyEmailCodeRequest
-	(*VerifyEmailCodeResponse)(nil),        // 32: quiz.VerifyEmailCodeResponse
-	(*LinkEmailRequest)(nil),               // 33: quiz.LinkEmailRequest
-	(*LinkEmailResponse)(nil),              // 34: quiz.LinkEmailResponse
-	(*ResetPasswordRequest)(nil),           // 35: quiz.ResetPasswordRequest
-	(*ResetPasswordResponse)(nil),          // 36: quiz.ResetPasswordResponse
-	(*CheckUsernameRequest)(nil),           // 37: quiz.CheckUsernameRequest
-	(*CheckUsernameResponse)(nil),          // 38: quiz.CheckUsernameResponse
-	(*DeleteAccountRequest)(nil),           // 39: quiz.DeleteAccountRequest
-	(*DeleteAccountResponse)(nil),          // 40: quiz.DeleteAccountResponse
-	(*UpdateProfileRequest)(nil),           // 41: quiz.UpdateProfileRequest
-	(*UpdateProfileResponse)(nil),          // 42: quiz.UpdateProfileResponse
-	(*CalculateScoreRequest)(nil),          // 43: quiz.CalculateScoreRequest
-	(*CalculateScoreResponse)(nil),         // 44: quiz.CalculateScoreResponse
-	(*GetLeaderboardRequest)(nil),          // 45: quiz.GetLeaderboardRequest
-	(*GetLeaderboardResponse)(nil),         // 46: quiz.GetLeaderboardResponse
-	(*GetMatchHistoryRequest)(nil),         // 47: quiz.GetMatchHistoryRequest
-	(*GetMatchHistoryResponse)(nil),        // 48: quiz.GetMatchHistoryResponse
-	(*MatchHistoryEntry)(nil),              // 49: quiz.MatchHistoryEntry
-	(*StreakInfo)(nil),                     // 50: quiz.StreakInfo
-	(*RewardGrant)(nil),                    // 51: quiz.RewardGrant
-	(*PlanStatus)(nil),                     // 52: quiz.PlanStatus
-	(*GoogleSignInRequest)(nil),            // 53: quiz.GoogleSignInRequest
-	(*GoogleSignInResponse)(nil),           // 54: quiz.GoogleSignInResponse
-	(*UserProfile)(nil),                    // 55: quiz.UserProfile
-	(*ClaimDailyRewardRequest)(nil),        // 56: quiz.ClaimDailyRewardRequest
-	(*ClaimDailyRewardResponse)(nil),       // 57: quiz.ClaimDailyRewardResponse
-	(*GetStreakInfoRequest)(nil),           // 58: quiz.GetStreakInfoRequest
-	(*GetStreakInfoResponse)(nil),          // 59: quiz.GetStreakInfoResponse
-	(*GetHomeScreenDataRequest)(nil),       // 60: quiz.GetHomeScreenDataRequest
-	(*GetHomeScreenDataResponse)(nil),      // 61: quiz.GetHomeScreenDataResponse
-	(*GetReferralDashboardRequest)(nil),    // 62: quiz.GetReferralDashboardRequest
-	(*GetReferralDashboardResponse)(nil),   // 63: quiz.GetReferralDashboardResponse
-	(*ApplyReferralCodeRequest)(nil),       // 64: quiz.ApplyReferralCodeRequest
-	(*ApplyReferralCodeResponse)(nil),      // 65: quiz.ApplyReferralCodeResponse
-	(*UpdateFCMTokenRequest)(nil),          // 66: quiz.UpdateFCMTokenRequest
-	(*UpdateFCMTokenResponse)(nil),         // 67: quiz.UpdateFCMTokenResponse
-	(*CreateOrderRequest)(nil),             // 68: quiz.CreateOrderRequest
-	(*CreateOrderResponse)(nil),            // 69: quiz.CreateOrderResponse
-	(*VerifyPaymentRequest)(nil),           // 70: quiz.VerifyPaymentRequest
-	(*VerifyPaymentResponse)(nil),          // 71: quiz.VerifyPaymentResponse
-	(*GetPlanStatusRequest)(nil),           // 72: quiz.GetPlanStatusRequest
-	(*GetPlanStatusResponse)(nil),          // 73: quiz.GetPlanStatusResponse
-	(*GetPaymentHistoryRequest)(nil),       // 74: quiz.GetPaymentHistoryRequest
-	(*GetPaymentHistoryResponse)(nil),      // 75: quiz.GetPaymentHistoryResponse
-	(*PaymentRecord)(nil),                  // 76: quiz.PaymentRecord
-	(*GetTournamentListRequest)(nil),       // 77: quiz.GetTournamentListRequest
-	(*GetTournamentListResponse)(nil),      // 78: quiz.GetTournamentListResponse
-	(*TournamentInfo)(nil),                 // 79: quiz.TournamentInfo
-	(*JoinTournamentRequest)(nil),          // 80: quiz.JoinTournamentRequest
-	(*JoinTournamentResponse)(nil),         // 81: quiz.JoinTournamentResponse
-	(*GetGlobalLeaderboardRequest)(nil),    // 82: quiz.GetGlobalLeaderboardRequest
-	(*GetGlobalLeaderboardResponse)(nil),   // 83: quiz.GetGlobalLeaderboardResponse
-	(*GetCoinBalanceRequest)(nil),          // 84: quiz.GetCoinBalanceRequest
-	(*GetCoinBalanceResponse)(nil),         // 85: quiz.GetCoinBalanceResponse
-	(*CoinLedgerEntry)(nil),                // 86: quiz.CoinLedgerEntry
-	(*GetCoinLedgerRequest)(nil),           // 87: quiz.GetCoinLedgerRequest
-	(*GetCoinLedgerResponse)(nil),          // 88: quiz.GetCoinLedgerResponse
-	(*ShopItem)(nil),                       // 89: quiz.ShopItem
-	(*GetShopCatalogRequest)(nil),          // 90: quiz.GetShopCatalogRequest
-	(*GetShopCatalogResponse)(nil),         // 91: quiz.GetShopCatalogResponse
-	(*GetShopInventoryRequest)(nil),        // 92: quiz.GetShopInventoryRequest
-	(*GetShopInventoryResponse)(nil),       // 93: quiz.GetShopInventoryResponse
-	(*PurchaseShopItemRequest)(nil),        // 94: quiz.PurchaseShopItemRequest
-	(*PurchaseShopItemResponse)(nil),       // 95: quiz.PurchaseShopItemResponse
-	(*EquipCosmeticRequest)(nil),           // 96: quiz.EquipCosmeticRequest
-	(*EquipCosmeticResponse)(nil),          // 97: quiz.EquipCosmeticResponse
-	(*ConsumeRerollRequest)(nil),           // 98: quiz.ConsumeRerollRequest
-	(*ConsumeRerollResponse)(nil),          // 99: quiz.ConsumeRerollResponse
-	(*SendFriendRequestRequest)(nil),       // 100: quiz.SendFriendRequestRequest
-	(*SendFriendRequestResponse)(nil),      // 101: quiz.SendFriendRequestResponse
-	(*FriendRequest)(nil),                  // 102: quiz.FriendRequest
-	(*RespondToFriendRequestRequest)(nil),  // 103: quiz.RespondToFriendRequestRequest
-	(*RespondToFriendRequestResponse)(nil), // 104: quiz.RespondToFriendRequestResponse
-	(*Friend)(nil),                         // 105: quiz.Friend
-	(*GetFriendsListRequest)(nil),          // 106: quiz.GetFriendsListRequest
-	(*GetFriendsListResponse)(nil),         // 107: quiz.GetFriendsListResponse
-	(*GetFriendRequestsRequest)(nil),       // 108: quiz.GetFriendRequestsRequest
-	(*GetFriendRequestsResponse)(nil),      // 109: quiz.GetFriendRequestsResponse
-	(*HeartbeatRequest)(nil),               // 110: quiz.HeartbeatRequest
-	(*HeartbeatResponse)(nil),              // 111: quiz.HeartbeatResponse
-	(*ChallengeFriendRequest)(nil),         // 112: quiz.ChallengeFriendRequest
-	(*ChallengeFriendResponse)(nil),        // 113: quiz.ChallengeFriendResponse
-	nil,                                    // 114: quiz.CoinLedgerEntry.MetadataEntry
-	nil,                                    // 115: quiz.ShopItem.MetadataEntry
+	(MatchmakingStatus)(0),                  // 0: quiz.MatchmakingStatus
+	(*JoinMatchmakingRequest)(nil),          // 1: quiz.JoinMatchmakingRequest
+	(*JoinMatchmakingResponse)(nil),         // 2: quiz.JoinMatchmakingResponse
+	(*LeaveMatchmakingRequest)(nil),         // 3: quiz.LeaveMatchmakingRequest
+	(*LeaveMatchmakingResponse)(nil),        // 4: quiz.LeaveMatchmakingResponse
+	(*SubscribeToMatchRequest)(nil),         // 5: quiz.SubscribeToMatchRequest
+	(*MatchEvent)(nil),                      // 6: quiz.MatchEvent
+	(*GetRoomQuestionsRequest)(nil),         // 7: quiz.GetRoomQuestionsRequest
+	(*GetRoomQuestionsResponse)(nil),        // 8: quiz.GetRoomQuestionsResponse
+	(*Question)(nil),                        // 9: quiz.Question
+	(*SubmitAnswerRequest)(nil),             // 10: quiz.SubmitAnswerRequest
+	(*SubmitAnswerResponse)(nil),            // 11: quiz.SubmitAnswerResponse
+	(*StreamGameEventsRequest)(nil),         // 12: quiz.StreamGameEventsRequest
+	(*GameEvent)(nil),                       // 13: quiz.GameEvent
+	(*QuestionBroadcast)(nil),               // 14: quiz.QuestionBroadcast
+	(*LeaderboardUpdate)(nil),               // 15: quiz.LeaderboardUpdate
+	(*LeaderboardEntry)(nil),                // 16: quiz.LeaderboardEntry
+	(*RoundResult)(nil),                     // 17: quiz.RoundResult
+	(*MatchEnd)(nil),                        // 18: quiz.MatchEnd
+	(*PlayerResult)(nil),                    // 19: quiz.PlayerResult
+	(*PlayerJoined)(nil),                    // 20: quiz.PlayerJoined
+	(*TimerSync)(nil),                       // 21: quiz.TimerSync
+	(*RegisterRequest)(nil),                 // 22: quiz.RegisterRequest
+	(*LoginRequest)(nil),                    // 23: quiz.LoginRequest
+	(*AuthResponse)(nil),                    // 24: quiz.AuthResponse
+	(*GetProfileRequest)(nil),               // 25: quiz.GetProfileRequest
+	(*ProfileResponse)(nil),                 // 26: quiz.ProfileResponse
+	(*GuestLoginRequest)(nil),               // 27: quiz.GuestLoginRequest
+	(*EmailLoginRequest)(nil),               // 28: quiz.EmailLoginRequest
+	(*SendEmailCodeRequest)(nil),            // 29: quiz.SendEmailCodeRequest
+	(*SendEmailCodeResponse)(nil),           // 30: quiz.SendEmailCodeResponse
+	(*VerifyEmailCodeRequest)(nil),          // 31: quiz.VerifyEmailCodeRequest
+	(*VerifyEmailCodeResponse)(nil),         // 32: quiz.VerifyEmailCodeResponse
+	(*LinkEmailRequest)(nil),                // 33: quiz.LinkEmailRequest
+	(*LinkEmailResponse)(nil),               // 34: quiz.LinkEmailResponse
+	(*ResetPasswordRequest)(nil),            // 35: quiz.ResetPasswordRequest
+	(*ResetPasswordResponse)(nil),           // 36: quiz.ResetPasswordResponse
+	(*CheckUsernameRequest)(nil),            // 37: quiz.CheckUsernameRequest
+	(*CheckUsernameResponse)(nil),           // 38: quiz.CheckUsernameResponse
+	(*DeleteAccountRequest)(nil),            // 39: quiz.DeleteAccountRequest
+	(*DeleteAccountResponse)(nil),           // 40: quiz.DeleteAccountResponse
+	(*UpdateProfileRequest)(nil),            // 41: quiz.UpdateProfileRequest
+	(*UpdateProfileResponse)(nil),           // 42: quiz.UpdateProfileResponse
+	(*CalculateScoreRequest)(nil),           // 43: quiz.CalculateScoreRequest
+	(*CalculateScoreResponse)(nil),          // 44: quiz.CalculateScoreResponse
+	(*GetLeaderboardRequest)(nil),           // 45: quiz.GetLeaderboardRequest
+	(*GetLeaderboardResponse)(nil),          // 46: quiz.GetLeaderboardResponse
+	(*GetMatchHistoryRequest)(nil),          // 47: quiz.GetMatchHistoryRequest
+	(*GetMatchHistoryResponse)(nil),         // 48: quiz.GetMatchHistoryResponse
+	(*MatchHistoryEntry)(nil),               // 49: quiz.MatchHistoryEntry
+	(*StreakInfo)(nil),                      // 50: quiz.StreakInfo
+	(*RewardGrant)(nil),                     // 51: quiz.RewardGrant
+	(*PlanStatus)(nil),                      // 52: quiz.PlanStatus
+	(*GoogleSignInRequest)(nil),             // 53: quiz.GoogleSignInRequest
+	(*GoogleSignInResponse)(nil),            // 54: quiz.GoogleSignInResponse
+	(*UserProfile)(nil),                     // 55: quiz.UserProfile
+	(*ClaimDailyRewardRequest)(nil),         // 56: quiz.ClaimDailyRewardRequest
+	(*ClaimDailyRewardResponse)(nil),        // 57: quiz.ClaimDailyRewardResponse
+	(*GetStreakInfoRequest)(nil),            // 58: quiz.GetStreakInfoRequest
+	(*GetStreakInfoResponse)(nil),           // 59: quiz.GetStreakInfoResponse
+	(*GetHomeScreenDataRequest)(nil),        // 60: quiz.GetHomeScreenDataRequest
+	(*GetHomeScreenDataResponse)(nil),       // 61: quiz.GetHomeScreenDataResponse
+	(*GetReferralDashboardRequest)(nil),     // 62: quiz.GetReferralDashboardRequest
+	(*GetReferralDashboardResponse)(nil),    // 63: quiz.GetReferralDashboardResponse
+	(*ApplyReferralCodeRequest)(nil),        // 64: quiz.ApplyReferralCodeRequest
+	(*ApplyReferralCodeResponse)(nil),       // 65: quiz.ApplyReferralCodeResponse
+	(*UpdateFCMTokenRequest)(nil),           // 66: quiz.UpdateFCMTokenRequest
+	(*UpdateFCMTokenResponse)(nil),          // 67: quiz.UpdateFCMTokenResponse
+	(*CreateOrderRequest)(nil),              // 68: quiz.CreateOrderRequest
+	(*CreateOrderResponse)(nil),             // 69: quiz.CreateOrderResponse
+	(*VerifyPaymentRequest)(nil),            // 70: quiz.VerifyPaymentRequest
+	(*VerifyPaymentResponse)(nil),           // 71: quiz.VerifyPaymentResponse
+	(*GetPlanStatusRequest)(nil),            // 72: quiz.GetPlanStatusRequest
+	(*GetPlanStatusResponse)(nil),           // 73: quiz.GetPlanStatusResponse
+	(*GetPaymentHistoryRequest)(nil),        // 74: quiz.GetPaymentHistoryRequest
+	(*GetPaymentHistoryResponse)(nil),       // 75: quiz.GetPaymentHistoryResponse
+	(*PaymentRecord)(nil),                   // 76: quiz.PaymentRecord
+	(*GetTournamentListRequest)(nil),        // 77: quiz.GetTournamentListRequest
+	(*GetTournamentListResponse)(nil),       // 78: quiz.GetTournamentListResponse
+	(*TournamentInfo)(nil),                  // 79: quiz.TournamentInfo
+	(*JoinTournamentRequest)(nil),           // 80: quiz.JoinTournamentRequest
+	(*JoinTournamentResponse)(nil),          // 81: quiz.JoinTournamentResponse
+	(*GetGlobalLeaderboardRequest)(nil),     // 82: quiz.GetGlobalLeaderboardRequest
+	(*GetGlobalLeaderboardResponse)(nil),    // 83: quiz.GetGlobalLeaderboardResponse
+	(*GetCoinBalanceRequest)(nil),           // 84: quiz.GetCoinBalanceRequest
+	(*GetCoinBalanceResponse)(nil),          // 85: quiz.GetCoinBalanceResponse
+	(*CoinLedgerEntry)(nil),                 // 86: quiz.CoinLedgerEntry
+	(*GetCoinLedgerRequest)(nil),            // 87: quiz.GetCoinLedgerRequest
+	(*GetCoinLedgerResponse)(nil),           // 88: quiz.GetCoinLedgerResponse
+	(*ShopItem)(nil),                        // 89: quiz.ShopItem
+	(*GetShopCatalogRequest)(nil),           // 90: quiz.GetShopCatalogRequest
+	(*GetShopCatalogResponse)(nil),          // 91: quiz.GetShopCatalogResponse
+	(*GetShopInventoryRequest)(nil),         // 92: quiz.GetShopInventoryRequest
+	(*GetShopInventoryResponse)(nil),        // 93: quiz.GetShopInventoryResponse
+	(*PurchaseShopItemRequest)(nil),         // 94: quiz.PurchaseShopItemRequest
+	(*PurchaseShopItemResponse)(nil),        // 95: quiz.PurchaseShopItemResponse
+	(*EquipCosmeticRequest)(nil),            // 96: quiz.EquipCosmeticRequest
+	(*EquipCosmeticResponse)(nil),           // 97: quiz.EquipCosmeticResponse
+	(*ConsumeRerollRequest)(nil),            // 98: quiz.ConsumeRerollRequest
+	(*ConsumeRerollResponse)(nil),           // 99: quiz.ConsumeRerollResponse
+	(*SendFriendRequestRequest)(nil),        // 100: quiz.SendFriendRequestRequest
+	(*SendFriendRequestResponse)(nil),       // 101: quiz.SendFriendRequestResponse
+	(*FriendRequest)(nil),                   // 102: quiz.FriendRequest
+	(*RespondToFriendRequestRequest)(nil),   // 103: quiz.RespondToFriendRequestRequest
+	(*RespondToFriendRequestResponse)(nil),  // 104: quiz.RespondToFriendRequestResponse
+	(*Friend)(nil),                          // 105: quiz.Friend
+	(*GetFriendsListRequest)(nil),           // 106: quiz.GetFriendsListRequest
+	(*GetFriendsListResponse)(nil),          // 107: quiz.GetFriendsListResponse
+	(*GetFriendRequestsRequest)(nil),        // 108: quiz.GetFriendRequestsRequest
+	(*GetFriendRequestsResponse)(nil),       // 109: quiz.GetFriendRequestsResponse
+	(*HeartbeatRequest)(nil),                // 110: quiz.HeartbeatRequest
+	(*HeartbeatResponse)(nil),               // 111: quiz.HeartbeatResponse
+	(*ChallengeFriendRequest)(nil),          // 112: quiz.ChallengeFriendRequest
+	(*ChallengeFriendResponse)(nil),         // 113: quiz.ChallengeFriendResponse
+	(*GetNotificationPrefsRequest)(nil),     // 114: quiz.GetNotificationPrefsRequest
+	(*GetNotificationPrefsResponse)(nil),    // 115: quiz.GetNotificationPrefsResponse
+	(*UpdateNotificationPrefsRequest)(nil),  // 116: quiz.UpdateNotificationPrefsRequest
+	(*UpdateNotificationPrefsResponse)(nil), // 117: quiz.UpdateNotificationPrefsResponse
+	(*MarkNotificationOpenedRequest)(nil),   // 118: quiz.MarkNotificationOpenedRequest
+	(*MarkNotificationOpenedResponse)(nil),  // 119: quiz.MarkNotificationOpenedResponse
+	nil,                                     // 120: quiz.CoinLedgerEntry.MetadataEntry
+	nil,                                     // 121: quiz.ShopItem.MetadataEntry
 }
 var file_proto_quiz_proto_depIdxs = []int32{
 	0,   // 0: quiz.JoinMatchmakingResponse.status:type_name -> quiz.MatchmakingStatus
@@ -7240,9 +7540,9 @@ var file_proto_quiz_proto_depIdxs = []int32{
 	76,  // 24: quiz.GetPaymentHistoryResponse.payments:type_name -> quiz.PaymentRecord
 	79,  // 25: quiz.GetTournamentListResponse.tournaments:type_name -> quiz.TournamentInfo
 	16,  // 26: quiz.GetGlobalLeaderboardResponse.entries:type_name -> quiz.LeaderboardEntry
-	114, // 27: quiz.CoinLedgerEntry.metadata:type_name -> quiz.CoinLedgerEntry.MetadataEntry
+	120, // 27: quiz.CoinLedgerEntry.metadata:type_name -> quiz.CoinLedgerEntry.MetadataEntry
 	86,  // 28: quiz.GetCoinLedgerResponse.entries:type_name -> quiz.CoinLedgerEntry
-	115, // 29: quiz.ShopItem.metadata:type_name -> quiz.ShopItem.MetadataEntry
+	121, // 29: quiz.ShopItem.metadata:type_name -> quiz.ShopItem.MetadataEntry
 	89,  // 30: quiz.GetShopCatalogResponse.items:type_name -> quiz.ShopItem
 	105, // 31: quiz.GetFriendsListResponse.friends:type_name -> quiz.Friend
 	102, // 32: quiz.GetFriendRequestsResponse.incoming:type_name -> quiz.FriendRequest
@@ -7275,75 +7575,81 @@ var file_proto_quiz_proto_depIdxs = []int32{
 	108, // 59: quiz.ScoringService.GetFriendRequests:input_type -> quiz.GetFriendRequestsRequest
 	110, // 60: quiz.ScoringService.Heartbeat:input_type -> quiz.HeartbeatRequest
 	112, // 61: quiz.ScoringService.ChallengeFriend:input_type -> quiz.ChallengeFriendRequest
-	22,  // 62: quiz.AuthService.Register:input_type -> quiz.RegisterRequest
-	23,  // 63: quiz.AuthService.Login:input_type -> quiz.LoginRequest
-	25,  // 64: quiz.AuthService.GetProfile:input_type -> quiz.GetProfileRequest
-	27,  // 65: quiz.AuthService.GuestLogin:input_type -> quiz.GuestLoginRequest
-	28,  // 66: quiz.AuthService.LoginWithEmail:input_type -> quiz.EmailLoginRequest
-	29,  // 67: quiz.AuthService.SendEmailCode:input_type -> quiz.SendEmailCodeRequest
-	31,  // 68: quiz.AuthService.VerifyEmailCode:input_type -> quiz.VerifyEmailCodeRequest
-	33,  // 69: quiz.AuthService.LinkEmail:input_type -> quiz.LinkEmailRequest
-	35,  // 70: quiz.AuthService.ResetPassword:input_type -> quiz.ResetPasswordRequest
-	37,  // 71: quiz.AuthService.CheckUsername:input_type -> quiz.CheckUsernameRequest
-	39,  // 72: quiz.AuthService.DeleteAccount:input_type -> quiz.DeleteAccountRequest
-	53,  // 73: quiz.AuthService.GoogleSignIn:input_type -> quiz.GoogleSignInRequest
-	56,  // 74: quiz.AuthService.ClaimDailyReward:input_type -> quiz.ClaimDailyRewardRequest
-	58,  // 75: quiz.AuthService.GetStreakInfo:input_type -> quiz.GetStreakInfoRequest
-	41,  // 76: quiz.AuthService.UpdateProfile:input_type -> quiz.UpdateProfileRequest
-	68,  // 77: quiz.PaymentService.CreateOrder:input_type -> quiz.CreateOrderRequest
-	70,  // 78: quiz.PaymentService.VerifyPayment:input_type -> quiz.VerifyPaymentRequest
-	72,  // 79: quiz.PaymentService.GetPlanStatus:input_type -> quiz.GetPlanStatusRequest
-	74,  // 80: quiz.PaymentService.GetPaymentHistory:input_type -> quiz.GetPaymentHistoryRequest
-	2,   // 81: quiz.MatchmakingService.JoinMatchmaking:output_type -> quiz.JoinMatchmakingResponse
-	4,   // 82: quiz.MatchmakingService.LeaveMatchmaking:output_type -> quiz.LeaveMatchmakingResponse
-	6,   // 83: quiz.MatchmakingService.SubscribeToMatch:output_type -> quiz.MatchEvent
-	8,   // 84: quiz.QuizService.GetRoomQuestions:output_type -> quiz.GetRoomQuestionsResponse
-	11,  // 85: quiz.QuizService.SubmitAnswer:output_type -> quiz.SubmitAnswerResponse
-	13,  // 86: quiz.QuizService.StreamGameEvents:output_type -> quiz.GameEvent
-	78,  // 87: quiz.QuizService.GetTournamentList:output_type -> quiz.GetTournamentListResponse
-	81,  // 88: quiz.QuizService.JoinTournament:output_type -> quiz.JoinTournamentResponse
-	44,  // 89: quiz.ScoringService.CalculateScore:output_type -> quiz.CalculateScoreResponse
-	46,  // 90: quiz.ScoringService.GetLeaderboard:output_type -> quiz.GetLeaderboardResponse
-	48,  // 91: quiz.ScoringService.GetMatchHistory:output_type -> quiz.GetMatchHistoryResponse
-	61,  // 92: quiz.ScoringService.GetHomeScreenData:output_type -> quiz.GetHomeScreenDataResponse
-	63,  // 93: quiz.ScoringService.GetReferralDashboard:output_type -> quiz.GetReferralDashboardResponse
-	65,  // 94: quiz.ScoringService.ApplyReferralCode:output_type -> quiz.ApplyReferralCodeResponse
-	67,  // 95: quiz.ScoringService.UpdateFCMToken:output_type -> quiz.UpdateFCMTokenResponse
-	83,  // 96: quiz.ScoringService.GetGlobalLeaderboard:output_type -> quiz.GetGlobalLeaderboardResponse
-	85,  // 97: quiz.ScoringService.GetCoinBalance:output_type -> quiz.GetCoinBalanceResponse
-	88,  // 98: quiz.ScoringService.GetCoinLedger:output_type -> quiz.GetCoinLedgerResponse
-	91,  // 99: quiz.ScoringService.GetShopCatalog:output_type -> quiz.GetShopCatalogResponse
-	93,  // 100: quiz.ScoringService.GetShopInventory:output_type -> quiz.GetShopInventoryResponse
-	95,  // 101: quiz.ScoringService.PurchaseShopItem:output_type -> quiz.PurchaseShopItemResponse
-	97,  // 102: quiz.ScoringService.EquipCosmetic:output_type -> quiz.EquipCosmeticResponse
-	99,  // 103: quiz.ScoringService.ConsumeReroll:output_type -> quiz.ConsumeRerollResponse
-	101, // 104: quiz.ScoringService.SendFriendRequest:output_type -> quiz.SendFriendRequestResponse
-	104, // 105: quiz.ScoringService.RespondToFriendRequest:output_type -> quiz.RespondToFriendRequestResponse
-	107, // 106: quiz.ScoringService.GetFriendsList:output_type -> quiz.GetFriendsListResponse
-	109, // 107: quiz.ScoringService.GetFriendRequests:output_type -> quiz.GetFriendRequestsResponse
-	111, // 108: quiz.ScoringService.Heartbeat:output_type -> quiz.HeartbeatResponse
-	113, // 109: quiz.ScoringService.ChallengeFriend:output_type -> quiz.ChallengeFriendResponse
-	24,  // 110: quiz.AuthService.Register:output_type -> quiz.AuthResponse
-	24,  // 111: quiz.AuthService.Login:output_type -> quiz.AuthResponse
-	26,  // 112: quiz.AuthService.GetProfile:output_type -> quiz.ProfileResponse
-	24,  // 113: quiz.AuthService.GuestLogin:output_type -> quiz.AuthResponse
-	30,  // 114: quiz.AuthService.LoginWithEmail:output_type -> quiz.SendEmailCodeResponse
-	30,  // 115: quiz.AuthService.SendEmailCode:output_type -> quiz.SendEmailCodeResponse
-	32,  // 116: quiz.AuthService.VerifyEmailCode:output_type -> quiz.VerifyEmailCodeResponse
-	34,  // 117: quiz.AuthService.LinkEmail:output_type -> quiz.LinkEmailResponse
-	36,  // 118: quiz.AuthService.ResetPassword:output_type -> quiz.ResetPasswordResponse
-	38,  // 119: quiz.AuthService.CheckUsername:output_type -> quiz.CheckUsernameResponse
-	40,  // 120: quiz.AuthService.DeleteAccount:output_type -> quiz.DeleteAccountResponse
-	54,  // 121: quiz.AuthService.GoogleSignIn:output_type -> quiz.GoogleSignInResponse
-	57,  // 122: quiz.AuthService.ClaimDailyReward:output_type -> quiz.ClaimDailyRewardResponse
-	59,  // 123: quiz.AuthService.GetStreakInfo:output_type -> quiz.GetStreakInfoResponse
-	42,  // 124: quiz.AuthService.UpdateProfile:output_type -> quiz.UpdateProfileResponse
-	69,  // 125: quiz.PaymentService.CreateOrder:output_type -> quiz.CreateOrderResponse
-	71,  // 126: quiz.PaymentService.VerifyPayment:output_type -> quiz.VerifyPaymentResponse
-	73,  // 127: quiz.PaymentService.GetPlanStatus:output_type -> quiz.GetPlanStatusResponse
-	75,  // 128: quiz.PaymentService.GetPaymentHistory:output_type -> quiz.GetPaymentHistoryResponse
-	81,  // [81:129] is the sub-list for method output_type
-	33,  // [33:81] is the sub-list for method input_type
+	114, // 62: quiz.ScoringService.GetNotificationPrefs:input_type -> quiz.GetNotificationPrefsRequest
+	116, // 63: quiz.ScoringService.UpdateNotificationPrefs:input_type -> quiz.UpdateNotificationPrefsRequest
+	118, // 64: quiz.ScoringService.MarkNotificationOpened:input_type -> quiz.MarkNotificationOpenedRequest
+	22,  // 65: quiz.AuthService.Register:input_type -> quiz.RegisterRequest
+	23,  // 66: quiz.AuthService.Login:input_type -> quiz.LoginRequest
+	25,  // 67: quiz.AuthService.GetProfile:input_type -> quiz.GetProfileRequest
+	27,  // 68: quiz.AuthService.GuestLogin:input_type -> quiz.GuestLoginRequest
+	28,  // 69: quiz.AuthService.LoginWithEmail:input_type -> quiz.EmailLoginRequest
+	29,  // 70: quiz.AuthService.SendEmailCode:input_type -> quiz.SendEmailCodeRequest
+	31,  // 71: quiz.AuthService.VerifyEmailCode:input_type -> quiz.VerifyEmailCodeRequest
+	33,  // 72: quiz.AuthService.LinkEmail:input_type -> quiz.LinkEmailRequest
+	35,  // 73: quiz.AuthService.ResetPassword:input_type -> quiz.ResetPasswordRequest
+	37,  // 74: quiz.AuthService.CheckUsername:input_type -> quiz.CheckUsernameRequest
+	39,  // 75: quiz.AuthService.DeleteAccount:input_type -> quiz.DeleteAccountRequest
+	53,  // 76: quiz.AuthService.GoogleSignIn:input_type -> quiz.GoogleSignInRequest
+	56,  // 77: quiz.AuthService.ClaimDailyReward:input_type -> quiz.ClaimDailyRewardRequest
+	58,  // 78: quiz.AuthService.GetStreakInfo:input_type -> quiz.GetStreakInfoRequest
+	41,  // 79: quiz.AuthService.UpdateProfile:input_type -> quiz.UpdateProfileRequest
+	68,  // 80: quiz.PaymentService.CreateOrder:input_type -> quiz.CreateOrderRequest
+	70,  // 81: quiz.PaymentService.VerifyPayment:input_type -> quiz.VerifyPaymentRequest
+	72,  // 82: quiz.PaymentService.GetPlanStatus:input_type -> quiz.GetPlanStatusRequest
+	74,  // 83: quiz.PaymentService.GetPaymentHistory:input_type -> quiz.GetPaymentHistoryRequest
+	2,   // 84: quiz.MatchmakingService.JoinMatchmaking:output_type -> quiz.JoinMatchmakingResponse
+	4,   // 85: quiz.MatchmakingService.LeaveMatchmaking:output_type -> quiz.LeaveMatchmakingResponse
+	6,   // 86: quiz.MatchmakingService.SubscribeToMatch:output_type -> quiz.MatchEvent
+	8,   // 87: quiz.QuizService.GetRoomQuestions:output_type -> quiz.GetRoomQuestionsResponse
+	11,  // 88: quiz.QuizService.SubmitAnswer:output_type -> quiz.SubmitAnswerResponse
+	13,  // 89: quiz.QuizService.StreamGameEvents:output_type -> quiz.GameEvent
+	78,  // 90: quiz.QuizService.GetTournamentList:output_type -> quiz.GetTournamentListResponse
+	81,  // 91: quiz.QuizService.JoinTournament:output_type -> quiz.JoinTournamentResponse
+	44,  // 92: quiz.ScoringService.CalculateScore:output_type -> quiz.CalculateScoreResponse
+	46,  // 93: quiz.ScoringService.GetLeaderboard:output_type -> quiz.GetLeaderboardResponse
+	48,  // 94: quiz.ScoringService.GetMatchHistory:output_type -> quiz.GetMatchHistoryResponse
+	61,  // 95: quiz.ScoringService.GetHomeScreenData:output_type -> quiz.GetHomeScreenDataResponse
+	63,  // 96: quiz.ScoringService.GetReferralDashboard:output_type -> quiz.GetReferralDashboardResponse
+	65,  // 97: quiz.ScoringService.ApplyReferralCode:output_type -> quiz.ApplyReferralCodeResponse
+	67,  // 98: quiz.ScoringService.UpdateFCMToken:output_type -> quiz.UpdateFCMTokenResponse
+	83,  // 99: quiz.ScoringService.GetGlobalLeaderboard:output_type -> quiz.GetGlobalLeaderboardResponse
+	85,  // 100: quiz.ScoringService.GetCoinBalance:output_type -> quiz.GetCoinBalanceResponse
+	88,  // 101: quiz.ScoringService.GetCoinLedger:output_type -> quiz.GetCoinLedgerResponse
+	91,  // 102: quiz.ScoringService.GetShopCatalog:output_type -> quiz.GetShopCatalogResponse
+	93,  // 103: quiz.ScoringService.GetShopInventory:output_type -> quiz.GetShopInventoryResponse
+	95,  // 104: quiz.ScoringService.PurchaseShopItem:output_type -> quiz.PurchaseShopItemResponse
+	97,  // 105: quiz.ScoringService.EquipCosmetic:output_type -> quiz.EquipCosmeticResponse
+	99,  // 106: quiz.ScoringService.ConsumeReroll:output_type -> quiz.ConsumeRerollResponse
+	101, // 107: quiz.ScoringService.SendFriendRequest:output_type -> quiz.SendFriendRequestResponse
+	104, // 108: quiz.ScoringService.RespondToFriendRequest:output_type -> quiz.RespondToFriendRequestResponse
+	107, // 109: quiz.ScoringService.GetFriendsList:output_type -> quiz.GetFriendsListResponse
+	109, // 110: quiz.ScoringService.GetFriendRequests:output_type -> quiz.GetFriendRequestsResponse
+	111, // 111: quiz.ScoringService.Heartbeat:output_type -> quiz.HeartbeatResponse
+	113, // 112: quiz.ScoringService.ChallengeFriend:output_type -> quiz.ChallengeFriendResponse
+	115, // 113: quiz.ScoringService.GetNotificationPrefs:output_type -> quiz.GetNotificationPrefsResponse
+	117, // 114: quiz.ScoringService.UpdateNotificationPrefs:output_type -> quiz.UpdateNotificationPrefsResponse
+	119, // 115: quiz.ScoringService.MarkNotificationOpened:output_type -> quiz.MarkNotificationOpenedResponse
+	24,  // 116: quiz.AuthService.Register:output_type -> quiz.AuthResponse
+	24,  // 117: quiz.AuthService.Login:output_type -> quiz.AuthResponse
+	26,  // 118: quiz.AuthService.GetProfile:output_type -> quiz.ProfileResponse
+	24,  // 119: quiz.AuthService.GuestLogin:output_type -> quiz.AuthResponse
+	30,  // 120: quiz.AuthService.LoginWithEmail:output_type -> quiz.SendEmailCodeResponse
+	30,  // 121: quiz.AuthService.SendEmailCode:output_type -> quiz.SendEmailCodeResponse
+	32,  // 122: quiz.AuthService.VerifyEmailCode:output_type -> quiz.VerifyEmailCodeResponse
+	34,  // 123: quiz.AuthService.LinkEmail:output_type -> quiz.LinkEmailResponse
+	36,  // 124: quiz.AuthService.ResetPassword:output_type -> quiz.ResetPasswordResponse
+	38,  // 125: quiz.AuthService.CheckUsername:output_type -> quiz.CheckUsernameResponse
+	40,  // 126: quiz.AuthService.DeleteAccount:output_type -> quiz.DeleteAccountResponse
+	54,  // 127: quiz.AuthService.GoogleSignIn:output_type -> quiz.GoogleSignInResponse
+	57,  // 128: quiz.AuthService.ClaimDailyReward:output_type -> quiz.ClaimDailyRewardResponse
+	59,  // 129: quiz.AuthService.GetStreakInfo:output_type -> quiz.GetStreakInfoResponse
+	42,  // 130: quiz.AuthService.UpdateProfile:output_type -> quiz.UpdateProfileResponse
+	69,  // 131: quiz.PaymentService.CreateOrder:output_type -> quiz.CreateOrderResponse
+	71,  // 132: quiz.PaymentService.VerifyPayment:output_type -> quiz.VerifyPaymentResponse
+	73,  // 133: quiz.PaymentService.GetPlanStatus:output_type -> quiz.GetPlanStatusResponse
+	75,  // 134: quiz.PaymentService.GetPaymentHistory:output_type -> quiz.GetPaymentHistoryResponse
+	84,  // [84:135] is the sub-list for method output_type
+	33,  // [33:84] is the sub-list for method input_type
 	33,  // [33:33] is the sub-list for extension type_name
 	33,  // [33:33] is the sub-list for extension extendee
 	0,   // [0:33] is the sub-list for field type_name
@@ -7368,7 +7674,7 @@ func file_proto_quiz_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_quiz_proto_rawDesc), len(file_proto_quiz_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   115,
+			NumMessages:   121,
 			NumExtensions: 0,
 			NumServices:   5,
 		},

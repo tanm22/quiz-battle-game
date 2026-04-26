@@ -2083,3 +2083,84 @@ const ChallengeFriendResponse$json = {
 final $typed_data.Uint8List challengeFriendResponseDescriptor = $convert.base64Decode(
     'ChdDaGFsbGVuZ2VGcmllbmRSZXNwb25zZRIYCgdzdWNjZXNzGAEgASgIUgdzdWNjZXNzEhcKB3'
     'Jvb21faWQYAiABKAlSBnJvb21JZBIdCgplcnJvcl9jb2RlGAMgASgJUgllcnJvckNvZGU=');
+
+@$core.Deprecated('Use getNotificationPrefsRequestDescriptor instead')
+const GetNotificationPrefsRequest$json = {
+  '1': 'GetNotificationPrefsRequest',
+};
+
+/// Descriptor for `GetNotificationPrefsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getNotificationPrefsRequestDescriptor =
+    $convert.base64Decode('ChtHZXROb3RpZmljYXRpb25QcmVmc1JlcXVlc3Q=');
+
+@$core.Deprecated('Use getNotificationPrefsResponseDescriptor instead')
+const GetNotificationPrefsResponse$json = {
+  '1': 'GetNotificationPrefsResponse',
+  '2': [
+    {'1': 'muted_types', '3': 1, '4': 3, '5': 9, '10': 'mutedTypes'},
+    {'1': 'timezone', '3': 2, '4': 1, '5': 9, '10': 'timezone'},
+  ],
+};
+
+/// Descriptor for `GetNotificationPrefsResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getNotificationPrefsResponseDescriptor =
+    $convert.base64Decode(
+        'ChxHZXROb3RpZmljYXRpb25QcmVmc1Jlc3BvbnNlEh8KC211dGVkX3R5cGVzGAEgAygJUgptdX'
+        'RlZFR5cGVzEhoKCHRpbWV6b25lGAIgASgJUgh0aW1lem9uZQ==');
+
+@$core.Deprecated('Use updateNotificationPrefsRequestDescriptor instead')
+const UpdateNotificationPrefsRequest$json = {
+  '1': 'UpdateNotificationPrefsRequest',
+  '2': [
+    {'1': 'muted_types', '3': 1, '4': 3, '5': 9, '10': 'mutedTypes'},
+    {'1': 'timezone', '3': 2, '4': 1, '5': 9, '10': 'timezone'},
+  ],
+};
+
+/// Descriptor for `UpdateNotificationPrefsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List updateNotificationPrefsRequestDescriptor =
+    $convert.base64Decode(
+        'Ch5VcGRhdGVOb3RpZmljYXRpb25QcmVmc1JlcXVlc3QSHwoLbXV0ZWRfdHlwZXMYASADKAlSCm'
+        '11dGVkVHlwZXMSGgoIdGltZXpvbmUYAiABKAlSCHRpbWV6b25l');
+
+@$core.Deprecated('Use updateNotificationPrefsResponseDescriptor instead')
+const UpdateNotificationPrefsResponse$json = {
+  '1': 'UpdateNotificationPrefsResponse',
+  '2': [
+    {'1': 'success', '3': 1, '4': 1, '5': 8, '10': 'success'},
+  ],
+};
+
+/// Descriptor for `UpdateNotificationPrefsResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List updateNotificationPrefsResponseDescriptor =
+    $convert.base64Decode(
+        'Ch9VcGRhdGVOb3RpZmljYXRpb25QcmVmc1Jlc3BvbnNlEhgKB3N1Y2Nlc3MYASABKAhSB3N1Y2'
+        'Nlc3M=');
+
+@$core.Deprecated('Use markNotificationOpenedRequestDescriptor instead')
+const MarkNotificationOpenedRequest$json = {
+  '1': 'MarkNotificationOpenedRequest',
+  '2': [
+    {'1': 'category', '3': 1, '4': 1, '5': 9, '10': 'category'},
+  ],
+};
+
+/// Descriptor for `MarkNotificationOpenedRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List markNotificationOpenedRequestDescriptor =
+    $convert.base64Decode(
+        'Ch1NYXJrTm90aWZpY2F0aW9uT3BlbmVkUmVxdWVzdBIaCghjYXRlZ29yeRgBIAEoCVIIY2F0ZW'
+        'dvcnk=');
+
+@$core.Deprecated('Use markNotificationOpenedResponseDescriptor instead')
+const MarkNotificationOpenedResponse$json = {
+  '1': 'MarkNotificationOpenedResponse',
+  '2': [
+    {'1': 'success', '3': 1, '4': 1, '5': 8, '10': 'success'},
+  ],
+};
+
+/// Descriptor for `MarkNotificationOpenedResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List markNotificationOpenedResponseDescriptor =
+    $convert.base64Decode(
+        'Ch5NYXJrTm90aWZpY2F0aW9uT3BlbmVkUmVzcG9uc2USGAoHc3VjY2VzcxgBIAEoCFIHc3VjY2'
+        'Vzcw==');

@@ -461,3 +461,71 @@ const ChallengeThrottleTTL = 30 * time.Second
 func TrySetChallengeThrottle(ctx context.Context, rdb *redis.Client, fromUserID, toUserID string) (bool, error) {
 	return rdb.SetNX(ctx, ChallengeThrottle(fromUserID, toUserID), "1", ChallengeThrottleTTL).Result()
 }
+
+// §4.6 Notification policy helpers ----------------------------------------
+
+// NotifDailyCapTTL is 48h on purpose — the {YYYY-MM-DD} segment of the
+// key handles the actual day rollover; the TTL is a fail-safe so a
+// crashed service or clock skew doesn't leave a forever counter behind.
+const NotifDailyCapTTL = 48 * time.Hour
+
+// NotifDedupTTL is the suppression window for repeat pushes of the same
+// category. 1 hour matches the problem-03 example: "don't send 3 streak
+// warnings in an hour."
+const NotifDedupTTL = 1 * time.Hour
+
+// NotifMetricTTL keeps per-day counters around long enough to look at
+// "yesterday" without keeping a forever metric set. Operators wanting
+// long-term trends should aggregate to a real metrics store.
+const NotifMetricTTL = 7 * 24 * time.Hour
+
+// IncrNotifDailyCap atomically increments the per-user daily push
+// counter and returns the new value. Sets the TTL only on the first
+// hit (Expire on a not-yet-seen key) so subsequent hits don't reset
+// the day boundary.
+func IncrNotifDailyCap(ctx context.Context, rdb *redis.Client, userID, day string) (int64, error) {
+	pipe := rdb.TxPipeline()
+	incr := pipe.Incr(ctx, NotifDailyCap(userID, day))
+	pipe.Expire(ctx, NotifDailyCap(userID, day), NotifDailyCapTTL)
+	if _, err := pipe.Exec(ctx); err != nil {
+		return 0, err
+	}
+	return incr.Val(), nil
+}
+
+// DecrNotifDailyCap rolls back a counted push when the policy decides
+// to drop it AFTER the cap was incremented. Today this isn't called —
+// the cap is the LAST gate so a counted push is always sent — but the
+// helper exists so a future reorder can compensate without bespoke code.
+func DecrNotifDailyCap(ctx context.Context, rdb *redis.Client, userID, day string) error {
+	return rdb.Decr(ctx, NotifDailyCap(userID, day)).Err()
+}
+
+// TrySetNotifDedup returns true when this is the first push of the
+// category in the dedup window. False means "we just sent one, suppress."
+// Idempotent retries within the window stay suppressed — the SETNX
+// race is resolved by Redis.
+func TrySetNotifDedup(ctx context.Context, rdb *redis.Client, userID, category string) (bool, error) {
+	return rdb.SetNX(ctx, NotifDedup(userID, category), "1", NotifDedupTTL).Result()
+}
+
+// IncrNotifMetricSent / Opened / Dropped are the three counters the
+// policy gate writes for offline analysis. Failures are non-fatal —
+// metrics are best-effort and the caller should log + continue.
+func IncrNotifMetricSent(ctx context.Context, rdb *redis.Client, category, day string) error {
+	return incrWithTTL(ctx, rdb, NotifMetricSent(category, day))
+}
+func IncrNotifMetricOpened(ctx context.Context, rdb *redis.Client, category, day string) error {
+	return incrWithTTL(ctx, rdb, NotifMetricOpened(category, day))
+}
+func IncrNotifMetricDropped(ctx context.Context, rdb *redis.Client, category, reason, day string) error {
+	return incrWithTTL(ctx, rdb, NotifMetricDropped(category, reason, day))
+}
+
+func incrWithTTL(ctx context.Context, rdb *redis.Client, key string) error {
+	pipe := rdb.TxPipeline()
+	pipe.Incr(ctx, key)
+	pipe.Expire(ctx, key, NotifMetricTTL)
+	_, err := pipe.Exec(ctx)
+	return err
+}

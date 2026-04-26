@@ -8283,6 +8283,349 @@ class ChallengeFriendResponse extends $pb.GeneratedMessage {
   void clearErrorCode() => $_clearField(3);
 }
 
+class GetNotificationPrefsRequest extends $pb.GeneratedMessage {
+  factory GetNotificationPrefsRequest() => create();
+
+  GetNotificationPrefsRequest._();
+
+  factory GetNotificationPrefsRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetNotificationPrefsRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetNotificationPrefsRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetNotificationPrefsRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetNotificationPrefsRequest copyWith(
+          void Function(GetNotificationPrefsRequest) updates) =>
+      super.copyWith(
+              (message) => updates(message as GetNotificationPrefsRequest))
+          as GetNotificationPrefsRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetNotificationPrefsRequest create() =>
+      GetNotificationPrefsRequest._();
+  @$core.override
+  GetNotificationPrefsRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetNotificationPrefsRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetNotificationPrefsRequest>(create);
+  static GetNotificationPrefsRequest? _defaultInstance;
+}
+
+class GetNotificationPrefsResponse extends $pb.GeneratedMessage {
+  factory GetNotificationPrefsResponse({
+    $core.Iterable<$core.String>? mutedTypes,
+    $core.String? timezone,
+  }) {
+    final result = create();
+    if (mutedTypes != null) result.mutedTypes.addAll(mutedTypes);
+    if (timezone != null) result.timezone = timezone;
+    return result;
+  }
+
+  GetNotificationPrefsResponse._();
+
+  factory GetNotificationPrefsResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetNotificationPrefsResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetNotificationPrefsResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..pPS(1, _omitFieldNames ? '' : 'mutedTypes')
+    ..aOS(2, _omitFieldNames ? '' : 'timezone')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetNotificationPrefsResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetNotificationPrefsResponse copyWith(
+          void Function(GetNotificationPrefsResponse) updates) =>
+      super.copyWith(
+              (message) => updates(message as GetNotificationPrefsResponse))
+          as GetNotificationPrefsResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetNotificationPrefsResponse create() =>
+      GetNotificationPrefsResponse._();
+  @$core.override
+  GetNotificationPrefsResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetNotificationPrefsResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetNotificationPrefsResponse>(create);
+  static GetNotificationPrefsResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<$core.String> get mutedTypes => $_getList(0);
+
+  @$pb.TagNumber(2)
+  $core.String get timezone => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set timezone($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasTimezone() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTimezone() => $_clearField(2);
+}
+
+class UpdateNotificationPrefsRequest extends $pb.GeneratedMessage {
+  factory UpdateNotificationPrefsRequest({
+    $core.Iterable<$core.String>? mutedTypes,
+    $core.String? timezone,
+  }) {
+    final result = create();
+    if (mutedTypes != null) result.mutedTypes.addAll(mutedTypes);
+    if (timezone != null) result.timezone = timezone;
+    return result;
+  }
+
+  UpdateNotificationPrefsRequest._();
+
+  factory UpdateNotificationPrefsRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory UpdateNotificationPrefsRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UpdateNotificationPrefsRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..pPS(1, _omitFieldNames ? '' : 'mutedTypes')
+    ..aOS(2, _omitFieldNames ? '' : 'timezone')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateNotificationPrefsRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateNotificationPrefsRequest copyWith(
+          void Function(UpdateNotificationPrefsRequest) updates) =>
+      super.copyWith(
+              (message) => updates(message as UpdateNotificationPrefsRequest))
+          as UpdateNotificationPrefsRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static UpdateNotificationPrefsRequest create() =>
+      UpdateNotificationPrefsRequest._();
+  @$core.override
+  UpdateNotificationPrefsRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static UpdateNotificationPrefsRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UpdateNotificationPrefsRequest>(create);
+  static UpdateNotificationPrefsRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<$core.String> get mutedTypes => $_getList(0);
+
+  /// IANA timezone name. Empty preserves the existing value; explicitly
+  /// setting "" is not supported — clients pass the current value when they
+  /// only intend to mutate muted_types.
+  @$pb.TagNumber(2)
+  $core.String get timezone => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set timezone($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasTimezone() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTimezone() => $_clearField(2);
+}
+
+class UpdateNotificationPrefsResponse extends $pb.GeneratedMessage {
+  factory UpdateNotificationPrefsResponse({
+    $core.bool? success,
+  }) {
+    final result = create();
+    if (success != null) result.success = success;
+    return result;
+  }
+
+  UpdateNotificationPrefsResponse._();
+
+  factory UpdateNotificationPrefsResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory UpdateNotificationPrefsResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UpdateNotificationPrefsResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'success')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateNotificationPrefsResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateNotificationPrefsResponse copyWith(
+          void Function(UpdateNotificationPrefsResponse) updates) =>
+      super.copyWith(
+              (message) => updates(message as UpdateNotificationPrefsResponse))
+          as UpdateNotificationPrefsResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static UpdateNotificationPrefsResponse create() =>
+      UpdateNotificationPrefsResponse._();
+  @$core.override
+  UpdateNotificationPrefsResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static UpdateNotificationPrefsResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UpdateNotificationPrefsResponse>(
+          create);
+  static UpdateNotificationPrefsResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get success => $_getBF(0);
+  @$pb.TagNumber(1)
+  set success($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSuccess() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSuccess() => $_clearField(1);
+}
+
+class MarkNotificationOpenedRequest extends $pb.GeneratedMessage {
+  factory MarkNotificationOpenedRequest({
+    $core.String? category,
+  }) {
+    final result = create();
+    if (category != null) result.category = category;
+    return result;
+  }
+
+  MarkNotificationOpenedRequest._();
+
+  factory MarkNotificationOpenedRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory MarkNotificationOpenedRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'MarkNotificationOpenedRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'category')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MarkNotificationOpenedRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MarkNotificationOpenedRequest copyWith(
+          void Function(MarkNotificationOpenedRequest) updates) =>
+      super.copyWith(
+              (message) => updates(message as MarkNotificationOpenedRequest))
+          as MarkNotificationOpenedRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static MarkNotificationOpenedRequest create() =>
+      MarkNotificationOpenedRequest._();
+  @$core.override
+  MarkNotificationOpenedRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static MarkNotificationOpenedRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<MarkNotificationOpenedRequest>(create);
+  static MarkNotificationOpenedRequest? _defaultInstance;
+
+  /// Category as listed above. Unknown categories are rejected.
+  @$pb.TagNumber(1)
+  $core.String get category => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set category($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasCategory() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearCategory() => $_clearField(1);
+}
+
+class MarkNotificationOpenedResponse extends $pb.GeneratedMessage {
+  factory MarkNotificationOpenedResponse({
+    $core.bool? success,
+  }) {
+    final result = create();
+    if (success != null) result.success = success;
+    return result;
+  }
+
+  MarkNotificationOpenedResponse._();
+
+  factory MarkNotificationOpenedResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory MarkNotificationOpenedResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'MarkNotificationOpenedResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'success')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MarkNotificationOpenedResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MarkNotificationOpenedResponse copyWith(
+          void Function(MarkNotificationOpenedResponse) updates) =>
+      super.copyWith(
+              (message) => updates(message as MarkNotificationOpenedResponse))
+          as MarkNotificationOpenedResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static MarkNotificationOpenedResponse create() =>
+      MarkNotificationOpenedResponse._();
+  @$core.override
+  MarkNotificationOpenedResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static MarkNotificationOpenedResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<MarkNotificationOpenedResponse>(create);
+  static MarkNotificationOpenedResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get success => $_getBF(0);
+  @$pb.TagNumber(1)
+  set success($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSuccess() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSuccess() => $_clearField(1);
+}
+
 const $core.bool _omitFieldNames =
     $core.bool.fromEnvironment('protobuf.omit_field_names');
 const $core.bool _omitMessageNames =
