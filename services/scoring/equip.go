@@ -78,16 +78,15 @@ func (s *scoringServer) EquipCosmetic(ctx context.Context, req *pb.EquipCosmetic
 // mongo.ErrNoDocuments and maps to the NO_CHARGES domain error code.
 // The user document is otherwise untouched.
 //
-// roomId / roundId are accepted in the request for forward-compat with
-// a future "log reroll consumption per match" audit trail, but this PR
-// doesn't persist them — the per-match audit is out of §4.3 scope.
-func (s *scoringServer) ConsumeReroll(ctx context.Context, req *pb.ConsumeRerollRequest) (*pb.ConsumeRerollResponse, error) {
+// roomId / roundId are optional today — accepted for forward-compat
+// with a per-match audit trail in a future PR, but the server doesn't
+// require them, so callers can leave them empty until that lands. We
+// don't validate non-empty: enforcing a contract the server doesn't
+// actually use makes the proto fields meaningless beyond their comment.
+func (s *scoringServer) ConsumeReroll(ctx context.Context, _ *pb.ConsumeRerollRequest) (*pb.ConsumeRerollResponse, error) {
 	uid, err := auth.UserIDFromContext(ctx)
 	if err != nil {
 		return nil, status.Error(codes.Unauthenticated, "not authenticated")
-	}
-	if req.RoomId == "" || req.RoundId == "" {
-		return nil, status.Error(codes.InvalidArgument, "roomId and roundId required")
 	}
 
 	var u struct {
@@ -100,13 +99,29 @@ func (s *scoringServer) ConsumeReroll(ctx context.Context, req *pb.ConsumeReroll
 			SetProjection(bson.M{"rerollCharges": 1}),
 	).Decode(&u)
 	if err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			// Either the user has no rerollCharges field at all, or the
-			// existing count is 0. Either way, no charge consumed —
-			// surface NO_CHARGES so the client renders the right copy.
-			return &pb.ConsumeRerollResponse{ErrorCode: "NO_CHARGES"}, nil
+		if !errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, status.Errorf(codes.Internal, "consume reroll: %v", err)
 		}
-		return nil, status.Errorf(codes.Internal, "consume reroll: %v", err)
+		// FindOneAndUpdate with no match has two meanings: (a) the user
+		// doc doesn't exist, (b) the user exists but rerollCharges <= 0.
+		// They look identical from this single op, but the client should
+		// see different copy: "you've used all your re-rolls" vs "your
+		// account is gone". A short follow-up FindOne distinguishes
+		// them. The race window between the FindOneAndUpdate miss and
+		// this read is non-issue: a user that gets created in between
+		// has no charges either way (NO_CHARGES is correct), and a
+		// user that gets deleted in between is already in the NotFound
+		// arm (also correct).
+		var probe struct{}
+		probeErr := s.mongoDB.Collection("users").
+			FindOne(ctx, bson.M{"_id": uid}, options.FindOne().SetProjection(bson.M{"_id": 1})).
+			Decode(&probe)
+		if errors.Is(probeErr, mongo.ErrNoDocuments) {
+			return nil, status.Error(codes.NotFound, "user not found")
+		}
+		// Probe also caught a real error; surface NO_CHARGES rather
+		// than masking the FindOneAndUpdate result with a probe error.
+		return &pb.ConsumeRerollResponse{ErrorCode: "NO_CHARGES"}, nil
 	}
 	return &pb.ConsumeRerollResponse{Success: true, ChargesRemaining: u.RerollCharges}, nil
 }

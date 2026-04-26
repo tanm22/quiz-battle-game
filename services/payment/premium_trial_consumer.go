@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"strconv"
 	"time"
@@ -81,59 +82,106 @@ func (s *paymentServer) drainPremiumTrialOutbox(ctx context.Context) {
 
 // applyPremiumTrialRow processes a single outbox row. Split out so it
 // returns early on per-row error without breaking the surrounding loop.
+//
+// Atomicity: read user → compute expiry → user UpdateOne → MarkProcessed
+// all run inside ONE Mongo transaction. Without this, a transient
+// MarkProcessed failure (Mongo blip, context deadline mid-op, network
+// reset) would leave planExpiresAt extended but the row still pending.
+// On the next 1s poll the renewal-aware base would read the freshly-
+// extended expiry as the existing trial and re-extend from THERE,
+// granting `2 * days` for a single purchase. The transaction collapses
+// that whole window: either both writes commit and the row never re-
+// enters DequeueDue, or neither writes and the next poll starts from
+// the original (untouched) state.
+//
+// Concurrency note: rs0 supports read-snapshot inside transactions, so
+// the read-then-update against `users` is consistent with `MarkProcessed`
+// against `coin_effect_outbox` even though they're different collections.
 func (s *paymentServer) applyPremiumTrialRow(ctx context.Context, db *mongo.Database, r shop.OutboxRow) {
 	days, _ := strconv.Atoi(r.Payload["days"])
 	if days <= 0 {
 		days = premiumTrialDefaultDays
 	}
 
-	// Renewal-aware extension: if the user already has a planExpiresAt in
-	// the future, extend from THERE so we don't shorten an existing trial
-	// when a user buys overlapping rows. Read in the same op as the
-	// update via FindOneAndUpdate is overkill here (no concurrent writers
-	// to this field other than this worker + Razorpay webhook); a plain
-	// FindOne+Update is fine since the worker is single-instance.
-	var existing struct {
-		PlanExpiresAt *time.Time `bson:"planExpiresAt"`
+	session, err := s.mongoClient.StartSession()
+	if err != nil {
+		log.Printf("[payment] premium-trial: start session for row %s: %v", r.ID, err)
+		return
 	}
+	defer session.EndSession(ctx)
+
 	now := time.Now().UTC()
-	if err := s.users().FindOne(ctx, bson.M{"_id": r.UserID}).Decode(&existing); err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			// User was deleted between debit and trial application —
-			// rare, but log and mark processed so we stop retrying.
-			log.Printf("[payment] premium-trial: user %s gone, marking row %s processed", r.UserID, r.ID)
-			if err := shop.MarkProcessed(ctx, db, r.ID); err != nil {
-				log.Printf("[payment] mark processed (user gone) %s: %v", r.ID, err)
-			}
-			return
+	res, err := session.WithTransaction(ctx, func(sc context.Context) (any, error) {
+		// Re-read inside the session so the renewal-aware base is the
+		// snapshot the txn commits against. A non-existent user here is
+		// not a transient error — log it, mark the row processed in the
+		// SAME txn so we don't spin retrying, and ack with a sentinel.
+		var existing struct {
+			PlanExpiresAt *time.Time `bson:"planExpiresAt"`
 		}
-		log.Printf("[payment] premium-trial: load user %s for row %s: %v", r.UserID, r.ID, err)
+		if err := s.users().FindOne(sc, bson.M{"_id": r.UserID}).Decode(&existing); err != nil {
+			if errors.Is(err, mongo.ErrNoDocuments) {
+				if err := markProcessedInSession(sc, db, r.ID); err != nil {
+					return nil, fmt.Errorf("mark processed (user gone): %w", err)
+				}
+				return userGoneSentinel{}, nil
+			}
+			return nil, fmt.Errorf("load user: %w", err)
+		}
+
+		base := now
+		if existing.PlanExpiresAt != nil && existing.PlanExpiresAt.After(now) {
+			base = *existing.PlanExpiresAt
+		}
+		expiry := base.Add(time.Duration(days) * 24 * time.Hour)
+
+		// Clear premiumExpiryWarned so the warning worker can re-fire if
+		// this new expiry crosses the 3-day threshold; mirrors the
+		// existing payment.captured plan-upgrade behavior.
+		if _, err := s.users().UpdateOne(sc,
+			bson.M{"_id": r.UserID},
+			bson.M{
+				"$set":   bson.M{"plan": "premium", "planExpiresAt": expiry},
+				"$unset": bson.M{"premiumExpiryWarned": ""},
+			},
+		); err != nil {
+			return nil, fmt.Errorf("extend plan: %w", err)
+		}
+
+		if err := markProcessedInSession(sc, db, r.ID); err != nil {
+			return nil, fmt.Errorf("mark processed: %w", err)
+		}
+		return expiry, nil
+	})
+	if err != nil {
+		log.Printf("[payment] premium-trial: row %s txn aborted, will retry: %v", r.ID, err)
 		return
 	}
-	base := now
-	if existing.PlanExpiresAt != nil && existing.PlanExpiresAt.After(now) {
-		base = *existing.PlanExpiresAt
-	}
-	expiry := base.Add(time.Duration(days) * 24 * time.Hour)
 
-	// Clear premiumExpiryWarned so the warning worker can re-fire if this
-	// new expiry crosses the 3-day threshold; mirrors the existing
-	// payment.captured plan-upgrade behavior.
-	if _, err := s.users().UpdateOne(ctx,
-		bson.M{"_id": r.UserID},
-		bson.M{
-			"$set":   bson.M{"plan": "premium", "planExpiresAt": expiry},
-			"$unset": bson.M{"premiumExpiryWarned": ""},
-		},
-	); err != nil {
-		log.Printf("[payment] premium-trial: extend plan for %s row %s: %v", r.UserID, r.ID, err)
-		return
-	}
-
-	if err := shop.MarkProcessed(ctx, db, r.ID); err != nil {
-		log.Printf("[payment] premium-trial: mark processed %s: %v", r.ID, err)
+	if _, gone := res.(userGoneSentinel); gone {
+		log.Printf("[payment] premium-trial: user %s gone, row %s marked processed", r.UserID, r.ID)
 		return
 	}
 	log.Printf("[payment] premium-trial granted user=%s days=%d expiresAt=%s row=%s",
-		r.UserID, days, expiry.Format(time.RFC3339), r.ID)
+		r.UserID, days, res.(time.Time).Format(time.RFC3339), r.ID)
+}
+
+// userGoneSentinel is the WithTransaction return value used when the
+// targeted user document doesn't exist. Lets the caller distinguish
+// "trial granted" from "row marked processed because nothing to grant"
+// without a magic time.Time value.
+type userGoneSentinel struct{}
+
+// markProcessedInSession is the session-aware variant of
+// shop.MarkProcessed. Inlined here rather than added to the shop package
+// because (a) it's the only consumer that needs in-session marking, and
+// (b) the field shape lives in shop.OutboxRow's bson tags, so this stays
+// trivially synced.
+func markProcessedInSession(sc context.Context, db *mongo.Database, id string) error {
+	now := time.Now().UTC()
+	_, err := db.Collection(shop.EffectOutboxCollection).UpdateOne(sc,
+		bson.M{"_id": id},
+		bson.M{"$set": bson.M{"processedAt": now}},
+	)
+	return err
 }

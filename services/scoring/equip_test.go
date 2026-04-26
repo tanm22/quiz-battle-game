@@ -151,15 +151,6 @@ func TestConsumeReroll_RejectsUnauthenticated(t *testing.T) {
 	}
 }
 
-func TestConsumeReroll_RejectsMissingArgs(t *testing.T) {
-	srv, c, db := scoringTestEnv(t)
-	seedScoringUser(t, c, db, "alice", 0)
-	_, err := srv.ConsumeReroll(authedCtx("alice"), &pb.ConsumeRerollRequest{RoomId: "", RoundId: "1"})
-	if status.Code(err) != codes.InvalidArgument {
-		t.Errorf("got %v, want InvalidArgument", err)
-	}
-}
-
 func TestConsumeReroll_NoCharges(t *testing.T) {
 	srv, c, db := scoringTestEnv(t)
 	seedScoringUser(t, c, db, "alice", 0)
@@ -169,6 +160,39 @@ func TestConsumeReroll_NoCharges(t *testing.T) {
 	}
 	if resp.ErrorCode != "NO_CHARGES" {
 		t.Errorf("got %q, want NO_CHARGES", resp.ErrorCode)
+	}
+}
+
+func TestConsumeReroll_AcceptsEmptyRoomAndRound(t *testing.T) {
+	// Review feedback (PR #15): roomId/roundId aren't required by the
+	// server today; the audit-trail use case is forward-compat. Empty
+	// values must take the same code path as populated ones.
+	srv, c, db := scoringTestEnv(t)
+	seedScoringUser(t, c, db, "alice", 0)
+	_, _ = srv.mongoDB.Collection("users").UpdateOne(context.Background(),
+		bson.M{"_id": "alice"},
+		bson.M{"$set": bson.M{"rerollCharges": int32(1)}},
+	)
+	resp, err := srv.ConsumeReroll(authedCtx("alice"), &pb.ConsumeRerollRequest{})
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if !resp.Success || resp.ChargesRemaining != 0 {
+		t.Errorf("empty room/round: success=%v remaining=%d, want true/0", resp.Success, resp.ChargesRemaining)
+	}
+}
+
+func TestConsumeReroll_DistinguishesUserNotFoundFromNoCharges(t *testing.T) {
+	// Review feedback (PR #15): a deleted user with a stale-but-valid
+	// JWT used to surface as NO_CHARGES — same client copy as "you've
+	// used all your re-rolls." Now the FindOneAndUpdate miss is
+	// disambiguated by a follow-up _id probe so a missing user gets
+	// codes.NotFound and a real out-of-charges user gets NO_CHARGES.
+	srv, _, _ := scoringTestEnv(t)
+	// No seed — the user doesn't exist.
+	_, err := srv.ConsumeReroll(authedCtx("ghost-user"), &pb.ConsumeRerollRequest{RoomId: "r1", RoundId: "1"})
+	if status.Code(err) != codes.NotFound {
+		t.Errorf("got %v, want codes.NotFound", err)
 	}
 }
 

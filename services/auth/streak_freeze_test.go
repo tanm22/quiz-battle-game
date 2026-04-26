@@ -104,6 +104,42 @@ func TestProcessStreak_NoFreezeFallsThroughToReset(t *testing.T) {
 	}
 }
 
+func TestProcessStreak_FreezeDoesNotBridgeMultiDayGap(t *testing.T) {
+	// Review feedback (PR #15): a held freeze must bridge ONE missed day
+	// only, not arbitrarily long absences. A user gone 30 days with a
+	// freeze still held should reset the streak AND keep the freeze for
+	// the next time they actually need it.
+	srv := newTestAuthServer(t)
+	uid := createTestUser(t, srv, "elena")
+
+	thirtyDaysAgo := istDaysAgo(t, 30)
+	if _, err := srv.users().UpdateOne(context.Background(),
+		bson.M{"_id": uid},
+		bson.M{"$set": bson.M{
+			"streak.lastClaimedDate": thirtyDaysAgo,
+			"streak.current":         5,
+			"streak.longest":         5,
+			"streakFreezeHeld":       true,
+		}},
+	); err != nil {
+		t.Fatalf("backdate: %v", err)
+	}
+
+	user := loadUser(t, srv, uid)
+	si, _, ok := srv.processStreak(context.Background(), user)
+	if !ok {
+		t.Fatalf("expected commit, ok=false")
+	}
+	if si.Current != 1 {
+		t.Errorf("multi-day gap should reset streak to 1; got %d", si.Current)
+	}
+
+	post := loadUser(t, srv, uid)
+	if !post.StreakFreezeHeld {
+		t.Errorf("freeze must NOT be consumed on a multi-day gap; user is owed a future bridge")
+	}
+}
+
 func TestProcessStreak_FirstEverLoginIgnoresFreeze(t *testing.T) {
 	// First-ever login: lastClaimedDate is empty. Even if a freeze flag is
 	// somehow set on a fresh user, the empty-date guard takes the reset

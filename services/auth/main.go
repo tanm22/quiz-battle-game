@@ -619,6 +619,7 @@ func (s *authServer) processStreak(ctx context.Context, user *models.User) (*pb.
 	ist, _ := time.LoadLocation("Asia/Kolkata")
 	today := time.Now().In(ist).Format("2006-01-02")
 	yesterday := time.Now().In(ist).Add(-24 * time.Hour).Format("2006-01-02")
+	twoDaysAgo := time.Now().In(ist).AddDate(0, 0, -2).Format("2006-01-02")
 
 	streak := user.Streak
 	// freezeConsumed flips true when the gap-day branch consumed a held
@@ -645,15 +646,17 @@ func (s *authServer) processStreak(ctx context.Context, user *models.User) (*pb.
 	default:
 		// CASE C: gap >= 2 days (or first ever login).
 		//
-		// §4.3 (PR 5): if the user holds a streak freeze, consume it instead
-		// of resetting. The freeze pretends yesterday was claimed, so the
-		// streak advances by one rather than restarting at 1. The user paid
-		// for this in the shop; honoring it is what makes streak freeze a
-		// real product, not a vanity flag.
-		//
-		// Guard on LastClaimedDate != "" so first-ever-login (no previous
-		// streak to preserve) takes the reset path naturally.
-		if user.StreakFreezeHeld && streak.LastClaimedDate != "" {
+		// §4.3 (PR 5) streak freeze policy: a held freeze bridges EXACTLY
+		// ONE missed day — the lastClaimed-was-the-day-before-yesterday
+		// case. A user gone longer (3+ days) has the freeze stay held
+		// and the streak resets normally; the freeze remains spendable
+		// for the next time they miss exactly one day. This matches
+		// typical product semantics ("freeze covers a forgotten day,
+		// not a long absence") and keeps the freeze meaningful — without
+		// the gap cap, a 30-day disappearance would burn the freeze for
+		// a +1 advance from a long-stale streak, which doesn't match
+		// what users buy a freeze for.
+		if user.StreakFreezeHeld && streak.LastClaimedDate == twoDaysAgo {
 			streak.Current++
 			if streak.Current > streak.Longest {
 				streak.Longest = streak.Current
