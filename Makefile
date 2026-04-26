@@ -5,7 +5,9 @@ PROTO_SRC := proto/quiz.proto
 proto: proto-go proto-dart
 
 proto-go:
-	protoc -I proto \
+	# -I . (not -I proto) so the source-relative output keeps the proto/
+	# prefix and lands in proto/quiz.pb.go, matching go_package in the proto.
+	protoc -I . \
 	  --go_out=. --go_opt=paths=source_relative \
 	  --go-grpc_out=. --go-grpc_opt=paths=source_relative \
 	  $(PROTO_SRC)
@@ -14,7 +16,7 @@ proto-go:
 # Skip-friendly: `make proto-go` regenerates only Go stubs when the dart plugin
 # isn't installed (e.g. on CI runners that don't need Flutter codegen).
 proto-dart:
-	protoc -I proto \
+	protoc -I . \
 	  --dart_out=grpc:flutter/lib/proto \
 	  $(PROTO_SRC)
 

@@ -179,6 +179,9 @@ service ScoringService {
   rpc UpdateFCMToken(UpdateFCMTokenRequest) returns (UpdateFCMTokenResponse);
   // Phase 3: Global leaderboard with time filters
   rpc GetGlobalLeaderboard(GetGlobalLeaderboardRequest) returns (GetGlobalLeaderboardResponse);
+  // Phase 3 (4.3): Coins & Shop — balance read + ledger history.
+  rpc GetCoinBalance(GetCoinBalanceRequest) returns (GetCoinBalanceResponse);
+  rpc GetCoinLedger(GetCoinLedgerRequest) returns (GetCoinLedgerResponse);
 }
 
 // ---------------------------------------------------------------------------
@@ -576,4 +579,34 @@ message GetGlobalLeaderboardRequest {
 
 message GetGlobalLeaderboardResponse {
   repeated LeaderboardEntry entries = 1;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3 (4.3): Coins & Shop — coin balance + ledger history
+// ---------------------------------------------------------------------------
+
+message GetCoinBalanceRequest {}
+
+message GetCoinBalanceResponse {
+  int64 balance = 1;
+}
+
+message CoinLedgerEntry {
+  string id                = 1;
+  int64  delta             = 2;
+  string reason            = 3;
+  string ref_id            = 4;
+  int64  balance_after     = 5;
+  int64  created_at_unix_ms = 6;
+  map<string, string> metadata = 7;
+}
+
+message GetCoinLedgerRequest {
+  int32  page_size  = 1;
+  string page_token = 2;
+}
+
+message GetCoinLedgerResponse {
+  repeated CoinLedgerEntry entries = 1;
+  string next_page_token = 2;
 }

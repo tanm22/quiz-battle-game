@@ -23,6 +23,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"quiz-battle/pkg/auth"
+	"quiz-battle/pkg/coins"
 	"quiz-battle/pkg/keys"
 	"quiz-battle/pkg/models"
 	pb "quiz-battle/proto"
@@ -51,6 +52,7 @@ type scoringServer struct {
 	amqpCh     *amqp.Channel // for publishing only
 	amqpMu     sync.Mutex    // AMQP channels are not thread-safe
 	mongoDB    *mongo.Database
+	ledger     *coins.Ledger // §4.3 — every balance change goes through Grant
 	jwtSecret  string
 	selfClient pb.ScoringServiceClient // gRPC loopback client for CalculateScore
 }
@@ -1712,6 +1714,7 @@ func main() {
 		amqpConn:  conn,
 		amqpCh:    amqpCh,
 		mongoDB:   mongoClient.Database("quizbattle"),
+		ledger:    coins.NewLedger(mongoClient, "quizbattle"),
 		jwtSecret: jwtSecret,
 	}
 
