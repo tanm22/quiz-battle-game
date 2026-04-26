@@ -621,6 +621,13 @@ func (s *authServer) processStreak(ctx context.Context, user *models.User) (*pb.
 	yesterday := time.Now().In(ist).Add(-24 * time.Hour).Format("2006-01-02")
 
 	streak := user.Streak
+	// freezeConsumed flips true when the gap-day branch consumed a held
+	// streak freeze instead of resetting the streak. Threaded out so the
+	// single UpdateOne below can flip streakFreezeHeld in the same write
+	// — keeping the freeze flag in lock-step with the streak fields means
+	// a crash between them can't desync ("freeze burned but streak reset"
+	// or "streak preserved but freeze still held").
+	freezeConsumed := false
 
 	switch {
 	case streak.LastClaimedDate == today:
@@ -636,14 +643,36 @@ func (s *authServer) processStreak(ctx context.Context, user *models.User) (*pb.
 		streak.LastClaimedDate = today
 
 	default:
-		// CASE C: gap >= 2 days (or first ever login)
+		// CASE C: gap >= 2 days (or first ever login).
+		//
+		// §4.3 (PR 5): if the user holds a streak freeze, consume it instead
+		// of resetting. The freeze pretends yesterday was claimed, so the
+		// streak advances by one rather than restarting at 1. The user paid
+		// for this in the shop; honoring it is what makes streak freeze a
+		// real product, not a vanity flag.
+		//
+		// Guard on LastClaimedDate != "" so first-ever-login (no previous
+		// streak to preserve) takes the reset path naturally.
+		if user.StreakFreezeHeld && streak.LastClaimedDate != "" {
+			streak.Current++
+			if streak.Current > streak.Longest {
+				streak.Longest = streak.Current
+			}
+			streak.LastClaimedDate = today
+			freezeConsumed = true
+			break
+		}
 		streak.Current = 1
 		streak.LastClaimedDate = today
 	}
 
+	update := bson.M{"streak": streak}
+	if freezeConsumed {
+		update["streakFreezeHeld"] = false
+	}
 	res, err := s.users().UpdateOne(ctx,
 		bson.M{"_id": user.ID, "streak.lastClaimedDate": bson.M{"$ne": today}},
-		bson.M{"$set": bson.M{"streak": streak}})
+		bson.M{"$set": update})
 	if err != nil {
 		log.Printf("[auth] streak update error for %s: %v", user.ID, err)
 	}
@@ -652,6 +681,9 @@ func (s *authServer) processStreak(ctx context.Context, user *models.User) (*pb.
 		return toStreakInfo(user.Streak), nil, false
 	}
 	user.Streak = streak
+	if freezeConsumed {
+		user.StreakFreezeHeld = false
+	}
 
 	reward := rewardForDay(streak.Current)
 	return toStreakInfo(streak), reward, true

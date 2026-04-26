@@ -186,6 +186,14 @@ service ScoringService {
   rpc GetShopCatalog(GetShopCatalogRequest) returns (GetShopCatalogResponse);
   rpc GetShopInventory(GetShopInventoryRequest) returns (GetShopInventoryResponse);
   rpc PurchaseShopItem(PurchaseShopItemRequest) returns (PurchaseShopItemResponse);
+  // Phase 3 (4.3) PR 5: item effects.
+  // EquipCosmetic activates an owned avatar frame or name color. Idempotent
+  // — re-equipping the already-equipped item is a no-op success.
+  rpc EquipCosmetic(EquipCosmeticRequest) returns (EquipCosmeticResponse);
+  // ConsumeReroll atomically decrements rerollCharges by 1; returns the
+  // post-decrement count so the caller can render "N left" without a
+  // second read.
+  rpc ConsumeReroll(ConsumeRerollRequest) returns (ConsumeRerollResponse);
 }
 
 // ---------------------------------------------------------------------------
@@ -660,4 +668,34 @@ message PurchaseShopItemResponse {
   // WEEKLY_CAP. gRPC-level errors (Unauthenticated, InvalidArgument) come
   // back as status errors instead.
   string error_code      = 4;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3 (4.3) PR 5: Item effects
+// ---------------------------------------------------------------------------
+
+message EquipCosmeticRequest {
+  string item_id = 1;
+}
+
+message EquipCosmeticResponse {
+  bool success = 1;
+  // Empty on success. Domain error codes:
+  //   UNKNOWN        — itemId not in catalog
+  //   NOT_OWNED      — user doesn't own this cosmetic
+  //   NOT_EQUIPPABLE — item is not a cosmetic kind (frame / name color)
+  string error_code = 2;
+}
+
+message ConsumeRerollRequest {
+  string room_id  = 1;
+  string round_id = 2;
+}
+
+message ConsumeRerollResponse {
+  bool  success           = 1;
+  int32 charges_remaining = 2;
+  // Empty on success. Domain error code: NO_CHARGES — user has zero
+  // rerollCharges, so the spend was rejected without mutating state.
+  string error_code       = 3;
 }
