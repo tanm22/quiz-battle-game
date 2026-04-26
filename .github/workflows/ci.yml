@@ -1,0 +1,53 @@
+name: ci
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:6
+        ports: ['27017:27017']
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ping:1})'"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.25' }
+      - name: Init replica set
+        run: |
+          docker exec ${{ job.services.mongo.id }} mongosh --quiet --eval '
+            try { rs.status() } catch (e) {
+              rs.initiate({_id:"rs0", members:[{_id:0, host:"localhost:27017"}]});
+            }
+          '
+          # Wait for PRIMARY
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            ok=$(docker exec ${{ job.services.mongo.id }} mongosh --quiet --eval 'db.hello().isWritablePrimary' || echo false)
+            if [ "$ok" = "true" ]; then break; fi
+            sleep 2
+          done
+      - run: go mod download
+      - run: make vet
+      - run: make lint
+      - run: make test
+        env:
+          MONGO_URI: mongodb://localhost:27017/?replicaSet=rs0&directConnection=true
+
+  flutter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with: { flutter-version: '3.24.x', channel: stable }
+      - run: cd flutter && flutter pub get
+      - run: cd flutter && flutter analyze --no-fatal-warnings
+      - run: cd flutter && flutter test
