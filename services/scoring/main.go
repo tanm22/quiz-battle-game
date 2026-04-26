@@ -57,10 +57,16 @@ type scoringServer struct {
 	selfClient pb.ScoringServiceClient // gRPC loopback client for CalculateScore
 }
 
-// publish sends a message to the topic exchange with mutex protection.
+// publish sends a message to the topic exchange with mutex protection. In
+// tests where amqpCh is left nil (we don't stand up RabbitMQ for unit tests
+// that only exercise Mongo state), publish is a no-op so callers don't need
+// to special-case the test seam.
 func (s *scoringServer) publish(ctx context.Context, routingKey string, body []byte) error {
 	s.amqpMu.Lock()
 	defer s.amqpMu.Unlock()
+	if s.amqpCh == nil {
+		return nil
+	}
 	return s.amqpCh.PublishWithContext(ctx, "sx", routingKey, false, false, amqp.Publishing{
 		ContentType: "application/json",
 		Body:        body,
@@ -1298,54 +1304,11 @@ func (s *scoringServer) consumeReferralEvents(ctx context.Context) {
 			if !ok {
 				return
 			}
-
-			var event struct {
-				ReferrerID  string `json:"referrerId"`
-				RefereeID   string `json:"refereeId"`
-				RefereeName string `json:"refereeName"`
-			}
-			if err := json.Unmarshal(msg.Body, &event); err != nil {
-				log.Printf("[referral-consumer] bad payload: %v", err)
-				msg.Nack(false, false)
+			if err := s.handleReferralEvent(ctx, msg.Body); err != nil {
+				log.Printf("[referral-consumer] error: %v body=%s", err, string(msg.Body))
+				msg.Nack(false, true) // requeue once; broker eventually dead-letters poison messages
 				continue
 			}
-
-			// Idempotent: findOneAndUpdate with rewardGranted: false
-			result := s.mongoDB.Collection("referrals").FindOneAndUpdate(ctx,
-				bson.M{"refereeId": event.RefereeID, "rewardGranted": false},
-				bson.M{"$set": bson.M{
-					"status":        "converted",
-					"rewardGranted": true,
-					"convertedAt":   time.Now(),
-				}},
-			)
-			if result.Err() != nil {
-				// No matching doc = already processed or doesn't exist
-				log.Printf("[referral-consumer] skip (already processed or missing): %v", result.Err())
-				msg.Ack(false)
-				continue
-			}
-
-			// Grant coins: referrer +100, referee +50
-			s.mongoDB.Collection("users").UpdateOne(ctx,
-				bson.M{"_id": event.ReferrerID},
-				bson.M{"$inc": bson.M{"coins": int64(100)}},
-			)
-			s.mongoDB.Collection("users").UpdateOne(ctx,
-				bson.M{"_id": event.RefereeID},
-				bson.M{"$inc": bson.M{"coins": int64(50)}},
-			)
-
-			// Publish notification to referrer (ISSUE-06 complete chain)
-			notifJSON, _ := json.Marshal(map[string]interface{}{
-				"event":       "notif.referral.converted",
-				"userId":      event.ReferrerID,
-				"refereeName": event.RefereeName,
-				"coinsEarned": 100,
-			})
-			s.publish(ctx, "notif.referral.converted", notifJSON)
-
-			log.Printf("[referral-consumer] referral converted: %s referred %s, coins granted", event.ReferrerID, event.RefereeID)
 			msg.Ack(false)
 		}
 	}
