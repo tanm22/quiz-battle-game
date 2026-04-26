@@ -32,10 +32,11 @@ services:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
-      - ./docker/mongo/replset-init.js:/docker-entrypoint-initdb.d/replset-init.js:ro
-    # Healthcheck doubles as a self-heal: on first start (or on a volume
-    # that pre-dates rs0), the inner try/catch fires rs.initiate() — so
-    # the same compose file works for fresh and existing dev volumes.
+    # We deliberately do NOT use /docker-entrypoint-initdb.d for rs.initiate:
+    # the entrypoint runs that script before docker-compose DNS has wired
+    # the `mongo` alias, so isSelf-checks fail. The healthcheck below
+    # initiates idempotently once mongod is fully listening on the network,
+    # and serves as a self-heal for volumes that pre-date this change.
     healthcheck:
       test:
         - "CMD-SHELL"
