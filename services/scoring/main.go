@@ -1467,99 +1467,21 @@ func (s *scoringServer) consumeTournamentFinished(ctx context.Context) {
 			if !ok {
 				return
 			}
-
-			var event struct {
-				TournamentID   string `json:"tournamentId"`
-				TournamentName string `json:"tournamentName"`
-				UserID         string `json:"userId"`
-				Username       string `json:"username"`
-				Rank           int    `json:"rank"`
-				CoinsAwarded   int64  `json:"coinsAwarded"`
-				FinalScore     int64  `json:"finalScore"`
-			}
-			if err := json.Unmarshal(msg.Body, &event); err != nil {
-				log.Printf("[tournament-finished] bad payload: %v", err)
-				msg.Nack(false, false)
-				continue
-			}
-
-			// Idempotent transition on the tournament_payouts work-list:
-			// "pending" or "published" → "paid". A queue redelivery (or a
-			// drain-worker republish of the same payout) hits an already-
-			// "paid" row, sees ModifiedCount == 0, and ack-skips. Only the
-			// thread that wins this UpdateOne actually grants coins.
-			//
-			// This is the dedup point that lets the producer side
-			// re-publish freely on RabbitMQ failure without double-paying.
-			now := time.Now()
-			res, err := s.mongoDB.Collection("tournament_payouts").UpdateOne(ctx,
-				bson.M{
-					"tournamentId": event.TournamentID,
-					"userId":       event.UserID,
-					"status":       bson.M{"$ne": "paid"},
-				},
-				bson.M{"$set": bson.M{"status": "paid", "paidAt": now}},
-			)
-			if err != nil {
-				log.Printf("[tournament-finished] payout transition failed for user=%s tournament=%s: %v", event.UserID, event.TournamentID, err)
+			if err := s.handleTournamentFinished(ctx, msg.Body); err != nil {
+				if errors.Is(err, errBadTournamentPayload) {
+					log.Printf("[tournament-finished] bad payload, dropping: %v body=%s", err, string(msg.Body))
+					msg.Nack(false, false)
+					continue
+				}
+				log.Printf("[tournament-finished] error: %v body=%s", err, string(msg.Body))
+				// Transient — requeue. With classic queues there is no
+				// auto-DLQ on a delivery-count threshold, so a persistent
+				// failure (Mongo unreachable, etc.) loops until the
+				// underlying issue is fixed; an operator alert on
+				// tournament-finished-queue depth is the floor.
 				msg.Nack(false, true)
 				continue
 			}
-			if res.MatchedCount == 0 {
-				// No payout row exists for this (tournament, user) at all.
-				// Either the producer didn't write one (shouldn't happen
-				// under normal flow) or the row was manually pruned. Ack
-				// without granting coins so we don't pay out a phantom
-				// winner; log loudly so an operator can investigate.
-				log.Printf("[tournament-finished] no payout row for user=%s tournament=%s — discarding event", event.UserID, event.TournamentID)
-				msg.Ack(false)
-				continue
-			}
-			if res.ModifiedCount == 0 {
-				// Row exists but was already in "paid" state — this is the
-				// expected redelivery / drain-worker-republish path. Skip.
-				msg.Ack(false)
-				continue
-			}
-
-			if event.CoinsAwarded > 0 {
-				_, err := s.mongoDB.Collection("users").UpdateOne(ctx,
-					bson.M{"_id": event.UserID},
-					bson.M{"$inc": bson.M{"coins": event.CoinsAwarded}},
-				)
-				if err != nil {
-					// We already flipped the payout row to "paid" above —
-					// requeuing would only retry the $inc behind a row
-					// that the redelivery loop will now skip. Log loud
-					// and ack; manual reconciliation needed in this rare
-					// path. A real outbox would close this gap (out of
-					// scope here).
-					log.Printf("[tournament-finished] coin grant failed AFTER payout transition for user=%s tournament=%s: %v — manual reconciliation required", event.UserID, event.TournamentID, err)
-					msg.Ack(false)
-					continue
-				}
-			}
-
-			notifJSON, _ := json.Marshal(map[string]interface{}{
-				"event":          "notif.tournament.finished",
-				"userId":         event.UserID,
-				"username":       event.Username,
-				"tournamentId":   event.TournamentID,
-				"tournamentName": event.TournamentName,
-				"rank":           event.Rank,
-				"coinsAwarded":   event.CoinsAwarded,
-				"finalScore":     event.FinalScore,
-			})
-			// The publish error doesn't change the ack decision — the coin
-			// grant is already committed and requeuing would double-pay.
-			// Logging is the floor so prod triage can see push drops;
-			// durable retry of the FCM event would need its own outbox
-			// (out of scope here).
-			if err := s.publish(ctx, "notif.tournament.finished", notifJSON); err != nil {
-				log.Printf("[tournament-finished] notif publish failed for user=%s tournament=%s: %v", event.UserID, event.TournamentID, err)
-			}
-
-			log.Printf("[tournament-finished] user=%s tournament=%s rank=%d coins=%d", event.UserID, event.TournamentID, event.Rank, event.CoinsAwarded)
 			msg.Ack(false)
 		}
 	}
