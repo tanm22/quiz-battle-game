@@ -1293,6 +1293,49 @@ final $typed_data.Uint8List createOrderResponseDescriptor = $convert.base64Decod
     '9pZBgCIAEoCVIFa2V5SWQSFgoGYW1vdW50GAMgASgDUgZhbW91bnQSGgoIY3VycmVuY3kYBCAB'
     'KAlSCGN1cnJlbmN5');
 
+@$core.Deprecated('Use verifyPaymentRequestDescriptor instead')
+const VerifyPaymentRequest$json = {
+  '1': 'VerifyPaymentRequest',
+  '2': [
+    {'1': 'razorpay_order_id', '3': 1, '4': 1, '5': 9, '10': 'razorpayOrderId'},
+    {
+      '1': 'razorpay_payment_id',
+      '3': 2,
+      '4': 1,
+      '5': 9,
+      '10': 'razorpayPaymentId'
+    },
+    {
+      '1': 'razorpay_signature',
+      '3': 3,
+      '4': 1,
+      '5': 9,
+      '10': 'razorpaySignature'
+    },
+  ],
+};
+
+/// Descriptor for `VerifyPaymentRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List verifyPaymentRequestDescriptor = $convert.base64Decode(
+    'ChRWZXJpZnlQYXltZW50UmVxdWVzdBIqChFyYXpvcnBheV9vcmRlcl9pZBgBIAEoCVIPcmF6b3'
+    'JwYXlPcmRlcklkEi4KE3Jhem9ycGF5X3BheW1lbnRfaWQYAiABKAlSEXJhem9ycGF5UGF5bWVu'
+    'dElkEi0KEnJhem9ycGF5X3NpZ25hdHVyZRgDIAEoCVIRcmF6b3JwYXlTaWduYXR1cmU=');
+
+@$core.Deprecated('Use verifyPaymentResponseDescriptor instead')
+const VerifyPaymentResponse$json = {
+  '1': 'VerifyPaymentResponse',
+  '2': [
+    {'1': 'success', '3': 1, '4': 1, '5': 8, '10': 'success'},
+    {'1': 'plan', '3': 2, '4': 1, '5': 9, '10': 'plan'},
+    {'1': 'expires_at', '3': 3, '4': 1, '5': 3, '10': 'expiresAt'},
+  ],
+};
+
+/// Descriptor for `VerifyPaymentResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List verifyPaymentResponseDescriptor = $convert.base64Decode(
+    'ChVWZXJpZnlQYXltZW50UmVzcG9uc2USGAoHc3VjY2VzcxgBIAEoCFIHc3VjY2VzcxISCgRwbG'
+    'FuGAIgASgJUgRwbGFuEh0KCmV4cGlyZXNfYXQYAyABKANSCWV4cGlyZXNBdA==');
+
 @$core.Deprecated('Use getPlanStatusRequestDescriptor instead')
 const GetPlanStatusRequest$json = {
   '1': 'GetPlanStatusRequest',
@@ -1823,3 +1866,220 @@ final $typed_data.Uint8List consumeRerollResponseDescriptor = $convert.base64Dec
     'ChVDb25zdW1lUmVyb2xsUmVzcG9uc2USGAoHc3VjY2VzcxgBIAEoCFIHc3VjY2VzcxIrChFjaG'
     'FyZ2VzX3JlbWFpbmluZxgCIAEoBVIQY2hhcmdlc1JlbWFpbmluZxIdCgplcnJvcl9jb2RlGAMg'
     'ASgJUgllcnJvckNvZGU=');
+
+@$core.Deprecated('Use sendFriendRequestRequestDescriptor instead')
+const SendFriendRequestRequest$json = {
+  '1': 'SendFriendRequestRequest',
+  '2': [
+    {'1': 'target_username', '3': 1, '4': 1, '5': 9, '10': 'targetUsername'},
+    {
+      '1': 'target_referral_code',
+      '3': 2,
+      '4': 1,
+      '5': 9,
+      '10': 'targetReferralCode'
+    },
+  ],
+};
+
+/// Descriptor for `SendFriendRequestRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sendFriendRequestRequestDescriptor = $convert.base64Decode(
+    'ChhTZW5kRnJpZW5kUmVxdWVzdFJlcXVlc3QSJwoPdGFyZ2V0X3VzZXJuYW1lGAEgASgJUg50YX'
+    'JnZXRVc2VybmFtZRIwChR0YXJnZXRfcmVmZXJyYWxfY29kZRgCIAEoCVISdGFyZ2V0UmVmZXJy'
+    'YWxDb2Rl');
+
+@$core.Deprecated('Use sendFriendRequestResponseDescriptor instead')
+const SendFriendRequestResponse$json = {
+  '1': 'SendFriendRequestResponse',
+  '2': [
+    {'1': 'success', '3': 1, '4': 1, '5': 8, '10': 'success'},
+    {'1': 'request_id', '3': 2, '4': 1, '5': 9, '10': 'requestId'},
+    {'1': 'error_code', '3': 3, '4': 1, '5': 9, '10': 'errorCode'},
+  ],
+};
+
+/// Descriptor for `SendFriendRequestResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sendFriendRequestResponseDescriptor = $convert.base64Decode(
+    'ChlTZW5kRnJpZW5kUmVxdWVzdFJlc3BvbnNlEhgKB3N1Y2Nlc3MYASABKAhSB3N1Y2Nlc3MSHQ'
+    'oKcmVxdWVzdF9pZBgCIAEoCVIJcmVxdWVzdElkEh0KCmVycm9yX2NvZGUYAyABKAlSCWVycm9y'
+    'Q29kZQ==');
+
+@$core.Deprecated('Use friendRequestDescriptor instead')
+const FriendRequest$json = {
+  '1': 'FriendRequest',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+    {'1': 'from_user_id', '3': 2, '4': 1, '5': 9, '10': 'fromUserId'},
+    {'1': 'from_username', '3': 3, '4': 1, '5': 9, '10': 'fromUsername'},
+    {'1': 'to_user_id', '3': 4, '4': 1, '5': 9, '10': 'toUserId'},
+    {'1': 'to_username', '3': 5, '4': 1, '5': 9, '10': 'toUsername'},
+    {'1': 'status', '3': 6, '4': 1, '5': 9, '10': 'status'},
+    {'1': 'created_at_ms', '3': 7, '4': 1, '5': 3, '10': 'createdAtMs'},
+    {'1': 'responded_at_ms', '3': 8, '4': 1, '5': 3, '10': 'respondedAtMs'},
+  ],
+};
+
+/// Descriptor for `FriendRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List friendRequestDescriptor = $convert.base64Decode(
+    'Cg1GcmllbmRSZXF1ZXN0Eg4KAmlkGAEgASgJUgJpZBIgCgxmcm9tX3VzZXJfaWQYAiABKAlSCm'
+    'Zyb21Vc2VySWQSIwoNZnJvbV91c2VybmFtZRgDIAEoCVIMZnJvbVVzZXJuYW1lEhwKCnRvX3Vz'
+    'ZXJfaWQYBCABKAlSCHRvVXNlcklkEh8KC3RvX3VzZXJuYW1lGAUgASgJUgp0b1VzZXJuYW1lEh'
+    'YKBnN0YXR1cxgGIAEoCVIGc3RhdHVzEiIKDWNyZWF0ZWRfYXRfbXMYByABKANSC2NyZWF0ZWRB'
+    'dE1zEiYKD3Jlc3BvbmRlZF9hdF9tcxgIIAEoA1INcmVzcG9uZGVkQXRNcw==');
+
+@$core.Deprecated('Use respondToFriendRequestRequestDescriptor instead')
+const RespondToFriendRequestRequest$json = {
+  '1': 'RespondToFriendRequestRequest',
+  '2': [
+    {'1': 'request_id', '3': 1, '4': 1, '5': 9, '10': 'requestId'},
+    {'1': 'accept', '3': 2, '4': 1, '5': 8, '10': 'accept'},
+  ],
+};
+
+/// Descriptor for `RespondToFriendRequestRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List respondToFriendRequestRequestDescriptor =
+    $convert.base64Decode(
+        'Ch1SZXNwb25kVG9GcmllbmRSZXF1ZXN0UmVxdWVzdBIdCgpyZXF1ZXN0X2lkGAEgASgJUglyZX'
+        'F1ZXN0SWQSFgoGYWNjZXB0GAIgASgIUgZhY2NlcHQ=');
+
+@$core.Deprecated('Use respondToFriendRequestResponseDescriptor instead')
+const RespondToFriendRequestResponse$json = {
+  '1': 'RespondToFriendRequestResponse',
+  '2': [
+    {'1': 'success', '3': 1, '4': 1, '5': 8, '10': 'success'},
+    {'1': 'error_code', '3': 2, '4': 1, '5': 9, '10': 'errorCode'},
+  ],
+};
+
+/// Descriptor for `RespondToFriendRequestResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List respondToFriendRequestResponseDescriptor =
+    $convert.base64Decode(
+        'Ch5SZXNwb25kVG9GcmllbmRSZXF1ZXN0UmVzcG9uc2USGAoHc3VjY2VzcxgBIAEoCFIHc3VjY2'
+        'VzcxIdCgplcnJvcl9jb2RlGAIgASgJUgllcnJvckNvZGU=');
+
+@$core.Deprecated('Use friendDescriptor instead')
+const Friend$json = {
+  '1': 'Friend',
+  '2': [
+    {'1': 'user_id', '3': 1, '4': 1, '5': 9, '10': 'userId'},
+    {'1': 'username', '3': 2, '4': 1, '5': 9, '10': 'username'},
+    {'1': 'online', '3': 3, '4': 1, '5': 8, '10': 'online'},
+    {'1': 'friended_at_ms', '3': 4, '4': 1, '5': 3, '10': 'friendedAtMs'},
+  ],
+};
+
+/// Descriptor for `Friend`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List friendDescriptor = $convert.base64Decode(
+    'CgZGcmllbmQSFwoHdXNlcl9pZBgBIAEoCVIGdXNlcklkEhoKCHVzZXJuYW1lGAIgASgJUgh1c2'
+    'VybmFtZRIWCgZvbmxpbmUYAyABKAhSBm9ubGluZRIkCg5mcmllbmRlZF9hdF9tcxgEIAEoA1IM'
+    'ZnJpZW5kZWRBdE1z');
+
+@$core.Deprecated('Use getFriendsListRequestDescriptor instead')
+const GetFriendsListRequest$json = {
+  '1': 'GetFriendsListRequest',
+};
+
+/// Descriptor for `GetFriendsListRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getFriendsListRequestDescriptor =
+    $convert.base64Decode('ChVHZXRGcmllbmRzTGlzdFJlcXVlc3Q=');
+
+@$core.Deprecated('Use getFriendsListResponseDescriptor instead')
+const GetFriendsListResponse$json = {
+  '1': 'GetFriendsListResponse',
+  '2': [
+    {
+      '1': 'friends',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.quiz.Friend',
+      '10': 'friends'
+    },
+  ],
+};
+
+/// Descriptor for `GetFriendsListResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getFriendsListResponseDescriptor =
+    $convert.base64Decode(
+        'ChZHZXRGcmllbmRzTGlzdFJlc3BvbnNlEiYKB2ZyaWVuZHMYASADKAsyDC5xdWl6LkZyaWVuZF'
+        'IHZnJpZW5kcw==');
+
+@$core.Deprecated('Use getFriendRequestsRequestDescriptor instead')
+const GetFriendRequestsRequest$json = {
+  '1': 'GetFriendRequestsRequest',
+};
+
+/// Descriptor for `GetFriendRequestsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getFriendRequestsRequestDescriptor =
+    $convert.base64Decode('ChhHZXRGcmllbmRSZXF1ZXN0c1JlcXVlc3Q=');
+
+@$core.Deprecated('Use getFriendRequestsResponseDescriptor instead')
+const GetFriendRequestsResponse$json = {
+  '1': 'GetFriendRequestsResponse',
+  '2': [
+    {
+      '1': 'incoming',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.quiz.FriendRequest',
+      '10': 'incoming'
+    },
+  ],
+};
+
+/// Descriptor for `GetFriendRequestsResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getFriendRequestsResponseDescriptor =
+    $convert.base64Decode(
+        'ChlHZXRGcmllbmRSZXF1ZXN0c1Jlc3BvbnNlEi8KCGluY29taW5nGAEgAygLMhMucXVpei5Gcm'
+        'llbmRSZXF1ZXN0UghpbmNvbWluZw==');
+
+@$core.Deprecated('Use heartbeatRequestDescriptor instead')
+const HeartbeatRequest$json = {
+  '1': 'HeartbeatRequest',
+};
+
+/// Descriptor for `HeartbeatRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List heartbeatRequestDescriptor =
+    $convert.base64Decode('ChBIZWFydGJlYXRSZXF1ZXN0');
+
+@$core.Deprecated('Use heartbeatResponseDescriptor instead')
+const HeartbeatResponse$json = {
+  '1': 'HeartbeatResponse',
+  '2': [
+    {'1': 'success', '3': 1, '4': 1, '5': 8, '10': 'success'},
+  ],
+};
+
+/// Descriptor for `HeartbeatResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List heartbeatResponseDescriptor = $convert.base64Decode(
+    'ChFIZWFydGJlYXRSZXNwb25zZRIYCgdzdWNjZXNzGAEgASgIUgdzdWNjZXNz');
+
+@$core.Deprecated('Use challengeFriendRequestDescriptor instead')
+const ChallengeFriendRequest$json = {
+  '1': 'ChallengeFriendRequest',
+  '2': [
+    {'1': 'friend_user_id', '3': 1, '4': 1, '5': 9, '10': 'friendUserId'},
+  ],
+};
+
+/// Descriptor for `ChallengeFriendRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List challengeFriendRequestDescriptor =
+    $convert.base64Decode(
+        'ChZDaGFsbGVuZ2VGcmllbmRSZXF1ZXN0EiQKDmZyaWVuZF91c2VyX2lkGAEgASgJUgxmcmllbm'
+        'RVc2VySWQ=');
+
+@$core.Deprecated('Use challengeFriendResponseDescriptor instead')
+const ChallengeFriendResponse$json = {
+  '1': 'ChallengeFriendResponse',
+  '2': [
+    {'1': 'success', '3': 1, '4': 1, '5': 8, '10': 'success'},
+    {'1': 'room_id', '3': 2, '4': 1, '5': 9, '10': 'roomId'},
+    {'1': 'error_code', '3': 3, '4': 1, '5': 9, '10': 'errorCode'},
+  ],
+};
+
+/// Descriptor for `ChallengeFriendResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List challengeFriendResponseDescriptor = $convert.base64Decode(
+    'ChdDaGFsbGVuZ2VGcmllbmRSZXNwb25zZRIYCgdzdWNjZXNzGAEgASgIUgdzdWNjZXNzEhcKB3'
+    'Jvb21faWQYAiABKAlSBnJvb21JZBIdCgplcnJvcl9jb2RlGAMgASgJUgllcnJvckNvZGU=');

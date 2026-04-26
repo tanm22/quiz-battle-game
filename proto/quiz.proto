@@ -248,6 +248,12 @@ service AuthService {
 
 service PaymentService {
   rpc CreateOrder(CreateOrderRequest) returns (CreateOrderResponse);
+  // Client-side signature verification — Flutter calls this with the
+  // (paymentId, orderId, signature) triple from the Razorpay SDK
+  // success callback. Activates premium synchronously without waiting
+  // on the webhook (which needs ngrok in dev). Idempotent: repeat
+  // calls with the same paymentId are no-ops.
+  rpc VerifyPayment(VerifyPaymentRequest) returns (VerifyPaymentResponse);
   rpc GetPlanStatus(GetPlanStatusRequest) returns (GetPlanStatusResponse);
   rpc GetPaymentHistory(GetPaymentHistoryRequest) returns (GetPaymentHistoryResponse);
 }
@@ -547,6 +553,21 @@ message CreateOrderResponse {
   string key_id   = 2;
   int64  amount   = 3; // in paise
   string currency = 4;
+}
+
+message VerifyPaymentRequest {
+  string razorpay_order_id   = 1;
+  string razorpay_payment_id = 2;
+  string razorpay_signature  = 3;
+}
+
+message VerifyPaymentResponse {
+  // True iff the signature verified and the payment is now in the
+  // captured state. Idempotent — repeat verifies on the same payment
+  // return success without re-running the upgrade pipeline.
+  bool   success    = 1;
+  string plan       = 2;
+  int64  expires_at = 3;
 }
 
 message GetPlanStatusRequest {}

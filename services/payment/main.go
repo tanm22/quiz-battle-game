@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -281,45 +282,73 @@ func (s *paymentServer) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Step 5: SETNX idempotency check
+	orderID := payload.Payload.Payment.Entity.OrderID
 	ctx := context.Background()
-	isNew, err := keys.SetWebhookIdem(ctx, s.rdb, paymentID)
-	if err != nil {
-		log.Printf("[payment] idempotency check error: %v", err)
+	// capturePayment is idempotent on paymentID via the SETNX guard, so
+	// receiving the same webhook twice is a no-op.
+	if err := s.capturePayment(ctx, orderID, paymentID); err != nil {
+		log.Printf("[payment] webhook capture error: %v", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	if !isNew {
-		w.WriteHeader(http.StatusOK)
-		return
+
+	w.WriteHeader(http.StatusOK)
+}
+
+// capturePayment is the shared "mark this payment as captured and fan out
+// the upgrade event" path. Both the Razorpay webhook and the client-side
+// VerifyPayment RPC end here, after their respective signature checks.
+//
+// It is idempotent on paymentID via Redis SETNX: the first call wins,
+// flips the payment doc's status to `captured`, and publishes
+// `payment.captured` to RabbitMQ for the scoring service's plan-upgrade
+// consumer. Subsequent calls with the same paymentID return nil without
+// mutating anything — Razorpay re-deliveries and the
+// "Flutter-already-verified-then-webhook-arrives" race both collapse to
+// a single capture.
+func (s *paymentServer) capturePayment(ctx context.Context, orderID, paymentID string) error {
+	if orderID == "" || paymentID == "" {
+		return errors.New("orderID and paymentID required")
 	}
 
-	// Step 6: Update payment document
-	orderID := payload.Payload.Payment.Entity.OrderID
+	isNew, err := keys.SetWebhookIdem(ctx, s.rdb, paymentID)
+	if err != nil {
+		return fmt.Errorf("idempotency check: %w", err)
+	}
+	if !isNew {
+		// Already processed by an earlier webhook / verify call. Caller
+		// can treat as success (the first writer already published the
+		// event and the scoring consumer is/was upgrading the plan).
+		return nil
+	}
+
 	now := time.Now()
 	if _, err := s.mongoDB.Collection("payments").UpdateOne(ctx,
 		bson.M{"razorpayOrderId": orderID},
 		bson.M{"$set": bson.M{
 			"status":            "captured",
 			"razorpayPaymentId": paymentID,
-			"webhookReceivedAt": now,
+			"capturedAt":        now,
 		}},
 	); err != nil {
-		log.Printf("[payment] failed to update payment doc for order %s: %v", orderID, err)
-		s.rdb.Del(ctx, keys.WebhookIdem(paymentID)) // rollback so Razorpay can retry
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
+		// Roll back the SETNX so a retry can re-attempt — without this
+		// a transient Mongo blip would permanently mark the payment as
+		// "processed" (in Redis) but leave it stuck in `created`.
+		s.rdb.Del(ctx, keys.WebhookIdem(paymentID))
+		return fmt.Errorf("update payment doc for order %s: %w", orderID, err)
 	}
 
-	// Step 7: Look up userId from payment doc
 	var payDoc bson.M
-	if err := s.mongoDB.Collection("payments").FindOne(ctx, bson.M{"razorpayOrderId": orderID}).Decode(&payDoc); err != nil {
-		log.Printf("[payment] payment doc not found for order %s: %v", orderID, err)
-		w.WriteHeader(http.StatusOK) // no matching order — don't retry
-		return
+	if err := s.mongoDB.Collection("payments").FindOne(ctx,
+		bson.M{"razorpayOrderId": orderID}).Decode(&payDoc); err != nil {
+		// No matching order — most likely a stale paymentID from
+		// outside this system; surface as success so callers stop
+		// retrying. The Redis idem key is left set so we don't
+		// re-process a future identical paymentID.
+		log.Printf("[payment] capturePayment: no payment doc for order %s: %v", orderID, err)
+		return nil
 	}
 
-	// Step 8: Publish payment.captured to RabbitMQ (must succeed or rollback)
 	eventJSON, err := json.Marshal(map[string]interface{}{
 		"event":        "payment.captured",
 		"userId":       payDoc["userId"],
@@ -330,21 +359,108 @@ func (s *paymentServer) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		"timestamp":    now.Format(time.RFC3339),
 	})
 	if err != nil {
-		log.Printf("[payment] failed to marshal event for order %s: %v", orderID, err)
 		s.rdb.Del(ctx, keys.WebhookIdem(paymentID))
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
+		return fmt.Errorf("marshal event: %w", err)
 	}
 
 	if err := s.publish(ctx, "payment.captured", eventJSON); err != nil {
-		log.Printf("[payment] failed to publish event for order %s: %v", orderID, err)
 		s.rdb.Del(ctx, keys.WebhookIdem(paymentID))
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
+		return fmt.Errorf("publish event: %w", err)
 	}
 
-	log.Printf("[payment] webhook processed: payment %s order %s", paymentID, orderID)
-	w.WriteHeader(http.StatusOK)
+	log.Printf("[payment] captured: payment=%s order=%s user=%v",
+		paymentID, orderID, payDoc["userId"])
+	return nil
+}
+
+// VerifyPayment is the client-driven counterpart to the Razorpay
+// webhook. The Flutter app calls this after the Razorpay SDK reports a
+// successful charge with the (orderId, paymentId, signature) triple.
+// We HMAC-SHA256 verify the signature against `orderId|paymentId` using
+// the Razorpay key secret, then route through capturePayment — same
+// path the webhook takes.
+//
+// This is what makes the payment flow work in dev without ngrok or any
+// other public webhook tunnel: the verify call is a normal authed gRPC
+// from the client, the upgrade fans out via RabbitMQ exactly as it
+// would have via the webhook, and Flutter sees a synchronous
+// success/failure rather than waiting on a delivery it can't observe.
+func (s *paymentServer) VerifyPayment(ctx context.Context, req *pb.VerifyPaymentRequest) (*pb.VerifyPaymentResponse, error) {
+	userID, err := auth.UserIDFromContext(ctx)
+	if err != nil {
+		return nil, status.Error(codes.Unauthenticated, "not authenticated")
+	}
+	if req.RazorpayOrderId == "" || req.RazorpayPaymentId == "" || req.RazorpaySignature == "" {
+		return nil, status.Error(codes.InvalidArgument, "razorpay_order_id, razorpay_payment_id, and razorpay_signature are required")
+	}
+	if s.razorpaySecret == "" {
+		return nil, status.Error(codes.FailedPrecondition, "razorpay key secret not configured")
+	}
+
+	// Razorpay's documented client-side signature contract:
+	//   sig == HMAC-SHA256(key_secret, order_id + "|" + payment_id)
+	mac := hmac.New(sha256.New, []byte(s.razorpaySecret))
+	mac.Write([]byte(req.RazorpayOrderId + "|" + req.RazorpayPaymentId))
+	expected := hex.EncodeToString(mac.Sum(nil))
+	if !hmac.Equal([]byte(expected), []byte(req.RazorpaySignature)) {
+		log.Printf("[payment] VerifyPayment: signature mismatch user=%s order=%s",
+			userID, req.RazorpayOrderId)
+		return nil, status.Error(codes.PermissionDenied, "invalid payment signature")
+	}
+
+	// Authorisation: the order has to belong to the caller. Without
+	// this check, a leaked signature could let user A upgrade user B's
+	// plan (extremely unlikely but cheap to defend against).
+	var owner struct {
+		UserID string `bson:"userId"`
+	}
+	err = s.mongoDB.Collection("payments").
+		FindOne(ctx, bson.M{"razorpayOrderId": req.RazorpayOrderId}).Decode(&owner)
+	if err != nil {
+		return nil, status.Error(codes.NotFound, "order not found")
+	}
+	if owner.UserID != userID {
+		log.Printf("[payment] VerifyPayment: order ownership mismatch user=%s order=%s actual_owner=%s",
+			userID, req.RazorpayOrderId, owner.UserID)
+		return nil, status.Error(codes.PermissionDenied, "order does not belong to caller")
+	}
+
+	if err := s.capturePayment(ctx, req.RazorpayOrderId, req.RazorpayPaymentId); err != nil {
+		return nil, status.Errorf(codes.Internal, "capture: %v", err)
+	}
+
+	// Returning plan="premium" is optimistic — the actual users.plan
+	// flip is done asynchronously by the scoring service's
+	// payment.captured consumer. Flutter will reload via GetPlanStatus
+	// shortly to reflect the canonical state. expires_at is computed
+	// here so the UI can render an immediate confirmation rather than
+	// flashing "free" between verify and the consumer catching up.
+	planDuration, _ := s.lookupPlanDuration(ctx, req.RazorpayOrderId)
+	expiresAt := time.Now().AddDate(0, 1, 0).Unix()
+	if planDuration == "yearly" {
+		expiresAt = time.Now().AddDate(1, 0, 0).Unix()
+	}
+	return &pb.VerifyPaymentResponse{
+		Success:   true,
+		Plan:      "premium",
+		ExpiresAt: expiresAt,
+	}, nil
+}
+
+// lookupPlanDuration is a small helper that reads the planDuration off
+// the payment doc — needed by VerifyPayment to compute the optimistic
+// expiry returned to the client. Wraps a no-op fallback so a missing
+// doc simply yields "monthly" and never errors.
+func (s *paymentServer) lookupPlanDuration(ctx context.Context, orderID string) (string, error) {
+	var doc struct {
+		PlanDuration string `bson:"planDuration"`
+	}
+	err := s.mongoDB.Collection("payments").
+		FindOne(ctx, bson.M{"razorpayOrderId": orderID}).Decode(&doc)
+	if err != nil {
+		return "monthly", err
+	}
+	return doc.PlanDuration, nil
 }
 
 func verifyRazorpaySignature(rawBody []byte, sig, secret string) bool {
