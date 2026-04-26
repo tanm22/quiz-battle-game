@@ -9,7 +9,18 @@ import '../services/quiz_service.dart';
 // Step 59: GameState — holds all live match state
 // ---------------------------------------------------------------------------
 
-enum GameScreen { login, home, matchmaking, gameplay, leaderboard, results }
+enum GameScreen {
+  login,
+  onboardingCarousel,
+  onboardingProfileSetup,
+  onboardingTopicPicker,
+  onboardingPermissionPrime,
+  home,
+  matchmaking,
+  gameplay,
+  leaderboard,
+  results,
+}
 
 class GameState {
   final GameScreen currentScreen;
@@ -378,6 +389,26 @@ class GameStateNotifier extends Notifier<GameState> {
 
   void navigateToHome() {
     state = state.copyWith(currentScreen: GameScreen.home);
+  }
+
+  void navigateToLogin() {
+    state = state.copyWith(currentScreen: GameScreen.login);
+  }
+
+  void navigateToOnboardingCarousel() {
+    state = state.copyWith(currentScreen: GameScreen.onboardingCarousel);
+  }
+
+  void navigateToOnboardingProfileSetup() {
+    state = state.copyWith(currentScreen: GameScreen.onboardingProfileSetup);
+  }
+
+  void navigateToOnboardingTopicPicker() {
+    state = state.copyWith(currentScreen: GameScreen.onboardingTopicPicker);
+  }
+
+  void navigateToOnboardingPermissionPrime() {
+    state = state.copyWith(currentScreen: GameScreen.onboardingPermissionPrime);
   }
 
   Future<void> playAgain() async {

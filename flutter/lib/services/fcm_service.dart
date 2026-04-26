@@ -56,9 +56,16 @@ class FcmService {
     }
   }
 
-  /// Called after the user is authenticated — registers the token with the
-  /// backend and wires up foreground/background handlers. Safe to call more
-  /// than once; subsequent calls are no-ops.
+  /// Called after the user is authenticated — asks the OS for notification
+  /// permission, registers the FCM token with the backend, and wires up
+  /// foreground/background handlers. Safe to call more than once;
+  /// subsequent calls are no-ops via the [_initialized] guard.
+  ///
+  /// Permission ownership lives entirely in this method — there is no
+  /// separate `requestPermission()` entry point, so callers can't trigger
+  /// the OS dialog at the wrong time. To delay the dialog (e.g. behind
+  /// the onboarding permission-prime screen), the caller should defer
+  /// invoking [registerForUser] until the right moment.
   Future<void> registerForUser() async {
     if (_initialized) return;
     if (Firebase.apps.isEmpty) {

@@ -94,7 +94,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   void _navigateToMatchmaking(AuthService auth) {
     QuizService().setAuthToken(auth.token!);
-    ref.read(gameStateProvider.notifier).setAuth(
+    final notifier = ref.read(gameStateProvider.notifier);
+    notifier.setAuth(
       auth.userId!, auth.token!, auth.rating,
       email: auth.email, isGuest: auth.isGuest,
     );
@@ -103,12 +104,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     unawaited(FcmService.instance.registerForUser());
   }
 
+  /// Used after register / Google sign-in. If onboarding is incomplete,
+  /// routes to profile setup AND deliberately skips FCM registration —
+  /// the OS notification permission dialog must wait until the prime
+  /// screen fires it, otherwise the prime screen has nothing left to
+  /// ask for. Already-onboarded users (e.g. a returning Google account)
+  /// take the same path as Login.
+  void _navigateAfterSignup(AuthService auth) {
+    if (!auth.onboardingCompleted) {
+      QuizService().setAuthToken(auth.token!);
+      final notifier = ref.read(gameStateProvider.notifier);
+      notifier.setAuth(
+        auth.userId!, auth.token!, auth.rating,
+        email: auth.email, isGuest: auth.isGuest,
+      );
+      // Intentionally NOT calling FcmService.registerForUser() —
+      // permission ask is deferred to the prime screen so the OS
+      // dialog fires after the user has seen the explanatory context.
+      notifier.navigateToOnboardingProfileSetup();
+    } else {
+      _navigateToMatchmaking(auth);
+    }
+  }
+
   Future<void> _googleSignIn() async {
     setState(() => _isLoading = true);
     try {
       final auth = AuthService();
       await auth.signInWithGoogle();
-      _navigateToMatchmaking(auth);
+      _navigateAfterSignup(auth);
     } on GrpcError catch (e) {
       _showError(e.message ?? 'Google sign-in failed');
     } catch (e) {
@@ -189,7 +213,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     try {
       final auth = AuthService();
       await auth.register(username, password, email: email.isNotEmpty ? email : null, referralCode: referral.isNotEmpty ? referral : null);
-      _navigateToMatchmaking(auth);
+      _navigateAfterSignup(auth);
     } on GrpcError catch (e) {
       _showError(e.message ?? 'Registration failed');
     } catch (e) {
@@ -223,17 +247,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         builder: (_) => EmailCodeScreen(
           email: email,
           purpose: purpose,
-          onVerified: (token, userId) {
+          onVerified: (token, userId) async {
             if (token != null && userId != null) {
               final auth = AuthService();
               QuizService().setAuthToken(auth.token!);
-              ref.read(gameStateProvider.notifier).setAuth(
-                auth.userId!, auth.token!, auth.rating,
-                email: auth.email, isGuest: auth.isGuest,
-              );
-              unawaited(FcmService.instance.registerForUser());
+              // VerifyEmailCodeResponse carries only verified/token/userId.
+              // The local _onboardingCompleted defaults to false on a fresh
+              // device, so we explicitly fetch the profile to know whether
+              // to route to onboarding or home — same contract as register
+              // / Google sign-in. Network failure falls through to cached
+              // defaults; that's the same risk every other flow accepts.
+              await auth.refreshProfile();
             }
-            if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+            if (!mounted) return;
+            Navigator.of(context).popUntil((route) => route.isFirst);
+            if (token != null && userId != null) {
+              _navigateAfterSignup(AuthService());
+            }
           },
         ),
       ),
