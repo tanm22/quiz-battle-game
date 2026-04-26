@@ -22,6 +22,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"quiz-battle/pkg/auth"
+	"quiz-battle/pkg/coins"
 	"quiz-battle/pkg/keys"
 	"quiz-battle/pkg/models"
 	pb "quiz-battle/proto"
@@ -571,6 +572,30 @@ func (s *quizServer) finishMatch(ctx context.Context, roomID string, totalRounds
 		log.Printf("[quiz] failed to marshal match.finished: %v", err)
 	} else if err := s.publish(ctx, "match.finished", finishEvent); err != nil {
 		log.Printf("[quiz] failed to publish match.finished: %v", err)
+	}
+
+	// Phase 3 (4.3): publish coins.earn.match_win for the winner. The
+	// scoring service's coin-earn-queue consumer dispatches this through
+	// ledger.Grant with the (userId, refId, reason) idempotency key, so
+	// a queue redelivery or a republish doesn't double-credit. Empty
+	// `winner` is the opponent-abandoned / zero-rounds path; no coins
+	// in that case (see ADR-0002 reasoning — abandoned matches don't
+	// reward).
+	if winner != "" {
+		earn := coins.EarnEvent{
+			Event:    "coins.earn.match_win",
+			UserID:   winner,
+			Amount:   100, // ADR-0002 initial calibration
+			Reason:   coins.ReasonMatchWin,
+			RefID:    fmt.Sprintf("match:%s:user:%s", roomID, winner),
+			Metadata: map[string]string{"roomId": roomID},
+		}
+		body, mErr := json.Marshal(earn)
+		if mErr != nil {
+			log.Printf("[quiz] marshal coin earn: %v", mErr)
+		} else if pErr := s.publish(ctx, "coins.earn.match_win", body); pErr != nil {
+			log.Printf("[quiz] publish coin earn: %v", pErr)
+		}
 	}
 
 	// Cleanup in-memory state

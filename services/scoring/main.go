@@ -1658,6 +1658,18 @@ func setupRabbitMQ(ch *amqp.Channel) error {
 		return fmt.Errorf("tournament-finished queue bind: %w", err)
 	}
 
+	// Phase 3 (4.3): coin-earn-queue. Single consumer for every async coin
+	// earn source (match wins, future tournament placements, future streak
+	// bonuses). Producers publish "coins.earn.<source>" on the existing sx
+	// exchange; the wildcard binding catches them all and dispatches via
+	// scoringServer.handleEarnEvent → ledger.Grant.
+	if _, err := ch.QueueDeclare(coins.EarnQueueName, true, false, false, false, nil); err != nil {
+		return fmt.Errorf("%s declare: %w", coins.EarnQueueName, err)
+	}
+	if err := ch.QueueBind(coins.EarnQueueName, coins.EarnBindingPattern, coins.EarnExchange, false, nil); err != nil {
+		return fmt.Errorf("%s bind: %w", coins.EarnQueueName, err)
+	}
+
 	return nil
 }
 
@@ -1774,6 +1786,7 @@ func main() {
 	go srv.consumePaymentCaptured(ctx)    // Phase 2: plan upgrade on payment
 	go srv.consumeReferralEvents(ctx)     // Phase 2: referral reward chain (ISSUE-06)
 	go srv.consumeTournamentFinished(ctx) // Phase 3 (4.2): tournament prize coin awards
+	go srv.consumeCoinEarn(ctx)           // Phase 3 (4.3): coins.earn.* fan-in to ledger.Grant
 
 	// Block forever (gRPC server runs in background goroutine)
 	select {}
