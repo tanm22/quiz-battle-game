@@ -22,3 +22,4 @@ RUN apk add --no-cache ca-certificates tzdata
 
 COPY --from=builder /out/ /usr/local/bin/
 COPY seed/questions.json /data/questions.json
+COPY seed/shop_items.json /data/shop_items.json

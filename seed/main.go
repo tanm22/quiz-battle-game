@@ -14,6 +14,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"quiz-battle/pkg/coins"
+	"quiz-battle/pkg/coins/shop"
 )
 
 type Question struct {
@@ -326,6 +327,25 @@ func main() {
 	}
 	tCount, _ := tournamentsColl.CountDocuments(ctx, bson.M{})
 	log.Printf("[seed] %d tournaments in database", tCount)
+
+	// PR 4 (§4.3): upsert shop catalog from JSON. We try the in-image path
+	// first (the Dockerfile copies seed/shop_items.json to /data) and fall
+	// back to the repo-relative path for local `go run ./seed` invocations.
+	shopPath := "/data/shop_items.json"
+	if _, err := os.Stat(shopPath); err != nil {
+		shopPath = "seed/shop_items.json"
+		if _, err := os.Stat(shopPath); err != nil {
+			shopPath = "shop_items.json"
+		}
+	}
+	items, err := shop.LoadFromFile(shopPath)
+	if err != nil {
+		log.Fatalf("[seed] load shop items from %s: %v", shopPath, err)
+	}
+	if err := shop.Upsert(ctx, db, items); err != nil {
+		log.Fatalf("[seed] upsert shop items: %v", err)
+	}
+	log.Printf("[seed] upserted %d shop items", len(items))
 
 	log.Println("[seed] done")
 }

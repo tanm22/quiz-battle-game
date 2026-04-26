@@ -1,0 +1,9 @@
+[
+  {"id":"frame.gold","kind":"cosmetic.avatar_frame","name":"Gold Frame","description":"Premium gold avatar frame","priceCoins":500,"active":true},
+  {"id":"frame.neon","kind":"cosmetic.avatar_frame","name":"Neon Frame","description":"Glowing neon ring","priceCoins":300,"active":true},
+  {"id":"name.crimson","kind":"cosmetic.name_color","name":"Crimson Name","description":"Red display name","priceCoins":150,"active":true},
+  {"id":"name.aurora","kind":"cosmetic.name_color","name":"Aurora Name","description":"Gradient name color","priceCoins":300,"active":true},
+  {"id":"streak_freeze.weekly","kind":"streak_freeze","name":"Streak Freeze","description":"Skip one missed day this week — max 1/week.","priceCoins":200,"active":true},
+  {"id":"premium.trial.3d","kind":"premium_trial","name":"3-Day Premium Trial","description":"Premium for 3 days","priceCoins":1500,"active":true,"metadata":{"days":"3"}},
+  {"id":"reroll.topic","kind":"reroll_topic","name":"Topic Re-Roll","description":"Re-roll one question topic during a match","priceCoins":50,"active":true,"metadata":{"charges":"1"}}
+]
