@@ -136,6 +136,26 @@ func main() {
 		Keys: bson.D{{Key: "status", Value: 1}},
 	})
 
+	// Phase 3 (4.3): coin_ledger is the immutable source of truth for every
+	// balance change. The unique compound index on (userId, refId, reason)
+	// gives Grant its idempotency: calling Grant twice with the same refId
+	// returns the existing row instead of double-crediting. The (userId,
+	// createdAt desc) index is the read path for GetLedger pagination.
+	ledgerColl := db.Collection("coin_ledger")
+	if _, err := ledgerColl.Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "userId", Value: 1}, {Key: "refId", Value: 1}, {Key: "reason", Value: 1}},
+			Options: options.Index().SetUnique(true).SetName("uniq_user_ref_reason"),
+		},
+		{
+			Keys:    bson.D{{Key: "userId", Value: 1}, {Key: "createdAt", Value: -1}},
+			Options: options.Index().SetName("idx_user_recent"),
+		},
+	}); err != nil {
+		log.Fatalf("[seed] coin_ledger indexes: %v", err)
+	}
+	log.Println("[seed] coin_ledger indexes ensured")
+
 	log.Println("[seed] indexes created")
 
 	// --- Seed questions ---
