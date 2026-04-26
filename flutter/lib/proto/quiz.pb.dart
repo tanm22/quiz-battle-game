@@ -6919,6 +6919,278 @@ class PurchaseShopItemResponse extends $pb.GeneratedMessage {
   void clearErrorCode() => $_clearField(4);
 }
 
+class EquipCosmeticRequest extends $pb.GeneratedMessage {
+  factory EquipCosmeticRequest({
+    $core.String? itemId,
+  }) {
+    final result = create();
+    if (itemId != null) result.itemId = itemId;
+    return result;
+  }
+
+  EquipCosmeticRequest._();
+
+  factory EquipCosmeticRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory EquipCosmeticRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'EquipCosmeticRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'itemId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EquipCosmeticRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EquipCosmeticRequest copyWith(void Function(EquipCosmeticRequest) updates) =>
+      super.copyWith((message) => updates(message as EquipCosmeticRequest))
+          as EquipCosmeticRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static EquipCosmeticRequest create() => EquipCosmeticRequest._();
+  @$core.override
+  EquipCosmeticRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static EquipCosmeticRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<EquipCosmeticRequest>(create);
+  static EquipCosmeticRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get itemId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set itemId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasItemId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearItemId() => $_clearField(1);
+}
+
+class EquipCosmeticResponse extends $pb.GeneratedMessage {
+  factory EquipCosmeticResponse({
+    $core.bool? success,
+    $core.String? errorCode,
+  }) {
+    final result = create();
+    if (success != null) result.success = success;
+    if (errorCode != null) result.errorCode = errorCode;
+    return result;
+  }
+
+  EquipCosmeticResponse._();
+
+  factory EquipCosmeticResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory EquipCosmeticResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'EquipCosmeticResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'success')
+    ..aOS(2, _omitFieldNames ? '' : 'errorCode')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EquipCosmeticResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EquipCosmeticResponse copyWith(
+          void Function(EquipCosmeticResponse) updates) =>
+      super.copyWith((message) => updates(message as EquipCosmeticResponse))
+          as EquipCosmeticResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static EquipCosmeticResponse create() => EquipCosmeticResponse._();
+  @$core.override
+  EquipCosmeticResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static EquipCosmeticResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<EquipCosmeticResponse>(create);
+  static EquipCosmeticResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get success => $_getBF(0);
+  @$pb.TagNumber(1)
+  set success($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSuccess() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSuccess() => $_clearField(1);
+
+  /// Empty on success. Domain error codes:
+  ///   UNKNOWN        — itemId not in catalog
+  ///   NOT_OWNED      — user doesn't own this cosmetic
+  ///   NOT_EQUIPPABLE — item is not a cosmetic kind (frame / name color)
+  @$pb.TagNumber(2)
+  $core.String get errorCode => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set errorCode($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasErrorCode() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearErrorCode() => $_clearField(2);
+}
+
+class ConsumeRerollRequest extends $pb.GeneratedMessage {
+  factory ConsumeRerollRequest({
+    $core.String? roomId,
+    $core.String? roundId,
+  }) {
+    final result = create();
+    if (roomId != null) result.roomId = roomId;
+    if (roundId != null) result.roundId = roundId;
+    return result;
+  }
+
+  ConsumeRerollRequest._();
+
+  factory ConsumeRerollRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ConsumeRerollRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ConsumeRerollRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'roomId')
+    ..aOS(2, _omitFieldNames ? '' : 'roundId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ConsumeRerollRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ConsumeRerollRequest copyWith(void Function(ConsumeRerollRequest) updates) =>
+      super.copyWith((message) => updates(message as ConsumeRerollRequest))
+          as ConsumeRerollRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ConsumeRerollRequest create() => ConsumeRerollRequest._();
+  @$core.override
+  ConsumeRerollRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ConsumeRerollRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ConsumeRerollRequest>(create);
+  static ConsumeRerollRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get roomId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set roomId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRoomId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRoomId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get roundId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set roundId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRoundId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRoundId() => $_clearField(2);
+}
+
+class ConsumeRerollResponse extends $pb.GeneratedMessage {
+  factory ConsumeRerollResponse({
+    $core.bool? success,
+    $core.int? chargesRemaining,
+    $core.String? errorCode,
+  }) {
+    final result = create();
+    if (success != null) result.success = success;
+    if (chargesRemaining != null) result.chargesRemaining = chargesRemaining;
+    if (errorCode != null) result.errorCode = errorCode;
+    return result;
+  }
+
+  ConsumeRerollResponse._();
+
+  factory ConsumeRerollResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ConsumeRerollResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ConsumeRerollResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'success')
+    ..aI(2, _omitFieldNames ? '' : 'chargesRemaining')
+    ..aOS(3, _omitFieldNames ? '' : 'errorCode')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ConsumeRerollResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ConsumeRerollResponse copyWith(
+          void Function(ConsumeRerollResponse) updates) =>
+      super.copyWith((message) => updates(message as ConsumeRerollResponse))
+          as ConsumeRerollResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ConsumeRerollResponse create() => ConsumeRerollResponse._();
+  @$core.override
+  ConsumeRerollResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ConsumeRerollResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ConsumeRerollResponse>(create);
+  static ConsumeRerollResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get success => $_getBF(0);
+  @$pb.TagNumber(1)
+  set success($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSuccess() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSuccess() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get chargesRemaining => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set chargesRemaining($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasChargesRemaining() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearChargesRemaining() => $_clearField(2);
+
+  /// Empty on success. Domain error code: NO_CHARGES — user has zero
+  /// rerollCharges, so the spend was rejected without mutating state.
+  @$pb.TagNumber(3)
+  $core.String get errorCode => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set errorCode($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasErrorCode() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearErrorCode() => $_clearField(3);
+}
+
 const $core.bool _omitFieldNames =
     $core.bool.fromEnvironment('protobuf.omit_field_names');
 const $core.bool _omitMessageNames =
