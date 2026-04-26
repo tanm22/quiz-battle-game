@@ -205,10 +205,13 @@ type TournamentPayout struct {
 //   - unique compound (fromUserId, toUserId) — one outbound request per pair
 //   - compound (toUserId, status) — incoming pending list query
 //   - compound (fromUserId, status) — outgoing pending list (future use)
-//   - sparse compound (toUserId, fromUserId) — symmetric lookup for the
-//     "reverse direction already exists" check
+//   - compound (toUserId, fromUserId) — symmetric lookup for the
+//     "reverse direction already exists" check in SendFriendRequest
 type FriendRequest struct {
-	ID           string     `bson:"_id,omitempty"`
+	// _id is NOT tagged omitempty: callers always assign a uuid before
+	// InsertOne, and we want a future zero-value bug to fail loudly rather
+	// than silently fall back to a Mongo-generated ObjectId. Mirrors User.ID.
+	ID           string     `bson:"_id"`
 	FromUserID   string     `bson:"fromUserId"`
 	FromUsername string     `bson:"fromUsername"`
 	ToUserID     string     `bson:"toUserId"`

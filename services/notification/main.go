@@ -312,6 +312,22 @@ func buildMessage(event string, payload map[string]any) (string, string, map[str
 			fmt.Sprintf("%s wants to be your friend.", name),
 			data
 
+	case "notif.friend.request_accepted":
+		// Phase 3 (4.4): emitted by scoring when a pending request flips to
+		// accepted (RespondToFriendRequest accept path, or the auto-accept-
+		// reverse path inside SendFriendRequest). Tells the original sender
+		// in real time so they don't have to poll GetFriendsList.
+		name := strField(payload, "accepterUsername")
+		if name == "" {
+			name = "Someone"
+		}
+		if reqID := strField(payload, "requestId"); reqID != "" {
+			data["requestId"] = reqID
+		}
+		return "🤝 Friend request accepted",
+			fmt.Sprintf("%s accepted your friend request.", name),
+			data
+
 	case "notif.friend.challenge":
 		// Phase 3 (4.4): emitted by scoring's ChallengeFriend. roomId is
 		// the active 1v1 room — the client routes the tap straight into

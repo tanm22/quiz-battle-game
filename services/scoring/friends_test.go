@@ -185,11 +185,14 @@ func TestSendFriendRequest_HappyPathByReferralCode(t *testing.T) {
 func TestSendFriendRequest_AutoAcceptsReversePending(t *testing.T) {
 	// Bob → Alice was already pending. Alice "sends" to Bob → the
 	// existing reverse request flips to accepted; no new row written.
+	// Bob (the original sender) gets a notif.friend.request_accepted push
+	// so he learns about it without polling.
 	srv, _, _ := scoringTestEnv(t)
 	seedFullUser(t, srv, "alice", "alice", "REFAA")
 	seedFullUser(t, srv, "bob", "bob", "REFBB")
 	ensureFriendIndexes(t, srv)
 	seedFriendRequestRow(t, srv, "req-1", "bob", "alice", "pending")
+	captured := publishCapture(srv)
 
 	resp, _ := srv.SendFriendRequest(authedCtx("alice"),
 		&pb.SendFriendRequestRequest{TargetUsername: "bob"})
@@ -211,6 +214,18 @@ func TestSendFriendRequest_AutoAcceptsReversePending(t *testing.T) {
 		bson.M{"fromUserId": "alice", "toUserId": "bob"})
 	if count != 0 {
 		t.Errorf("forward row created during auto-accept: %d", count)
+	}
+
+	// Bob receives the accept push. Without this he wouldn't know his
+	// pending request just became a friendship until he next polled.
+	accepted := 0
+	for _, p := range captured() {
+		if p.Routing == "notif.friend.request_accepted" {
+			accepted++
+		}
+	}
+	if accepted != 1 {
+		t.Errorf("notif.friend.request_accepted: got %d, want 1", accepted)
 	}
 }
 
@@ -286,6 +301,7 @@ func TestRespondToFriendRequest_Accept(t *testing.T) {
 	seedFullUser(t, srv, "alice", "alice", "REFAA")
 	seedFullUser(t, srv, "bob", "bob", "REFBB")
 	seedFriendRequestRow(t, srv, "req-4", "alice", "bob", "pending")
+	captured := publishCapture(srv)
 
 	resp, _ := srv.RespondToFriendRequest(authedCtx("bob"),
 		&pb.RespondToFriendRequestRequest{RequestId: "req-4", Accept: true})
@@ -300,6 +316,18 @@ func TestRespondToFriendRequest_Accept(t *testing.T) {
 		bson.M{"_id": "req-4"}).Decode(&r)
 	if r.Status != "accepted" || r.RespondedAt == nil {
 		t.Errorf("post-state: %+v", r)
+	}
+
+	// Original sender (alice) receives the accept push. Reject path is
+	// silent on purpose — see TestRespondToFriendRequest_Reject below.
+	accepted := 0
+	for _, p := range captured() {
+		if p.Routing == "notif.friend.request_accepted" {
+			accepted++
+		}
+	}
+	if accepted != 1 {
+		t.Errorf("notif.friend.request_accepted: got %d, want 1", accepted)
 	}
 }
 
@@ -524,6 +552,26 @@ func TestChallengeFriend_HappyPath(t *testing.T) {
 	if notif != 1 {
 		t.Errorf("notif.friend.challenge publishes: got %d, want 1", notif)
 	}
+
+	// Outbox row exists and is marked processed (the inline publish
+	// succeeded, so the drainer won't redeliver).
+	var rows []challengeNotifOutboxRow
+	cur, err := srv.mongoDB.Collection(challengeNotifOutboxCollection).Find(context.Background(), bson.M{})
+	if err != nil {
+		t.Fatalf("outbox find: %v", err)
+	}
+	if err := cur.All(context.Background(), &rows); err != nil {
+		t.Fatalf("outbox decode: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("outbox rows: got %d, want 1", len(rows))
+	}
+	if rows[0].ProcessedAt == nil {
+		t.Errorf("outbox row not marked processed: %+v", rows[0])
+	}
+	if rows[0].RoomID != resp.RoomId || rows[0].RecipientID != "bob" || rows[0].FromUserID != "alice" {
+		t.Errorf("outbox row payload mismatch: %+v", rows[0])
+	}
 }
 
 func TestChallengeFriend_OfflineHint(t *testing.T) {
@@ -556,5 +604,123 @@ func TestChallengeFriend_Throttled(t *testing.T) {
 		&pb.ChallengeFriendRequest{FriendUserId: "bob"})
 	if resp.ErrorCode != "THROTTLED" {
 		t.Errorf("got %q, want THROTTLED", resp.ErrorCode)
+	}
+}
+
+func TestChallengeFriend_DeletedUserMapsToNotFound(t *testing.T) {
+	// resolvePlayer must surface mongo.ErrNoDocuments as codes.NotFound,
+	// not codes.Internal — a stale JWT or deleted account is a 404, not a
+	// server bug. This was issue #4 from the PR review.
+	srv, _, _ := scoringTestEnv(t)
+	attachRedis(t, srv)
+	seedFullUser(t, srv, "alice", "alice", "REFAA")
+	// Friendship row references a friend user that doesn't exist in users
+	// collection — simulates a deleted account whose row was orphaned.
+	seedFriendRequestRow(t, srv, "fr-deleted", "alice", "ghost", "accepted")
+
+	_, err := srv.ChallengeFriend(authedCtx("alice"),
+		&pb.ChallengeFriendRequest{FriendUserId: "ghost"})
+	if status.Code(err) != codes.NotFound {
+		t.Errorf("got code=%v err=%v, want NotFound", status.Code(err), err)
+	}
+}
+
+func TestChallengeFriend_ReleasesThrottleOnErrorPath(t *testing.T) {
+	// On any error return after the SETNX, the throttle key must be
+	// released so the caller isn't locked out for 30s when no room ever
+	// existed. Issue #1 from the PR review.
+	srv, _, _ := scoringTestEnv(t)
+	attachRedis(t, srv)
+	seedFullUser(t, srv, "alice", "alice", "REFAA")
+	seedFriendRequestRow(t, srv, "fr-err", "alice", "ghost", "accepted")
+
+	_, err := srv.ChallengeFriend(authedCtx("alice"),
+		&pb.ChallengeFriendRequest{FriendUserId: "ghost"})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("setup precondition: want NotFound, got %v", err)
+	}
+	// Throttle key must be gone so a second attempt isn't blocked.
+	exists, err := srv.rdb.Exists(context.Background(),
+		keys.ChallengeThrottle("alice", "ghost")).Result()
+	if err != nil {
+		t.Fatalf("EXISTS: %v", err)
+	}
+	if exists != 0 {
+		t.Errorf("throttle key still set after error path; want released")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Outbox drain worker
+// ---------------------------------------------------------------------------
+
+func TestDrainChallengeNotifOnce_RepublishesPending(t *testing.T) {
+	// A row stuck without processedAt should get republished and marked
+	// processed in one drain pass.
+	srv, _, _ := scoringTestEnv(t)
+	captured := publishCapture(srv)
+
+	row := challengeNotifOutboxRow{
+		ID:           "outbox-1",
+		RecipientID:  "bob",
+		FromUserID:   "alice",
+		FromUsername: "alice",
+		RoomID:       "room-stuck",
+		CreatedAt:    time.Now().UTC().Add(-1 * time.Minute),
+	}
+	if _, err := srv.mongoDB.Collection(challengeNotifOutboxCollection).
+		InsertOne(context.Background(), row); err != nil {
+		t.Fatalf("seed outbox row: %v", err)
+	}
+
+	srv.drainChallengeNotifOnce(context.Background())
+
+	// Republish landed.
+	pubs := captured()
+	got := 0
+	for _, p := range pubs {
+		if p.Routing == "notif.friend.challenge" {
+			got++
+		}
+	}
+	if got != 1 {
+		t.Errorf("republish count: got %d, want 1", got)
+	}
+	// Row marked processed.
+	var after challengeNotifOutboxRow
+	_ = srv.mongoDB.Collection(challengeNotifOutboxCollection).
+		FindOne(context.Background(), bson.M{"_id": "outbox-1"}).Decode(&after)
+	if after.ProcessedAt == nil {
+		t.Errorf("row not marked processed after successful republish: %+v", after)
+	}
+}
+
+func TestDrainChallengeNotifOnce_SkipsProcessedRows(t *testing.T) {
+	// Already-processed rows must be skipped — otherwise a healthy publish
+	// would fan out duplicate FCMs every drain tick.
+	srv, _, _ := scoringTestEnv(t)
+	captured := publishCapture(srv)
+
+	processed := time.Now().UTC()
+	row := challengeNotifOutboxRow{
+		ID:           "outbox-done",
+		RecipientID:  "bob",
+		FromUserID:   "alice",
+		FromUsername: "alice",
+		RoomID:       "room-done",
+		CreatedAt:    processed.Add(-1 * time.Minute),
+		ProcessedAt:  &processed,
+	}
+	if _, err := srv.mongoDB.Collection(challengeNotifOutboxCollection).
+		InsertOne(context.Background(), row); err != nil {
+		t.Fatalf("seed outbox row: %v", err)
+	}
+
+	srv.drainChallengeNotifOnce(context.Background())
+
+	for _, p := range captured() {
+		if p.Routing == "notif.friend.challenge" {
+			t.Errorf("processed row was republished: %+v", p)
+		}
 	}
 }

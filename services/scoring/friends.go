@@ -24,6 +24,36 @@ import (
 // to a const so tests and seed don't drift on the literal.
 const friendRequestsCollection = "friend_requests"
 
+// friendAcceptedEvent is the payload for notif.friend.request_accepted —
+// fired when a pending request flips to accepted (either via the
+// auto-accept-reverse path in SendFriendRequest or the explicit accept in
+// RespondToFriendRequest). The recipient is the user whose original
+// outbound request just got accepted.
+type friendAcceptedEvent struct {
+	RecipientUserID  string
+	AccepterUserID   string
+	AccepterUsername string
+	RequestID        string
+}
+
+// publishFriendRequestAccepted is the single fan-out point for the
+// "your friend request was accepted" push. Best-effort: a publish failure
+// is logged but doesn't fail the caller — the friendship is already
+// committed in Mongo and the recipient will see it on next GetFriendsList.
+func (s *scoringServer) publishFriendRequestAccepted(ctx context.Context, ev friendAcceptedEvent) {
+	body, _ := json.Marshal(map[string]any{
+		"event":            "notif.friend.request_accepted",
+		"userId":           ev.RecipientUserID,
+		"accepterUserId":   ev.AccepterUserID,
+		"accepterUsername": ev.AccepterUsername,
+		"requestId":        ev.RequestID,
+	})
+	if err := s.publish(ctx, "notif.friend.request_accepted", body); err != nil {
+		log.Printf("[friends] publish notif.friend.request_accepted failed (recipient=%s): %v",
+			ev.RecipientUserID, err)
+	}
+}
+
 // SendFriendRequest creates a pending friend_requests row for the caller →
 // target. Idempotent on (fromUserId, toUserId) via the unique index in
 // seed/main.go: a duplicate send returns the existing pending request or,
@@ -95,6 +125,16 @@ func (s *scoringServer) SendFriendRequest(ctx context.Context, req *pb.SendFrien
 			); err != nil {
 				return nil, status.Errorf(codes.Internal, "auto-accept: %v", err)
 			}
+			// Tell the original requester (Bob) that the request just flipped
+			// to accepted. Without this push he'd only learn via polling
+			// GetFriendsList. Best-effort: a publish failure doesn't fail
+			// the RPC — the friendship is already committed in Mongo.
+			s.publishFriendRequestAccepted(ctx, friendAcceptedEvent{
+				RecipientUserID:  reverse.FromUserID, // Bob, the original sender
+				AccepterUserID:   fromID,             // Alice, who just sent in reverse
+				AccepterUsername: caller.Username,
+				RequestID:        reverse.ID,
+			})
 			return &pb.SendFriendRequestResponse{Success: true, RequestId: reverse.ID}, nil
 		}
 		// reverse.Status == "rejected": fall through and let the caller
@@ -204,6 +244,26 @@ func (s *scoringServer) RespondToFriendRequest(ctx context.Context, req *pb.Resp
 	if res.MatchedCount == 0 {
 		// Concurrent racer responded between our read and write.
 		return &pb.RespondToFriendRequestResponse{ErrorCode: "ALREADY_RESPONDED"}, nil
+	}
+	// On accept, push the original sender so they learn in real time
+	// (mirrors the auto-accept-reverse path in SendFriendRequest). Reject
+	// is silent on purpose — surfacing rejections would create an
+	// uncomfortable UX without giving the rejector any control.
+	if newStatus == "accepted" {
+		// Resolve the responder's username for the push body so the
+		// recipient sees "<friend> accepted your request" instead of an
+		// opaque user id. Best-effort lookup; a failure here doesn't
+		// fail the RPC.
+		var responder struct {
+			Username string `bson:"username"`
+		}
+		_ = s.mongoDB.Collection("users").FindOne(ctx, bson.M{"_id": uid}).Decode(&responder)
+		s.publishFriendRequestAccepted(ctx, friendAcceptedEvent{
+			RecipientUserID:  existing.FromUserID, // original sender
+			AccepterUserID:   uid,
+			AccepterUsername: responder.Username,
+			RequestID:        existing.ID,
+		})
 	}
 	return &pb.RespondToFriendRequestResponse{Success: true}, nil
 }
@@ -383,6 +443,11 @@ func (s *scoringServer) ChallengeFriend(ctx context.Context, req *pb.ChallengeFr
 
 	// Throttle SETNX so a double-tap or rapid retry doesn't create two
 	// rooms + two notifs. 30 seconds is the debounce window.
+	//
+	// Held throughout the rest of the handler so concurrent calls see
+	// THROTTLED, but compensated (DEL) on every error return below — a
+	// failed challenge mustn't lock the user out for 30 seconds when no
+	// room ever existed. We only keep the throttle on the happy path.
 	ok, err := keys.TrySetChallengeThrottle(ctx, s.rdb, fromID, req.FriendUserId)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "throttle: %v", err)
@@ -390,10 +455,27 @@ func (s *scoringServer) ChallengeFriend(ctx context.Context, req *pb.ChallengeFr
 	if !ok {
 		return &pb.ChallengeFriendResponse{ErrorCode: "THROTTLED"}, nil
 	}
+	throttleHeld := true
+	defer func() {
+		if throttleHeld {
+			// Use Background — the request ctx may be cancelled by the
+			// time we get here, but the throttle key release must still
+			// land or the caller stays locked out.
+			if delErr := s.rdb.Del(context.Background(),
+				keys.ChallengeThrottle(fromID, req.FriendUserId)).Err(); delErr != nil {
+				log.Printf("[friends] release throttle on error path failed (from=%s to=%s): %v",
+					fromID, req.FriendUserId, delErr)
+			}
+		}
+	}()
 
 	// Resolve usernames + plans for the room players hash so leaderboard
 	// rendering doesn't have to look them up later. Mirrors the pattern
 	// in matchmaking/main.go createRoom.
+	//
+	// mongo.ErrNoDocuments here means a stale JWT or deleted account —
+	// surface as NotFound so the client can re-auth or render a friendly
+	// error rather than swallow a 500. Other lookup failures stay Internal.
 	resolvePlayer := func(uid string) (models.PlayerInfo, error) {
 		var u struct {
 			Username string `bson:"username"`
@@ -416,10 +498,16 @@ func (s *scoringServer) ChallengeFriend(ctx context.Context, req *pb.ChallengeFr
 	}
 	challenger, err := resolvePlayer(fromID)
 	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, status.Errorf(codes.NotFound, "%v", err)
+		}
 		return nil, status.Errorf(codes.Internal, "%v", err)
 	}
 	friend, err := resolvePlayer(req.FriendUserId)
 	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, status.Errorf(codes.NotFound, "%v", err)
+		}
 		return nil, status.Errorf(codes.Internal, "%v", err)
 	}
 
@@ -460,14 +548,40 @@ func (s *scoringServer) ChallengeFriend(ctx context.Context, req *pb.ChallengeFr
 		return nil, status.Errorf(codes.Internal, "write room: %v", err)
 	}
 
+	// Durably enqueue the friend-challenge push BEFORE attempting to
+	// publish. A transient RabbitMQ failure here would otherwise
+	// permanently lose the FCM (the room is already committed in Redis
+	// but the recipient never gets the push). drainChallengeNotifOutbox
+	// retries unprocessed rows on a 30s ticker — see friends_outbox.go.
+	outboxRow := challengeNotifOutboxRow{
+		ID:           uuid.New().String(),
+		RecipientID:  req.FriendUserId,
+		FromUserID:   fromID,
+		FromUsername: challenger.Username,
+		RoomID:       roomID,
+		CreatedAt:    time.Now().UTC(),
+	}
+	if err := s.enqueueChallengeNotifOutbox(ctx, outboxRow); err != nil {
+		// Rare: Mongo write failed AFTER Redis room commit. Log loudly —
+		// the room exists but no push will fire. Don't fail the RPC: the
+		// challenger still has the roomId and can share it directly.
+		log.Printf("[friends] enqueue challenge notif outbox failed (room=%s): %v", roomID, err)
+	}
+
 	// match.created is what the quiz service consumes to start the
 	// round. Identical event shape to matchmaking's publish, so the
 	// quiz consumer doesn't need to know about challenges.
+	//
+	// Contract note: matchmaking's publish is `{roomId, playerIds,
+	// createdAt}`. We add an OPTIONAL `source` field for log triage —
+	// consumers must ignore unknown fields (the quiz consumer already
+	// does). Recorded here so a future schema migration knows the field
+	// is publisher-side optional, not part of the canonical payload.
 	event := map[string]any{
 		"roomId":    roomID,
 		"playerIds": playerIDs,
 		"createdAt": now,
-		"source":    "friend_challenge", // hint for log triage
+		"source":    "friend_challenge",
 	}
 	eventJSON, _ := json.Marshal(event)
 	if err := s.publish(ctx, "match.created", eventJSON); err != nil {
@@ -490,9 +604,22 @@ func (s *scoringServer) ChallengeFriend(ctx context.Context, req *pb.ChallengeFr
 		"fromUsername":    challenger.Username,
 		"roomId":          roomID,
 		"recipientOnline": friendOnline,
+		"outboxId":        outboxRow.ID,
 	})
 	if err := s.publish(ctx, "notif.friend.challenge", notifJSON); err != nil {
-		log.Printf("[friends] publish notif.friend.challenge failed: %v", err)
+		// Don't mark the outbox row processed — the drain worker will
+		// retry on its next tick.
+		log.Printf("[friends] publish notif.friend.challenge failed (outbox=%s, will retry): %v",
+			outboxRow.ID, err)
+	} else {
+		// Inline success path: mark processed so the drain worker doesn't
+		// re-fire the same notif. Failure to mark is acceptable — the
+		// drainer will publish again, and the consumer is idempotent on
+		// (recipient, roomId).
+		if err := s.markChallengeNotifProcessed(ctx, outboxRow.ID); err != nil {
+			log.Printf("[friends] mark challenge notif processed failed (outbox=%s): %v",
+				outboxRow.ID, err)
+		}
 	}
 
 	resp := &pb.ChallengeFriendResponse{Success: true, RoomId: roomID}
@@ -502,5 +629,8 @@ func (s *scoringServer) ChallengeFriend(ctx context.Context, req *pb.ChallengeFr
 		// Non-blocking — the challenge still goes out via FCM.
 		resp.ErrorCode = "FRIEND_OFFLINE"
 	}
+	// Successful return: keep the throttle so a rapid follow-up click
+	// hits THROTTLED rather than creating a second room.
+	throttleHeld = false
 	return resp, nil
 }

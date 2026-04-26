@@ -25,9 +25,9 @@ const (
 	MatchInviteThrottleKey = "match_invite:%s:%s" // fromUserID, toUserID
 	// Phase 3 (4.4): friend challenge throttle so one challenger can't
 	// spam-fire challenges at the same friend. Key per (from, to) pair,
-	// 60-second TTL set on send.
+	// 30-second TTL set on send (see ChallengeThrottleTTL in redis.go).
 	ChallengeThrottleKey = "challenge:throttle:%s:%s" // fromUserID, toUserID
-	// Phase 3 (4.4): online-presence TTL key. SET with 60s expiry on
+	// Phase 3 (4.4): online-presence TTL key. SET with PresenceTTL on
 	// every Heartbeat RPC; GetFriendsList reads via EXISTS-equivalent
 	// (a non-zero TTL key means "online within the last minute").
 	PresenceKey = "presence:%s" // userID
