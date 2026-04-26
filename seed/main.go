@@ -249,6 +249,23 @@ func main() {
 		log.Printf("[seed] migrated %d existing users to onboardingCompleted=true", migRes.ModifiedCount)
 	}
 
+	// §4.3 (PR 4) backfill: pre-shop users have no inventory fields. Seed
+	// rerollCharges=0 / streakFreezeHeld=false / streakFreezeWeekISO="" so
+	// the GetShopInventory RPC and Purchase.Buy weekly-cap predicate never
+	// have to special-case "field absent" vs "field zero".
+	shopBackfillRes, err := usersColl.UpdateMany(ctx,
+		bson.M{"rerollCharges": bson.M{"$exists": false}},
+		bson.M{"$set": bson.M{
+			"rerollCharges":       int32(0),
+			"streakFreezeHeld":    false,
+			"streakFreezeWeekISO": "",
+		}},
+	)
+	if err != nil {
+		log.Fatalf("[seed] shop field backfill: %v", err)
+	}
+	log.Printf("[seed] shop fields backfilled on %d users", shopBackfillRes.ModifiedCount)
+
 	// --- Seed tournaments ---
 	tournamentsColl := db.Collection("tournaments")
 	now := time.Now()

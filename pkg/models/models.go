@@ -62,7 +62,19 @@ type User struct {
 	PreferredTopics       []string   `bson:"preferredTopics,omitempty" json:"preferredTopics,omitempty"`
 	OnboardingCompleted   bool       `bson:"onboardingCompleted" json:"onboardingCompleted"`
 	OnboardingCompletedAt *time.Time `bson:"onboardingCompletedAt,omitempty" json:"onboardingCompletedAt,omitempty"`
-	CreatedAt             int64      `bson:"createdAt"`
+	// §4.3 Shop inventory. OwnedCosmetics holds itemIds the user has bought
+	// (avatar frames + name colours); EquippedCosmeticID / EquippedNameColor
+	// pin the currently active selection. RerollCharges is the spendable
+	// counter consumed by the in-match topic re-roll. StreakFreezeHeld +
+	// StreakFreezeWeekISO together gate the "1 streak-freeze per ISO week"
+	// rule: WeekISO is the year-week the freeze was claimed in.
+	OwnedCosmetics      []string `bson:"ownedCosmetics,omitempty"`
+	EquippedCosmeticID  string   `bson:"equippedCosmeticId,omitempty"`
+	EquippedNameColor   string   `bson:"equippedNameColor,omitempty"`
+	RerollCharges       int32    `bson:"rerollCharges,omitempty"`
+	StreakFreezeHeld    bool     `bson:"streakFreezeHeld,omitempty"`
+	StreakFreezeWeekISO string   `bson:"streakFreezeWeekISO,omitempty"`
+	CreatedAt           int64    `bson:"createdAt"`
 }
 
 // Payment is the MongoDB document in the payments collection.
