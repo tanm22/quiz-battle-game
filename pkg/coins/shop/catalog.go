@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -22,7 +23,8 @@ import (
 
 // Kind* constants enumerate the supported item kinds. Each kind is dispatched
 // to a distinct branch in Purchase.Buy; adding a new kind means adding a
-// constant here AND a switch arm there.
+// constant here AND a switch arm there AND an entry in validKinds below so
+// LoadFromFile rejects catalog rows it can't dispatch.
 const (
 	KindAvatarFrame  = "cosmetic.avatar_frame"
 	KindNameColor    = "cosmetic.name_color"
@@ -30,6 +32,19 @@ const (
 	KindPremiumTrial = "premium_trial"
 	KindRerollTopic  = "reroll_topic"
 )
+
+// validKinds is the authoritative allowlist for catalog rows. LoadFromFile
+// rejects any item whose Kind is not a key in this map so a typo'd kind
+// (e.g. "cosmetic.avatar_fram") fails loudly at deploy time instead of
+// surfacing as a codes.Internal at first-purchase time when applyEffect's
+// default arm fires.
+var validKinds = map[string]struct{}{
+	KindAvatarFrame:  {},
+	KindNameColor:    {},
+	KindStreakFreeze: {},
+	KindPremiumTrial: {},
+	KindRerollTopic:  {},
+}
 
 // CatalogCollection is the Mongo collection name. Exported so tests and the
 // seed binary can reach it without re-declaring the literal.
@@ -64,8 +79,43 @@ func LoadFromFile(path string) ([]Item, error) {
 		if it.ID == "" || it.Kind == "" || it.PriceCoins <= 0 {
 			return nil, fmt.Errorf("invalid item: %+v", it)
 		}
+		if _, ok := validKinds[it.Kind]; !ok {
+			return nil, fmt.Errorf("invalid item %s: unknown kind %q", it.ID, it.Kind)
+		}
+		if err := validateMetadataForKind(it); err != nil {
+			return nil, err
+		}
 	}
 	return items, nil
+}
+
+// validateMetadataForKind enforces the per-kind shape of Item.Metadata at
+// load time. Without this, a typo or missing key would silently fall through
+// to runtime — most dangerously, a bad "charges" value on a reroll item
+// would let Purchase.Buy debit the user but apply the wrong charge count.
+// Failing loudly in the seed binary is cheaper than a bug report.
+func validateMetadataForKind(it Item) error {
+	switch it.Kind {
+	case KindRerollTopic:
+		raw, ok := it.Metadata["charges"]
+		if !ok {
+			return fmt.Errorf("invalid item %s: %s requires metadata.charges", it.ID, it.Kind)
+		}
+		n, err := strconv.ParseInt(raw, 10, 32)
+		if err != nil || n <= 0 {
+			return fmt.Errorf("invalid item %s: metadata.charges must be a positive int, got %q", it.ID, raw)
+		}
+	case KindPremiumTrial:
+		raw, ok := it.Metadata["days"]
+		if !ok {
+			return fmt.Errorf("invalid item %s: %s requires metadata.days", it.ID, it.Kind)
+		}
+		n, err := strconv.ParseInt(raw, 10, 32)
+		if err != nil || n <= 0 {
+			return fmt.Errorf("invalid item %s: metadata.days must be a positive int, got %q", it.ID, raw)
+		}
+	}
+	return nil
 }
 
 // Upsert writes each Item into coin_catalog by _id, replacing the previous

@@ -65,6 +65,17 @@ func TestGetShopCatalog_OmitsInactive(t *testing.T) {
 	}
 }
 
+func TestGetShopInventory_MissingUserReturnsNotFound(t *testing.T) {
+	srv, _ := shopTestEnv(t)
+	// JWT for a user that doesn't exist (rare but possible — DeleteAccount
+	// races against a cached client token). Should map to NotFound, not
+	// Internal, so the client can render a clean message.
+	_, err := srv.GetShopInventory(authedCtx("ghost"), &pb.GetShopInventoryRequest{})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("got %v, want NotFound", err)
+	}
+}
+
 func TestGetShopInventory_ReturnsUserState(t *testing.T) {
 	srv, db := shopTestEnv(t)
 	seedScoringUser(t, srv.mongoClient, db, "alice", 750)

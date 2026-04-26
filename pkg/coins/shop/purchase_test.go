@@ -161,6 +161,42 @@ func TestPurchase_StreakFreeze_WeeklyCapAbortsTransaction(t *testing.T) {
 	}
 }
 
+func TestPurchase_RerollWithBadMetadata_AbortsTransaction(t *testing.T) {
+	// Defence-in-depth: even though LoadFromFile rejects bad metadata at
+	// deploy time, a hand-edited coin_catalog row with an invalid charges
+	// value must NOT debit the user. The runtime parse aborts the txn.
+	c, db := mongoForTest(t)
+	uid := seedUser(t, c, db, "u1", 1000)
+	d := c.Database(db)
+	// Bypass shop.Upsert (which would itself reject the bad row through
+	// load-time validation) and write directly. Simulates a hand-edit.
+	if _, err := d.Collection(shop.CatalogCollection).InsertOne(context.Background(), bson.M{
+		"_id":         "reroll.broken",
+		"kind":        shop.KindRerollTopic,
+		"name":        "Broken Reroll",
+		"description": "bad metadata",
+		"priceCoins":  int64(50),
+		"active":      true,
+		"metadata":    bson.M{"charges": "lots"},
+	}); err != nil {
+		t.Fatalf("insert bad row: %v", err)
+	}
+	p := shop.NewPurchase(c, d, coins.NewLedger(c, db))
+
+	if _, err := p.Buy(context.Background(), uid, "reroll.broken", "idem-1"); err == nil {
+		t.Fatalf("expected error for bad charges metadata, got nil")
+	}
+
+	bal, _ := coins.NewLedger(c, db).GetBalance(context.Background(), uid)
+	if bal != 1000 {
+		t.Errorf("balance changed on aborted txn: %d", bal)
+	}
+	cnt, _ := d.Collection("coin_ledger").CountDocuments(context.Background(), bson.M{"userId": uid})
+	if cnt != 0 {
+		t.Errorf("ledger row written for aborted txn: %d", cnt)
+	}
+}
+
 func TestPurchase_RerollIncrementsCharges(t *testing.T) {
 	c, db := mongoForTest(t)
 	uid := seedUser(t, c, db, "u1", 1000)

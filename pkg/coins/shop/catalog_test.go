@@ -63,17 +63,55 @@ func TestUpsertIsIdempotent(t *testing.T) {
 }
 
 func TestLoadFromFile_RejectsInvalid(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "items.json")
-
-	// Missing PriceCoins (zero) should fail validation.
-	bad := []map[string]any{{"id": "x", "kind": "cosmetic.avatar_frame", "name": "X"}}
-	raw, _ := json.Marshal(bad)
-	if err := os.WriteFile(path, raw, 0o600); err != nil {
-		t.Fatalf("write fixture: %v", err)
+	cases := []struct {
+		name string
+		row  map[string]any
+	}{
+		{
+			name: "zero price",
+			row:  map[string]any{"id": "x", "kind": "cosmetic.avatar_frame", "name": "X"},
+		},
+		{
+			name: "typo in kind (catches deploy-time mistakes)",
+			row:  map[string]any{"id": "x", "kind": "cosmetic.avatar_fram", "name": "X", "priceCoins": 100, "active": true},
+		},
+		{
+			name: "reroll item missing charges metadata",
+			row:  map[string]any{"id": "reroll.x", "kind": "reroll_topic", "name": "RR", "priceCoins": 50, "active": true},
+		},
+		{
+			name: "reroll item with non-numeric charges",
+			row:  map[string]any{"id": "reroll.x", "kind": "reroll_topic", "name": "RR", "priceCoins": 50, "active": true, "metadata": map[string]string{"charges": "many"}},
+		},
+		{
+			name: "reroll item with zero charges",
+			row:  map[string]any{"id": "reroll.x", "kind": "reroll_topic", "name": "RR", "priceCoins": 50, "active": true, "metadata": map[string]string{"charges": "0"}},
+		},
+		{
+			name: "premium trial missing days metadata",
+			row:  map[string]any{"id": "premium.x", "kind": "premium_trial", "name": "PT", "priceCoins": 1500, "active": true},
+		},
+		{
+			name: "premium trial with negative days",
+			row:  map[string]any{"id": "premium.x", "kind": "premium_trial", "name": "PT", "priceCoins": 1500, "active": true, "metadata": map[string]string{"days": "-3"}},
+		},
 	}
-	if _, err := shop.LoadFromFile(path); err == nil {
-		t.Errorf("expected error for zero price item")
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, "items.json")
+			raw, err := json.Marshal([]map[string]any{tc.row})
+			if err != nil {
+				t.Fatalf("marshal fixture: %v", err)
+			}
+			if err := os.WriteFile(path, raw, 0o600); err != nil {
+				t.Fatalf("write fixture: %v", err)
+			}
+			if _, err := shop.LoadFromFile(path); err == nil {
+				t.Errorf("expected error, got nil for %+v", tc.row)
+			}
+		})
 	}
 }
 

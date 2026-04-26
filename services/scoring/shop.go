@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -60,6 +61,13 @@ func (s *scoringServer) GetShopInventory(ctx context.Context, _ *pb.GetShopInven
 		Coins               int64    `bson:"coins"`
 	}
 	if err := s.mongoDB.Collection("users").FindOne(ctx, bson.M{"_id": uid}).Decode(&u); err != nil {
+		// A JWT can outlive the user it was issued for (DeleteAccount races
+		// against a cached token). Map ErrNoDocuments to NotFound so the
+		// client renders "account missing" instead of a generic crash banner,
+		// matching what GetCoinBalance does.
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, status.Error(codes.NotFound, "user not found")
+		}
 		return nil, status.Errorf(codes.Internal, "user: %v", err)
 	}
 	return &pb.GetShopInventoryResponse{

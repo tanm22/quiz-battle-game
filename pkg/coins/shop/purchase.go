@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -161,7 +162,13 @@ func (p *Purchase) applyEffect(sc context.Context, item *Item, entry *coins.Ledg
 		if applied {
 			return nil
 		}
-		charges := chargesForRerollItem(item)
+		charges, err := chargesForRerollItem(item)
+		if err != nil {
+			// Bad metadata aborts the txn so the debit rolls back. In normal
+			// operation LoadFromFile catches this at deploy time; this is the
+			// runtime safety net for a hand-edited coin_catalog row.
+			return err
+		}
 		if err := inventory.IncrementReroll(sc, userID, charges); err != nil {
 			return fmt.Errorf("incr reroll: %w", err)
 		}
@@ -200,14 +207,22 @@ func (p *Purchase) applyEffect(sc context.Context, item *Item, entry *coins.Ledg
 	}
 }
 
-// chargesForRerollItem reads the charge count from the item's metadata,
-// defaulting to 1 if unset or unparseable. Currently only "1" and "5"
-// are honoured as catalog values; anything else falls back to 1.
-func chargesForRerollItem(item *Item) int32 {
-	if v, ok := item.Metadata["charges"]; ok && v == "5" {
-		return 5
+// chargesForRerollItem parses the charges metadata strictly. Returns an
+// error for missing, unparseable, or non-positive values so applyEffect
+// can roll the txn back instead of silently under-crediting (a future
+// "charges":"3" bundle would otherwise pay full price for 1 charge).
+// LoadFromFile applies the same validation at deploy time; this is the
+// runtime safety net for a hand-edited catalog row.
+func chargesForRerollItem(item *Item) (int32, error) {
+	raw, ok := item.Metadata["charges"]
+	if !ok {
+		return 0, fmt.Errorf("reroll item %s: missing metadata.charges", item.ID)
 	}
-	return 1
+	n, err := strconv.ParseInt(raw, 10, 32)
+	if err != nil || n <= 0 {
+		return 0, fmt.Errorf("reroll item %s: invalid metadata.charges %q", item.ID, raw)
+	}
+	return int32(n), nil
 }
 
 func findExistingPurchase(ctx context.Context, db *mongo.Database, userID, refID string) (*coins.LedgerEntry, error) {
