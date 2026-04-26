@@ -394,3 +394,70 @@ const MatchInviteThrottleTTL = 30 * time.Minute
 func TrySetMatchInviteThrottle(ctx context.Context, rdb *redis.Client, fromUserID, toUserID string) (bool, error) {
 	return rdb.SetNX(ctx, MatchInviteThrottle(fromUserID, toUserID), "1", MatchInviteThrottleTTL).Result()
 }
+
+// ---------------------------------------------------------------------------
+// Phase 3 (4.4): Friend presence + challenge throttle
+// ---------------------------------------------------------------------------
+
+// PresenceTTL is the window inside which a user counts as "online". Each
+// Heartbeat RPC refreshes the key; readers (GetFriendsList) check the
+// key's existence to render the online dot. 60s matches the typical
+// mobile foreground keep-alive cadence and survives a single missed
+// heartbeat without flicker.
+const PresenceTTL = 60 * time.Second
+
+// TouchPresence sets the user's presence key with PresenceTTL, replacing
+// any existing TTL. Equivalent to "this user just heartbeat'd."
+func TouchPresence(ctx context.Context, rdb *redis.Client, userID string) error {
+	return rdb.Set(ctx, Presence(userID), "1", PresenceTTL).Err()
+}
+
+// IsOnline returns true when the presence key exists for userID. Used
+// from GetFriendsList to render the online dot. EXISTS is single-key
+// O(1) on Redis, so the per-friend overhead is negligible — a user
+// with 200 friends sees ~200 EXISTS calls per list fetch, well under a
+// millisecond on the same Redis pool the rest of the service uses.
+func IsOnline(ctx context.Context, rdb *redis.Client, userID string) (bool, error) {
+	n, err := rdb.Exists(ctx, Presence(userID)).Result()
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
+}
+
+// AreOnline does an MGET-style batch check across many users so
+// GetFriendsList can issue ONE round trip instead of N. Returns a map
+// keyed by userID; missing entries default to false (caller can
+// freely range over its friend list).
+func AreOnline(ctx context.Context, rdb *redis.Client, userIDs []string) (map[string]bool, error) {
+	if len(userIDs) == 0 {
+		return map[string]bool{}, nil
+	}
+	keys := make([]string, len(userIDs))
+	for i, uid := range userIDs {
+		keys[i] = Presence(uid)
+	}
+	vals, err := rdb.MGet(ctx, keys...).Result()
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]bool, len(userIDs))
+	for i, uid := range userIDs {
+		out[uid] = vals[i] != nil
+	}
+	return out, nil
+}
+
+// ChallengeThrottleTTL is short on purpose: the use case is "stop
+// spam clicks of the Challenge button," not "limit challenges per
+// hour." 30 seconds is enough to debounce double-taps and the
+// notification-arrives-late-and-user-clicks-again pattern.
+const ChallengeThrottleTTL = 30 * time.Second
+
+// TrySetChallengeThrottle returns true when this is the first
+// challenge from fromUserID → toUserID inside the throttle window.
+// Returns false if a challenge from this pair was sent recently —
+// the caller should surface a friendly "you just challenged them" hint.
+func TrySetChallengeThrottle(ctx context.Context, rdb *redis.Client, fromUserID, toUserID string) (bool, error) {
+	return rdb.SetNX(ctx, ChallengeThrottle(fromUserID, toUserID), "1", ChallengeThrottleTTL).Result()
+}

@@ -159,6 +159,54 @@ func main() {
 	}
 	log.Println("[seed] coin_ledger indexes ensured")
 
+	// §4.4 Friends & Challenges: the friend_requests collection holds one
+	// row per (fromUserId, toUserId) pair. Unique compound prevents two
+	// outbound requests in the same direction; the (toUserId, status) and
+	// (fromUserId, status) indexes back the incoming/outgoing pending-list
+	// queries.
+	friendReqs := db.Collection("friend_requests")
+	if _, err := friendReqs.Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "fromUserId", Value: 1}, {Key: "toUserId", Value: 1}},
+			Options: options.Index().SetUnique(true).SetName("uniq_from_to"),
+		},
+		{
+			Keys:    bson.D{{Key: "toUserId", Value: 1}, {Key: "status", Value: 1}},
+			Options: options.Index().SetName("idx_to_status"),
+		},
+		{
+			Keys:    bson.D{{Key: "fromUserId", Value: 1}, {Key: "status", Value: 1}},
+			Options: options.Index().SetName("idx_from_status"),
+		},
+		{
+			// Symmetric reverse-direction lookup: SendFriendRequest queries
+			// (fromUserId == target, toUserId == caller) before insert to
+			// detect "Bob already sent Alice a request" and auto-accept it.
+			// Without a leading toUserId index this would be a collection scan
+			// on the rejected fall-through path. Today the leading-prefix of
+			// uniq_from_to also serves the same query, but documenting and
+			// creating the index makes the model contract honest and removes
+			// the implicit dependency on uniq_from_to staying compound.
+			Keys:    bson.D{{Key: "toUserId", Value: 1}, {Key: "fromUserId", Value: 1}},
+			Options: options.Index().SetName("idx_to_from"),
+		},
+	}); err != nil {
+		log.Fatalf("[seed] friend_requests indexes: %v", err)
+	}
+	log.Println("[seed] friend_requests indexes ensured")
+
+	// §4.4 Friends & Challenges: friend_challenge_outbox is the durable
+	// queue for notif.friend.challenge pushes. The drainer in
+	// services/scoring scans (processedAt == nil, createdAt asc) on a
+	// 30s tick to retry rows stranded by a transient broker outage.
+	if _, err := db.Collection("friend_challenge_outbox").Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    bson.D{{Key: "processedAt", Value: 1}, {Key: "createdAt", Value: 1}},
+		Options: options.Index().SetName("idx_outbox_pending"),
+	}); err != nil {
+		log.Fatalf("[seed] friend_challenge_outbox index: %v", err)
+	}
+	log.Println("[seed] friend_challenge_outbox index ensured")
+
 	// PR 4 (§4.3 Shop): the effect outbox is consumed by services/payment in
 	// PR 5 to extend planExpiresAt for premium-trial purchases. The (kind,
 	// processedAt asc) index lets the dequeuer's "find unprocessed by kind,

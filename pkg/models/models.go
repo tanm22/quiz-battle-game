@@ -190,3 +190,33 @@ type TournamentPayout struct {
 	PublishedAt    *time.Time `bson:"publishedAt,omitempty"`
 	PaidAt         *time.Time `bson:"paidAt,omitempty"`
 }
+
+// FriendRequest is one row in the friend_requests collection. It models
+// both the in-flight invite and the accepted relationship — a single row
+// per (fromUserId, toUserId) pair, with status flipping from "pending"
+// to "accepted" or "rejected".
+//
+// Direction note: the row is "owned" by the sender. GetFriendsList in
+// scoring queries against BOTH (fromUserId == me, status == accepted)
+// AND (toUserId == me, status == accepted) so direction is symmetric
+// once the request is accepted.
+//
+// Indexes (declared in seed/main.go):
+//   - unique compound (fromUserId, toUserId) — one outbound request per pair
+//   - compound (toUserId, status) — incoming pending list query
+//   - compound (fromUserId, status) — outgoing pending list (future use)
+//   - compound (toUserId, fromUserId) — symmetric lookup for the
+//     "reverse direction already exists" check in SendFriendRequest
+type FriendRequest struct {
+	// _id is NOT tagged omitempty: callers always assign a uuid before
+	// InsertOne, and we want a future zero-value bug to fail loudly rather
+	// than silently fall back to a Mongo-generated ObjectId. Mirrors User.ID.
+	ID           string     `bson:"_id"`
+	FromUserID   string     `bson:"fromUserId"`
+	FromUsername string     `bson:"fromUsername"`
+	ToUserID     string     `bson:"toUserId"`
+	ToUsername   string     `bson:"toUsername"`
+	Status       string     `bson:"status"` // "pending" | "accepted" | "rejected"
+	CreatedAt    time.Time  `bson:"createdAt"`
+	RespondedAt  *time.Time `bson:"respondedAt,omitempty"`
+}

@@ -1710,6 +1710,7 @@ func main() {
 	go srv.consumeReferralEvents(ctx)     // Phase 2: referral reward chain (ISSUE-06)
 	go srv.consumeTournamentFinished(ctx) // Phase 3 (4.2): tournament prize coin awards
 	go srv.consumeCoinEarn(ctx)           // Phase 3 (4.3): coins.earn.* → ledger.Grant
+	go srv.drainChallengeNotifOutbox(ctx) // Phase 3 (4.4): retry stuck friend-challenge pushes
 
 	// Block forever (gRPC server runs in background goroutine)
 	select {}
