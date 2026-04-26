@@ -52,6 +52,15 @@ func (s *scoringServer) handleTournamentFinished(ctx context.Context, body []byt
 	if event.TournamentID == "" || event.UserID == "" {
 		return fmt.Errorf("%w: missing tournamentId or userId: %+v", errBadTournamentPayload, event)
 	}
+	// Negative coinsAwarded is rejected so a producer bug (typo'd
+	// tournaments.prizePool, bad migration, etc.) dead-letters here
+	// instead of: skipping Grant, flipping the payout to "paid", and
+	// publishing a misleading notif. Mirrors handleEarnEvent's guard.
+	// `coinsAwarded == 0` is legal — purely-reputational tournaments
+	// flip the payout + notify without a credit (test below).
+	if event.CoinsAwarded < 0 {
+		return fmt.Errorf("%w: coinsAwarded must not be negative (got %d)", errBadTournamentPayload, event.CoinsAwarded)
+	}
 
 	// Phantom-winner protection: only credit for events that have a
 	// pre-existing tournament_payouts row. The quiz finalizer writes that
@@ -129,9 +138,12 @@ func (s *scoringServer) handleTournamentFinished(ctx context.Context, body []byt
 		"finalScore":     event.FinalScore,
 	})
 	if err := s.publish(ctx, "notif.tournament.finished", notifJSON); err != nil {
-		// Best-effort — logging only. The credit is committed; redelivery
-		// would re-Grant (idempotent, no double-credit) but also re-fire
-		// this notif, which is the worse trade.
+		// Best-effort: a publish failure here permanently loses the FCM
+		// because the row is now "paid" and the next redelivery
+		// early-returns on payout.Status=="paid" before reaching this
+		// publish. A true outbox (durable notif row + drain worker)
+		// would close this gap; out of scope for this PR. Operator
+		// floor: alert on tournament-finished log volume.
 		log.Printf("[tournament-finished] notif publish failed for user=%s tournament=%s: %v",
 			event.UserID, event.TournamentID, err)
 	}

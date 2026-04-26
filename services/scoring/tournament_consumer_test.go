@@ -180,6 +180,7 @@ func TestHandleTournamentFinished_BadPayloadDLQs(t *testing.T) {
 		{"not json", []byte("{not json")},
 		{"missing tournamentId", []byte(`{"userId":"u1","coinsAwarded":100}`)},
 		{"missing userId", []byte(`{"tournamentId":"t1","coinsAwarded":100}`)},
+		{"negative coinsAwarded", []byte(`{"tournamentId":"t1","userId":"u1","coinsAwarded":-100}`)},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -194,6 +195,44 @@ func TestHandleTournamentFinished_BadPayloadDLQs(t *testing.T) {
 	}
 }
 
+func TestHandleTournamentFinished_NegativeAwardDoesNotMutateState(t *testing.T) {
+	// Catches the original review concern: before the guard, a negative
+	// coinsAwarded would skip Grant (the > 0 branch) but still flip the
+	// payout row to "paid" and publish a notif with the bad amount. With
+	// the guard, the message dead-letters and state stays untouched so
+	// an operator can investigate the producer-side bug.
+	srv, c, db := scoringTestEnv(t)
+	tID := "tour-" + bson.NewObjectID().Hex()
+	uid := "user_neg"
+	seedScoringUser(t, c, db, uid, 0)
+	seedTournamentPayout(t, srv, tID, uid, "pending", -50)
+
+	body, _ := json.Marshal(map[string]any{
+		"tournamentId": tID, "userId": uid, "coinsAwarded": int64(-50),
+	})
+	err := srv.handleTournamentFinished(context.Background(), body)
+	if !errors.Is(err, errBadTournamentPayload) {
+		t.Fatalf("expected errBadTournamentPayload, got %v", err)
+	}
+
+	bal, _ := srv.ledger.GetBalance(context.Background(), uid)
+	if bal != 0 {
+		t.Errorf("balance must not change on negative amount; got %d", bal)
+	}
+	count, _ := srv.mongoDB.Collection("coin_ledger").CountDocuments(context.Background(), bson.M{"userId": uid})
+	if count != 0 {
+		t.Errorf("ledger must stay empty on negative amount; got %d", count)
+	}
+	var p struct {
+		Status string `bson:"status"`
+	}
+	_ = srv.mongoDB.Collection("tournament_payouts").FindOne(context.Background(),
+		bson.M{"tournamentId": tID, "userId": uid}).Decode(&p)
+	if p.Status == "paid" {
+		t.Errorf("payout must NOT flip to paid on negative amount; got status=%q", p.Status)
+	}
+}
+
 func TestHandleTournamentFinished_GrantBeforeFlipPreservesInvariant(t *testing.T) {
 	// Reorder check: the new flow grants FIRST, so that a hypothetical
 	// flip failure (Mongo blip on the second UpdateOne) would still leave
@@ -201,6 +240,13 @@ func TestHandleTournamentFinished_GrantBeforeFlipPreservesInvariant(t *testing.T
 	// such a failure cleanly; we exercise the ordering by asserting that
 	// after a successful run, the ledger entry has a CreatedAt at or
 	// before the payout's PaidAt — a witness to "grant happened first".
+	//
+	// Limitation: this is a timing witness, not a causal-ordering proof.
+	// Sub-millisecond writes can land on the same wall-clock instant and
+	// `After` would still be false even if the order silently flipped in
+	// a future refactor. A truly causal ordering check requires injecting
+	// a fault between Grant and the flip; left as a follow-up once a
+	// fault-injection seam exists.
 	srv, c, db := scoringTestEnv(t)
 	tID := "tour-" + bson.NewObjectID().Hex()
 	uid := "user_order"
