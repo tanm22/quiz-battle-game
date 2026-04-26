@@ -14,26 +14,9 @@ import (
 	"quiz-battle/pkg/auth"
 	"quiz-battle/pkg/keys"
 	"quiz-battle/pkg/models"
+	"quiz-battle/pkg/notif"
 	pb "quiz-battle/proto"
 )
-
-// notifCategories enumerates every category the §4.6 policy gate
-// recognises. Kept in one place so UpdateNotificationPrefs validation,
-// the policy gate's category-from-event lookup, and the Flutter settings
-// screen all reference the same canonical list.
-//
-// Adding a new category: extend this slice AND add the routing-key →
-// category mapping in services/notification/policy.go.
-var notifCategories = map[string]struct{}{
-	"friend_request":   {},
-	"friend_challenge": {},
-	"match_invite":     {},
-	"streak":           {},
-	"daily_reward":     {},
-	"referral":         {},
-	"tournament":       {},
-	"premium":          {},
-}
 
 // defaultNotifTimezone is the fallback when a user has no timezone set
 // (no onboarding step has captured it yet). Asia/Kolkata matches the
@@ -91,7 +74,7 @@ func (s *scoringServer) UpdateNotificationPrefs(ctx context.Context, req *pb.Upd
 	seen := map[string]struct{}{}
 	cleaned := make([]string, 0, len(req.MutedTypes))
 	for _, c := range req.MutedTypes {
-		if _, known := notifCategories[c]; !known {
+		if !notif.IsKnown(c) {
 			return nil, status.Errorf(codes.InvalidArgument, "unknown notification category: %q", c)
 		}
 		if _, dup := seen[c]; dup {
@@ -133,15 +116,36 @@ func (s *scoringServer) UpdateNotificationPrefs(ctx context.Context, req *pb.Upd
 //
 // Per-user open events aren't recorded. Aggregate metrics are enough
 // for the §4.6 requirement and avoid building a privacy review for
-// per-user notification timing data.
+// per-user notification timing data. To keep the global counter
+// honest, the increment is gated by a per-(user, category, day) SETNX
+// dedup with a 24h TTL — a misbehaving client can't bump the counter
+// in a loop, and idempotent retries (FCM tap firing twice) are no-ops.
+//
+// Day bucket is UTC to match the global SENT counter in
+// services/notification/policy.go: open rate = opened/sent only makes
+// sense when both sides agree on what "today" means.
 func (s *scoringServer) MarkNotificationOpened(ctx context.Context, req *pb.MarkNotificationOpenedRequest) (*pb.MarkNotificationOpenedResponse, error) {
-	if _, err := auth.UserIDFromContext(ctx); err != nil {
+	uid, err := auth.UserIDFromContext(ctx)
+	if err != nil {
 		return nil, status.Error(codes.Unauthenticated, "not authenticated")
 	}
-	if _, ok := notifCategories[req.Category]; !ok {
+	if !notif.IsKnown(req.Category) {
 		return nil, status.Errorf(codes.InvalidArgument, "unknown notification category: %q", req.Category)
 	}
 	day := time.Now().UTC().Format("2006-01-02")
+	first, dedupErr := keys.TrySetNotifOpenedDedup(ctx, s.rdb, uid, req.Category, day)
+	if dedupErr != nil {
+		// Fail-open posture matches the policy gate: a degraded Redis
+		// shouldn't make taps fail. The increment will still run; in
+		// the worst case the counter double-counts for one user/day
+		// while Redis is down.
+		first = true
+	}
+	if !first {
+		// Already counted today. Return success so the client doesn't
+		// surface a "tap didn't register" error.
+		return &pb.MarkNotificationOpenedResponse{Success: true}, nil
+	}
 	if err := keys.IncrNotifMetricOpened(ctx, s.rdb, req.Category, day); err != nil {
 		return nil, status.Errorf(codes.Internal, "increment open counter: %v", err)
 	}

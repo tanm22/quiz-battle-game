@@ -48,6 +48,11 @@ const (
 	NotifMetricSentKey    = "notif:metric:sent:%s:%s"       // category, YYYY-MM-DD
 	NotifMetricOpenedKey  = "notif:metric:opened:%s:%s"     // category, YYYY-MM-DD
 	NotifMetricDroppedKey = "notif:metric:dropped:%s:%s:%s" // category, reason, YYYY-MM-DD
+	// NotifOpenedDedupKey gates the global "opened" counter so a
+	// single misbehaving client can't bump it in a loop. Per-user,
+	// per-category, per-day with a 24h TTL — repeats inside the same
+	// UTC day are no-ops, the counter rolls naturally at 00:00 UTC.
+	NotifOpenedDedupKey = "notif:opened_dedup:%s:%s:%s" // userID, category, YYYY-MM-DD
 )
 
 // Key helper functions — one function per key to prevent fmt.Sprintf typos.
@@ -151,4 +156,12 @@ func NotifMetricOpened(category, day string) string {
 }
 func NotifMetricDropped(category, reason, day string) string {
 	return fmt.Sprintf(NotifMetricDroppedKey, category, reason, day)
+}
+
+// NotifOpenedDedup builds the per-user-per-category-per-day SETNX key
+// that gates the global open counter. Any user can call
+// MarkNotificationOpened any number of times; only the first call per
+// (user, category, day) actually bumps the metric.
+func NotifOpenedDedup(userID, category, day string) string {
+	return fmt.Sprintf(NotifOpenedDedupKey, userID, category, day)
 }

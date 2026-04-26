@@ -40,7 +40,11 @@ func policyTestEnv(t *testing.T, dailyCap int) (*policy, *mongo.Database, *redis
 	if redisAddr == "" {
 		redisAddr = "localhost:6379"
 	}
-	rdb := redis.NewClient(&redis.Options{Addr: redisAddr})
+	// DB 15 is reserved for tests so FlushDB only nukes test keys —
+	// dev stacks running on the default DB 0 are unaffected. Redis
+	// ships with 16 logical DBs by default; nothing else in the repo
+	// uses 15.
+	rdb := redis.NewClient(&redis.Options{Addr: redisAddr, DB: 15})
 	if err := rdb.Ping(context.Background()).Err(); err != nil {
 		t.Skipf("redis ping: %v", err)
 	}
@@ -76,34 +80,8 @@ func seedUser(t *testing.T, db *mongo.Database, uid string, mutedTypes []string,
 	}
 }
 
-// ---------------------------------------------------------------------------
-// categoryFromEvent
-// ---------------------------------------------------------------------------
-
-func TestCategoryFromEvent_KnownAndUnknown(t *testing.T) {
-	cases := map[string]string{
-		"notif.friend.request_received":  "friend_request",
-		"notif.friend.request_accepted":  "friend_request",
-		"notif.friend.challenge":         "friend_challenge",
-		"notif.match.invite":             "match_invite",
-		"notif.streak.warning":           "streak",
-		"notif.daily.reward":             "daily_reward",
-		"notif.referral.converted":       "referral",
-		"notif.tournament.remind":        "tournament",
-		"notif.tournament.finished":      "tournament",
-		"notif.tournament.rank_changed":  "tournament",
-		"notif.premium.activated":        "premium",
-		"notif.premium.expired":          "premium",
-		"premium.expired":                "premium",
-		"notif.premium.expiry":           "premium",
-		"notif.something.never_seen_yet": "other",
-	}
-	for event, want := range cases {
-		if got := categoryFromEvent(event); got != want {
-			t.Errorf("categoryFromEvent(%q) = %q, want %q", event, got, want)
-		}
-	}
-}
+// CategoryFromEvent is exercised in pkg/notif/categories_test.go —
+// the wire contract lives with the package that owns it now.
 
 // ---------------------------------------------------------------------------
 // inQuietHours

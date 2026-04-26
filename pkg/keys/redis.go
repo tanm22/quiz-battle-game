@@ -480,17 +480,29 @@ const NotifDedupTTL = 1 * time.Hour
 const NotifMetricTTL = 7 * 24 * time.Hour
 
 // IncrNotifDailyCap atomically increments the per-user daily push
-// counter and returns the new value. Sets the TTL only on the first
-// hit (Expire on a not-yet-seen key) so subsequent hits don't reset
-// the day boundary.
+// counter and returns the new value. The TTL is set only on the
+// first increment of the day via ExpireNX (Redis 7.0+) — subsequent
+// hits don't reset the 48h fail-safe. Day rollover itself is handled
+// by the {YYYY-MM-DD} segment of the key, not the TTL.
 func IncrNotifDailyCap(ctx context.Context, rdb *redis.Client, userID, day string) (int64, error) {
 	pipe := rdb.TxPipeline()
 	incr := pipe.Incr(ctx, NotifDailyCap(userID, day))
-	pipe.Expire(ctx, NotifDailyCap(userID, day), NotifDailyCapTTL)
+	pipe.ExpireNX(ctx, NotifDailyCap(userID, day), NotifDailyCapTTL)
 	if _, err := pipe.Exec(ctx); err != nil {
 		return 0, err
 	}
 	return incr.Val(), nil
+}
+
+// TrySetNotifOpenedDedup gates the global "opened" counter to one
+// increment per (user, category, day). Returns true on the first call
+// in the window; false on subsequent calls so the caller knows to
+// skip the metric increment.
+func TrySetNotifOpenedDedup(ctx context.Context, rdb *redis.Client, userID, category, day string) (bool, error) {
+	// 25h TTL gives a one-hour cushion past midnight UTC so a tap that
+	// arrives right at the day boundary doesn't double-count.
+	const ttl = 25 * time.Hour
+	return rdb.SetNX(ctx, NotifOpenedDedup(userID, category, day), "1", ttl).Result()
 }
 
 // DecrNotifDailyCap rolls back a counted push when the policy decides

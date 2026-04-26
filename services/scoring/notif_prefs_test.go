@@ -155,6 +155,32 @@ func TestMarkNotificationOpened_BumpsRedisCounter(t *testing.T) {
 	}
 }
 
+func TestMarkNotificationOpened_DedupsRepeatsWithinDay(t *testing.T) {
+	// A misbehaving client calling MarkNotificationOpened in a loop
+	// must not be able to inflate the global open counter — that would
+	// poison the open-rate metric. Per-(user, category, day) SETNX
+	// gates the increment.
+	srv, c, dbName := scoringTestEnv(t)
+	attachRedis(t, srv)
+	seedScoringUser(t, c, dbName, "alice", 0)
+
+	for i := 0; i < 5; i++ {
+		if _, err := srv.MarkNotificationOpened(authedCtx("alice"),
+			&pb.MarkNotificationOpenedRequest{Category: "friend_challenge"}); err != nil {
+			t.Fatalf("call #%d: %v", i, err)
+		}
+	}
+	day := time.Now().UTC().Format("2006-01-02")
+	got, err := srv.rdb.Get(context.Background(),
+		keys.NotifMetricOpened("friend_challenge", day)).Int()
+	if err != nil {
+		t.Fatalf("redis get: %v", err)
+	}
+	if got != 1 {
+		t.Errorf("opened counter inflated by repeats: got %d, want 1", got)
+	}
+}
+
 func TestMarkNotificationOpened_RejectsUnknownCategory(t *testing.T) {
 	srv, c, dbName := scoringTestEnv(t)
 	attachRedis(t, srv)

@@ -11,6 +11,7 @@ import (
 
 	"quiz-battle/pkg/keys"
 	"quiz-battle/pkg/models"
+	"quiz-battle/pkg/notif"
 )
 
 // §4.6 Notification policy
@@ -43,46 +44,21 @@ const (
 // notices over a single day shouldn't realistically hit this. Override
 // at startup via NOTIF_DAILY_CAP env var so we don't have to redeploy
 // to relax or tighten the gate.
+//
+// Soft cap: the gate INCRs first and checks second, and a Redis
+// failure during the cap check fails open (logs + allows). Under
+// concurrent over-cap attempts the counter can therefore reach
+// dailyCap+N before a single drop lands; an INCR error during a burst
+// can also push past. The trade-off is deliberate — decrementing on
+// cap-hit would let tomorrow's first push see N=10 and allow N+1
+// pushes after rollover, which is the worse failure mode.
 const notifDailyCap = 10
 
-// categoryFromEvent maps a RabbitMQ event string (the value of the
-// "event" field in the payload, which mirrors the routing key) to a
-// notification category. The category is what users mute and what the
-// dedup/cap counters key off.
-//
-// An unknown event resolves to "other". The policy gate still runs for
-// "other" — quiet hours and the daily cap apply — but mute and dedup
-// don't have a meaningful category to key off, so unknown events
-// effectively bypass those two gates.
-func categoryFromEvent(event string) string {
-	switch event {
-	case "notif.friend.request_received", "notif.friend.request_accepted":
-		return "friend_request"
-	case "notif.friend.challenge":
-		return "friend_challenge"
-	case "notif.match.invite":
-		return "match_invite"
-	case "notif.streak.warning":
-		return "streak"
-	case "notif.daily.reward":
-		return "daily_reward"
-	case "notif.referral.converted":
-		return "referral"
-	case "notif.tournament.remind",
-		"notif.tournament.finished",
-		"notif.tournament.rank_changed":
-		return "tournament"
-	case "notif.premium.activated",
-		"notif.premium.expired",
-		"premium.expired",
-		"notif.premium.expiry":
-		return "premium"
-	}
-	return "other"
-}
-
 // policy holds the dependencies the gate needs. Constructed once in
-// main.go and passed by reference into the dispatch loop.
+// main.go and passed by reference into the dispatch loop. The cap is
+// SOFT — see the const above for the exact bound. Categories live in
+// pkg/notif so this gate, scoring/notif_prefs.go, and the Flutter
+// settings UI can't drift apart.
 type policy struct {
 	rdb     *redis.Client
 	mongoDB *mongo.Database
@@ -117,26 +93,31 @@ type allowResult struct {
 // burn one of the user's 10 daily slots. The cap is the last gate so
 // every counted push is actually dispatched.
 func (p *policy) allow(ctx context.Context, userID, event string) allowResult {
-	category := categoryFromEvent(event)
+	category := notif.CategoryFromEvent(event)
+	// now is captured in UTC up front so every metric/dedup helper
+	// below sees the same day boundary. Per-user daily cap is the only
+	// thing that re-projects into the user's local timezone — see the
+	// explicit userLocalDay call at gate 4.
 	now := time.Now().UTC()
+	metricDay := now.Format("2006-01-02") // global metrics: UTC
 
 	prefs := p.loadPrefs(ctx, userID)
 
 	// Gate 1: per-type mute.
 	if isMuted(prefs, category) {
-		p.dropped(ctx, category, "muted", now)
+		p.dropped(ctx, category, "muted", metricDay)
 		return allowResult{Allowed: false, Category: category, Reason: "muted"}
 	}
 
 	// Gate 2: quiet hours in the user's local time.
 	if inQuietHours(now, prefs.tz) {
-		p.dropped(ctx, category, "quiet_hours", now)
+		p.dropped(ctx, category, "quiet_hours", metricDay)
 		return allowResult{Allowed: false, Category: category, Reason: "quiet_hours"}
 	}
 
 	// Gate 3: per-user-per-category dedup. SETNX failure means a recent
 	// push of the same category is still inside NotifDedupTTL.
-	if category != "other" {
+	if category != notif.CategoryOther {
 		first, err := keys.TrySetNotifDedup(ctx, p.rdb, userID, category)
 		if err != nil {
 			// Redis unavailable — fail open rather than drop the push.
@@ -144,15 +125,18 @@ func (p *policy) allow(ctx context.Context, userID, event string) allowResult {
 			// challenge notif because Redis is degraded.
 			log.Printf("[notif-policy] dedup SETNX failed for user=%s category=%s: %v", userID, category, err)
 		} else if !first {
-			p.dropped(ctx, category, "deduped", now)
+			p.dropped(ctx, category, "deduped", metricDay)
 			return allowResult{Allowed: false, Category: category, Reason: "deduped"}
 		}
 	}
 
 	// Gate 4: per-user daily cap. Day bucket is in the user's timezone
-	// so the rollover lines up with their midnight, not UTC.
-	day := userLocalDay(now, prefs.tz)
-	count, err := keys.IncrNotifDailyCap(ctx, p.rdb, userID, day)
+	// so the rollover lines up with their midnight, not UTC. This is
+	// deliberately different from the metric bucket above: caps are a
+	// user-facing fairness guarantee ("no more than 10 today"), so
+	// "today" must mean "in your day."
+	capDay := userLocalDay(now, prefs.tz)
+	count, err := keys.IncrNotifDailyCap(ctx, p.rdb, userID, capDay)
 	if err != nil {
 		// Same fail-open posture as dedup. Logged so an operator notices.
 		log.Printf("[notif-policy] daily-cap INCR failed for user=%s: %v — allowing", userID, err)
@@ -160,20 +144,24 @@ func (p *policy) allow(ctx context.Context, userID, event string) allowResult {
 		// We've already incremented; don't decrement on cap hit because
 		// the next day's first push would otherwise see count=10 and
 		// allow N+1 pushes. The bumped counter at the boundary is the
-		// safer side of the trade.
-		p.dropped(ctx, category, "capped", now)
+		// safer side of the trade. See newPolicy doc for the soft-cap
+		// contract this implies.
+		p.dropped(ctx, category, "capped", metricDay)
 		return allowResult{Allowed: false, Category: category, Reason: "capped"}
 	}
 
 	// Allowed. Bump the global sent counter for offline open-rate math.
-	if err := keys.IncrNotifMetricSent(ctx, p.rdb, category, now.Format("2006-01-02")); err != nil {
+	// MUST share the day-bucket convention with MarkNotificationOpened
+	// in services/scoring/notif_prefs.go (UTC) — opened/sent ratios
+	// across timezone boundaries are otherwise meaningless.
+	if err := keys.IncrNotifMetricSent(ctx, p.rdb, category, metricDay); err != nil {
 		log.Printf("[notif-policy] sent metric INCR failed for category=%s: %v", category, err)
 	}
 	return allowResult{Allowed: true, Category: category}
 }
 
-func (p *policy) dropped(ctx context.Context, category, reason string, now time.Time) {
-	if err := keys.IncrNotifMetricDropped(ctx, p.rdb, category, reason, now.Format("2006-01-02")); err != nil {
+func (p *policy) dropped(ctx context.Context, category, reason, metricDay string) {
+	if err := keys.IncrNotifMetricDropped(ctx, p.rdb, category, reason, metricDay); err != nil {
 		log.Printf("[notif-policy] dropped metric INCR failed: %v", err)
 	}
 }
