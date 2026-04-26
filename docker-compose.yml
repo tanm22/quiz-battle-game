@@ -26,16 +26,22 @@ services:
       retries: 5
 
   mongo:
-    image: mongo:6
+    image: mongo:7
+    command: ["--replSet", "rs0", "--bind_ip_all"]
     ports:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
+      - ./docker/mongo/replset-init.js:/docker-entrypoint-initdb.d/replset-init.js:ro
     healthcheck:
-      test: [ "CMD", "mongosh", "--eval", "db.adminCommand('ping')" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      # The healthcheck doubles as the rs0 initiator: idempotent rs.initiate()
+      # if status throws, otherwise just a pingable status. Once primary, we
+      # report healthy.
+      test: ["CMD", "mongosh", "--quiet", "--eval",
+             "try { rs.status().ok } catch (e) { rs.initiate({_id:'rs0', members:[{_id:0,host:'mongo:27017'}]}).ok }"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
 
   seed:
     build: .
@@ -44,7 +50,7 @@ services:
       mongo:
         condition: service_healthy
     environment:
-      - MONGO_URI=mongodb://mongo:27017/quizbattle
+      - MONGO_URI=mongodb://mongo:27017/quizbattle?replicaSet=rs0
 
   matchmaking:
     build: .
@@ -63,7 +69,7 @@ services:
     environment:
       - REDIS_ADDR=redis:6379
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
-      - MONGO_URI=mongodb://mongo:27017/quizbattle
+      - MONGO_URI=mongodb://mongo:27017/quizbattle?replicaSet=rs0
       - JWT_SECRET=change-me-in-production
 
   quiz:
@@ -83,7 +89,7 @@ services:
     environment:
       - REDIS_ADDR=redis:6379
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
-      - MONGO_URI=mongodb://mongo:27017/quizbattle
+      - MONGO_URI=mongodb://mongo:27017/quizbattle?replicaSet=rs0
       - JWT_SECRET=change-me-in-production
 
   scoring:
@@ -103,7 +109,7 @@ services:
     environment:
       - REDIS_ADDR=redis:6379
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
-      - MONGO_URI=mongodb://mongo:27017/quizbattle
+      - MONGO_URI=mongodb://mongo:27017/quizbattle?replicaSet=rs0
       - JWT_SECRET=change-me-in-production
 
   auth:
@@ -123,7 +129,7 @@ services:
     environment:
       - REDIS_ADDR=redis:6379
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
-      - MONGO_URI=mongodb://mongo:27017/quizbattle
+      - MONGO_URI=mongodb://mongo:27017/quizbattle?replicaSet=rs0
       - JWT_SECRET=change-me-in-production
       - RESEND_API_KEY=${RESEND_API_KEY:-}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
@@ -146,7 +152,7 @@ services:
     environment:
       - REDIS_ADDR=redis:6379
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
-      - MONGO_URI=mongodb://mongo:27017/quizbattle
+      - MONGO_URI=mongodb://mongo:27017/quizbattle?replicaSet=rs0
       - JWT_SECRET=change-me-in-production
       - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-}
       - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-}
@@ -162,7 +168,7 @@ services:
         condition: service_healthy
     environment:
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
-      - MONGO_URI=mongodb://mongo:27017/quizbattle
+      - MONGO_URI=mongodb://mongo:27017/quizbattle?replicaSet=rs0
       # Firebase Admin SDK auto-discovers credentials at this path via ADC.
       # Drop a real service-account JSON into ./secrets/firebase-admin.json
       # (download from Firebase Console → Service accounts → Generate key —

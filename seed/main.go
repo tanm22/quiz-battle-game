@@ -136,6 +136,28 @@ func main() {
 		Keys: bson.D{{Key: "status", Value: 1}},
 	})
 
+	// coin_ledger: append-only history of every balance change. The unique
+	// compound index on (userId, refId, reason) is the persistence-layer
+	// idempotency key — repeat Grant() calls for the same triple short-
+	// circuit on read or, if they race, dup-key on insert. The
+	// (userId, createdAt desc) index is the leading edge for GetLedger's
+	// pagination cursor.
+	ledger := db.Collection("coin_ledger")
+	_, err = ledger.Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "userId", Value: 1}, {Key: "refId", Value: 1}, {Key: "reason", Value: 1}},
+			Options: options.Index().SetUnique(true).SetName("uniq_user_ref_reason"),
+		},
+		{
+			Keys:    bson.D{{Key: "userId", Value: 1}, {Key: "createdAt", Value: -1}},
+			Options: options.Index().SetName("idx_user_recent"),
+		},
+	})
+	if err != nil {
+		log.Fatalf("[seed] coin_ledger indexes: %v", err)
+	}
+	log.Println("[seed] coin_ledger indexes ensured")
+
 	log.Println("[seed] indexes created")
 
 	// --- Seed questions ---

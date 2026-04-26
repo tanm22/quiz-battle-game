@@ -26,6 +26,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"quiz-battle/pkg/auth"
+	"quiz-battle/pkg/coins"
 	"quiz-battle/pkg/email"
 	"quiz-battle/pkg/keys"
 	"quiz-battle/pkg/models"
@@ -39,11 +40,14 @@ var (
 
 type authServer struct {
 	pb.UnimplementedAuthServiceServer
-	mongoDB   *mongo.Database
-	rdb       *redis.Client
-	amqpConn  *amqp.Connection
-	jwtSecret string
-	mailer    *email.Sender
+	mongoClient *mongo.Client // raw client for sessions (coins.Ledger needs this)
+	mongoDB     *mongo.Database
+	dbName      string
+	ledger      *coins.Ledger
+	rdb         *redis.Client
+	amqpConn    *amqp.Connection
+	jwtSecret   string
+	mailer      *email.Sender
 }
 
 func (s *authServer) users() *mongo.Collection {
@@ -589,20 +593,20 @@ func (s *authServer) GoogleSignIn(ctx context.Context, req *pb.GoogleSignInReque
 		StreakUpdated: streakUpdated,
 		Reward:        reward,
 		UserProfile: &pb.UserProfile{
-			UserId:       user.ID,
-			Username:     user.Username,
-			DisplayName:  user.DisplayName,
-			Email:        user.Email,
-			AvatarUrl:    user.AvatarUrl,
-			Rating:       user.Rating,
-			MatchesPlayed: user.MatchesPlayed,
-			Wins:         user.Wins,
-			Plan:         user.Plan,
-			Coins:        user.Coins,
-			Streak:       streakInfo,
-			ReferralCode: user.ReferralCode,
-			IsGuest:      false,
-			WinStreak:    user.WinStreak,
+			UserId:              user.ID,
+			Username:            user.Username,
+			DisplayName:         user.DisplayName,
+			Email:               user.Email,
+			AvatarUrl:           user.AvatarUrl,
+			Rating:              user.Rating,
+			MatchesPlayed:       user.MatchesPlayed,
+			Wins:                user.Wins,
+			Plan:                user.Plan,
+			Coins:               user.Coins,
+			Streak:              streakInfo,
+			ReferralCode:        user.ReferralCode,
+			IsGuest:             false,
+			WinStreak:           user.WinStreak,
 			PreferredTopics:     user.PreferredTopics,
 			OnboardingCompleted: user.OnboardingCompleted,
 		},
@@ -712,27 +716,37 @@ func (s *authServer) ClaimDailyReward(ctx context.Context, _ *pb.ClaimDailyRewar
 
 	reward := rewardForDay(user.Streak.Current)
 
-	// Atomically grant coins and mark reward as claimed for today
-	res, err := s.users().UpdateOne(ctx,
-		bson.M{"_id": userID, "streak.rewardClaimedDate": bson.M{"$ne": today}},
-		bson.M{
-			"$inc": bson.M{"coins": reward.Coins},
-			"$set": bson.M{"streak.rewardClaimedDate": today},
-		})
+	// Phase 3 (4.3): coins flow through pkg/coins.Grant so the persistence
+	// layer enforces "every $inc has a matching ledger row in the same
+	// transaction." The (userId, refId, reason) idempotency key is the IST
+	// date — re-call on the same day returns the existing entry rather than
+	// double-paying. The streak.rewardClaimedDate flip is intentionally a
+	// SEPARATE UpdateOne after the grant lands: we used to combine them in
+	// one $inc/$set call to dedup races, but the ledger's unique index now
+	// owns dedup, so the streak flip is just a UI-visible breadcrumb.
+	refID := "streak:" + userID + ":" + today
+	entry, err := s.ledger.Grant(ctx, userID, reward.Coins, coins.ReasonDailyReward, refID, map[string]string{
+		"streakDay": fmt.Sprintf("%d", user.Streak.Current),
+	})
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to claim reward: %v", err)
+		return nil, status.Errorf(codes.Internal, "grant: %v", err)
 	}
-	if res.ModifiedCount == 0 {
-		// Race: another request already claimed
-		return &pb.ClaimDailyRewardResponse{
-			Reward: reward,
-			Streak: toStreakInfo(user.Streak),
-		}, nil
+
+	// Mark the reward as claimed for the day. Doing this AFTER the ledger
+	// grant means a server crash between the two writes leaves a ledger row
+	// without the streak flag set — the next ClaimDailyReward call hits the
+	// idempotent fast-path on the ledger (returning the existing entry) and
+	// then gets to retry just the streak flip. No double-pay risk.
+	if _, err := s.users().UpdateOne(ctx,
+		bson.M{"_id": userID},
+		bson.M{"$set": bson.M{"streak.rewardClaimedDate": today}}); err != nil {
+		return nil, status.Errorf(codes.Internal, "mark claimed: %v", err)
 	}
 
 	return &pb.ClaimDailyRewardResponse{
-		Reward: reward,
-		Streak: toStreakInfo(user.Streak),
+		Reward:     reward,
+		Streak:     toStreakInfo(user.Streak),
+		NewBalance: entry.BalanceAfter,
 	}, nil
 }
 
@@ -810,12 +824,12 @@ func (s *authServer) applyReferral(ctx context.Context, refereeID, code string) 
 
 	// Create referral document
 	s.mongoDB.Collection("referrals").InsertOne(ctx, bson.M{
-		"referrerId":   referrerID,
-		"refereeId":    refereeID,
-		"referralCode": code,
-		"status":       "pending",
+		"referrerId":    referrerID,
+		"refereeId":     refereeID,
+		"referralCode":  code,
+		"status":        "pending",
 		"rewardGranted": false,
-		"createdAt":    time.Now(),
+		"createdAt":     time.Now(),
 	})
 
 	// Set referredBy on the referee
@@ -928,7 +942,7 @@ func (s *authServer) dailyRewardNudgeCron(ctx context.Context) {
 		today := time.Now().In(ist).Format("2006-01-02")
 		cursor, err := s.mongoDB.Collection("users").Find(ctx, bson.M{
 			"streak.lastClaimedDate": bson.M{"$ne": today},
-			"isGuest":               false,
+			"isGuest":                false,
 		})
 		if err != nil {
 			log.Printf("[auth-cron] daily nudge query error: %v", err)
@@ -1034,12 +1048,16 @@ func main() {
 		log.Println("[auth] WARNING: RESEND_API_KEY not set — email codes will only be logged to stdout")
 	}
 
+	const dbName = "quizbattle"
 	srv := &authServer{
-		mongoDB:   db,
-		rdb:       rdb,
-		amqpConn:  amqpConn,
-		jwtSecret: jwtSecret,
-		mailer:    email.NewSender(resendKey, resendFrom),
+		mongoClient: mongoClient,
+		mongoDB:     db,
+		dbName:      dbName,
+		ledger:      coins.NewLedger(mongoClient, dbName),
+		rdb:         rdb,
+		amqpConn:    amqpConn,
+		jwtSecret:   jwtSecret,
+		mailer:      email.NewSender(resendKey, resendFrom),
 	}
 
 	// Phase 2: Start notification cron goroutines
@@ -1057,7 +1075,6 @@ func main() {
 		"/quiz.AuthService/CheckUsername",
 		"/quiz.AuthService/GoogleSignIn",
 	}
-
 
 	grpcServer := grpc.NewServer(
 		grpc.UnaryInterceptor(auth.UnaryInterceptor(jwtSecret, skipMethods)),

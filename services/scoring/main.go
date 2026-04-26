@@ -23,6 +23,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"quiz-battle/pkg/auth"
+	"quiz-battle/pkg/coins"
 	"quiz-battle/pkg/keys"
 	"quiz-battle/pkg/models"
 	pb "quiz-battle/proto"
@@ -46,13 +47,16 @@ type Question struct {
 
 type scoringServer struct {
 	pb.UnimplementedScoringServiceServer
-	rdb        *redis.Client
-	amqpConn   *amqp.Connection
-	amqpCh     *amqp.Channel // for publishing only
-	amqpMu     sync.Mutex    // AMQP channels are not thread-safe
-	mongoDB    *mongo.Database
-	jwtSecret  string
-	selfClient pb.ScoringServiceClient // gRPC loopback client for CalculateScore
+	rdb         *redis.Client
+	amqpConn    *amqp.Connection
+	amqpCh      *amqp.Channel // for publishing only
+	amqpMu      sync.Mutex    // AMQP channels are not thread-safe
+	mongoClient *mongo.Client // raw client for sessions / multi-DB lookups (e.g. coins.Ledger)
+	mongoDB     *mongo.Database
+	dbName      string // "quizbattle" in prod; per-test DB in tests
+	ledger      *coins.Ledger
+	jwtSecret   string
+	selfClient  pb.ScoringServiceClient // gRPC loopback client for CalculateScore
 }
 
 // publish sends a message to the topic exchange with mutex protection.
@@ -1324,15 +1328,25 @@ func (s *scoringServer) consumeReferralEvents(ctx context.Context) {
 				continue
 			}
 
-			// Grant coins: referrer +100, referee +50
-			s.mongoDB.Collection("users").UpdateOne(ctx,
-				bson.M{"_id": event.ReferrerID},
-				bson.M{"$inc": bson.M{"coins": int64(100)}},
-			)
-			s.mongoDB.Collection("users").UpdateOne(ctx,
-				bson.M{"_id": event.RefereeID},
-				bson.M{"$inc": bson.M{"coins": int64(50)}},
-			)
+			// Phase 3 (4.3): coins flow through pkg/coins.Grant. The natural
+			// idempotency key is the refereeId (unique-indexed on the
+			// referrals collection in seed) plus the role ("referrer" /
+			// "referee"). We already filtered duplicates above via the
+			// findOneAndUpdate on rewardGranted:false, so a re-call would
+			// only happen on a queue redelivery before that flip — in which
+			// case the ledger's own dup-key index also no-ops.
+			referrerRef := "referral:" + event.RefereeID + ":referrer"
+			refereeRef := "referral:" + event.RefereeID + ":referee"
+			if _, err := s.ledger.Grant(ctx, event.ReferrerID, 100, coins.ReasonReferralReferrer, referrerRef, nil); err != nil {
+				log.Printf("[referral-consumer] referrer grant failed for %s: %v", event.ReferrerID, err)
+				msg.Nack(false, true)
+				continue
+			}
+			if _, err := s.ledger.Grant(ctx, event.RefereeID, 50, coins.ReasonReferralReferee, refereeRef, nil); err != nil {
+				log.Printf("[referral-consumer] referee grant failed for %s: %v", event.RefereeID, err)
+				msg.Nack(false, true)
+				continue
+			}
 
 			// Publish notification to referrer (ISSUE-06 complete chain)
 			notifJSON, _ := json.Marshal(map[string]interface{}{
@@ -1707,12 +1721,16 @@ func main() {
 		jwtSecret = "quiz-battle-dev-secret"
 	}
 
+	const dbName = "quizbattle"
 	srv := &scoringServer{
-		rdb:       rdb,
-		amqpConn:  conn,
-		amqpCh:    amqpCh,
-		mongoDB:   mongoClient.Database("quizbattle"),
-		jwtSecret: jwtSecret,
+		rdb:         rdb,
+		amqpConn:    conn,
+		amqpCh:      amqpCh,
+		mongoClient: mongoClient,
+		mongoDB:     mongoClient.Database(dbName),
+		dbName:      dbName,
+		ledger:      coins.NewLedger(mongoClient, dbName),
+		jwtSecret:   jwtSecret,
 	}
 
 	// gRPC server — CalculateScore is called internally by the scoring worker

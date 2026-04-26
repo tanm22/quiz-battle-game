@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.1
 // - protoc             v7.34.1
-// source: proto/quiz.proto
+// source: quiz.proto
 
 package proto
 
@@ -197,7 +197,7 @@ var MatchmakingService_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "proto/quiz.proto",
+	Metadata: "quiz.proto",
 }
 
 const (
@@ -457,7 +457,7 @@ var QuizService_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "proto/quiz.proto",
+	Metadata: "quiz.proto",
 }
 
 const (
@@ -469,6 +469,8 @@ const (
 	ScoringService_ApplyReferralCode_FullMethodName    = "/quiz.ScoringService/ApplyReferralCode"
 	ScoringService_UpdateFCMToken_FullMethodName       = "/quiz.ScoringService/UpdateFCMToken"
 	ScoringService_GetGlobalLeaderboard_FullMethodName = "/quiz.ScoringService/GetGlobalLeaderboard"
+	ScoringService_GetCoinBalance_FullMethodName       = "/quiz.ScoringService/GetCoinBalance"
+	ScoringService_GetCoinLedger_FullMethodName        = "/quiz.ScoringService/GetCoinLedger"
 )
 
 // ScoringServiceClient is the client API for ScoringService service.
@@ -485,6 +487,11 @@ type ScoringServiceClient interface {
 	UpdateFCMToken(ctx context.Context, in *UpdateFCMTokenRequest, opts ...grpc.CallOption) (*UpdateFCMTokenResponse, error)
 	// Phase 3: Global leaderboard with time filters
 	GetGlobalLeaderboard(ctx context.Context, in *GetGlobalLeaderboardRequest, opts ...grpc.CallOption) (*GetGlobalLeaderboardResponse, error)
+	// Phase 3 (4.3): Coin balance + ledger history. Balance is read from
+	// users.coins; ledger reads from coin_ledger via the unique
+	// (userId, refId, reason) idempotency index.
+	GetCoinBalance(ctx context.Context, in *GetCoinBalanceRequest, opts ...grpc.CallOption) (*GetCoinBalanceResponse, error)
+	GetCoinLedger(ctx context.Context, in *GetCoinLedgerRequest, opts ...grpc.CallOption) (*GetCoinLedgerResponse, error)
 }
 
 type scoringServiceClient struct {
@@ -575,6 +582,26 @@ func (c *scoringServiceClient) GetGlobalLeaderboard(ctx context.Context, in *Get
 	return out, nil
 }
 
+func (c *scoringServiceClient) GetCoinBalance(ctx context.Context, in *GetCoinBalanceRequest, opts ...grpc.CallOption) (*GetCoinBalanceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetCoinBalanceResponse)
+	err := c.cc.Invoke(ctx, ScoringService_GetCoinBalance_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scoringServiceClient) GetCoinLedger(ctx context.Context, in *GetCoinLedgerRequest, opts ...grpc.CallOption) (*GetCoinLedgerResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetCoinLedgerResponse)
+	err := c.cc.Invoke(ctx, ScoringService_GetCoinLedger_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ScoringServiceServer is the server API for ScoringService service.
 // All implementations must embed UnimplementedScoringServiceServer
 // for forward compatibility.
@@ -589,6 +616,11 @@ type ScoringServiceServer interface {
 	UpdateFCMToken(context.Context, *UpdateFCMTokenRequest) (*UpdateFCMTokenResponse, error)
 	// Phase 3: Global leaderboard with time filters
 	GetGlobalLeaderboard(context.Context, *GetGlobalLeaderboardRequest) (*GetGlobalLeaderboardResponse, error)
+	// Phase 3 (4.3): Coin balance + ledger history. Balance is read from
+	// users.coins; ledger reads from coin_ledger via the unique
+	// (userId, refId, reason) idempotency index.
+	GetCoinBalance(context.Context, *GetCoinBalanceRequest) (*GetCoinBalanceResponse, error)
+	GetCoinLedger(context.Context, *GetCoinLedgerRequest) (*GetCoinLedgerResponse, error)
 	mustEmbedUnimplementedScoringServiceServer()
 }
 
@@ -622,6 +654,12 @@ func (UnimplementedScoringServiceServer) UpdateFCMToken(context.Context, *Update
 }
 func (UnimplementedScoringServiceServer) GetGlobalLeaderboard(context.Context, *GetGlobalLeaderboardRequest) (*GetGlobalLeaderboardResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetGlobalLeaderboard not implemented")
+}
+func (UnimplementedScoringServiceServer) GetCoinBalance(context.Context, *GetCoinBalanceRequest) (*GetCoinBalanceResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetCoinBalance not implemented")
+}
+func (UnimplementedScoringServiceServer) GetCoinLedger(context.Context, *GetCoinLedgerRequest) (*GetCoinLedgerResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetCoinLedger not implemented")
 }
 func (UnimplementedScoringServiceServer) mustEmbedUnimplementedScoringServiceServer() {}
 func (UnimplementedScoringServiceServer) testEmbeddedByValue()                        {}
@@ -788,6 +826,42 @@ func _ScoringService_GetGlobalLeaderboard_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ScoringService_GetCoinBalance_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetCoinBalanceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScoringServiceServer).GetCoinBalance(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScoringService_GetCoinBalance_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScoringServiceServer).GetCoinBalance(ctx, req.(*GetCoinBalanceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScoringService_GetCoinLedger_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetCoinLedgerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScoringServiceServer).GetCoinLedger(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScoringService_GetCoinLedger_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScoringServiceServer).GetCoinLedger(ctx, req.(*GetCoinLedgerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ScoringService_ServiceDesc is the grpc.ServiceDesc for ScoringService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -827,9 +901,17 @@ var ScoringService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "GetGlobalLeaderboard",
 			Handler:    _ScoringService_GetGlobalLeaderboard_Handler,
 		},
+		{
+			MethodName: "GetCoinBalance",
+			Handler:    _ScoringService_GetCoinBalance_Handler,
+		},
+		{
+			MethodName: "GetCoinLedger",
+			Handler:    _ScoringService_GetCoinLedger_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "proto/quiz.proto",
+	Metadata: "quiz.proto",
 }
 
 const (
@@ -1467,7 +1549,7 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "proto/quiz.proto",
+	Metadata: "quiz.proto",
 }
 
 const (
@@ -1645,5 +1727,5 @@ var PaymentService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "proto/quiz.proto",
+	Metadata: "quiz.proto",
 }
