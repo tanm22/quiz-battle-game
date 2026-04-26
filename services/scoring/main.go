@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -23,6 +24,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"quiz-battle/pkg/auth"
+	"quiz-battle/pkg/coins"
 	"quiz-battle/pkg/keys"
 	"quiz-battle/pkg/models"
 	pb "quiz-battle/proto"
@@ -51,14 +53,21 @@ type scoringServer struct {
 	amqpCh     *amqp.Channel // for publishing only
 	amqpMu     sync.Mutex    // AMQP channels are not thread-safe
 	mongoDB    *mongo.Database
+	ledger     *coins.Ledger // §4.3 — every balance change goes through Grant
 	jwtSecret  string
 	selfClient pb.ScoringServiceClient // gRPC loopback client for CalculateScore
 }
 
-// publish sends a message to the topic exchange with mutex protection.
+// publish sends a message to the topic exchange with mutex protection. In
+// tests where amqpCh is left nil (we don't stand up RabbitMQ for unit tests
+// that only exercise Mongo state), publish is a no-op so callers don't need
+// to special-case the test seam.
 func (s *scoringServer) publish(ctx context.Context, routingKey string, body []byte) error {
 	s.amqpMu.Lock()
 	defer s.amqpMu.Unlock()
+	if s.amqpCh == nil {
+		return nil
+	}
 	return s.amqpCh.PublishWithContext(ctx, "sx", routingKey, false, false, amqp.Publishing{
 		ContentType: "application/json",
 		Body:        body,
@@ -1296,54 +1305,18 @@ func (s *scoringServer) consumeReferralEvents(ctx context.Context) {
 			if !ok {
 				return
 			}
-
-			var event struct {
-				ReferrerID  string `json:"referrerId"`
-				RefereeID   string `json:"refereeId"`
-				RefereeName string `json:"refereeName"`
-			}
-			if err := json.Unmarshal(msg.Body, &event); err != nil {
-				log.Printf("[referral-consumer] bad payload: %v", err)
-				msg.Nack(false, false)
+			if err := s.handleReferralEvent(ctx, msg.Body); err != nil {
+				if errors.Is(err, errBadReferralPayload) {
+					log.Printf("[referral-consumer] bad payload, dropping: %v body=%s", err, string(msg.Body))
+					msg.Nack(false, false)
+					continue
+				}
+				log.Printf("[referral-consumer] error: %v body=%s", err, string(msg.Body))
+				// Transient error — requeue. The queue's x-max-delivery-count
+				// dead-letters the message after repeated failures.
+				msg.Nack(false, true)
 				continue
 			}
-
-			// Idempotent: findOneAndUpdate with rewardGranted: false
-			result := s.mongoDB.Collection("referrals").FindOneAndUpdate(ctx,
-				bson.M{"refereeId": event.RefereeID, "rewardGranted": false},
-				bson.M{"$set": bson.M{
-					"status":        "converted",
-					"rewardGranted": true,
-					"convertedAt":   time.Now(),
-				}},
-			)
-			if result.Err() != nil {
-				// No matching doc = already processed or doesn't exist
-				log.Printf("[referral-consumer] skip (already processed or missing): %v", result.Err())
-				msg.Ack(false)
-				continue
-			}
-
-			// Grant coins: referrer +100, referee +50
-			s.mongoDB.Collection("users").UpdateOne(ctx,
-				bson.M{"_id": event.ReferrerID},
-				bson.M{"$inc": bson.M{"coins": int64(100)}},
-			)
-			s.mongoDB.Collection("users").UpdateOne(ctx,
-				bson.M{"_id": event.RefereeID},
-				bson.M{"$inc": bson.M{"coins": int64(50)}},
-			)
-
-			// Publish notification to referrer (ISSUE-06 complete chain)
-			notifJSON, _ := json.Marshal(map[string]interface{}{
-				"event":       "notif.referral.converted",
-				"userId":      event.ReferrerID,
-				"refereeName": event.RefereeName,
-				"coinsEarned": 100,
-			})
-			s.publish(ctx, "notif.referral.converted", notifJSON)
-
-			log.Printf("[referral-consumer] referral converted: %s referred %s, coins granted", event.ReferrerID, event.RefereeID)
 			msg.Ack(false)
 		}
 	}
@@ -1606,8 +1579,17 @@ func setupRabbitMQ(ch *amqp.Channel) error {
 		return fmt.Errorf("payment queue bind: %w", err)
 	}
 
-	// Phase 2: referral-event-queue (consumed by this service to grant rewards)
-	if _, err := ch.QueueDeclare("referral-event-queue", true, false, false, false, nil); err != nil {
+	// Phase 2: referral-event-queue (consumed by this service to grant rewards).
+	// Mirrors the tournament-finished DLQ pattern: a poison message would
+	// otherwise head-of-line-block the queue forever once we requeue on error.
+	if _, err := ch.QueueDeclare("referral-event-dlq", true, false, false, false, nil); err != nil {
+		return fmt.Errorf("referral DLQ declare: %w", err)
+	}
+	if _, err := ch.QueueDeclare("referral-event-queue", true, false, false, false, amqp.Table{
+		"x-dead-letter-exchange":    "",
+		"x-dead-letter-routing-key": "referral-event-dlq",
+		"x-max-delivery-count":      3,
+	}); err != nil {
 		return fmt.Errorf("referral queue declare: %w", err)
 	}
 	if err := ch.QueueBind("referral-event-queue", "referral.*", "sx", false, nil); err != nil {
@@ -1711,7 +1693,8 @@ func main() {
 		rdb:       rdb,
 		amqpConn:  conn,
 		amqpCh:    amqpCh,
-		mongoDB:   mongoClient.Database("quizbattle"),
+		mongoDB:   mongoClient.Database(coins.DefaultDBName),
+		ledger:    coins.NewLedger(mongoClient, coins.DefaultDBName),
 		jwtSecret: jwtSecret,
 	}
 

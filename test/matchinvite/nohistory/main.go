@@ -22,10 +22,10 @@ import (
 )
 
 const (
-	mongoURI   = "mongodb://localhost:27017/quizbattle"
-	mmAddr     = "localhost:50051"
-	jwtSecret  = "change-me-in-production"
-	newbieID   = "mi_test_newbie"
+	mongoURI  = "mongodb://localhost:27017/quizbattle"
+	mmAddr    = "localhost:50051"
+	jwtSecret = "change-me-in-production"
+	newbieID  = "mi_test_newbie"
 )
 
 func main() {
