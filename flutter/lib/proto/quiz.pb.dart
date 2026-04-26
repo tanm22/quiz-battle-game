@@ -5256,6 +5256,166 @@ class CreateOrderResponse extends $pb.GeneratedMessage {
   void clearCurrency() => $_clearField(4);
 }
 
+class VerifyPaymentRequest extends $pb.GeneratedMessage {
+  factory VerifyPaymentRequest({
+    $core.String? razorpayOrderId,
+    $core.String? razorpayPaymentId,
+    $core.String? razorpaySignature,
+  }) {
+    final result = create();
+    if (razorpayOrderId != null) result.razorpayOrderId = razorpayOrderId;
+    if (razorpayPaymentId != null) result.razorpayPaymentId = razorpayPaymentId;
+    if (razorpaySignature != null) result.razorpaySignature = razorpaySignature;
+    return result;
+  }
+
+  VerifyPaymentRequest._();
+
+  factory VerifyPaymentRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory VerifyPaymentRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'VerifyPaymentRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'razorpayOrderId')
+    ..aOS(2, _omitFieldNames ? '' : 'razorpayPaymentId')
+    ..aOS(3, _omitFieldNames ? '' : 'razorpaySignature')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  VerifyPaymentRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  VerifyPaymentRequest copyWith(void Function(VerifyPaymentRequest) updates) =>
+      super.copyWith((message) => updates(message as VerifyPaymentRequest))
+          as VerifyPaymentRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static VerifyPaymentRequest create() => VerifyPaymentRequest._();
+  @$core.override
+  VerifyPaymentRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static VerifyPaymentRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<VerifyPaymentRequest>(create);
+  static VerifyPaymentRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get razorpayOrderId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set razorpayOrderId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRazorpayOrderId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRazorpayOrderId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get razorpayPaymentId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set razorpayPaymentId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRazorpayPaymentId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRazorpayPaymentId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get razorpaySignature => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set razorpaySignature($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasRazorpaySignature() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRazorpaySignature() => $_clearField(3);
+}
+
+class VerifyPaymentResponse extends $pb.GeneratedMessage {
+  factory VerifyPaymentResponse({
+    $core.bool? success,
+    $core.String? plan,
+    $fixnum.Int64? expiresAt,
+  }) {
+    final result = create();
+    if (success != null) result.success = success;
+    if (plan != null) result.plan = plan;
+    if (expiresAt != null) result.expiresAt = expiresAt;
+    return result;
+  }
+
+  VerifyPaymentResponse._();
+
+  factory VerifyPaymentResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory VerifyPaymentResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'VerifyPaymentResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'success')
+    ..aOS(2, _omitFieldNames ? '' : 'plan')
+    ..aInt64(3, _omitFieldNames ? '' : 'expiresAt')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  VerifyPaymentResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  VerifyPaymentResponse copyWith(
+          void Function(VerifyPaymentResponse) updates) =>
+      super.copyWith((message) => updates(message as VerifyPaymentResponse))
+          as VerifyPaymentResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static VerifyPaymentResponse create() => VerifyPaymentResponse._();
+  @$core.override
+  VerifyPaymentResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static VerifyPaymentResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<VerifyPaymentResponse>(create);
+  static VerifyPaymentResponse? _defaultInstance;
+
+  /// True iff the signature verified and the payment is now in the
+  /// captured state. Idempotent — repeat verifies on the same payment
+  /// return success without re-running the upgrade pipeline.
+  @$pb.TagNumber(1)
+  $core.bool get success => $_getBF(0);
+  @$pb.TagNumber(1)
+  set success($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSuccess() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSuccess() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get plan => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set plan($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPlan() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPlan() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get expiresAt => $_getI64(2);
+  @$pb.TagNumber(3)
+  set expiresAt($fixnum.Int64 value) => $_setInt64(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasExpiresAt() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearExpiresAt() => $_clearField(3);
+}
+
 class GetPlanStatusRequest extends $pb.GeneratedMessage {
   factory GetPlanStatusRequest() => create();
 
@@ -7181,6 +7341,938 @@ class ConsumeRerollResponse extends $pb.GeneratedMessage {
 
   /// Empty on success. Domain error code: NO_CHARGES — user has zero
   /// rerollCharges, so the spend was rejected without mutating state.
+  @$pb.TagNumber(3)
+  $core.String get errorCode => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set errorCode($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasErrorCode() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearErrorCode() => $_clearField(3);
+}
+
+class SendFriendRequestRequest extends $pb.GeneratedMessage {
+  factory SendFriendRequestRequest({
+    $core.String? targetUsername,
+    $core.String? targetReferralCode,
+  }) {
+    final result = create();
+    if (targetUsername != null) result.targetUsername = targetUsername;
+    if (targetReferralCode != null)
+      result.targetReferralCode = targetReferralCode;
+    return result;
+  }
+
+  SendFriendRequestRequest._();
+
+  factory SendFriendRequestRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory SendFriendRequestRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SendFriendRequestRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'targetUsername')
+    ..aOS(2, _omitFieldNames ? '' : 'targetReferralCode')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SendFriendRequestRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SendFriendRequestRequest copyWith(
+          void Function(SendFriendRequestRequest) updates) =>
+      super.copyWith((message) => updates(message as SendFriendRequestRequest))
+          as SendFriendRequestRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static SendFriendRequestRequest create() => SendFriendRequestRequest._();
+  @$core.override
+  SendFriendRequestRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static SendFriendRequestRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SendFriendRequestRequest>(create);
+  static SendFriendRequestRequest? _defaultInstance;
+
+  /// Exactly one of these must be set. target_username is the friendly path
+  /// (Add by name); target_referral_code is the share-link path.
+  @$pb.TagNumber(1)
+  $core.String get targetUsername => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set targetUsername($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasTargetUsername() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearTargetUsername() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get targetReferralCode => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set targetReferralCode($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasTargetReferralCode() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTargetReferralCode() => $_clearField(2);
+}
+
+class SendFriendRequestResponse extends $pb.GeneratedMessage {
+  factory SendFriendRequestResponse({
+    $core.bool? success,
+    $core.String? requestId,
+    $core.String? errorCode,
+  }) {
+    final result = create();
+    if (success != null) result.success = success;
+    if (requestId != null) result.requestId = requestId;
+    if (errorCode != null) result.errorCode = errorCode;
+    return result;
+  }
+
+  SendFriendRequestResponse._();
+
+  factory SendFriendRequestResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory SendFriendRequestResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SendFriendRequestResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'success')
+    ..aOS(2, _omitFieldNames ? '' : 'requestId')
+    ..aOS(3, _omitFieldNames ? '' : 'errorCode')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SendFriendRequestResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SendFriendRequestResponse copyWith(
+          void Function(SendFriendRequestResponse) updates) =>
+      super.copyWith((message) => updates(message as SendFriendRequestResponse))
+          as SendFriendRequestResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static SendFriendRequestResponse create() => SendFriendRequestResponse._();
+  @$core.override
+  SendFriendRequestResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static SendFriendRequestResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SendFriendRequestResponse>(create);
+  static SendFriendRequestResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get success => $_getBF(0);
+  @$pb.TagNumber(1)
+  set success($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSuccess() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSuccess() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get requestId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set requestId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRequestId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRequestId() => $_clearField(2);
+
+  /// Empty on success. Domain error codes:
+  ///   USER_NOT_FOUND     — username/code didn't resolve
+  ///   ALREADY_FRIENDS    — relationship already accepted
+  ///   ALREADY_PENDING    — outbound request already pending
+  ///   SELF               — caller tried to friend themselves
+  ///   INVALID_ARGUMENT   — both or neither identifier set
+  @$pb.TagNumber(3)
+  $core.String get errorCode => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set errorCode($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasErrorCode() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearErrorCode() => $_clearField(3);
+}
+
+class FriendRequest extends $pb.GeneratedMessage {
+  factory FriendRequest({
+    $core.String? id,
+    $core.String? fromUserId,
+    $core.String? fromUsername,
+    $core.String? toUserId,
+    $core.String? toUsername,
+    $core.String? status,
+    $fixnum.Int64? createdAtMs,
+    $fixnum.Int64? respondedAtMs,
+  }) {
+    final result = create();
+    if (id != null) result.id = id;
+    if (fromUserId != null) result.fromUserId = fromUserId;
+    if (fromUsername != null) result.fromUsername = fromUsername;
+    if (toUserId != null) result.toUserId = toUserId;
+    if (toUsername != null) result.toUsername = toUsername;
+    if (status != null) result.status = status;
+    if (createdAtMs != null) result.createdAtMs = createdAtMs;
+    if (respondedAtMs != null) result.respondedAtMs = respondedAtMs;
+    return result;
+  }
+
+  FriendRequest._();
+
+  factory FriendRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory FriendRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'FriendRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aOS(2, _omitFieldNames ? '' : 'fromUserId')
+    ..aOS(3, _omitFieldNames ? '' : 'fromUsername')
+    ..aOS(4, _omitFieldNames ? '' : 'toUserId')
+    ..aOS(5, _omitFieldNames ? '' : 'toUsername')
+    ..aOS(6, _omitFieldNames ? '' : 'status')
+    ..aInt64(7, _omitFieldNames ? '' : 'createdAtMs')
+    ..aInt64(8, _omitFieldNames ? '' : 'respondedAtMs')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FriendRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FriendRequest copyWith(void Function(FriendRequest) updates) =>
+      super.copyWith((message) => updates(message as FriendRequest))
+          as FriendRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static FriendRequest create() => FriendRequest._();
+  @$core.override
+  FriendRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static FriendRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<FriendRequest>(create);
+  static FriendRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get fromUserId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set fromUserId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasFromUserId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearFromUserId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get fromUsername => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set fromUsername($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasFromUsername() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearFromUsername() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get toUserId => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set toUserId($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasToUserId() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearToUserId() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get toUsername => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set toUsername($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasToUsername() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearToUsername() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get status => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set status($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasStatus() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearStatus() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $fixnum.Int64 get createdAtMs => $_getI64(6);
+  @$pb.TagNumber(7)
+  set createdAtMs($fixnum.Int64 value) => $_setInt64(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasCreatedAtMs() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearCreatedAtMs() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $fixnum.Int64 get respondedAtMs => $_getI64(7);
+  @$pb.TagNumber(8)
+  set respondedAtMs($fixnum.Int64 value) => $_setInt64(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasRespondedAtMs() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearRespondedAtMs() => $_clearField(8);
+}
+
+class RespondToFriendRequestRequest extends $pb.GeneratedMessage {
+  factory RespondToFriendRequestRequest({
+    $core.String? requestId,
+    $core.bool? accept,
+  }) {
+    final result = create();
+    if (requestId != null) result.requestId = requestId;
+    if (accept != null) result.accept = accept;
+    return result;
+  }
+
+  RespondToFriendRequestRequest._();
+
+  factory RespondToFriendRequestRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RespondToFriendRequestRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RespondToFriendRequestRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'requestId')
+    ..aOB(2, _omitFieldNames ? '' : 'accept')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RespondToFriendRequestRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RespondToFriendRequestRequest copyWith(
+          void Function(RespondToFriendRequestRequest) updates) =>
+      super.copyWith(
+              (message) => updates(message as RespondToFriendRequestRequest))
+          as RespondToFriendRequestRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RespondToFriendRequestRequest create() =>
+      RespondToFriendRequestRequest._();
+  @$core.override
+  RespondToFriendRequestRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RespondToFriendRequestRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RespondToFriendRequestRequest>(create);
+  static RespondToFriendRequestRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get requestId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set requestId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRequestId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRequestId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.bool get accept => $_getBF(1);
+  @$pb.TagNumber(2)
+  set accept($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasAccept() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearAccept() => $_clearField(2);
+}
+
+class RespondToFriendRequestResponse extends $pb.GeneratedMessage {
+  factory RespondToFriendRequestResponse({
+    $core.bool? success,
+    $core.String? errorCode,
+  }) {
+    final result = create();
+    if (success != null) result.success = success;
+    if (errorCode != null) result.errorCode = errorCode;
+    return result;
+  }
+
+  RespondToFriendRequestResponse._();
+
+  factory RespondToFriendRequestResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RespondToFriendRequestResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RespondToFriendRequestResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'success')
+    ..aOS(2, _omitFieldNames ? '' : 'errorCode')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RespondToFriendRequestResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RespondToFriendRequestResponse copyWith(
+          void Function(RespondToFriendRequestResponse) updates) =>
+      super.copyWith(
+              (message) => updates(message as RespondToFriendRequestResponse))
+          as RespondToFriendRequestResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RespondToFriendRequestResponse create() =>
+      RespondToFriendRequestResponse._();
+  @$core.override
+  RespondToFriendRequestResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RespondToFriendRequestResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RespondToFriendRequestResponse>(create);
+  static RespondToFriendRequestResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get success => $_getBF(0);
+  @$pb.TagNumber(1)
+  set success($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSuccess() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSuccess() => $_clearField(1);
+
+  /// Domain error codes: NOT_FOUND, NOT_RECIPIENT, ALREADY_RESPONDED.
+  @$pb.TagNumber(2)
+  $core.String get errorCode => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set errorCode($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasErrorCode() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearErrorCode() => $_clearField(2);
+}
+
+class Friend extends $pb.GeneratedMessage {
+  factory Friend({
+    $core.String? userId,
+    $core.String? username,
+    $core.bool? online,
+    $fixnum.Int64? friendedAtMs,
+  }) {
+    final result = create();
+    if (userId != null) result.userId = userId;
+    if (username != null) result.username = username;
+    if (online != null) result.online = online;
+    if (friendedAtMs != null) result.friendedAtMs = friendedAtMs;
+    return result;
+  }
+
+  Friend._();
+
+  factory Friend.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory Friend.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Friend',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'userId')
+    ..aOS(2, _omitFieldNames ? '' : 'username')
+    ..aOB(3, _omitFieldNames ? '' : 'online')
+    ..aInt64(4, _omitFieldNames ? '' : 'friendedAtMs')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Friend clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Friend copyWith(void Function(Friend) updates) =>
+      super.copyWith((message) => updates(message as Friend)) as Friend;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static Friend create() => Friend._();
+  @$core.override
+  Friend createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static Friend getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<Friend>(create);
+  static Friend? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get userId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set userId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasUserId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearUserId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get username => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set username($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasUsername() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearUsername() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get online => $_getBF(2);
+  @$pb.TagNumber(3)
+  set online($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasOnline() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearOnline() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $fixnum.Int64 get friendedAtMs => $_getI64(3);
+  @$pb.TagNumber(4)
+  set friendedAtMs($fixnum.Int64 value) => $_setInt64(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasFriendedAtMs() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearFriendedAtMs() => $_clearField(4);
+}
+
+class GetFriendsListRequest extends $pb.GeneratedMessage {
+  factory GetFriendsListRequest() => create();
+
+  GetFriendsListRequest._();
+
+  factory GetFriendsListRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetFriendsListRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetFriendsListRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetFriendsListRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetFriendsListRequest copyWith(
+          void Function(GetFriendsListRequest) updates) =>
+      super.copyWith((message) => updates(message as GetFriendsListRequest))
+          as GetFriendsListRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetFriendsListRequest create() => GetFriendsListRequest._();
+  @$core.override
+  GetFriendsListRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetFriendsListRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetFriendsListRequest>(create);
+  static GetFriendsListRequest? _defaultInstance;
+}
+
+class GetFriendsListResponse extends $pb.GeneratedMessage {
+  factory GetFriendsListResponse({
+    $core.Iterable<Friend>? friends,
+  }) {
+    final result = create();
+    if (friends != null) result.friends.addAll(friends);
+    return result;
+  }
+
+  GetFriendsListResponse._();
+
+  factory GetFriendsListResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetFriendsListResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetFriendsListResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..pPM<Friend>(1, _omitFieldNames ? '' : 'friends',
+        subBuilder: Friend.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetFriendsListResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetFriendsListResponse copyWith(
+          void Function(GetFriendsListResponse) updates) =>
+      super.copyWith((message) => updates(message as GetFriendsListResponse))
+          as GetFriendsListResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetFriendsListResponse create() => GetFriendsListResponse._();
+  @$core.override
+  GetFriendsListResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetFriendsListResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetFriendsListResponse>(create);
+  static GetFriendsListResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<Friend> get friends => $_getList(0);
+}
+
+class GetFriendRequestsRequest extends $pb.GeneratedMessage {
+  factory GetFriendRequestsRequest() => create();
+
+  GetFriendRequestsRequest._();
+
+  factory GetFriendRequestsRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetFriendRequestsRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetFriendRequestsRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetFriendRequestsRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetFriendRequestsRequest copyWith(
+          void Function(GetFriendRequestsRequest) updates) =>
+      super.copyWith((message) => updates(message as GetFriendRequestsRequest))
+          as GetFriendRequestsRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetFriendRequestsRequest create() => GetFriendRequestsRequest._();
+  @$core.override
+  GetFriendRequestsRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetFriendRequestsRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetFriendRequestsRequest>(create);
+  static GetFriendRequestsRequest? _defaultInstance;
+}
+
+class GetFriendRequestsResponse extends $pb.GeneratedMessage {
+  factory GetFriendRequestsResponse({
+    $core.Iterable<FriendRequest>? incoming,
+  }) {
+    final result = create();
+    if (incoming != null) result.incoming.addAll(incoming);
+    return result;
+  }
+
+  GetFriendRequestsResponse._();
+
+  factory GetFriendRequestsResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetFriendRequestsResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetFriendRequestsResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..pPM<FriendRequest>(1, _omitFieldNames ? '' : 'incoming',
+        subBuilder: FriendRequest.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetFriendRequestsResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetFriendRequestsResponse copyWith(
+          void Function(GetFriendRequestsResponse) updates) =>
+      super.copyWith((message) => updates(message as GetFriendRequestsResponse))
+          as GetFriendRequestsResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetFriendRequestsResponse create() => GetFriendRequestsResponse._();
+  @$core.override
+  GetFriendRequestsResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetFriendRequestsResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetFriendRequestsResponse>(create);
+  static GetFriendRequestsResponse? _defaultInstance;
+
+  /// Incoming pending requests only — outgoing requests aren't surfaced
+  /// here in v1 because they're known to the sender from
+  /// SendFriendRequestResponse and don't need a separate listing screen.
+  @$pb.TagNumber(1)
+  $pb.PbList<FriendRequest> get incoming => $_getList(0);
+}
+
+class HeartbeatRequest extends $pb.GeneratedMessage {
+  factory HeartbeatRequest() => create();
+
+  HeartbeatRequest._();
+
+  factory HeartbeatRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory HeartbeatRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'HeartbeatRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  HeartbeatRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  HeartbeatRequest copyWith(void Function(HeartbeatRequest) updates) =>
+      super.copyWith((message) => updates(message as HeartbeatRequest))
+          as HeartbeatRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static HeartbeatRequest create() => HeartbeatRequest._();
+  @$core.override
+  HeartbeatRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static HeartbeatRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<HeartbeatRequest>(create);
+  static HeartbeatRequest? _defaultInstance;
+}
+
+class HeartbeatResponse extends $pb.GeneratedMessage {
+  factory HeartbeatResponse({
+    $core.bool? success,
+  }) {
+    final result = create();
+    if (success != null) result.success = success;
+    return result;
+  }
+
+  HeartbeatResponse._();
+
+  factory HeartbeatResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory HeartbeatResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'HeartbeatResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'success')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  HeartbeatResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  HeartbeatResponse copyWith(void Function(HeartbeatResponse) updates) =>
+      super.copyWith((message) => updates(message as HeartbeatResponse))
+          as HeartbeatResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static HeartbeatResponse create() => HeartbeatResponse._();
+  @$core.override
+  HeartbeatResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static HeartbeatResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<HeartbeatResponse>(create);
+  static HeartbeatResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get success => $_getBF(0);
+  @$pb.TagNumber(1)
+  set success($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSuccess() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSuccess() => $_clearField(1);
+}
+
+class ChallengeFriendRequest extends $pb.GeneratedMessage {
+  factory ChallengeFriendRequest({
+    $core.String? friendUserId,
+  }) {
+    final result = create();
+    if (friendUserId != null) result.friendUserId = friendUserId;
+    return result;
+  }
+
+  ChallengeFriendRequest._();
+
+  factory ChallengeFriendRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ChallengeFriendRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ChallengeFriendRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'friendUserId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ChallengeFriendRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ChallengeFriendRequest copyWith(
+          void Function(ChallengeFriendRequest) updates) =>
+      super.copyWith((message) => updates(message as ChallengeFriendRequest))
+          as ChallengeFriendRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ChallengeFriendRequest create() => ChallengeFriendRequest._();
+  @$core.override
+  ChallengeFriendRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ChallengeFriendRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ChallengeFriendRequest>(create);
+  static ChallengeFriendRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get friendUserId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set friendUserId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasFriendUserId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearFriendUserId() => $_clearField(1);
+}
+
+class ChallengeFriendResponse extends $pb.GeneratedMessage {
+  factory ChallengeFriendResponse({
+    $core.bool? success,
+    $core.String? roomId,
+    $core.String? errorCode,
+  }) {
+    final result = create();
+    if (success != null) result.success = success;
+    if (roomId != null) result.roomId = roomId;
+    if (errorCode != null) result.errorCode = errorCode;
+    return result;
+  }
+
+  ChallengeFriendResponse._();
+
+  factory ChallengeFriendResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ChallengeFriendResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ChallengeFriendResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'success')
+    ..aOS(2, _omitFieldNames ? '' : 'roomId')
+    ..aOS(3, _omitFieldNames ? '' : 'errorCode')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ChallengeFriendResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ChallengeFriendResponse copyWith(
+          void Function(ChallengeFriendResponse) updates) =>
+      super.copyWith((message) => updates(message as ChallengeFriendResponse))
+          as ChallengeFriendResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ChallengeFriendResponse create() => ChallengeFriendResponse._();
+  @$core.override
+  ChallengeFriendResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ChallengeFriendResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ChallengeFriendResponse>(create);
+  static ChallengeFriendResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get success => $_getBF(0);
+  @$pb.TagNumber(1)
+  set success($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSuccess() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSuccess() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get roomId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set roomId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRoomId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRoomId() => $_clearField(2);
+
+  /// Empty on success. Domain error codes:
+  ///   NOT_FRIENDS         — caller and target are not accepted friends
+  ///   FRIEND_OFFLINE      — target's presence TTL expired (best-effort hint)
+  ///   THROTTLED           — caller already challenged this friend recently
   @$pb.TagNumber(3)
   $core.String get errorCode => $_getSZ(2);
   @$pb.TagNumber(3)

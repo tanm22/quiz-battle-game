@@ -42,6 +42,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _loadHomeData();
   }
 
+  /// Pushes [PaymentScreen] and refreshes the home payload after it
+  /// pops. Without this, a successful Razorpay purchase activates
+  /// premium server-side (users.plan flips via the scoring consumer)
+  /// but the home tab keeps rendering the stale `_homeData` it loaded
+  /// at init — so the upsell card + `0W/0L` ribbon stay visible until
+  /// the user manually pulls-to-refresh or restarts the app.
+  Future<void> _openPaymentScreen() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const PaymentScreen()),
+    );
+    if (mounted) await _loadHomeData();
+  }
+
   Future<void> _loadHomeData() async {
     setState(() { _loading = true; _error = null; });
     try {
@@ -168,7 +182,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final quotaExhausted = !isPremium && remaining <= 0;
 
     if (quotaExhausted) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentScreen()));
+      _openPaymentScreen();
     } else {
       ref.read(gameStateProvider.notifier).navigateToMatchmaking();
     }
@@ -283,7 +297,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               child: ElevatedButton.icon(
                 onPressed: quotaExhausted
-                    ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentScreen()))
+                    ? () => _openPaymentScreen()
                     : () => ref.read(gameStateProvider.notifier).navigateToMatchmaking(),
                 icon: Icon(quotaExhausted ? Icons.lock : Icons.bolt, size: 26),
                 label: Text(
@@ -317,7 +331,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               })),
               const SizedBox(width: 8),
               Expanded(child: _actionButton('👑', 'Premium', () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentScreen()));
+                _openPaymentScreen();
               })),
             ],
           ),
@@ -472,7 +486,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
             child: GestureDetector(
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentScreen())),
+              onTap: () => _openPaymentScreen(),
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
@@ -568,7 +582,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           }, color: AppColors.primary),
           const SizedBox(height: 8),
           _profileActionButton(Icons.workspace_premium, 'Premium', () {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentScreen()));
+            _openPaymentScreen();
           }, color: AppColors.gold),
           const SizedBox(height: 8),
           _profileActionButton(Icons.share, 'Invite Friends', () {
@@ -926,7 +940,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final isPremium = (_homeData?.profile.plan ?? 'free') == 'premium';
 
     return GestureDetector(
-      onTap: isPremium ? null : () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentScreen())),
+      onTap: isPremium ? null : () => _openPaymentScreen(),
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
@@ -994,7 +1008,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentScreen())),
+              onPressed: () => _openPaymentScreen(),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.gold,
                 foregroundColor: Colors.white,

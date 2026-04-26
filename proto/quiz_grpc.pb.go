@@ -2014,6 +2014,7 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 
 const (
 	PaymentService_CreateOrder_FullMethodName       = "/quiz.PaymentService/CreateOrder"
+	PaymentService_VerifyPayment_FullMethodName     = "/quiz.PaymentService/VerifyPayment"
 	PaymentService_GetPlanStatus_FullMethodName     = "/quiz.PaymentService/GetPlanStatus"
 	PaymentService_GetPaymentHistory_FullMethodName = "/quiz.PaymentService/GetPaymentHistory"
 )
@@ -2023,6 +2024,12 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type PaymentServiceClient interface {
 	CreateOrder(ctx context.Context, in *CreateOrderRequest, opts ...grpc.CallOption) (*CreateOrderResponse, error)
+	// Client-side signature verification — Flutter calls this with the
+	// (paymentId, orderId, signature) triple from the Razorpay SDK
+	// success callback. Activates premium synchronously without waiting
+	// on the webhook (which needs ngrok in dev). Idempotent: repeat
+	// calls with the same paymentId are no-ops.
+	VerifyPayment(ctx context.Context, in *VerifyPaymentRequest, opts ...grpc.CallOption) (*VerifyPaymentResponse, error)
 	GetPlanStatus(ctx context.Context, in *GetPlanStatusRequest, opts ...grpc.CallOption) (*GetPlanStatusResponse, error)
 	GetPaymentHistory(ctx context.Context, in *GetPaymentHistoryRequest, opts ...grpc.CallOption) (*GetPaymentHistoryResponse, error)
 }
@@ -2039,6 +2046,16 @@ func (c *paymentServiceClient) CreateOrder(ctx context.Context, in *CreateOrderR
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CreateOrderResponse)
 	err := c.cc.Invoke(ctx, PaymentService_CreateOrder_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *paymentServiceClient) VerifyPayment(ctx context.Context, in *VerifyPaymentRequest, opts ...grpc.CallOption) (*VerifyPaymentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(VerifyPaymentResponse)
+	err := c.cc.Invoke(ctx, PaymentService_VerifyPayment_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2070,6 +2087,12 @@ func (c *paymentServiceClient) GetPaymentHistory(ctx context.Context, in *GetPay
 // for forward compatibility.
 type PaymentServiceServer interface {
 	CreateOrder(context.Context, *CreateOrderRequest) (*CreateOrderResponse, error)
+	// Client-side signature verification — Flutter calls this with the
+	// (paymentId, orderId, signature) triple from the Razorpay SDK
+	// success callback. Activates premium synchronously without waiting
+	// on the webhook (which needs ngrok in dev). Idempotent: repeat
+	// calls with the same paymentId are no-ops.
+	VerifyPayment(context.Context, *VerifyPaymentRequest) (*VerifyPaymentResponse, error)
 	GetPlanStatus(context.Context, *GetPlanStatusRequest) (*GetPlanStatusResponse, error)
 	GetPaymentHistory(context.Context, *GetPaymentHistoryRequest) (*GetPaymentHistoryResponse, error)
 	mustEmbedUnimplementedPaymentServiceServer()
@@ -2084,6 +2107,9 @@ type UnimplementedPaymentServiceServer struct{}
 
 func (UnimplementedPaymentServiceServer) CreateOrder(context.Context, *CreateOrderRequest) (*CreateOrderResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateOrder not implemented")
+}
+func (UnimplementedPaymentServiceServer) VerifyPayment(context.Context, *VerifyPaymentRequest) (*VerifyPaymentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method VerifyPayment not implemented")
 }
 func (UnimplementedPaymentServiceServer) GetPlanStatus(context.Context, *GetPlanStatusRequest) (*GetPlanStatusResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetPlanStatus not implemented")
@@ -2126,6 +2152,24 @@ func _PaymentService_CreateOrder_Handler(srv interface{}, ctx context.Context, d
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(PaymentServiceServer).CreateOrder(ctx, req.(*CreateOrderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PaymentService_VerifyPayment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(VerifyPaymentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PaymentServiceServer).VerifyPayment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PaymentService_VerifyPayment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PaymentServiceServer).VerifyPayment(ctx, req.(*VerifyPaymentRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -2176,6 +2220,10 @@ var PaymentService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateOrder",
 			Handler:    _PaymentService_CreateOrder_Handler,
+		},
+		{
+			MethodName: "VerifyPayment",
+			Handler:    _PaymentService_VerifyPayment_Handler,
 		},
 		{
 			MethodName: "GetPlanStatus",

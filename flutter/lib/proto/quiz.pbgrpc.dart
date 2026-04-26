@@ -436,6 +436,66 @@ class ScoringServiceClient extends $grpc.Client {
     return $createUnaryCall(_$consumeReroll, request, options: options);
   }
 
+  /// Phase 3 (4.4): Friends & Challenges.
+  /// SendFriendRequest takes EXACTLY ONE of target_username / target_referral_code.
+  /// Idempotent on (fromUserId, toUserId): a duplicate send returns the
+  /// existing pending request or the existing accepted relationship.
+  $grpc.ResponseFuture<$0.SendFriendRequestResponse> sendFriendRequest(
+    $0.SendFriendRequestRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$sendFriendRequest, request, options: options);
+  }
+
+  /// RespondToFriendRequest accepts or rejects a pending incoming request.
+  /// The caller must be the request's recipient; otherwise PERMISSION_DENIED.
+  $grpc.ResponseFuture<$0.RespondToFriendRequestResponse>
+      respondToFriendRequest(
+    $0.RespondToFriendRequestRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$respondToFriendRequest, request,
+        options: options);
+  }
+
+  /// GetFriendsList returns accepted friendships for the caller, with each
+  /// friend's online flag derived from the Redis presence:{userId} TTL key.
+  $grpc.ResponseFuture<$0.GetFriendsListResponse> getFriendsList(
+    $0.GetFriendsListRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$getFriendsList, request, options: options);
+  }
+
+  /// GetFriendRequests returns pending incoming friend requests (the
+  /// outgoing direction is implicit from SendFriendRequest's response).
+  $grpc.ResponseFuture<$0.GetFriendRequestsResponse> getFriendRequests(
+    $0.GetFriendRequestsRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$getFriendRequests, request, options: options);
+  }
+
+  /// Heartbeat refreshes the caller's presence TTL. Clients call this on
+  /// app foreground / every ~30s while open. No-op safe.
+  $grpc.ResponseFuture<$0.HeartbeatResponse> heartbeat(
+    $0.HeartbeatRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$heartbeat, request, options: options);
+  }
+
+  /// ChallengeFriend creates a private 1v1 room with the caller and the
+  /// friend, publishes notif.friend.challenge, and returns the room id
+  /// both clients can use to enter the game flow. The friend must be in
+  /// the caller's accepted friends; otherwise NOT_FRIENDS error code.
+  $grpc.ResponseFuture<$0.ChallengeFriendResponse> challengeFriend(
+    $0.ChallengeFriendRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$challengeFriend, request, options: options);
+  }
+
   // method descriptors
 
   static final _$calculateScore =
@@ -513,6 +573,36 @@ class ScoringServiceClient extends $grpc.Client {
           '/quiz.ScoringService/ConsumeReroll',
           ($0.ConsumeRerollRequest value) => value.writeToBuffer(),
           $0.ConsumeRerollResponse.fromBuffer);
+  static final _$sendFriendRequest = $grpc.ClientMethod<
+          $0.SendFriendRequestRequest, $0.SendFriendRequestResponse>(
+      '/quiz.ScoringService/SendFriendRequest',
+      ($0.SendFriendRequestRequest value) => value.writeToBuffer(),
+      $0.SendFriendRequestResponse.fromBuffer);
+  static final _$respondToFriendRequest = $grpc.ClientMethod<
+          $0.RespondToFriendRequestRequest, $0.RespondToFriendRequestResponse>(
+      '/quiz.ScoringService/RespondToFriendRequest',
+      ($0.RespondToFriendRequestRequest value) => value.writeToBuffer(),
+      $0.RespondToFriendRequestResponse.fromBuffer);
+  static final _$getFriendsList =
+      $grpc.ClientMethod<$0.GetFriendsListRequest, $0.GetFriendsListResponse>(
+          '/quiz.ScoringService/GetFriendsList',
+          ($0.GetFriendsListRequest value) => value.writeToBuffer(),
+          $0.GetFriendsListResponse.fromBuffer);
+  static final _$getFriendRequests = $grpc.ClientMethod<
+          $0.GetFriendRequestsRequest, $0.GetFriendRequestsResponse>(
+      '/quiz.ScoringService/GetFriendRequests',
+      ($0.GetFriendRequestsRequest value) => value.writeToBuffer(),
+      $0.GetFriendRequestsResponse.fromBuffer);
+  static final _$heartbeat =
+      $grpc.ClientMethod<$0.HeartbeatRequest, $0.HeartbeatResponse>(
+          '/quiz.ScoringService/Heartbeat',
+          ($0.HeartbeatRequest value) => value.writeToBuffer(),
+          $0.HeartbeatResponse.fromBuffer);
+  static final _$challengeFriend =
+      $grpc.ClientMethod<$0.ChallengeFriendRequest, $0.ChallengeFriendResponse>(
+          '/quiz.ScoringService/ChallengeFriend',
+          ($0.ChallengeFriendRequest value) => value.writeToBuffer(),
+          $0.ChallengeFriendResponse.fromBuffer);
 }
 
 @$pb.GrpcServiceName('quiz.ScoringService')
@@ -655,6 +745,58 @@ abstract class ScoringServiceBase extends $grpc.Service {
             ($core.List<$core.int> value) =>
                 $0.ConsumeRerollRequest.fromBuffer(value),
             ($0.ConsumeRerollResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.SendFriendRequestRequest,
+            $0.SendFriendRequestResponse>(
+        'SendFriendRequest',
+        sendFriendRequest_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.SendFriendRequestRequest.fromBuffer(value),
+        ($0.SendFriendRequestResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.RespondToFriendRequestRequest,
+            $0.RespondToFriendRequestResponse>(
+        'RespondToFriendRequest',
+        respondToFriendRequest_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.RespondToFriendRequestRequest.fromBuffer(value),
+        ($0.RespondToFriendRequestResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.GetFriendsListRequest,
+            $0.GetFriendsListResponse>(
+        'GetFriendsList',
+        getFriendsList_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.GetFriendsListRequest.fromBuffer(value),
+        ($0.GetFriendsListResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.GetFriendRequestsRequest,
+            $0.GetFriendRequestsResponse>(
+        'GetFriendRequests',
+        getFriendRequests_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.GetFriendRequestsRequest.fromBuffer(value),
+        ($0.GetFriendRequestsResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.HeartbeatRequest, $0.HeartbeatResponse>(
+        'Heartbeat',
+        heartbeat_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.HeartbeatRequest.fromBuffer(value),
+        ($0.HeartbeatResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.ChallengeFriendRequest,
+            $0.ChallengeFriendResponse>(
+        'ChallengeFriend',
+        challengeFriend_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.ChallengeFriendRequest.fromBuffer(value),
+        ($0.ChallengeFriendResponse value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.CalculateScoreResponse> calculateScore_Pre(
@@ -791,6 +933,59 @@ abstract class ScoringServiceBase extends $grpc.Service {
 
   $async.Future<$0.ConsumeRerollResponse> consumeReroll(
       $grpc.ServiceCall call, $0.ConsumeRerollRequest request);
+
+  $async.Future<$0.SendFriendRequestResponse> sendFriendRequest_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.SendFriendRequestRequest> $request) async {
+    return sendFriendRequest($call, await $request);
+  }
+
+  $async.Future<$0.SendFriendRequestResponse> sendFriendRequest(
+      $grpc.ServiceCall call, $0.SendFriendRequestRequest request);
+
+  $async.Future<$0.RespondToFriendRequestResponse> respondToFriendRequest_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.RespondToFriendRequestRequest> $request) async {
+    return respondToFriendRequest($call, await $request);
+  }
+
+  $async.Future<$0.RespondToFriendRequestResponse> respondToFriendRequest(
+      $grpc.ServiceCall call, $0.RespondToFriendRequestRequest request);
+
+  $async.Future<$0.GetFriendsListResponse> getFriendsList_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.GetFriendsListRequest> $request) async {
+    return getFriendsList($call, await $request);
+  }
+
+  $async.Future<$0.GetFriendsListResponse> getFriendsList(
+      $grpc.ServiceCall call, $0.GetFriendsListRequest request);
+
+  $async.Future<$0.GetFriendRequestsResponse> getFriendRequests_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.GetFriendRequestsRequest> $request) async {
+    return getFriendRequests($call, await $request);
+  }
+
+  $async.Future<$0.GetFriendRequestsResponse> getFriendRequests(
+      $grpc.ServiceCall call, $0.GetFriendRequestsRequest request);
+
+  $async.Future<$0.HeartbeatResponse> heartbeat_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.HeartbeatRequest> $request) async {
+    return heartbeat($call, await $request);
+  }
+
+  $async.Future<$0.HeartbeatResponse> heartbeat(
+      $grpc.ServiceCall call, $0.HeartbeatRequest request);
+
+  $async.Future<$0.ChallengeFriendResponse> challengeFriend_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.ChallengeFriendRequest> $request) async {
+    return challengeFriend($call, await $request);
+  }
+
+  $async.Future<$0.ChallengeFriendResponse> challengeFriend(
+      $grpc.ServiceCall call, $0.ChallengeFriendRequest request);
 }
 
 @$pb.GrpcServiceName('quiz.AuthService')
@@ -1272,6 +1467,18 @@ class PaymentServiceClient extends $grpc.Client {
     return $createUnaryCall(_$createOrder, request, options: options);
   }
 
+  /// Client-side signature verification — Flutter calls this with the
+  /// (paymentId, orderId, signature) triple from the Razorpay SDK
+  /// success callback. Activates premium synchronously without waiting
+  /// on the webhook (which needs ngrok in dev). Idempotent: repeat
+  /// calls with the same paymentId are no-ops.
+  $grpc.ResponseFuture<$0.VerifyPaymentResponse> verifyPayment(
+    $0.VerifyPaymentRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$verifyPayment, request, options: options);
+  }
+
   $grpc.ResponseFuture<$0.GetPlanStatusResponse> getPlanStatus(
     $0.GetPlanStatusRequest request, {
     $grpc.CallOptions? options,
@@ -1293,6 +1500,11 @@ class PaymentServiceClient extends $grpc.Client {
           '/quiz.PaymentService/CreateOrder',
           ($0.CreateOrderRequest value) => value.writeToBuffer(),
           $0.CreateOrderResponse.fromBuffer);
+  static final _$verifyPayment =
+      $grpc.ClientMethod<$0.VerifyPaymentRequest, $0.VerifyPaymentResponse>(
+          '/quiz.PaymentService/VerifyPayment',
+          ($0.VerifyPaymentRequest value) => value.writeToBuffer(),
+          $0.VerifyPaymentResponse.fromBuffer);
   static final _$getPlanStatus =
       $grpc.ClientMethod<$0.GetPlanStatusRequest, $0.GetPlanStatusResponse>(
           '/quiz.PaymentService/GetPlanStatus',
@@ -1320,6 +1532,15 @@ abstract class PaymentServiceBase extends $grpc.Service {
                 $0.CreateOrderRequest.fromBuffer(value),
             ($0.CreateOrderResponse value) => value.writeToBuffer()));
     $addMethod(
+        $grpc.ServiceMethod<$0.VerifyPaymentRequest, $0.VerifyPaymentResponse>(
+            'VerifyPayment',
+            verifyPayment_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.VerifyPaymentRequest.fromBuffer(value),
+            ($0.VerifyPaymentResponse value) => value.writeToBuffer()));
+    $addMethod(
         $grpc.ServiceMethod<$0.GetPlanStatusRequest, $0.GetPlanStatusResponse>(
             'GetPlanStatus',
             getPlanStatus_Pre,
@@ -1346,6 +1567,15 @@ abstract class PaymentServiceBase extends $grpc.Service {
 
   $async.Future<$0.CreateOrderResponse> createOrder(
       $grpc.ServiceCall call, $0.CreateOrderRequest request);
+
+  $async.Future<$0.VerifyPaymentResponse> verifyPayment_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.VerifyPaymentRequest> $request) async {
+    return verifyPayment($call, await $request);
+  }
+
+  $async.Future<$0.VerifyPaymentResponse> verifyPayment(
+      $grpc.ServiceCall call, $0.VerifyPaymentRequest request);
 
   $async.Future<$0.GetPlanStatusResponse> getPlanStatus_Pre(
       $grpc.ServiceCall $call,

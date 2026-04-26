@@ -1,10 +1,14 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- gRPC + Razorpay both need the network. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- Android 13 (API 33) and later require runtime permission for notifications. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application
         android:label="quiz_battle"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -27,6 +31,18 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Required by razorpay_flutter — the Razorpay SDK launches its
+             own checkout Activity for the card / UPI / wallet sheet.
+             Without this declaration the plugin throws ActivityNotFoundException
+             the first time the Buy button is tapped on Android.
+             tools:replace lets us re-declare an activity the SDK manifest also
+             defines, with our own theme. -->
+        <activity
+            android:name="com.razorpay.CheckoutActivity"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenSize"
+            android:exported="true"
+            android:theme="@style/Theme.AppCompat.Light"
+            tools:replace="android:exported,android:theme" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

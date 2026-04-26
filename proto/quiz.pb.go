@@ -4158,6 +4158,129 @@ func (x *CreateOrderResponse) GetCurrency() string {
 	return ""
 }
 
+type VerifyPaymentRequest struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	RazorpayOrderId   string                 `protobuf:"bytes,1,opt,name=razorpay_order_id,json=razorpayOrderId,proto3" json:"razorpay_order_id,omitempty"`
+	RazorpayPaymentId string                 `protobuf:"bytes,2,opt,name=razorpay_payment_id,json=razorpayPaymentId,proto3" json:"razorpay_payment_id,omitempty"`
+	RazorpaySignature string                 `protobuf:"bytes,3,opt,name=razorpay_signature,json=razorpaySignature,proto3" json:"razorpay_signature,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *VerifyPaymentRequest) Reset() {
+	*x = VerifyPaymentRequest{}
+	mi := &file_proto_quiz_proto_msgTypes[69]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VerifyPaymentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VerifyPaymentRequest) ProtoMessage() {}
+
+func (x *VerifyPaymentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[69]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VerifyPaymentRequest.ProtoReflect.Descriptor instead.
+func (*VerifyPaymentRequest) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{69}
+}
+
+func (x *VerifyPaymentRequest) GetRazorpayOrderId() string {
+	if x != nil {
+		return x.RazorpayOrderId
+	}
+	return ""
+}
+
+func (x *VerifyPaymentRequest) GetRazorpayPaymentId() string {
+	if x != nil {
+		return x.RazorpayPaymentId
+	}
+	return ""
+}
+
+func (x *VerifyPaymentRequest) GetRazorpaySignature() string {
+	if x != nil {
+		return x.RazorpaySignature
+	}
+	return ""
+}
+
+type VerifyPaymentResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// True iff the signature verified and the payment is now in the
+	// captured state. Idempotent — repeat verifies on the same payment
+	// return success without re-running the upgrade pipeline.
+	Success       bool   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Plan          string `protobuf:"bytes,2,opt,name=plan,proto3" json:"plan,omitempty"`
+	ExpiresAt     int64  `protobuf:"varint,3,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *VerifyPaymentResponse) Reset() {
+	*x = VerifyPaymentResponse{}
+	mi := &file_proto_quiz_proto_msgTypes[70]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VerifyPaymentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VerifyPaymentResponse) ProtoMessage() {}
+
+func (x *VerifyPaymentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[70]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VerifyPaymentResponse.ProtoReflect.Descriptor instead.
+func (*VerifyPaymentResponse) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{70}
+}
+
+func (x *VerifyPaymentResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *VerifyPaymentResponse) GetPlan() string {
+	if x != nil {
+		return x.Plan
+	}
+	return ""
+}
+
+func (x *VerifyPaymentResponse) GetExpiresAt() int64 {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return 0
+}
+
 type GetPlanStatusRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -4166,7 +4289,7 @@ type GetPlanStatusRequest struct {
 
 func (x *GetPlanStatusRequest) Reset() {
 	*x = GetPlanStatusRequest{}
-	mi := &file_proto_quiz_proto_msgTypes[69]
+	mi := &file_proto_quiz_proto_msgTypes[71]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4178,7 +4301,7 @@ func (x *GetPlanStatusRequest) String() string {
 func (*GetPlanStatusRequest) ProtoMessage() {}
 
 func (x *GetPlanStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[69]
+	mi := &file_proto_quiz_proto_msgTypes[71]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4191,7 +4314,7 @@ func (x *GetPlanStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPlanStatusRequest.ProtoReflect.Descriptor instead.
 func (*GetPlanStatusRequest) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{69}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{71}
 }
 
 type GetPlanStatusResponse struct {
@@ -4204,7 +4327,7 @@ type GetPlanStatusResponse struct {
 
 func (x *GetPlanStatusResponse) Reset() {
 	*x = GetPlanStatusResponse{}
-	mi := &file_proto_quiz_proto_msgTypes[70]
+	mi := &file_proto_quiz_proto_msgTypes[72]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4216,7 +4339,7 @@ func (x *GetPlanStatusResponse) String() string {
 func (*GetPlanStatusResponse) ProtoMessage() {}
 
 func (x *GetPlanStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[70]
+	mi := &file_proto_quiz_proto_msgTypes[72]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4229,7 +4352,7 @@ func (x *GetPlanStatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPlanStatusResponse.ProtoReflect.Descriptor instead.
 func (*GetPlanStatusResponse) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{70}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{72}
 }
 
 func (x *GetPlanStatusResponse) GetPlan() string {
@@ -4256,7 +4379,7 @@ type GetPaymentHistoryRequest struct {
 
 func (x *GetPaymentHistoryRequest) Reset() {
 	*x = GetPaymentHistoryRequest{}
-	mi := &file_proto_quiz_proto_msgTypes[71]
+	mi := &file_proto_quiz_proto_msgTypes[73]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4268,7 +4391,7 @@ func (x *GetPaymentHistoryRequest) String() string {
 func (*GetPaymentHistoryRequest) ProtoMessage() {}
 
 func (x *GetPaymentHistoryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[71]
+	mi := &file_proto_quiz_proto_msgTypes[73]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4281,7 +4404,7 @@ func (x *GetPaymentHistoryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPaymentHistoryRequest.ProtoReflect.Descriptor instead.
 func (*GetPaymentHistoryRequest) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{71}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{73}
 }
 
 func (x *GetPaymentHistoryRequest) GetLimit() int32 {
@@ -4307,7 +4430,7 @@ type GetPaymentHistoryResponse struct {
 
 func (x *GetPaymentHistoryResponse) Reset() {
 	*x = GetPaymentHistoryResponse{}
-	mi := &file_proto_quiz_proto_msgTypes[72]
+	mi := &file_proto_quiz_proto_msgTypes[74]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4319,7 +4442,7 @@ func (x *GetPaymentHistoryResponse) String() string {
 func (*GetPaymentHistoryResponse) ProtoMessage() {}
 
 func (x *GetPaymentHistoryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[72]
+	mi := &file_proto_quiz_proto_msgTypes[74]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4332,7 +4455,7 @@ func (x *GetPaymentHistoryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPaymentHistoryResponse.ProtoReflect.Descriptor instead.
 func (*GetPaymentHistoryResponse) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{72}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{74}
 }
 
 func (x *GetPaymentHistoryResponse) GetPayments() []*PaymentRecord {
@@ -4356,7 +4479,7 @@ type PaymentRecord struct {
 
 func (x *PaymentRecord) Reset() {
 	*x = PaymentRecord{}
-	mi := &file_proto_quiz_proto_msgTypes[73]
+	mi := &file_proto_quiz_proto_msgTypes[75]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4368,7 +4491,7 @@ func (x *PaymentRecord) String() string {
 func (*PaymentRecord) ProtoMessage() {}
 
 func (x *PaymentRecord) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[73]
+	mi := &file_proto_quiz_proto_msgTypes[75]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4381,7 +4504,7 @@ func (x *PaymentRecord) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PaymentRecord.ProtoReflect.Descriptor instead.
 func (*PaymentRecord) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{73}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{75}
 }
 
 func (x *PaymentRecord) GetOrderId() string {
@@ -4434,7 +4557,7 @@ type GetTournamentListRequest struct {
 
 func (x *GetTournamentListRequest) Reset() {
 	*x = GetTournamentListRequest{}
-	mi := &file_proto_quiz_proto_msgTypes[74]
+	mi := &file_proto_quiz_proto_msgTypes[76]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4446,7 +4569,7 @@ func (x *GetTournamentListRequest) String() string {
 func (*GetTournamentListRequest) ProtoMessage() {}
 
 func (x *GetTournamentListRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[74]
+	mi := &file_proto_quiz_proto_msgTypes[76]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4459,7 +4582,7 @@ func (x *GetTournamentListRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTournamentListRequest.ProtoReflect.Descriptor instead.
 func (*GetTournamentListRequest) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{74}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{76}
 }
 
 type GetTournamentListResponse struct {
@@ -4471,7 +4594,7 @@ type GetTournamentListResponse struct {
 
 func (x *GetTournamentListResponse) Reset() {
 	*x = GetTournamentListResponse{}
-	mi := &file_proto_quiz_proto_msgTypes[75]
+	mi := &file_proto_quiz_proto_msgTypes[77]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4483,7 +4606,7 @@ func (x *GetTournamentListResponse) String() string {
 func (*GetTournamentListResponse) ProtoMessage() {}
 
 func (x *GetTournamentListResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[75]
+	mi := &file_proto_quiz_proto_msgTypes[77]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4496,7 +4619,7 @@ func (x *GetTournamentListResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTournamentListResponse.ProtoReflect.Descriptor instead.
 func (*GetTournamentListResponse) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{75}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{77}
 }
 
 func (x *GetTournamentListResponse) GetTournaments() []*TournamentInfo {
@@ -4522,7 +4645,7 @@ type TournamentInfo struct {
 
 func (x *TournamentInfo) Reset() {
 	*x = TournamentInfo{}
-	mi := &file_proto_quiz_proto_msgTypes[76]
+	mi := &file_proto_quiz_proto_msgTypes[78]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4534,7 +4657,7 @@ func (x *TournamentInfo) String() string {
 func (*TournamentInfo) ProtoMessage() {}
 
 func (x *TournamentInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[76]
+	mi := &file_proto_quiz_proto_msgTypes[78]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4547,7 +4670,7 @@ func (x *TournamentInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TournamentInfo.ProtoReflect.Descriptor instead.
 func (*TournamentInfo) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{76}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{78}
 }
 
 func (x *TournamentInfo) GetId() string {
@@ -4615,7 +4738,7 @@ type JoinTournamentRequest struct {
 
 func (x *JoinTournamentRequest) Reset() {
 	*x = JoinTournamentRequest{}
-	mi := &file_proto_quiz_proto_msgTypes[77]
+	mi := &file_proto_quiz_proto_msgTypes[79]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4627,7 +4750,7 @@ func (x *JoinTournamentRequest) String() string {
 func (*JoinTournamentRequest) ProtoMessage() {}
 
 func (x *JoinTournamentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[77]
+	mi := &file_proto_quiz_proto_msgTypes[79]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4640,7 +4763,7 @@ func (x *JoinTournamentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use JoinTournamentRequest.ProtoReflect.Descriptor instead.
 func (*JoinTournamentRequest) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{77}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{79}
 }
 
 func (x *JoinTournamentRequest) GetTournamentId() string {
@@ -4659,7 +4782,7 @@ type JoinTournamentResponse struct {
 
 func (x *JoinTournamentResponse) Reset() {
 	*x = JoinTournamentResponse{}
-	mi := &file_proto_quiz_proto_msgTypes[78]
+	mi := &file_proto_quiz_proto_msgTypes[80]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4671,7 +4794,7 @@ func (x *JoinTournamentResponse) String() string {
 func (*JoinTournamentResponse) ProtoMessage() {}
 
 func (x *JoinTournamentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[78]
+	mi := &file_proto_quiz_proto_msgTypes[80]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4684,7 +4807,7 @@ func (x *JoinTournamentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use JoinTournamentResponse.ProtoReflect.Descriptor instead.
 func (*JoinTournamentResponse) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{78}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{80}
 }
 
 func (x *JoinTournamentResponse) GetSuccess() bool {
@@ -4703,7 +4826,7 @@ type GetGlobalLeaderboardRequest struct {
 
 func (x *GetGlobalLeaderboardRequest) Reset() {
 	*x = GetGlobalLeaderboardRequest{}
-	mi := &file_proto_quiz_proto_msgTypes[79]
+	mi := &file_proto_quiz_proto_msgTypes[81]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4715,7 +4838,7 @@ func (x *GetGlobalLeaderboardRequest) String() string {
 func (*GetGlobalLeaderboardRequest) ProtoMessage() {}
 
 func (x *GetGlobalLeaderboardRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[79]
+	mi := &file_proto_quiz_proto_msgTypes[81]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4728,7 +4851,7 @@ func (x *GetGlobalLeaderboardRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetGlobalLeaderboardRequest.ProtoReflect.Descriptor instead.
 func (*GetGlobalLeaderboardRequest) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{79}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{81}
 }
 
 func (x *GetGlobalLeaderboardRequest) GetTimeFilter() string {
@@ -4747,7 +4870,7 @@ type GetGlobalLeaderboardResponse struct {
 
 func (x *GetGlobalLeaderboardResponse) Reset() {
 	*x = GetGlobalLeaderboardResponse{}
-	mi := &file_proto_quiz_proto_msgTypes[80]
+	mi := &file_proto_quiz_proto_msgTypes[82]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4759,7 +4882,7 @@ func (x *GetGlobalLeaderboardResponse) String() string {
 func (*GetGlobalLeaderboardResponse) ProtoMessage() {}
 
 func (x *GetGlobalLeaderboardResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[80]
+	mi := &file_proto_quiz_proto_msgTypes[82]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4772,7 +4895,7 @@ func (x *GetGlobalLeaderboardResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetGlobalLeaderboardResponse.ProtoReflect.Descriptor instead.
 func (*GetGlobalLeaderboardResponse) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{80}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{82}
 }
 
 func (x *GetGlobalLeaderboardResponse) GetEntries() []*LeaderboardEntry {
@@ -4790,7 +4913,7 @@ type GetCoinBalanceRequest struct {
 
 func (x *GetCoinBalanceRequest) Reset() {
 	*x = GetCoinBalanceRequest{}
-	mi := &file_proto_quiz_proto_msgTypes[81]
+	mi := &file_proto_quiz_proto_msgTypes[83]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4802,7 +4925,7 @@ func (x *GetCoinBalanceRequest) String() string {
 func (*GetCoinBalanceRequest) ProtoMessage() {}
 
 func (x *GetCoinBalanceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[81]
+	mi := &file_proto_quiz_proto_msgTypes[83]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4815,7 +4938,7 @@ func (x *GetCoinBalanceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCoinBalanceRequest.ProtoReflect.Descriptor instead.
 func (*GetCoinBalanceRequest) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{81}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{83}
 }
 
 type GetCoinBalanceResponse struct {
@@ -4827,7 +4950,7 @@ type GetCoinBalanceResponse struct {
 
 func (x *GetCoinBalanceResponse) Reset() {
 	*x = GetCoinBalanceResponse{}
-	mi := &file_proto_quiz_proto_msgTypes[82]
+	mi := &file_proto_quiz_proto_msgTypes[84]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4839,7 +4962,7 @@ func (x *GetCoinBalanceResponse) String() string {
 func (*GetCoinBalanceResponse) ProtoMessage() {}
 
 func (x *GetCoinBalanceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[82]
+	mi := &file_proto_quiz_proto_msgTypes[84]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4852,7 +4975,7 @@ func (x *GetCoinBalanceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCoinBalanceResponse.ProtoReflect.Descriptor instead.
 func (*GetCoinBalanceResponse) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{82}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{84}
 }
 
 func (x *GetCoinBalanceResponse) GetBalance() int64 {
@@ -4877,7 +5000,7 @@ type CoinLedgerEntry struct {
 
 func (x *CoinLedgerEntry) Reset() {
 	*x = CoinLedgerEntry{}
-	mi := &file_proto_quiz_proto_msgTypes[83]
+	mi := &file_proto_quiz_proto_msgTypes[85]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4889,7 +5012,7 @@ func (x *CoinLedgerEntry) String() string {
 func (*CoinLedgerEntry) ProtoMessage() {}
 
 func (x *CoinLedgerEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[83]
+	mi := &file_proto_quiz_proto_msgTypes[85]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4902,7 +5025,7 @@ func (x *CoinLedgerEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CoinLedgerEntry.ProtoReflect.Descriptor instead.
 func (*CoinLedgerEntry) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{83}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{85}
 }
 
 func (x *CoinLedgerEntry) GetId() string {
@@ -4964,7 +5087,7 @@ type GetCoinLedgerRequest struct {
 
 func (x *GetCoinLedgerRequest) Reset() {
 	*x = GetCoinLedgerRequest{}
-	mi := &file_proto_quiz_proto_msgTypes[84]
+	mi := &file_proto_quiz_proto_msgTypes[86]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4976,7 +5099,7 @@ func (x *GetCoinLedgerRequest) String() string {
 func (*GetCoinLedgerRequest) ProtoMessage() {}
 
 func (x *GetCoinLedgerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[84]
+	mi := &file_proto_quiz_proto_msgTypes[86]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4989,7 +5112,7 @@ func (x *GetCoinLedgerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCoinLedgerRequest.ProtoReflect.Descriptor instead.
 func (*GetCoinLedgerRequest) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{84}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{86}
 }
 
 func (x *GetCoinLedgerRequest) GetPageSize() int32 {
@@ -5016,7 +5139,7 @@ type GetCoinLedgerResponse struct {
 
 func (x *GetCoinLedgerResponse) Reset() {
 	*x = GetCoinLedgerResponse{}
-	mi := &file_proto_quiz_proto_msgTypes[85]
+	mi := &file_proto_quiz_proto_msgTypes[87]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5028,7 +5151,7 @@ func (x *GetCoinLedgerResponse) String() string {
 func (*GetCoinLedgerResponse) ProtoMessage() {}
 
 func (x *GetCoinLedgerResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[85]
+	mi := &file_proto_quiz_proto_msgTypes[87]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5041,7 +5164,7 @@ func (x *GetCoinLedgerResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCoinLedgerResponse.ProtoReflect.Descriptor instead.
 func (*GetCoinLedgerResponse) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{85}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{87}
 }
 
 func (x *GetCoinLedgerResponse) GetEntries() []*CoinLedgerEntry {
@@ -5073,7 +5196,7 @@ type ShopItem struct {
 
 func (x *ShopItem) Reset() {
 	*x = ShopItem{}
-	mi := &file_proto_quiz_proto_msgTypes[86]
+	mi := &file_proto_quiz_proto_msgTypes[88]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5085,7 +5208,7 @@ func (x *ShopItem) String() string {
 func (*ShopItem) ProtoMessage() {}
 
 func (x *ShopItem) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[86]
+	mi := &file_proto_quiz_proto_msgTypes[88]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5098,7 +5221,7 @@ func (x *ShopItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ShopItem.ProtoReflect.Descriptor instead.
 func (*ShopItem) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{86}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{88}
 }
 
 func (x *ShopItem) GetId() string {
@@ -5158,7 +5281,7 @@ type GetShopCatalogRequest struct {
 
 func (x *GetShopCatalogRequest) Reset() {
 	*x = GetShopCatalogRequest{}
-	mi := &file_proto_quiz_proto_msgTypes[87]
+	mi := &file_proto_quiz_proto_msgTypes[89]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5170,7 +5293,7 @@ func (x *GetShopCatalogRequest) String() string {
 func (*GetShopCatalogRequest) ProtoMessage() {}
 
 func (x *GetShopCatalogRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[87]
+	mi := &file_proto_quiz_proto_msgTypes[89]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5183,7 +5306,7 @@ func (x *GetShopCatalogRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetShopCatalogRequest.ProtoReflect.Descriptor instead.
 func (*GetShopCatalogRequest) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{87}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{89}
 }
 
 type GetShopCatalogResponse struct {
@@ -5195,7 +5318,7 @@ type GetShopCatalogResponse struct {
 
 func (x *GetShopCatalogResponse) Reset() {
 	*x = GetShopCatalogResponse{}
-	mi := &file_proto_quiz_proto_msgTypes[88]
+	mi := &file_proto_quiz_proto_msgTypes[90]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5207,7 +5330,7 @@ func (x *GetShopCatalogResponse) String() string {
 func (*GetShopCatalogResponse) ProtoMessage() {}
 
 func (x *GetShopCatalogResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[88]
+	mi := &file_proto_quiz_proto_msgTypes[90]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5220,7 +5343,7 @@ func (x *GetShopCatalogResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetShopCatalogResponse.ProtoReflect.Descriptor instead.
 func (*GetShopCatalogResponse) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{88}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{90}
 }
 
 func (x *GetShopCatalogResponse) GetItems() []*ShopItem {
@@ -5238,7 +5361,7 @@ type GetShopInventoryRequest struct {
 
 func (x *GetShopInventoryRequest) Reset() {
 	*x = GetShopInventoryRequest{}
-	mi := &file_proto_quiz_proto_msgTypes[89]
+	mi := &file_proto_quiz_proto_msgTypes[91]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5250,7 +5373,7 @@ func (x *GetShopInventoryRequest) String() string {
 func (*GetShopInventoryRequest) ProtoMessage() {}
 
 func (x *GetShopInventoryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[89]
+	mi := &file_proto_quiz_proto_msgTypes[91]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5263,7 +5386,7 @@ func (x *GetShopInventoryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetShopInventoryRequest.ProtoReflect.Descriptor instead.
 func (*GetShopInventoryRequest) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{89}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{91}
 }
 
 type GetShopInventoryResponse struct {
@@ -5281,7 +5404,7 @@ type GetShopInventoryResponse struct {
 
 func (x *GetShopInventoryResponse) Reset() {
 	*x = GetShopInventoryResponse{}
-	mi := &file_proto_quiz_proto_msgTypes[90]
+	mi := &file_proto_quiz_proto_msgTypes[92]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5293,7 +5416,7 @@ func (x *GetShopInventoryResponse) String() string {
 func (*GetShopInventoryResponse) ProtoMessage() {}
 
 func (x *GetShopInventoryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[90]
+	mi := &file_proto_quiz_proto_msgTypes[92]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5306,7 +5429,7 @@ func (x *GetShopInventoryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetShopInventoryResponse.ProtoReflect.Descriptor instead.
 func (*GetShopInventoryResponse) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{90}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{92}
 }
 
 func (x *GetShopInventoryResponse) GetOwnedCosmetics() []string {
@@ -5368,7 +5491,7 @@ type PurchaseShopItemRequest struct {
 
 func (x *PurchaseShopItemRequest) Reset() {
 	*x = PurchaseShopItemRequest{}
-	mi := &file_proto_quiz_proto_msgTypes[91]
+	mi := &file_proto_quiz_proto_msgTypes[93]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5380,7 +5503,7 @@ func (x *PurchaseShopItemRequest) String() string {
 func (*PurchaseShopItemRequest) ProtoMessage() {}
 
 func (x *PurchaseShopItemRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[91]
+	mi := &file_proto_quiz_proto_msgTypes[93]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5393,7 +5516,7 @@ func (x *PurchaseShopItemRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PurchaseShopItemRequest.ProtoReflect.Descriptor instead.
 func (*PurchaseShopItemRequest) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{91}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{93}
 }
 
 func (x *PurchaseShopItemRequest) GetItemId() string {
@@ -5425,7 +5548,7 @@ type PurchaseShopItemResponse struct {
 
 func (x *PurchaseShopItemResponse) Reset() {
 	*x = PurchaseShopItemResponse{}
-	mi := &file_proto_quiz_proto_msgTypes[92]
+	mi := &file_proto_quiz_proto_msgTypes[94]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5437,7 +5560,7 @@ func (x *PurchaseShopItemResponse) String() string {
 func (*PurchaseShopItemResponse) ProtoMessage() {}
 
 func (x *PurchaseShopItemResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[92]
+	mi := &file_proto_quiz_proto_msgTypes[94]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5450,7 +5573,7 @@ func (x *PurchaseShopItemResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PurchaseShopItemResponse.ProtoReflect.Descriptor instead.
 func (*PurchaseShopItemResponse) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{92}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{94}
 }
 
 func (x *PurchaseShopItemResponse) GetSuccess() bool {
@@ -5490,7 +5613,7 @@ type EquipCosmeticRequest struct {
 
 func (x *EquipCosmeticRequest) Reset() {
 	*x = EquipCosmeticRequest{}
-	mi := &file_proto_quiz_proto_msgTypes[93]
+	mi := &file_proto_quiz_proto_msgTypes[95]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5502,7 +5625,7 @@ func (x *EquipCosmeticRequest) String() string {
 func (*EquipCosmeticRequest) ProtoMessage() {}
 
 func (x *EquipCosmeticRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[93]
+	mi := &file_proto_quiz_proto_msgTypes[95]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5515,7 +5638,7 @@ func (x *EquipCosmeticRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EquipCosmeticRequest.ProtoReflect.Descriptor instead.
 func (*EquipCosmeticRequest) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{93}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{95}
 }
 
 func (x *EquipCosmeticRequest) GetItemId() string {
@@ -5540,7 +5663,7 @@ type EquipCosmeticResponse struct {
 
 func (x *EquipCosmeticResponse) Reset() {
 	*x = EquipCosmeticResponse{}
-	mi := &file_proto_quiz_proto_msgTypes[94]
+	mi := &file_proto_quiz_proto_msgTypes[96]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5552,7 +5675,7 @@ func (x *EquipCosmeticResponse) String() string {
 func (*EquipCosmeticResponse) ProtoMessage() {}
 
 func (x *EquipCosmeticResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[94]
+	mi := &file_proto_quiz_proto_msgTypes[96]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5565,7 +5688,7 @@ func (x *EquipCosmeticResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EquipCosmeticResponse.ProtoReflect.Descriptor instead.
 func (*EquipCosmeticResponse) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{94}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{96}
 }
 
 func (x *EquipCosmeticResponse) GetSuccess() bool {
@@ -5592,7 +5715,7 @@ type ConsumeRerollRequest struct {
 
 func (x *ConsumeRerollRequest) Reset() {
 	*x = ConsumeRerollRequest{}
-	mi := &file_proto_quiz_proto_msgTypes[95]
+	mi := &file_proto_quiz_proto_msgTypes[97]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5604,7 +5727,7 @@ func (x *ConsumeRerollRequest) String() string {
 func (*ConsumeRerollRequest) ProtoMessage() {}
 
 func (x *ConsumeRerollRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[95]
+	mi := &file_proto_quiz_proto_msgTypes[97]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5617,7 +5740,7 @@ func (x *ConsumeRerollRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConsumeRerollRequest.ProtoReflect.Descriptor instead.
 func (*ConsumeRerollRequest) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{95}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{97}
 }
 
 func (x *ConsumeRerollRequest) GetRoomId() string {
@@ -5647,7 +5770,7 @@ type ConsumeRerollResponse struct {
 
 func (x *ConsumeRerollResponse) Reset() {
 	*x = ConsumeRerollResponse{}
-	mi := &file_proto_quiz_proto_msgTypes[96]
+	mi := &file_proto_quiz_proto_msgTypes[98]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5659,7 +5782,7 @@ func (x *ConsumeRerollResponse) String() string {
 func (*ConsumeRerollResponse) ProtoMessage() {}
 
 func (x *ConsumeRerollResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[96]
+	mi := &file_proto_quiz_proto_msgTypes[98]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5672,7 +5795,7 @@ func (x *ConsumeRerollResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConsumeRerollResponse.ProtoReflect.Descriptor instead.
 func (*ConsumeRerollResponse) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{96}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{98}
 }
 
 func (x *ConsumeRerollResponse) GetSuccess() bool {
@@ -5708,7 +5831,7 @@ type SendFriendRequestRequest struct {
 
 func (x *SendFriendRequestRequest) Reset() {
 	*x = SendFriendRequestRequest{}
-	mi := &file_proto_quiz_proto_msgTypes[97]
+	mi := &file_proto_quiz_proto_msgTypes[99]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5720,7 +5843,7 @@ func (x *SendFriendRequestRequest) String() string {
 func (*SendFriendRequestRequest) ProtoMessage() {}
 
 func (x *SendFriendRequestRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[97]
+	mi := &file_proto_quiz_proto_msgTypes[99]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5733,7 +5856,7 @@ func (x *SendFriendRequestRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendFriendRequestRequest.ProtoReflect.Descriptor instead.
 func (*SendFriendRequestRequest) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{97}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{99}
 }
 
 func (x *SendFriendRequestRequest) GetTargetUsername() string {
@@ -5768,7 +5891,7 @@ type SendFriendRequestResponse struct {
 
 func (x *SendFriendRequestResponse) Reset() {
 	*x = SendFriendRequestResponse{}
-	mi := &file_proto_quiz_proto_msgTypes[98]
+	mi := &file_proto_quiz_proto_msgTypes[100]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5780,7 +5903,7 @@ func (x *SendFriendRequestResponse) String() string {
 func (*SendFriendRequestResponse) ProtoMessage() {}
 
 func (x *SendFriendRequestResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[98]
+	mi := &file_proto_quiz_proto_msgTypes[100]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5793,7 +5916,7 @@ func (x *SendFriendRequestResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendFriendRequestResponse.ProtoReflect.Descriptor instead.
 func (*SendFriendRequestResponse) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{98}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{100}
 }
 
 func (x *SendFriendRequestResponse) GetSuccess() bool {
@@ -5833,7 +5956,7 @@ type FriendRequest struct {
 
 func (x *FriendRequest) Reset() {
 	*x = FriendRequest{}
-	mi := &file_proto_quiz_proto_msgTypes[99]
+	mi := &file_proto_quiz_proto_msgTypes[101]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5845,7 +5968,7 @@ func (x *FriendRequest) String() string {
 func (*FriendRequest) ProtoMessage() {}
 
 func (x *FriendRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[99]
+	mi := &file_proto_quiz_proto_msgTypes[101]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5858,7 +5981,7 @@ func (x *FriendRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FriendRequest.ProtoReflect.Descriptor instead.
 func (*FriendRequest) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{99}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{101}
 }
 
 func (x *FriendRequest) GetId() string {
@@ -5927,7 +6050,7 @@ type RespondToFriendRequestRequest struct {
 
 func (x *RespondToFriendRequestRequest) Reset() {
 	*x = RespondToFriendRequestRequest{}
-	mi := &file_proto_quiz_proto_msgTypes[100]
+	mi := &file_proto_quiz_proto_msgTypes[102]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5939,7 +6062,7 @@ func (x *RespondToFriendRequestRequest) String() string {
 func (*RespondToFriendRequestRequest) ProtoMessage() {}
 
 func (x *RespondToFriendRequestRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[100]
+	mi := &file_proto_quiz_proto_msgTypes[102]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5952,7 +6075,7 @@ func (x *RespondToFriendRequestRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RespondToFriendRequestRequest.ProtoReflect.Descriptor instead.
 func (*RespondToFriendRequestRequest) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{100}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{102}
 }
 
 func (x *RespondToFriendRequestRequest) GetRequestId() string {
@@ -5980,7 +6103,7 @@ type RespondToFriendRequestResponse struct {
 
 func (x *RespondToFriendRequestResponse) Reset() {
 	*x = RespondToFriendRequestResponse{}
-	mi := &file_proto_quiz_proto_msgTypes[101]
+	mi := &file_proto_quiz_proto_msgTypes[103]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5992,7 +6115,7 @@ func (x *RespondToFriendRequestResponse) String() string {
 func (*RespondToFriendRequestResponse) ProtoMessage() {}
 
 func (x *RespondToFriendRequestResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[101]
+	mi := &file_proto_quiz_proto_msgTypes[103]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6005,7 +6128,7 @@ func (x *RespondToFriendRequestResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RespondToFriendRequestResponse.ProtoReflect.Descriptor instead.
 func (*RespondToFriendRequestResponse) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{101}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{103}
 }
 
 func (x *RespondToFriendRequestResponse) GetSuccess() bool {
@@ -6034,7 +6157,7 @@ type Friend struct {
 
 func (x *Friend) Reset() {
 	*x = Friend{}
-	mi := &file_proto_quiz_proto_msgTypes[102]
+	mi := &file_proto_quiz_proto_msgTypes[104]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6046,7 +6169,7 @@ func (x *Friend) String() string {
 func (*Friend) ProtoMessage() {}
 
 func (x *Friend) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[102]
+	mi := &file_proto_quiz_proto_msgTypes[104]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6059,7 +6182,7 @@ func (x *Friend) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Friend.ProtoReflect.Descriptor instead.
 func (*Friend) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{102}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{104}
 }
 
 func (x *Friend) GetUserId() string {
@@ -6098,7 +6221,7 @@ type GetFriendsListRequest struct {
 
 func (x *GetFriendsListRequest) Reset() {
 	*x = GetFriendsListRequest{}
-	mi := &file_proto_quiz_proto_msgTypes[103]
+	mi := &file_proto_quiz_proto_msgTypes[105]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6110,7 +6233,7 @@ func (x *GetFriendsListRequest) String() string {
 func (*GetFriendsListRequest) ProtoMessage() {}
 
 func (x *GetFriendsListRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[103]
+	mi := &file_proto_quiz_proto_msgTypes[105]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6123,7 +6246,7 @@ func (x *GetFriendsListRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFriendsListRequest.ProtoReflect.Descriptor instead.
 func (*GetFriendsListRequest) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{103}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{105}
 }
 
 type GetFriendsListResponse struct {
@@ -6135,7 +6258,7 @@ type GetFriendsListResponse struct {
 
 func (x *GetFriendsListResponse) Reset() {
 	*x = GetFriendsListResponse{}
-	mi := &file_proto_quiz_proto_msgTypes[104]
+	mi := &file_proto_quiz_proto_msgTypes[106]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6147,7 +6270,7 @@ func (x *GetFriendsListResponse) String() string {
 func (*GetFriendsListResponse) ProtoMessage() {}
 
 func (x *GetFriendsListResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[104]
+	mi := &file_proto_quiz_proto_msgTypes[106]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6160,7 +6283,7 @@ func (x *GetFriendsListResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFriendsListResponse.ProtoReflect.Descriptor instead.
 func (*GetFriendsListResponse) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{104}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{106}
 }
 
 func (x *GetFriendsListResponse) GetFriends() []*Friend {
@@ -6178,7 +6301,7 @@ type GetFriendRequestsRequest struct {
 
 func (x *GetFriendRequestsRequest) Reset() {
 	*x = GetFriendRequestsRequest{}
-	mi := &file_proto_quiz_proto_msgTypes[105]
+	mi := &file_proto_quiz_proto_msgTypes[107]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6190,7 +6313,7 @@ func (x *GetFriendRequestsRequest) String() string {
 func (*GetFriendRequestsRequest) ProtoMessage() {}
 
 func (x *GetFriendRequestsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[105]
+	mi := &file_proto_quiz_proto_msgTypes[107]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6203,7 +6326,7 @@ func (x *GetFriendRequestsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFriendRequestsRequest.ProtoReflect.Descriptor instead.
 func (*GetFriendRequestsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{105}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{107}
 }
 
 type GetFriendRequestsResponse struct {
@@ -6218,7 +6341,7 @@ type GetFriendRequestsResponse struct {
 
 func (x *GetFriendRequestsResponse) Reset() {
 	*x = GetFriendRequestsResponse{}
-	mi := &file_proto_quiz_proto_msgTypes[106]
+	mi := &file_proto_quiz_proto_msgTypes[108]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6230,7 +6353,7 @@ func (x *GetFriendRequestsResponse) String() string {
 func (*GetFriendRequestsResponse) ProtoMessage() {}
 
 func (x *GetFriendRequestsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[106]
+	mi := &file_proto_quiz_proto_msgTypes[108]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6243,7 +6366,7 @@ func (x *GetFriendRequestsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFriendRequestsResponse.ProtoReflect.Descriptor instead.
 func (*GetFriendRequestsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{106}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{108}
 }
 
 func (x *GetFriendRequestsResponse) GetIncoming() []*FriendRequest {
@@ -6261,7 +6384,7 @@ type HeartbeatRequest struct {
 
 func (x *HeartbeatRequest) Reset() {
 	*x = HeartbeatRequest{}
-	mi := &file_proto_quiz_proto_msgTypes[107]
+	mi := &file_proto_quiz_proto_msgTypes[109]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6273,7 +6396,7 @@ func (x *HeartbeatRequest) String() string {
 func (*HeartbeatRequest) ProtoMessage() {}
 
 func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[107]
+	mi := &file_proto_quiz_proto_msgTypes[109]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6286,7 +6409,7 @@ func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatRequest.ProtoReflect.Descriptor instead.
 func (*HeartbeatRequest) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{107}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{109}
 }
 
 type HeartbeatResponse struct {
@@ -6298,7 +6421,7 @@ type HeartbeatResponse struct {
 
 func (x *HeartbeatResponse) Reset() {
 	*x = HeartbeatResponse{}
-	mi := &file_proto_quiz_proto_msgTypes[108]
+	mi := &file_proto_quiz_proto_msgTypes[110]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6310,7 +6433,7 @@ func (x *HeartbeatResponse) String() string {
 func (*HeartbeatResponse) ProtoMessage() {}
 
 func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[108]
+	mi := &file_proto_quiz_proto_msgTypes[110]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6323,7 +6446,7 @@ func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatResponse.ProtoReflect.Descriptor instead.
 func (*HeartbeatResponse) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{108}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{110}
 }
 
 func (x *HeartbeatResponse) GetSuccess() bool {
@@ -6342,7 +6465,7 @@ type ChallengeFriendRequest struct {
 
 func (x *ChallengeFriendRequest) Reset() {
 	*x = ChallengeFriendRequest{}
-	mi := &file_proto_quiz_proto_msgTypes[109]
+	mi := &file_proto_quiz_proto_msgTypes[111]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6354,7 +6477,7 @@ func (x *ChallengeFriendRequest) String() string {
 func (*ChallengeFriendRequest) ProtoMessage() {}
 
 func (x *ChallengeFriendRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[109]
+	mi := &file_proto_quiz_proto_msgTypes[111]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6367,7 +6490,7 @@ func (x *ChallengeFriendRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChallengeFriendRequest.ProtoReflect.Descriptor instead.
 func (*ChallengeFriendRequest) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{109}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{111}
 }
 
 func (x *ChallengeFriendRequest) GetFriendUserId() string {
@@ -6393,7 +6516,7 @@ type ChallengeFriendResponse struct {
 
 func (x *ChallengeFriendResponse) Reset() {
 	*x = ChallengeFriendResponse{}
-	mi := &file_proto_quiz_proto_msgTypes[110]
+	mi := &file_proto_quiz_proto_msgTypes[112]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6405,7 +6528,7 @@ func (x *ChallengeFriendResponse) String() string {
 func (*ChallengeFriendResponse) ProtoMessage() {}
 
 func (x *ChallengeFriendResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_quiz_proto_msgTypes[110]
+	mi := &file_proto_quiz_proto_msgTypes[112]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6418,7 +6541,7 @@ func (x *ChallengeFriendResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChallengeFriendResponse.ProtoReflect.Descriptor instead.
 func (*ChallengeFriendResponse) Descriptor() ([]byte, []int) {
-	return file_proto_quiz_proto_rawDescGZIP(), []int{110}
+	return file_proto_quiz_proto_rawDescGZIP(), []int{112}
 }
 
 func (x *ChallengeFriendResponse) GetSuccess() bool {
@@ -6728,7 +6851,16 @@ const file_proto_quiz_proto_rawDesc = "" +
 	"\border_id\x18\x01 \x01(\tR\aorderId\x12\x15\n" +
 	"\x06key_id\x18\x02 \x01(\tR\x05keyId\x12\x16\n" +
 	"\x06amount\x18\x03 \x01(\x03R\x06amount\x12\x1a\n" +
-	"\bcurrency\x18\x04 \x01(\tR\bcurrency\"\x16\n" +
+	"\bcurrency\x18\x04 \x01(\tR\bcurrency\"\xa1\x01\n" +
+	"\x14VerifyPaymentRequest\x12*\n" +
+	"\x11razorpay_order_id\x18\x01 \x01(\tR\x0frazorpayOrderId\x12.\n" +
+	"\x13razorpay_payment_id\x18\x02 \x01(\tR\x11razorpayPaymentId\x12-\n" +
+	"\x12razorpay_signature\x18\x03 \x01(\tR\x11razorpaySignature\"d\n" +
+	"\x15VerifyPaymentResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x12\n" +
+	"\x04plan\x18\x02 \x01(\tR\x04plan\x12\x1d\n" +
+	"\n" +
+	"expires_at\x18\x03 \x01(\x03R\texpiresAt\"\x16\n" +
 	"\x14GetPlanStatusRequest\"J\n" +
 	"\x15GetPlanStatusResponse\x12\x12\n" +
 	"\x04plan\x18\x01 \x01(\tR\x04plan\x12\x1d\n" +
@@ -6941,9 +7073,10 @@ const file_proto_quiz_proto_rawDesc = "" +
 	"\fGoogleSignIn\x12\x19.quiz.GoogleSignInRequest\x1a\x1a.quiz.GoogleSignInResponse\x12Q\n" +
 	"\x10ClaimDailyReward\x12\x1d.quiz.ClaimDailyRewardRequest\x1a\x1e.quiz.ClaimDailyRewardResponse\x12H\n" +
 	"\rGetStreakInfo\x12\x1a.quiz.GetStreakInfoRequest\x1a\x1b.quiz.GetStreakInfoResponse\x12H\n" +
-	"\rUpdateProfile\x12\x1a.quiz.UpdateProfileRequest\x1a\x1b.quiz.UpdateProfileResponse2\xf4\x01\n" +
+	"\rUpdateProfile\x12\x1a.quiz.UpdateProfileRequest\x1a\x1b.quiz.UpdateProfileResponse2\xbe\x02\n" +
 	"\x0ePaymentService\x12B\n" +
 	"\vCreateOrder\x12\x18.quiz.CreateOrderRequest\x1a\x19.quiz.CreateOrderResponse\x12H\n" +
+	"\rVerifyPayment\x12\x1a.quiz.VerifyPaymentRequest\x1a\x1b.quiz.VerifyPaymentResponse\x12H\n" +
 	"\rGetPlanStatus\x12\x1a.quiz.GetPlanStatusRequest\x1a\x1b.quiz.GetPlanStatusResponse\x12T\n" +
 	"\x11GetPaymentHistory\x12\x1e.quiz.GetPaymentHistoryRequest\x1a\x1f.quiz.GetPaymentHistoryResponseB\x13Z\x11quiz-battle/protob\x06proto3"
 
@@ -6960,7 +7093,7 @@ func file_proto_quiz_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_quiz_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_proto_quiz_proto_msgTypes = make([]protoimpl.MessageInfo, 113)
+var file_proto_quiz_proto_msgTypes = make([]protoimpl.MessageInfo, 115)
 var file_proto_quiz_proto_goTypes = []any{
 	(MatchmakingStatus)(0),                 // 0: quiz.MatchmakingStatus
 	(*JoinMatchmakingRequest)(nil),         // 1: quiz.JoinMatchmakingRequest
@@ -7032,50 +7165,52 @@ var file_proto_quiz_proto_goTypes = []any{
 	(*UpdateFCMTokenResponse)(nil),         // 67: quiz.UpdateFCMTokenResponse
 	(*CreateOrderRequest)(nil),             // 68: quiz.CreateOrderRequest
 	(*CreateOrderResponse)(nil),            // 69: quiz.CreateOrderResponse
-	(*GetPlanStatusRequest)(nil),           // 70: quiz.GetPlanStatusRequest
-	(*GetPlanStatusResponse)(nil),          // 71: quiz.GetPlanStatusResponse
-	(*GetPaymentHistoryRequest)(nil),       // 72: quiz.GetPaymentHistoryRequest
-	(*GetPaymentHistoryResponse)(nil),      // 73: quiz.GetPaymentHistoryResponse
-	(*PaymentRecord)(nil),                  // 74: quiz.PaymentRecord
-	(*GetTournamentListRequest)(nil),       // 75: quiz.GetTournamentListRequest
-	(*GetTournamentListResponse)(nil),      // 76: quiz.GetTournamentListResponse
-	(*TournamentInfo)(nil),                 // 77: quiz.TournamentInfo
-	(*JoinTournamentRequest)(nil),          // 78: quiz.JoinTournamentRequest
-	(*JoinTournamentResponse)(nil),         // 79: quiz.JoinTournamentResponse
-	(*GetGlobalLeaderboardRequest)(nil),    // 80: quiz.GetGlobalLeaderboardRequest
-	(*GetGlobalLeaderboardResponse)(nil),   // 81: quiz.GetGlobalLeaderboardResponse
-	(*GetCoinBalanceRequest)(nil),          // 82: quiz.GetCoinBalanceRequest
-	(*GetCoinBalanceResponse)(nil),         // 83: quiz.GetCoinBalanceResponse
-	(*CoinLedgerEntry)(nil),                // 84: quiz.CoinLedgerEntry
-	(*GetCoinLedgerRequest)(nil),           // 85: quiz.GetCoinLedgerRequest
-	(*GetCoinLedgerResponse)(nil),          // 86: quiz.GetCoinLedgerResponse
-	(*ShopItem)(nil),                       // 87: quiz.ShopItem
-	(*GetShopCatalogRequest)(nil),          // 88: quiz.GetShopCatalogRequest
-	(*GetShopCatalogResponse)(nil),         // 89: quiz.GetShopCatalogResponse
-	(*GetShopInventoryRequest)(nil),        // 90: quiz.GetShopInventoryRequest
-	(*GetShopInventoryResponse)(nil),       // 91: quiz.GetShopInventoryResponse
-	(*PurchaseShopItemRequest)(nil),        // 92: quiz.PurchaseShopItemRequest
-	(*PurchaseShopItemResponse)(nil),       // 93: quiz.PurchaseShopItemResponse
-	(*EquipCosmeticRequest)(nil),           // 94: quiz.EquipCosmeticRequest
-	(*EquipCosmeticResponse)(nil),          // 95: quiz.EquipCosmeticResponse
-	(*ConsumeRerollRequest)(nil),           // 96: quiz.ConsumeRerollRequest
-	(*ConsumeRerollResponse)(nil),          // 97: quiz.ConsumeRerollResponse
-	(*SendFriendRequestRequest)(nil),       // 98: quiz.SendFriendRequestRequest
-	(*SendFriendRequestResponse)(nil),      // 99: quiz.SendFriendRequestResponse
-	(*FriendRequest)(nil),                  // 100: quiz.FriendRequest
-	(*RespondToFriendRequestRequest)(nil),  // 101: quiz.RespondToFriendRequestRequest
-	(*RespondToFriendRequestResponse)(nil), // 102: quiz.RespondToFriendRequestResponse
-	(*Friend)(nil),                         // 103: quiz.Friend
-	(*GetFriendsListRequest)(nil),          // 104: quiz.GetFriendsListRequest
-	(*GetFriendsListResponse)(nil),         // 105: quiz.GetFriendsListResponse
-	(*GetFriendRequestsRequest)(nil),       // 106: quiz.GetFriendRequestsRequest
-	(*GetFriendRequestsResponse)(nil),      // 107: quiz.GetFriendRequestsResponse
-	(*HeartbeatRequest)(nil),               // 108: quiz.HeartbeatRequest
-	(*HeartbeatResponse)(nil),              // 109: quiz.HeartbeatResponse
-	(*ChallengeFriendRequest)(nil),         // 110: quiz.ChallengeFriendRequest
-	(*ChallengeFriendResponse)(nil),        // 111: quiz.ChallengeFriendResponse
-	nil,                                    // 112: quiz.CoinLedgerEntry.MetadataEntry
-	nil,                                    // 113: quiz.ShopItem.MetadataEntry
+	(*VerifyPaymentRequest)(nil),           // 70: quiz.VerifyPaymentRequest
+	(*VerifyPaymentResponse)(nil),          // 71: quiz.VerifyPaymentResponse
+	(*GetPlanStatusRequest)(nil),           // 72: quiz.GetPlanStatusRequest
+	(*GetPlanStatusResponse)(nil),          // 73: quiz.GetPlanStatusResponse
+	(*GetPaymentHistoryRequest)(nil),       // 74: quiz.GetPaymentHistoryRequest
+	(*GetPaymentHistoryResponse)(nil),      // 75: quiz.GetPaymentHistoryResponse
+	(*PaymentRecord)(nil),                  // 76: quiz.PaymentRecord
+	(*GetTournamentListRequest)(nil),       // 77: quiz.GetTournamentListRequest
+	(*GetTournamentListResponse)(nil),      // 78: quiz.GetTournamentListResponse
+	(*TournamentInfo)(nil),                 // 79: quiz.TournamentInfo
+	(*JoinTournamentRequest)(nil),          // 80: quiz.JoinTournamentRequest
+	(*JoinTournamentResponse)(nil),         // 81: quiz.JoinTournamentResponse
+	(*GetGlobalLeaderboardRequest)(nil),    // 82: quiz.GetGlobalLeaderboardRequest
+	(*GetGlobalLeaderboardResponse)(nil),   // 83: quiz.GetGlobalLeaderboardResponse
+	(*GetCoinBalanceRequest)(nil),          // 84: quiz.GetCoinBalanceRequest
+	(*GetCoinBalanceResponse)(nil),         // 85: quiz.GetCoinBalanceResponse
+	(*CoinLedgerEntry)(nil),                // 86: quiz.CoinLedgerEntry
+	(*GetCoinLedgerRequest)(nil),           // 87: quiz.GetCoinLedgerRequest
+	(*GetCoinLedgerResponse)(nil),          // 88: quiz.GetCoinLedgerResponse
+	(*ShopItem)(nil),                       // 89: quiz.ShopItem
+	(*GetShopCatalogRequest)(nil),          // 90: quiz.GetShopCatalogRequest
+	(*GetShopCatalogResponse)(nil),         // 91: quiz.GetShopCatalogResponse
+	(*GetShopInventoryRequest)(nil),        // 92: quiz.GetShopInventoryRequest
+	(*GetShopInventoryResponse)(nil),       // 93: quiz.GetShopInventoryResponse
+	(*PurchaseShopItemRequest)(nil),        // 94: quiz.PurchaseShopItemRequest
+	(*PurchaseShopItemResponse)(nil),       // 95: quiz.PurchaseShopItemResponse
+	(*EquipCosmeticRequest)(nil),           // 96: quiz.EquipCosmeticRequest
+	(*EquipCosmeticResponse)(nil),          // 97: quiz.EquipCosmeticResponse
+	(*ConsumeRerollRequest)(nil),           // 98: quiz.ConsumeRerollRequest
+	(*ConsumeRerollResponse)(nil),          // 99: quiz.ConsumeRerollResponse
+	(*SendFriendRequestRequest)(nil),       // 100: quiz.SendFriendRequestRequest
+	(*SendFriendRequestResponse)(nil),      // 101: quiz.SendFriendRequestResponse
+	(*FriendRequest)(nil),                  // 102: quiz.FriendRequest
+	(*RespondToFriendRequestRequest)(nil),  // 103: quiz.RespondToFriendRequestRequest
+	(*RespondToFriendRequestResponse)(nil), // 104: quiz.RespondToFriendRequestResponse
+	(*Friend)(nil),                         // 105: quiz.Friend
+	(*GetFriendsListRequest)(nil),          // 106: quiz.GetFriendsListRequest
+	(*GetFriendsListResponse)(nil),         // 107: quiz.GetFriendsListResponse
+	(*GetFriendRequestsRequest)(nil),       // 108: quiz.GetFriendRequestsRequest
+	(*GetFriendRequestsResponse)(nil),      // 109: quiz.GetFriendRequestsResponse
+	(*HeartbeatRequest)(nil),               // 110: quiz.HeartbeatRequest
+	(*HeartbeatResponse)(nil),              // 111: quiz.HeartbeatResponse
+	(*ChallengeFriendRequest)(nil),         // 112: quiz.ChallengeFriendRequest
+	(*ChallengeFriendResponse)(nil),        // 113: quiz.ChallengeFriendResponse
+	nil,                                    // 114: quiz.CoinLedgerEntry.MetadataEntry
+	nil,                                    // 115: quiz.ShopItem.MetadataEntry
 }
 var file_proto_quiz_proto_depIdxs = []int32{
 	0,   // 0: quiz.JoinMatchmakingResponse.status:type_name -> quiz.MatchmakingStatus
@@ -7102,23 +7237,23 @@ var file_proto_quiz_proto_depIdxs = []int32{
 	50,  // 21: quiz.GetStreakInfoResponse.streak:type_name -> quiz.StreakInfo
 	55,  // 22: quiz.GetHomeScreenDataResponse.profile:type_name -> quiz.UserProfile
 	16,  // 23: quiz.GetHomeScreenDataResponse.leaderboard_preview:type_name -> quiz.LeaderboardEntry
-	74,  // 24: quiz.GetPaymentHistoryResponse.payments:type_name -> quiz.PaymentRecord
-	77,  // 25: quiz.GetTournamentListResponse.tournaments:type_name -> quiz.TournamentInfo
+	76,  // 24: quiz.GetPaymentHistoryResponse.payments:type_name -> quiz.PaymentRecord
+	79,  // 25: quiz.GetTournamentListResponse.tournaments:type_name -> quiz.TournamentInfo
 	16,  // 26: quiz.GetGlobalLeaderboardResponse.entries:type_name -> quiz.LeaderboardEntry
-	112, // 27: quiz.CoinLedgerEntry.metadata:type_name -> quiz.CoinLedgerEntry.MetadataEntry
-	84,  // 28: quiz.GetCoinLedgerResponse.entries:type_name -> quiz.CoinLedgerEntry
-	113, // 29: quiz.ShopItem.metadata:type_name -> quiz.ShopItem.MetadataEntry
-	87,  // 30: quiz.GetShopCatalogResponse.items:type_name -> quiz.ShopItem
-	103, // 31: quiz.GetFriendsListResponse.friends:type_name -> quiz.Friend
-	100, // 32: quiz.GetFriendRequestsResponse.incoming:type_name -> quiz.FriendRequest
+	114, // 27: quiz.CoinLedgerEntry.metadata:type_name -> quiz.CoinLedgerEntry.MetadataEntry
+	86,  // 28: quiz.GetCoinLedgerResponse.entries:type_name -> quiz.CoinLedgerEntry
+	115, // 29: quiz.ShopItem.metadata:type_name -> quiz.ShopItem.MetadataEntry
+	89,  // 30: quiz.GetShopCatalogResponse.items:type_name -> quiz.ShopItem
+	105, // 31: quiz.GetFriendsListResponse.friends:type_name -> quiz.Friend
+	102, // 32: quiz.GetFriendRequestsResponse.incoming:type_name -> quiz.FriendRequest
 	1,   // 33: quiz.MatchmakingService.JoinMatchmaking:input_type -> quiz.JoinMatchmakingRequest
 	3,   // 34: quiz.MatchmakingService.LeaveMatchmaking:input_type -> quiz.LeaveMatchmakingRequest
 	5,   // 35: quiz.MatchmakingService.SubscribeToMatch:input_type -> quiz.SubscribeToMatchRequest
 	7,   // 36: quiz.QuizService.GetRoomQuestions:input_type -> quiz.GetRoomQuestionsRequest
 	10,  // 37: quiz.QuizService.SubmitAnswer:input_type -> quiz.SubmitAnswerRequest
 	12,  // 38: quiz.QuizService.StreamGameEvents:input_type -> quiz.StreamGameEventsRequest
-	75,  // 39: quiz.QuizService.GetTournamentList:input_type -> quiz.GetTournamentListRequest
-	78,  // 40: quiz.QuizService.JoinTournament:input_type -> quiz.JoinTournamentRequest
+	77,  // 39: quiz.QuizService.GetTournamentList:input_type -> quiz.GetTournamentListRequest
+	80,  // 40: quiz.QuizService.JoinTournament:input_type -> quiz.JoinTournamentRequest
 	43,  // 41: quiz.ScoringService.CalculateScore:input_type -> quiz.CalculateScoreRequest
 	45,  // 42: quiz.ScoringService.GetLeaderboard:input_type -> quiz.GetLeaderboardRequest
 	47,  // 43: quiz.ScoringService.GetMatchHistory:input_type -> quiz.GetMatchHistoryRequest
@@ -7126,20 +7261,20 @@ var file_proto_quiz_proto_depIdxs = []int32{
 	62,  // 45: quiz.ScoringService.GetReferralDashboard:input_type -> quiz.GetReferralDashboardRequest
 	64,  // 46: quiz.ScoringService.ApplyReferralCode:input_type -> quiz.ApplyReferralCodeRequest
 	66,  // 47: quiz.ScoringService.UpdateFCMToken:input_type -> quiz.UpdateFCMTokenRequest
-	80,  // 48: quiz.ScoringService.GetGlobalLeaderboard:input_type -> quiz.GetGlobalLeaderboardRequest
-	82,  // 49: quiz.ScoringService.GetCoinBalance:input_type -> quiz.GetCoinBalanceRequest
-	85,  // 50: quiz.ScoringService.GetCoinLedger:input_type -> quiz.GetCoinLedgerRequest
-	88,  // 51: quiz.ScoringService.GetShopCatalog:input_type -> quiz.GetShopCatalogRequest
-	90,  // 52: quiz.ScoringService.GetShopInventory:input_type -> quiz.GetShopInventoryRequest
-	92,  // 53: quiz.ScoringService.PurchaseShopItem:input_type -> quiz.PurchaseShopItemRequest
-	94,  // 54: quiz.ScoringService.EquipCosmetic:input_type -> quiz.EquipCosmeticRequest
-	96,  // 55: quiz.ScoringService.ConsumeReroll:input_type -> quiz.ConsumeRerollRequest
-	98,  // 56: quiz.ScoringService.SendFriendRequest:input_type -> quiz.SendFriendRequestRequest
-	101, // 57: quiz.ScoringService.RespondToFriendRequest:input_type -> quiz.RespondToFriendRequestRequest
-	104, // 58: quiz.ScoringService.GetFriendsList:input_type -> quiz.GetFriendsListRequest
-	106, // 59: quiz.ScoringService.GetFriendRequests:input_type -> quiz.GetFriendRequestsRequest
-	108, // 60: quiz.ScoringService.Heartbeat:input_type -> quiz.HeartbeatRequest
-	110, // 61: quiz.ScoringService.ChallengeFriend:input_type -> quiz.ChallengeFriendRequest
+	82,  // 48: quiz.ScoringService.GetGlobalLeaderboard:input_type -> quiz.GetGlobalLeaderboardRequest
+	84,  // 49: quiz.ScoringService.GetCoinBalance:input_type -> quiz.GetCoinBalanceRequest
+	87,  // 50: quiz.ScoringService.GetCoinLedger:input_type -> quiz.GetCoinLedgerRequest
+	90,  // 51: quiz.ScoringService.GetShopCatalog:input_type -> quiz.GetShopCatalogRequest
+	92,  // 52: quiz.ScoringService.GetShopInventory:input_type -> quiz.GetShopInventoryRequest
+	94,  // 53: quiz.ScoringService.PurchaseShopItem:input_type -> quiz.PurchaseShopItemRequest
+	96,  // 54: quiz.ScoringService.EquipCosmetic:input_type -> quiz.EquipCosmeticRequest
+	98,  // 55: quiz.ScoringService.ConsumeReroll:input_type -> quiz.ConsumeRerollRequest
+	100, // 56: quiz.ScoringService.SendFriendRequest:input_type -> quiz.SendFriendRequestRequest
+	103, // 57: quiz.ScoringService.RespondToFriendRequest:input_type -> quiz.RespondToFriendRequestRequest
+	106, // 58: quiz.ScoringService.GetFriendsList:input_type -> quiz.GetFriendsListRequest
+	108, // 59: quiz.ScoringService.GetFriendRequests:input_type -> quiz.GetFriendRequestsRequest
+	110, // 60: quiz.ScoringService.Heartbeat:input_type -> quiz.HeartbeatRequest
+	112, // 61: quiz.ScoringService.ChallengeFriend:input_type -> quiz.ChallengeFriendRequest
 	22,  // 62: quiz.AuthService.Register:input_type -> quiz.RegisterRequest
 	23,  // 63: quiz.AuthService.Login:input_type -> quiz.LoginRequest
 	25,  // 64: quiz.AuthService.GetProfile:input_type -> quiz.GetProfileRequest
@@ -7156,57 +7291,59 @@ var file_proto_quiz_proto_depIdxs = []int32{
 	58,  // 75: quiz.AuthService.GetStreakInfo:input_type -> quiz.GetStreakInfoRequest
 	41,  // 76: quiz.AuthService.UpdateProfile:input_type -> quiz.UpdateProfileRequest
 	68,  // 77: quiz.PaymentService.CreateOrder:input_type -> quiz.CreateOrderRequest
-	70,  // 78: quiz.PaymentService.GetPlanStatus:input_type -> quiz.GetPlanStatusRequest
-	72,  // 79: quiz.PaymentService.GetPaymentHistory:input_type -> quiz.GetPaymentHistoryRequest
-	2,   // 80: quiz.MatchmakingService.JoinMatchmaking:output_type -> quiz.JoinMatchmakingResponse
-	4,   // 81: quiz.MatchmakingService.LeaveMatchmaking:output_type -> quiz.LeaveMatchmakingResponse
-	6,   // 82: quiz.MatchmakingService.SubscribeToMatch:output_type -> quiz.MatchEvent
-	8,   // 83: quiz.QuizService.GetRoomQuestions:output_type -> quiz.GetRoomQuestionsResponse
-	11,  // 84: quiz.QuizService.SubmitAnswer:output_type -> quiz.SubmitAnswerResponse
-	13,  // 85: quiz.QuizService.StreamGameEvents:output_type -> quiz.GameEvent
-	76,  // 86: quiz.QuizService.GetTournamentList:output_type -> quiz.GetTournamentListResponse
-	79,  // 87: quiz.QuizService.JoinTournament:output_type -> quiz.JoinTournamentResponse
-	44,  // 88: quiz.ScoringService.CalculateScore:output_type -> quiz.CalculateScoreResponse
-	46,  // 89: quiz.ScoringService.GetLeaderboard:output_type -> quiz.GetLeaderboardResponse
-	48,  // 90: quiz.ScoringService.GetMatchHistory:output_type -> quiz.GetMatchHistoryResponse
-	61,  // 91: quiz.ScoringService.GetHomeScreenData:output_type -> quiz.GetHomeScreenDataResponse
-	63,  // 92: quiz.ScoringService.GetReferralDashboard:output_type -> quiz.GetReferralDashboardResponse
-	65,  // 93: quiz.ScoringService.ApplyReferralCode:output_type -> quiz.ApplyReferralCodeResponse
-	67,  // 94: quiz.ScoringService.UpdateFCMToken:output_type -> quiz.UpdateFCMTokenResponse
-	81,  // 95: quiz.ScoringService.GetGlobalLeaderboard:output_type -> quiz.GetGlobalLeaderboardResponse
-	83,  // 96: quiz.ScoringService.GetCoinBalance:output_type -> quiz.GetCoinBalanceResponse
-	86,  // 97: quiz.ScoringService.GetCoinLedger:output_type -> quiz.GetCoinLedgerResponse
-	89,  // 98: quiz.ScoringService.GetShopCatalog:output_type -> quiz.GetShopCatalogResponse
-	91,  // 99: quiz.ScoringService.GetShopInventory:output_type -> quiz.GetShopInventoryResponse
-	93,  // 100: quiz.ScoringService.PurchaseShopItem:output_type -> quiz.PurchaseShopItemResponse
-	95,  // 101: quiz.ScoringService.EquipCosmetic:output_type -> quiz.EquipCosmeticResponse
-	97,  // 102: quiz.ScoringService.ConsumeReroll:output_type -> quiz.ConsumeRerollResponse
-	99,  // 103: quiz.ScoringService.SendFriendRequest:output_type -> quiz.SendFriendRequestResponse
-	102, // 104: quiz.ScoringService.RespondToFriendRequest:output_type -> quiz.RespondToFriendRequestResponse
-	105, // 105: quiz.ScoringService.GetFriendsList:output_type -> quiz.GetFriendsListResponse
-	107, // 106: quiz.ScoringService.GetFriendRequests:output_type -> quiz.GetFriendRequestsResponse
-	109, // 107: quiz.ScoringService.Heartbeat:output_type -> quiz.HeartbeatResponse
-	111, // 108: quiz.ScoringService.ChallengeFriend:output_type -> quiz.ChallengeFriendResponse
-	24,  // 109: quiz.AuthService.Register:output_type -> quiz.AuthResponse
-	24,  // 110: quiz.AuthService.Login:output_type -> quiz.AuthResponse
-	26,  // 111: quiz.AuthService.GetProfile:output_type -> quiz.ProfileResponse
-	24,  // 112: quiz.AuthService.GuestLogin:output_type -> quiz.AuthResponse
-	30,  // 113: quiz.AuthService.LoginWithEmail:output_type -> quiz.SendEmailCodeResponse
-	30,  // 114: quiz.AuthService.SendEmailCode:output_type -> quiz.SendEmailCodeResponse
-	32,  // 115: quiz.AuthService.VerifyEmailCode:output_type -> quiz.VerifyEmailCodeResponse
-	34,  // 116: quiz.AuthService.LinkEmail:output_type -> quiz.LinkEmailResponse
-	36,  // 117: quiz.AuthService.ResetPassword:output_type -> quiz.ResetPasswordResponse
-	38,  // 118: quiz.AuthService.CheckUsername:output_type -> quiz.CheckUsernameResponse
-	40,  // 119: quiz.AuthService.DeleteAccount:output_type -> quiz.DeleteAccountResponse
-	54,  // 120: quiz.AuthService.GoogleSignIn:output_type -> quiz.GoogleSignInResponse
-	57,  // 121: quiz.AuthService.ClaimDailyReward:output_type -> quiz.ClaimDailyRewardResponse
-	59,  // 122: quiz.AuthService.GetStreakInfo:output_type -> quiz.GetStreakInfoResponse
-	42,  // 123: quiz.AuthService.UpdateProfile:output_type -> quiz.UpdateProfileResponse
-	69,  // 124: quiz.PaymentService.CreateOrder:output_type -> quiz.CreateOrderResponse
-	71,  // 125: quiz.PaymentService.GetPlanStatus:output_type -> quiz.GetPlanStatusResponse
-	73,  // 126: quiz.PaymentService.GetPaymentHistory:output_type -> quiz.GetPaymentHistoryResponse
-	80,  // [80:127] is the sub-list for method output_type
-	33,  // [33:80] is the sub-list for method input_type
+	70,  // 78: quiz.PaymentService.VerifyPayment:input_type -> quiz.VerifyPaymentRequest
+	72,  // 79: quiz.PaymentService.GetPlanStatus:input_type -> quiz.GetPlanStatusRequest
+	74,  // 80: quiz.PaymentService.GetPaymentHistory:input_type -> quiz.GetPaymentHistoryRequest
+	2,   // 81: quiz.MatchmakingService.JoinMatchmaking:output_type -> quiz.JoinMatchmakingResponse
+	4,   // 82: quiz.MatchmakingService.LeaveMatchmaking:output_type -> quiz.LeaveMatchmakingResponse
+	6,   // 83: quiz.MatchmakingService.SubscribeToMatch:output_type -> quiz.MatchEvent
+	8,   // 84: quiz.QuizService.GetRoomQuestions:output_type -> quiz.GetRoomQuestionsResponse
+	11,  // 85: quiz.QuizService.SubmitAnswer:output_type -> quiz.SubmitAnswerResponse
+	13,  // 86: quiz.QuizService.StreamGameEvents:output_type -> quiz.GameEvent
+	78,  // 87: quiz.QuizService.GetTournamentList:output_type -> quiz.GetTournamentListResponse
+	81,  // 88: quiz.QuizService.JoinTournament:output_type -> quiz.JoinTournamentResponse
+	44,  // 89: quiz.ScoringService.CalculateScore:output_type -> quiz.CalculateScoreResponse
+	46,  // 90: quiz.ScoringService.GetLeaderboard:output_type -> quiz.GetLeaderboardResponse
+	48,  // 91: quiz.ScoringService.GetMatchHistory:output_type -> quiz.GetMatchHistoryResponse
+	61,  // 92: quiz.ScoringService.GetHomeScreenData:output_type -> quiz.GetHomeScreenDataResponse
+	63,  // 93: quiz.ScoringService.GetReferralDashboard:output_type -> quiz.GetReferralDashboardResponse
+	65,  // 94: quiz.ScoringService.ApplyReferralCode:output_type -> quiz.ApplyReferralCodeResponse
+	67,  // 95: quiz.ScoringService.UpdateFCMToken:output_type -> quiz.UpdateFCMTokenResponse
+	83,  // 96: quiz.ScoringService.GetGlobalLeaderboard:output_type -> quiz.GetGlobalLeaderboardResponse
+	85,  // 97: quiz.ScoringService.GetCoinBalance:output_type -> quiz.GetCoinBalanceResponse
+	88,  // 98: quiz.ScoringService.GetCoinLedger:output_type -> quiz.GetCoinLedgerResponse
+	91,  // 99: quiz.ScoringService.GetShopCatalog:output_type -> quiz.GetShopCatalogResponse
+	93,  // 100: quiz.ScoringService.GetShopInventory:output_type -> quiz.GetShopInventoryResponse
+	95,  // 101: quiz.ScoringService.PurchaseShopItem:output_type -> quiz.PurchaseShopItemResponse
+	97,  // 102: quiz.ScoringService.EquipCosmetic:output_type -> quiz.EquipCosmeticResponse
+	99,  // 103: quiz.ScoringService.ConsumeReroll:output_type -> quiz.ConsumeRerollResponse
+	101, // 104: quiz.ScoringService.SendFriendRequest:output_type -> quiz.SendFriendRequestResponse
+	104, // 105: quiz.ScoringService.RespondToFriendRequest:output_type -> quiz.RespondToFriendRequestResponse
+	107, // 106: quiz.ScoringService.GetFriendsList:output_type -> quiz.GetFriendsListResponse
+	109, // 107: quiz.ScoringService.GetFriendRequests:output_type -> quiz.GetFriendRequestsResponse
+	111, // 108: quiz.ScoringService.Heartbeat:output_type -> quiz.HeartbeatResponse
+	113, // 109: quiz.ScoringService.ChallengeFriend:output_type -> quiz.ChallengeFriendResponse
+	24,  // 110: quiz.AuthService.Register:output_type -> quiz.AuthResponse
+	24,  // 111: quiz.AuthService.Login:output_type -> quiz.AuthResponse
+	26,  // 112: quiz.AuthService.GetProfile:output_type -> quiz.ProfileResponse
+	24,  // 113: quiz.AuthService.GuestLogin:output_type -> quiz.AuthResponse
+	30,  // 114: quiz.AuthService.LoginWithEmail:output_type -> quiz.SendEmailCodeResponse
+	30,  // 115: quiz.AuthService.SendEmailCode:output_type -> quiz.SendEmailCodeResponse
+	32,  // 116: quiz.AuthService.VerifyEmailCode:output_type -> quiz.VerifyEmailCodeResponse
+	34,  // 117: quiz.AuthService.LinkEmail:output_type -> quiz.LinkEmailResponse
+	36,  // 118: quiz.AuthService.ResetPassword:output_type -> quiz.ResetPasswordResponse
+	38,  // 119: quiz.AuthService.CheckUsername:output_type -> quiz.CheckUsernameResponse
+	40,  // 120: quiz.AuthService.DeleteAccount:output_type -> quiz.DeleteAccountResponse
+	54,  // 121: quiz.AuthService.GoogleSignIn:output_type -> quiz.GoogleSignInResponse
+	57,  // 122: quiz.AuthService.ClaimDailyReward:output_type -> quiz.ClaimDailyRewardResponse
+	59,  // 123: quiz.AuthService.GetStreakInfo:output_type -> quiz.GetStreakInfoResponse
+	42,  // 124: quiz.AuthService.UpdateProfile:output_type -> quiz.UpdateProfileResponse
+	69,  // 125: quiz.PaymentService.CreateOrder:output_type -> quiz.CreateOrderResponse
+	71,  // 126: quiz.PaymentService.VerifyPayment:output_type -> quiz.VerifyPaymentResponse
+	73,  // 127: quiz.PaymentService.GetPlanStatus:output_type -> quiz.GetPlanStatusResponse
+	75,  // 128: quiz.PaymentService.GetPaymentHistory:output_type -> quiz.GetPaymentHistoryResponse
+	81,  // [81:129] is the sub-list for method output_type
+	33,  // [33:81] is the sub-list for method input_type
 	33,  // [33:33] is the sub-list for extension type_name
 	33,  // [33:33] is the sub-list for extension extendee
 	0,   // [0:33] is the sub-list for field type_name
@@ -7231,7 +7368,7 @@ func file_proto_quiz_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_quiz_proto_rawDesc), len(file_proto_quiz_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   113,
+			NumMessages:   115,
 			NumExtensions: 0,
 			NumServices:   5,
 		},

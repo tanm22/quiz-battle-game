@@ -16,11 +16,18 @@ class PaymentScreen extends StatefulWidget {
 class _PaymentScreenState extends State<PaymentScreen> {
   String _selectedPlan = 'monthly';
   bool _loading = false;
+  bool _verifying = false;
   String? _currentPlan;
   Int64? _expiresAt;
   List<PaymentRecord>? _paymentHistory;
   bool _historyLoading = false;
   late final Razorpay _razorpay;
+
+  /// Last successful CreateOrder response, retained so the "Try again"
+  /// path on a payment failure can reopen the SAME Razorpay order
+  /// rather than creating a new one (no new debit attempt on the
+  /// server, no duplicate payment row).
+  CreateOrderResponse? _lastOrder;
 
   @override
   void initState() {
@@ -81,19 +88,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
         CreateOrderRequest()..planDuration = _selectedPlan,
         options: QuizService().authCallOptions,
       );
+      _lastOrder = resp;
 
       if (!mounted) return;
-
-      // Open Razorpay checkout sheet
-      _razorpay.open({
-        'key': resp.keyId,
-        'amount': resp.amount.toInt(),
-        'order_id': resp.orderId,
-        'currency': resp.currency,
-        'name': 'Quiz Battle',
-        'description': _selectedPlan == 'yearly' ? 'Premium Yearly' : 'Premium Monthly',
-        'theme': {'color': '#6D59C4'},
-      });
+      _openCheckout(resp);
     } on GrpcError catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -109,29 +107,165 @@ class _PaymentScreenState extends State<PaymentScreen> {
     }
   }
 
-  void _handlePaymentSuccess(PaymentSuccessResponse response) {
-    if (!mounted) return;
-    // Show the celebratory dialog immediately. The webhook + RabbitMQ consumer
-    // will asynchronously upgrade the plan; we reload plan status after the
-    // dialog opens so the home state updates even if the user dismisses fast.
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => const _PaymentSuccessDialog(),
-    );
-    Future.delayed(const Duration(seconds: 2), () {
-      _loadPlanStatus();
-      _loadPaymentHistory();
+  /// Opens the Razorpay checkout sheet for [order]. Split out of
+  /// `_createOrder` so the retry flow can reopen the same order without
+  /// creating a new one — Razorpay accepts the same `order_id` for a
+  /// fresh attempt as long as the order hasn't been captured yet.
+  void _openCheckout(CreateOrderResponse order) {
+    _razorpay.open({
+      'key': order.keyId,
+      'amount': order.amount.toInt(),
+      'order_id': order.orderId,
+      'currency': order.currency,
+      'name': 'Quiz Battle',
+      'description':
+          _selectedPlan == 'yearly' ? 'Premium Yearly' : 'Premium Monthly',
+      'theme': {'color': '#6D59C4'},
+      // UPI-first ordering: GPay / PhonePe / Paytm sit at the top of
+      // the method picker, then card / netbanking / wallet. Reflects
+      // the actual usage mix in the target market.
+      'config': {
+        'display': {
+          'blocks': {
+            'banks': {
+              'name': 'Pay using UPI',
+              'instruments': [
+                {'method': 'upi'},
+              ],
+            },
+          },
+          'sequence': ['block.banks'],
+          'preferences': {'show_default_blocks': true},
+        },
+      },
     });
+  }
+
+  Future<void> _handlePaymentSuccess(PaymentSuccessResponse response) async {
+    if (!mounted) return;
+    if (response.orderId == null ||
+        response.paymentId == null ||
+        response.signature == null) {
+      // Razorpay should always include all three on success — but if a
+      // future SDK version drops one of them, fall back to a dialog
+      // that's at least honest about what happened.
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Payment confirmation incomplete — check Premium status in a minute.'),
+          backgroundColor: AppColors.danger,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    // Verify with our backend BEFORE celebrating. The webhook is still
+    // a defence-in-depth path (idempotent against this verify call),
+    // but in dev the webhook isn't reachable, so without this synchronous
+    // verify the user pays Razorpay successfully and the plan never
+    // upgrades.
+    setState(() => _verifying = true);
+    try {
+      final r = await QuizService().payment.verifyPayment(
+            VerifyPaymentRequest()
+              ..razorpayOrderId = response.orderId!
+              ..razorpayPaymentId = response.paymentId!
+              ..razorpaySignature = response.signature!,
+            options: QuizService().authCallOptions,
+          );
+      if (!mounted) return;
+      if (!r.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("We couldn't confirm your payment. Support has been notified."),
+            backgroundColor: AppColors.danger,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+      // Optimistically reflect the new plan in state so the dialog and
+      // subsequent reload don't briefly flash "free".
+      setState(() {
+        _currentPlan = r.plan;
+        _expiresAt = r.expiresAt;
+        _lastOrder = null; // order is now consumed; retries n/a
+      });
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => const _PaymentSuccessDialog(),
+      );
+      // The scoring service's payment.captured consumer will
+      // canonicalise users.plan in MongoDB; refresh after a beat so the
+      // history pane and any cached state reflect the truth.
+      Future.delayed(const Duration(milliseconds: 500), () {
+        _loadPlanStatus();
+        _loadPaymentHistory();
+      });
+    } on GrpcError catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Verification failed: ${e.message ?? 'unknown error'}'),
+            backgroundColor: AppColors.danger,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _verifying = false);
+    }
   }
 
   void _handlePaymentError(PaymentFailureResponse response) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Payment failed: ${response.message ?? 'Unknown error'}'),
-        backgroundColor: AppColors.danger,
-        behavior: SnackBarBehavior.floating,
+
+    // Razorpay SDK error codes: 0 == NETWORK_ERROR, 2 == PAYMENT_CANCELLED.
+    // User-initiated cancels are the only case we silently dismiss —
+    // surfacing a "Payment failed" dialog when the user themselves
+    // closed the sheet would feel like the app shouting at them.
+    // Network errors get the dialog so they can hit Try again.
+    if (response.code == Razorpay.PAYMENT_CANCELLED) return;
+
+    final order = _lastOrder;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Payment failed'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(response.message ?? 'Unknown error',
+                style: const TextStyle(color: AppColors.text)),
+            if (response.code != null) ...[
+              const SizedBox(height: 8),
+              Text('Code: ${response.code}',
+                  style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Close'),
+          ),
+          if (order != null)
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                // Reopen the SAME order — no new server-side debit
+                // attempt, no duplicate payment row.
+                _openCheckout(order);
+              },
+              child: const Text('Try again'),
+            ),
+        ],
       ),
     );
   }
@@ -217,14 +351,19 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     borderRadius: AppRadius.card,
                   ),
                   child: ElevatedButton(
-                    onPressed: _loading ? null : _createOrder,
+                    // _verifying gates the button while the
+                    // VerifyPayment RPC is mid-flight after Razorpay
+                    // closes — prevents a second tap re-creating an
+                    // order while the previous one is still being
+                    // confirmed.
+                    onPressed: (_loading || _verifying) ? null : _createOrder,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.transparent,
                       shadowColor: Colors.transparent,
                       foregroundColor: Colors.white,
                       shape: const RoundedRectangleBorder(borderRadius: AppRadius.card),
                     ),
-                    child: _loading
+                    child: (_loading || _verifying)
                         ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                         : const Text('Upgrade Now',
                             style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
