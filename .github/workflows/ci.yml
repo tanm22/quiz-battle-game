@@ -50,7 +50,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
-        with: { flutter-version: '3.29.x', channel: stable }
+        with: { flutter-version: '3.41.x', channel: stable }
       - run: cd flutter && flutter pub get
       - run: cd flutter && flutter analyze --no-fatal-warnings
-      - run: cd flutter && flutter test
+      # `flutter test` is intentionally omitted: no widget/unit tests exist
+      # yet. Re-add this step when the Flutter test suite is introduced.
