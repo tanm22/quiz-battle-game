@@ -2,6 +2,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:grpc/grpc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../proto/quiz.pbgrpc.dart';
+import 'fcm_service.dart';
 
 /// Singleton auth service — handles registration, login, guest login,
 /// email-based auth, and token persistence.
@@ -68,6 +69,7 @@ class AuthService {
     _onboardingCompleted = prefs.getBool('auth_onboarding_completed') ?? false;
     _displayName = prefs.getString('auth_display_name');
     _avatarUrl = prefs.getString('auth_avatar_url');
+    _preferredTopics = prefs.getStringList('auth_preferred_topics') ?? const [];
 
     if (_token == null || _userId == null) return false;
 
@@ -264,7 +266,11 @@ class AuthService {
     );
   }
 
-  /// Refresh profile from server — call after match to get updated rating/stats.
+  /// Refresh profile from server — call after match to get updated rating/stats,
+  /// and after a fresh login (email-code path) where the auth response doesn't
+  /// carry the onboarding fields. Populates the same set of fields as
+  /// [tryRestoreSession] so callers can rely on it for onboarding-aware
+  /// routing decisions.
   Future<void> refreshProfile() async {
     if (_token == null) return;
     try {
@@ -277,6 +283,10 @@ class AuthService {
       _wins = profile.wins;
       if (profile.email.isNotEmpty) _email = profile.email;
       _isGuest = profile.isGuest;
+      _onboardingCompleted = profile.onboardingCompleted;
+      _preferredTopics = List<String>.from(profile.preferredTopics);
+      if (profile.avatarUrl.isNotEmpty) _avatarUrl = profile.avatarUrl;
+      if (profile.displayName.isNotEmpty) _displayName = profile.displayName;
       await _saveToPrefs();
     } catch (_) {
       // Silently fail — will use cached values
@@ -338,8 +348,31 @@ class AuthService {
     await _saveToPrefs();
   }
 
+  /// Auth-owned SharedPreferences keys. Logout removes exactly these and
+  /// nothing else — `prefs.clear()` would also wipe keys owned by other
+  /// services (e.g. OnboardingService's onboarding_carousel_seen), which
+  /// would re-show the intro carousel on every logout.
+  static const _authPrefKeys = <String>[
+    'auth_token',
+    'auth_user_id',
+    'auth_username',
+    'auth_email',
+    'auth_is_guest',
+    'auth_rating',
+    'auth_matches_played',
+    'auth_wins',
+    'auth_onboarding_completed',
+    'auth_display_name',
+    'auth_avatar_url',
+    'auth_preferred_topics',
+  ];
+
   Future<void> logout() async {
     try { await GoogleSignIn().signOut(); } catch (_) {}
+    // Tear down FCM listeners + clear the singleton's _initialized flag so
+    // a subsequent registerForUser (e.g. another user signing in during the
+    // same app session) is not short-circuited by the idempotency guard.
+    FcmService.instance.reset();
     _token = null;
     _userId = null;
     _username = null;
@@ -353,7 +386,9 @@ class AuthService {
     _avatarUrl = null;
     _displayName = null;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    for (final key in _authPrefKeys) {
+      await prefs.remove(key);
+    }
   }
 
   Future<void> _saveToPrefs() async {
@@ -369,5 +404,6 @@ class AuthService {
     prefs.setBool('auth_onboarding_completed', _onboardingCompleted);
     if (_displayName != null) prefs.setString('auth_display_name', _displayName!);
     if (_avatarUrl != null) prefs.setString('auth_avatar_url', _avatarUrl!);
+    prefs.setStringList('auth_preferred_topics', _preferredTopics);
   }
 }
