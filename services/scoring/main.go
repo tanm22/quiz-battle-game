@@ -1626,6 +1626,26 @@ func setupRabbitMQ(ch *amqp.Channel) error {
 		return fmt.Errorf("tournament-finished queue bind: %w", err)
 	}
 
+	// Phase 3 (4.3): coin-earn-queue. Every earn source (match win,
+	// tournament placement, daily streak, referral fulfillment) publishes
+	// coins.earn.<source>; this queue funnels them to handleEarnEvent,
+	// which dispatches to ledger.Grant. DLQ pattern matches the other
+	// queues so a poison payload diverts after 3 redeliveries instead of
+	// head-of-line-blocking healthy events.
+	if _, err := ch.QueueDeclare("coin-earn-dlq", true, false, false, false, nil); err != nil {
+		return fmt.Errorf("coin-earn DLQ declare: %w", err)
+	}
+	if _, err := ch.QueueDeclare(coins.EarnQueueName, true, false, false, false, amqp.Table{
+		"x-dead-letter-exchange":    "",
+		"x-dead-letter-routing-key": "coin-earn-dlq",
+		"x-max-delivery-count":      3,
+	}); err != nil {
+		return fmt.Errorf("coin-earn queue declare: %w", err)
+	}
+	if err := ch.QueueBind(coins.EarnQueueName, coins.EarnBindingPattern, coins.EarnExchange, false, nil); err != nil {
+		return fmt.Errorf("coin-earn queue bind: %w", err)
+	}
+
 	return nil
 }
 
@@ -1739,6 +1759,7 @@ func main() {
 	go srv.consumePaymentCaptured(ctx)    // Phase 2: plan upgrade on payment
 	go srv.consumeReferralEvents(ctx)     // Phase 2: referral reward chain (ISSUE-06)
 	go srv.consumeTournamentFinished(ctx) // Phase 3 (4.2): tournament prize coin awards
+	go srv.consumeCoinEarn(ctx)           // Phase 3 (4.3): coins.earn.* → ledger.Grant
 
 	// Block forever (gRPC server runs in background goroutine)
 	select {}
