@@ -33,10 +33,10 @@ import (
 
 type matchmakingServer struct {
 	pb.UnimplementedMatchmakingServiceServer
-	rdb        *redis.Client
-	amqpCh     *amqp.Channel
-	mongoDB    *mongo.Database
-	jwtSecret  string
+	rdb         *redis.Client
+	amqpCh      *amqp.Channel
+	mongoDB     *mongo.Database
+	jwtSecret   string
 	subscribers sync.Map // userId -> chan *pb.MatchEvent
 	seqCounter  atomic.Int64
 }

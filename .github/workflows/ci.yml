@@ -9,32 +9,35 @@ on:
 jobs:
   go:
     runs-on: ubuntu-latest
-    services:
-      mongo:
-        image: mongo:6
-        ports: ['27017:27017']
-        options: >-
-          --health-cmd "mongosh --quiet --eval 'db.runCommand({ping:1})'"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with: { go-version: '1.25' }
-      - name: Init replica set
+      # GHA `services.<id>.options` only forwards `docker create` flags, so
+      # there's no way to pass `--replSet rs0` (a CMD arg to `mongod`) through
+      # that block. Run mongo manually as a replica set instead — the ledger
+      # tests rely on multi-document transactions, which standalone mongo
+      # doesn't support.
+      - name: Start Mongo rs0
         run: |
-          docker exec ${{ job.services.mongo.id }} mongosh --quiet --eval '
-            try { rs.status() } catch (e) {
-              rs.initiate({_id:"rs0", members:[{_id:0, host:"localhost:27017"}]});
-            }
-          '
-          # Wait for PRIMARY
-          for i in 1 2 3 4 5 6 7 8 9 10; do
-            ok=$(docker exec ${{ job.services.mongo.id }} mongosh --quiet --eval 'db.hello().isWritablePrimary' || echo false)
-            if [ "$ok" = "true" ]; then break; fi
+          docker run -d --name mongo -p 27017:27017 mongo:6 --replSet rs0 --bind_ip_all
+          ready=false
+          for i in $(seq 1 30); do
+            if docker exec mongo mongosh --quiet --eval 'db.runCommand({ping:1}).ok' | grep -q '^1$'; then
+              ready=true; break
+            fi
             sleep 2
           done
+          [ "$ready" = "true" ] || { echo "mongod never accepted connections" >&2; docker logs mongo >&2 || true; exit 1; }
+          docker exec mongo mongosh --quiet --eval 'rs.initiate({_id:"rs0",members:[{_id:0,host:"localhost:27017"}]})'
+          primary=false
+          for i in $(seq 1 30); do
+            if docker exec mongo mongosh --quiet --eval 'db.hello().isWritablePrimary' | grep -q '^true$'; then
+              primary=true; break
+            fi
+            sleep 2
+          done
+          [ "$primary" = "true" ] || { echo "rs0 never reached PRIMARY" >&2; docker logs mongo >&2 || true; exit 1; }
       - run: go mod download
       - run: make vet
       - run: make lint
@@ -47,7 +50,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
-        with: { flutter-version: '3.24.x', channel: stable }
+        with: { flutter-version: '3.29.x', channel: stable }
       - run: cd flutter && flutter pub get
       - run: cd flutter && flutter analyze --no-fatal-warnings
       - run: cd flutter && flutter test

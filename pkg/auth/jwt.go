@@ -21,7 +21,7 @@ type Claims struct {
 type contextKey string
 
 const (
-	ctxUserID  contextKey = "auth_user_id"
+	ctxUserID   contextKey = "auth_user_id"
 	ctxUsername contextKey = "auth_username"
 )
 

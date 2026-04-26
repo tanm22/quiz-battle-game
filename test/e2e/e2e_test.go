@@ -350,7 +350,7 @@ func TestFullMatchE2E(t *testing.T) {
 			UserId:          player1,
 			Round:           int32(round),
 			OptionIndex:     0,
-			ClientTimestamp:  clientTs,
+			ClientTimestamp: clientTs,
 		})
 		if err != nil {
 			t.Fatalf("round %d: submit player1: %v", round, err)
@@ -361,7 +361,7 @@ func TestFullMatchE2E(t *testing.T) {
 			UserId:          player2,
 			Round:           int32(round),
 			OptionIndex:     1,
-			ClientTimestamp:  clientTs + 500, // slightly later
+			ClientTimestamp: clientTs + 500, // slightly later
 		})
 		if err != nil {
 			t.Fatalf("round %d: submit player2: %v", round, err)

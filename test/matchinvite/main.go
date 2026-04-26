@@ -7,7 +7,8 @@
 // and verifies the backend path (throttle + publish) is hit.
 //
 // Tail notification logs after running to confirm dispatches:
-//   docker compose logs --tail=30 notification
+//
+//	docker compose logs --tail=30 notification
 //
 // Run: go run -tags phase2verify ./test/matchinvite/
 package main
@@ -34,9 +35,9 @@ const (
 	mmAddr    = "localhost:50051"
 	jwtSecret = "change-me-in-production"
 
-	inviterID  = "mi_test_inviter"
-	opponent1  = "mi_test_opp1"
-	opponent2  = "mi_test_opp2"
+	inviterID = "mi_test_inviter"
+	opponent1 = "mi_test_opp1"
+	opponent2 = "mi_test_opp2"
 )
 
 func must(err error, msg string) {

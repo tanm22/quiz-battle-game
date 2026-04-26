@@ -34,7 +34,7 @@ type paymentServer struct {
 	pb.UnimplementedPaymentServiceServer
 	rdb            *redis.Client
 	amqpConn       *amqp.Connection
-	amqpMu         sync.Mutex   // AMQP channels are not thread-safe
+	amqpMu         sync.Mutex // AMQP channels are not thread-safe
 	amqpCh         *amqp.Channel
 	mongoDB        *mongo.Database
 	jwtSecret      string
