@@ -2,9 +2,13 @@ package coins
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 // LedgerEntry is one immutable row in the coin_ledger collection.
@@ -81,19 +85,132 @@ func (l *Ledger) ledger() *mongo.Collection {
 // Returns ErrInsufficientBalance if a negative delta would drive coins below
 // zero; the transaction aborts and balance is preserved.
 func (l *Ledger) Grant(ctx context.Context, userID string, delta int64, reason, refID string, metadata map[string]string) (*LedgerEntry, error) {
-	panic("not implemented yet — Task 1.5")
+	if delta == 0 {
+		return nil, ErrAmountInvalid
+	}
+	if _, ok := validReasons[reason]; !ok {
+		return nil, ErrUnknownReason
+	}
+	if refID == "" {
+		return nil, ErrMissingRefID
+	}
+
+	// Fast path: idempotent replay. Skips the transaction overhead when we
+	// already have a row for this (userId, refId, reason). The unique index
+	// in seed/main.go is the authoritative guard against duplicates;
+	// concurrent racers fall through to the transaction below and exactly
+	// one writes the row, the rest see DuplicateKey and are funneled here.
+	if existing, err := l.findExisting(ctx, userID, refID, reason); err != nil {
+		return nil, err
+	} else if existing != nil {
+		return existing, nil
+	}
+
+	session, err := l.client.StartSession()
+	if err != nil {
+		return nil, fmt.Errorf("start session: %w", err)
+	}
+	defer session.EndSession(ctx)
+
+	result, err := session.WithTransaction(ctx, func(sc context.Context) (any, error) {
+		var user struct {
+			Coins int64 `bson:"coins"`
+		}
+		if err := l.users().FindOne(sc, bson.M{"_id": userID}).Decode(&user); err != nil {
+			return nil, fmt.Errorf("load user: %w", err)
+		}
+		if delta < 0 && user.Coins+delta < 0 {
+			return nil, ErrInsufficientBalance
+		}
+
+		entry := &LedgerEntry{
+			ID:           bson.NewObjectID().Hex(),
+			UserID:       userID,
+			Delta:        delta,
+			Reason:       reason,
+			RefID:        refID,
+			BalanceAfter: user.Coins + delta,
+			Metadata:     metadata,
+			CreatedAt:    time.Now().UTC(),
+		}
+		if _, err := l.ledger().InsertOne(sc, entry); err != nil {
+			return nil, fmt.Errorf("insert ledger: %w", err)
+		}
+		if _, err := l.users().UpdateOne(sc, bson.M{"_id": userID},
+			bson.M{"$inc": bson.M{"coins": delta}}); err != nil {
+			return nil, fmt.Errorf("inc balance: %w", err)
+		}
+		return entry, nil
+	})
+	if err != nil {
+		// Concurrent identical grant: the unique index rejected our insert.
+		// The winning grant's row is now visible — fetch and return it.
+		if mongo.IsDuplicateKeyError(err) {
+			if existing, ferr := l.findExisting(ctx, userID, refID, reason); ferr == nil && existing != nil {
+				return existing, nil
+			}
+		}
+		return nil, err
+	}
+	return result.(*LedgerEntry), nil
+}
+
+func (l *Ledger) findExisting(ctx context.Context, userID, refID, reason string) (*LedgerEntry, error) {
+	var existing LedgerEntry
+	err := l.ledger().FindOne(ctx, bson.M{"userId": userID, "refId": refID, "reason": reason}).Decode(&existing)
+	if err == nil {
+		return &existing, nil
+	}
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, nil
+	}
+	return nil, fmt.Errorf("lookup existing: %w", err)
 }
 
 // GetBalance returns the cached balance from users.coins. The cache is kept
 // consistent with the ledger by Grant's transaction, so this is the only
 // read path callers need.
 func (l *Ledger) GetBalance(ctx context.Context, userID string) (int64, error) {
-	panic("not implemented yet — Task 1.5")
+	var user struct {
+		Coins int64 `bson:"coins"`
+	}
+	if err := l.users().FindOne(ctx, bson.M{"_id": userID}).Decode(&user); err != nil {
+		return 0, err
+	}
+	return user.Coins, nil
 }
 
 // GetLedger returns ledger entries for the user newest-first, paged by an
 // opaque cursor that encodes the createdAt of the last row of the previous
 // page. pageSize is clamped to [1, 100] with a default of 25.
 func (l *Ledger) GetLedger(ctx context.Context, userID string, pageSize int32, pageToken string) ([]*LedgerEntry, string, error) {
-	panic("not implemented yet — Task 1.5/1.7")
+	if pageSize <= 0 || pageSize > 100 {
+		pageSize = 25
+	}
+	filter := bson.M{"userId": userID}
+	if pageToken != "" {
+		t, err := time.Parse(time.RFC3339Nano, pageToken)
+		if err != nil {
+			return nil, "", fmt.Errorf("invalid pageToken: %w", err)
+		}
+		filter["createdAt"] = bson.M{"$lt": t}
+	}
+	cur, err := l.ledger().Find(ctx, filter,
+		options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}).SetLimit(int64(pageSize)+1),
+	)
+	if err != nil {
+		return nil, "", err
+	}
+	defer cur.Close(ctx)
+
+	rows := []*LedgerEntry{}
+	if err := cur.All(ctx, &rows); err != nil {
+		return nil, "", err
+	}
+	var next string
+	if int32(len(rows)) > pageSize {
+		next = rows[pageSize-1].CreatedAt.Format(time.RFC3339Nano)
+		rows = rows[:pageSize]
+	}
+	return rows, next, nil
 }
