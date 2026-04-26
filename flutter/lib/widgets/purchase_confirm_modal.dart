@@ -96,7 +96,15 @@ class _PurchaseConfirmModalState extends ConsumerState<PurchaseConfirmModal> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
+    // PopScope blocks back-button + barrier-tap while the purchase RPC
+    // is in flight. Without this, a user dismissing the dialog
+    // mid-spinner would see the debit succeed silently — providers
+    // would invalidate, but the awaited `.pop(true)` never fires so the
+    // caller never shows the "Purchased!" snackbar. Forcing the user to
+    // wait for the request to resolve guarantees they see the outcome.
+    return PopScope(
+      canPop: !_busy,
+      child: AlertDialog(
       title: Text('Buy ${widget.item.name}?'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -152,6 +160,7 @@ class _PurchaseConfirmModalState extends ConsumerState<PurchaseConfirmModal> {
               : const Text('Buy'),
         ),
       ],
+      ),
     );
   }
 }
