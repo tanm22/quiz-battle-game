@@ -221,9 +221,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
   void _handlePaymentError(PaymentFailureResponse response) {
     if (!mounted) return;
 
-    // Razorpay error code 0 (or BAD_REQUEST_ERROR with `code: 0`) is
-    // the user actively cancelling — don't bug them with a dialog.
-    if (response.code == 0) return;
+    // Razorpay SDK error codes: 0 == NETWORK_ERROR, 2 == PAYMENT_CANCELLED.
+    // User-initiated cancels are the only case we silently dismiss —
+    // surfacing a "Payment failed" dialog when the user themselves
+    // closed the sheet would feel like the app shouting at them.
+    // Network errors get the dialog so they can hit Try again.
+    if (response.code == Razorpay.PAYMENT_CANCELLED) return;
 
     final order = _lastOrder;
     showDialog<void>(

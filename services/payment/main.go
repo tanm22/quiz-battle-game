@@ -341,12 +341,23 @@ func (s *paymentServer) capturePayment(ctx context.Context, orderID, paymentID s
 	var payDoc bson.M
 	if err := s.mongoDB.Collection("payments").FindOne(ctx,
 		bson.M{"razorpayOrderId": orderID}).Decode(&payDoc); err != nil {
-		// No matching order — most likely a stale paymentID from
-		// outside this system; surface as success so callers stop
-		// retrying. The Redis idem key is left set so we don't
-		// re-process a future identical paymentID.
-		log.Printf("[payment] capturePayment: no payment doc for order %s: %v", orderID, err)
-		return nil
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			// No matching order — most likely a stale paymentID from
+			// outside this system. Treat as success so callers stop
+			// retrying; the Redis idem key stays set so we don't
+			// re-process a future identical paymentID.
+			log.Printf("[payment] capturePayment: no payment doc for order %s", orderID)
+			return nil
+		}
+		// Transient Mongo error (network blip, replica step-down, etc).
+		// The payment doc was already marked captured by the UpdateOne
+		// above, but the event hasn't been published yet. If we leave
+		// the SETNX idem key set, every future webhook re-delivery and
+		// VerifyPayment retry short-circuits at !isNew and the user
+		// never gets upgraded — there is no recovery path. Roll back
+		// the idem key so the next attempt re-publishes.
+		s.rdb.Del(ctx, keys.WebhookIdem(paymentID))
+		return fmt.Errorf("load payment doc for order %s: %w", orderID, err)
 	}
 
 	eventJSON, err := json.Marshal(map[string]interface{}{
