@@ -1760,3 +1760,66 @@ final $typed_data.Uint8List purchaseShopItemResponseDescriptor = $convert.base64
     'ChhQdXJjaGFzZVNob3BJdGVtUmVzcG9uc2USGAoHc3VjY2VzcxgBIAEoCFIHc3VjY2VzcxImCg'
     '9sZWRnZXJfZW50cnlfaWQYAiABKAlSDWxlZGdlckVudHJ5SWQSHwoLbmV3X2JhbGFuY2UYAyAB'
     'KANSCm5ld0JhbGFuY2USHQoKZXJyb3JfY29kZRgEIAEoCVIJZXJyb3JDb2Rl');
+
+@$core.Deprecated('Use equipCosmeticRequestDescriptor instead')
+const EquipCosmeticRequest$json = {
+  '1': 'EquipCosmeticRequest',
+  '2': [
+    {'1': 'item_id', '3': 1, '4': 1, '5': 9, '10': 'itemId'},
+  ],
+};
+
+/// Descriptor for `EquipCosmeticRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List equipCosmeticRequestDescriptor =
+    $convert.base64Decode(
+        'ChRFcXVpcENvc21ldGljUmVxdWVzdBIXCgdpdGVtX2lkGAEgASgJUgZpdGVtSWQ=');
+
+@$core.Deprecated('Use equipCosmeticResponseDescriptor instead')
+const EquipCosmeticResponse$json = {
+  '1': 'EquipCosmeticResponse',
+  '2': [
+    {'1': 'success', '3': 1, '4': 1, '5': 8, '10': 'success'},
+    {'1': 'error_code', '3': 2, '4': 1, '5': 9, '10': 'errorCode'},
+  ],
+};
+
+/// Descriptor for `EquipCosmeticResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List equipCosmeticResponseDescriptor = $convert.base64Decode(
+    'ChVFcXVpcENvc21ldGljUmVzcG9uc2USGAoHc3VjY2VzcxgBIAEoCFIHc3VjY2VzcxIdCgplcn'
+    'Jvcl9jb2RlGAIgASgJUgllcnJvckNvZGU=');
+
+@$core.Deprecated('Use consumeRerollRequestDescriptor instead')
+const ConsumeRerollRequest$json = {
+  '1': 'ConsumeRerollRequest',
+  '2': [
+    {'1': 'room_id', '3': 1, '4': 1, '5': 9, '10': 'roomId'},
+    {'1': 'round_id', '3': 2, '4': 1, '5': 9, '10': 'roundId'},
+  ],
+};
+
+/// Descriptor for `ConsumeRerollRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List consumeRerollRequestDescriptor = $convert.base64Decode(
+    'ChRDb25zdW1lUmVyb2xsUmVxdWVzdBIXCgdyb29tX2lkGAEgASgJUgZyb29tSWQSGQoIcm91bm'
+    'RfaWQYAiABKAlSB3JvdW5kSWQ=');
+
+@$core.Deprecated('Use consumeRerollResponseDescriptor instead')
+const ConsumeRerollResponse$json = {
+  '1': 'ConsumeRerollResponse',
+  '2': [
+    {'1': 'success', '3': 1, '4': 1, '5': 8, '10': 'success'},
+    {
+      '1': 'charges_remaining',
+      '3': 2,
+      '4': 1,
+      '5': 5,
+      '10': 'chargesRemaining'
+    },
+    {'1': 'error_code', '3': 3, '4': 1, '5': 9, '10': 'errorCode'},
+  ],
+};
+
+/// Descriptor for `ConsumeRerollResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List consumeRerollResponseDescriptor = $convert.base64Decode(
+    'ChVDb25zdW1lUmVyb2xsUmVzcG9uc2USGAoHc3VjY2VzcxgBIAEoCFIHc3VjY2VzcxIrChFjaG'
+    'FyZ2VzX3JlbWFpbmluZxgCIAEoBVIQY2hhcmdlc1JlbWFpbmluZxIdCgplcnJvcl9jb2RlGAMg'
+    'ASgJUgllcnJvckNvZGU=');

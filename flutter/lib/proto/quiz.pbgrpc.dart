@@ -416,6 +416,26 @@ class ScoringServiceClient extends $grpc.Client {
     return $createUnaryCall(_$purchaseShopItem, request, options: options);
   }
 
+  /// Phase 3 (4.3) PR 5: item effects.
+  /// EquipCosmetic activates an owned avatar frame or name color. Idempotent
+  /// — re-equipping the already-equipped item is a no-op success.
+  $grpc.ResponseFuture<$0.EquipCosmeticResponse> equipCosmetic(
+    $0.EquipCosmeticRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$equipCosmetic, request, options: options);
+  }
+
+  /// ConsumeReroll atomically decrements rerollCharges by 1; returns the
+  /// post-decrement count so the caller can render "N left" without a
+  /// second read.
+  $grpc.ResponseFuture<$0.ConsumeRerollResponse> consumeReroll(
+    $0.ConsumeRerollRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$consumeReroll, request, options: options);
+  }
+
   // method descriptors
 
   static final _$calculateScore =
@@ -483,6 +503,16 @@ class ScoringServiceClient extends $grpc.Client {
       '/quiz.ScoringService/PurchaseShopItem',
       ($0.PurchaseShopItemRequest value) => value.writeToBuffer(),
       $0.PurchaseShopItemResponse.fromBuffer);
+  static final _$equipCosmetic =
+      $grpc.ClientMethod<$0.EquipCosmeticRequest, $0.EquipCosmeticResponse>(
+          '/quiz.ScoringService/EquipCosmetic',
+          ($0.EquipCosmeticRequest value) => value.writeToBuffer(),
+          $0.EquipCosmeticResponse.fromBuffer);
+  static final _$consumeReroll =
+      $grpc.ClientMethod<$0.ConsumeRerollRequest, $0.ConsumeRerollResponse>(
+          '/quiz.ScoringService/ConsumeReroll',
+          ($0.ConsumeRerollRequest value) => value.writeToBuffer(),
+          $0.ConsumeRerollResponse.fromBuffer);
 }
 
 @$pb.GrpcServiceName('quiz.ScoringService')
@@ -607,6 +637,24 @@ abstract class ScoringServiceBase extends $grpc.Service {
         ($core.List<$core.int> value) =>
             $0.PurchaseShopItemRequest.fromBuffer(value),
         ($0.PurchaseShopItemResponse value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.EquipCosmeticRequest, $0.EquipCosmeticResponse>(
+            'EquipCosmetic',
+            equipCosmetic_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.EquipCosmeticRequest.fromBuffer(value),
+            ($0.EquipCosmeticResponse value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.ConsumeRerollRequest, $0.ConsumeRerollResponse>(
+            'ConsumeReroll',
+            consumeReroll_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.ConsumeRerollRequest.fromBuffer(value),
+            ($0.ConsumeRerollResponse value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.CalculateScoreResponse> calculateScore_Pre(
@@ -725,6 +773,24 @@ abstract class ScoringServiceBase extends $grpc.Service {
 
   $async.Future<$0.PurchaseShopItemResponse> purchaseShopItem(
       $grpc.ServiceCall call, $0.PurchaseShopItemRequest request);
+
+  $async.Future<$0.EquipCosmeticResponse> equipCosmetic_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.EquipCosmeticRequest> $request) async {
+    return equipCosmetic($call, await $request);
+  }
+
+  $async.Future<$0.EquipCosmeticResponse> equipCosmetic(
+      $grpc.ServiceCall call, $0.EquipCosmeticRequest request);
+
+  $async.Future<$0.ConsumeRerollResponse> consumeReroll_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.ConsumeRerollRequest> $request) async {
+    return consumeReroll($call, await $request);
+  }
+
+  $async.Future<$0.ConsumeRerollResponse> consumeReroll(
+      $grpc.ServiceCall call, $0.ConsumeRerollRequest request);
 }
 
 @$pb.GrpcServiceName('quiz.AuthService')

@@ -51,6 +51,9 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  # DelegatingFuture lives here — used to fake a ResponseFuture in
+  # the CoinsService unit tests without standing up a real gRPC channel.
+  async: ^2.11.0
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is

@@ -8,8 +8,10 @@ import '../services/auth_service.dart';
 import '../services/quiz_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/animated_toast.dart';
+import '../widgets/coin_balance_chip.dart';
 import '../widgets/streak_calendar.dart';
 import '../proto/quiz.pbgrpc.dart';
+import 'shop/shop_screen.dart';
 import 'match_history_screen.dart';
 import 'payment_screen.dart';
 import 'link_email_screen.dart';
@@ -561,6 +563,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ));
           }),
           const SizedBox(height: 8),
+          _profileActionButton(Icons.storefront, 'Coin Shop', () {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const ShopScreen()));
+          }, color: AppColors.primary),
+          const SizedBox(height: 8),
           _profileActionButton(Icons.workspace_premium, 'Premium', () {
             Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentScreen()));
           }, color: AppColors.gold),
@@ -865,9 +871,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       Text('${profile.wins}W/${profile.matchesPlayed - profile.wins}L',
                         style: const TextStyle(color: AppColors.textMuted, fontSize: 13, fontWeight: FontWeight.w600)),
                       const SizedBox(width: 12),
-                      const Icon(Icons.monetization_on, size: 14, color: AppColors.primary),
-                      const SizedBox(width: 3),
-                      Text('${profile.coins}', style: const TextStyle(color: AppColors.primary, fontSize: 13, fontWeight: FontWeight.w600)),
+                      // Seed from profile.coins so we render the cached
+                      // value instantly without firing a redundant
+                      // GetCoinBalance — the home payload already has it.
+                      // The provider is still watched, so any later
+                      // invalidation (e.g. after a purchase) refreshes
+                      // the chip.
+                      CoinBalanceChip(initialBalance: profile.coins.toInt()),
                     ],
                   ],
                 ),
