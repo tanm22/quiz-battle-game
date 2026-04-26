@@ -247,17 +247,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         builder: (_) => EmailCodeScreen(
           email: email,
           purpose: purpose,
-          onVerified: (token, userId) {
+          onVerified: (token, userId) async {
             if (token != null && userId != null) {
               final auth = AuthService();
               QuizService().setAuthToken(auth.token!);
-              ref.read(gameStateProvider.notifier).setAuth(
-                auth.userId!, auth.token!, auth.rating,
-                email: auth.email, isGuest: auth.isGuest,
-              );
-              unawaited(FcmService.instance.registerForUser());
+              // VerifyEmailCodeResponse carries only verified/token/userId.
+              // The local _onboardingCompleted defaults to false on a fresh
+              // device, so we explicitly fetch the profile to know whether
+              // to route to onboarding or home — same contract as register
+              // / Google sign-in. Network failure falls through to cached
+              // defaults; that's the same risk every other flow accepts.
+              await auth.refreshProfile();
             }
-            if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+            if (!mounted) return;
+            Navigator.of(context).popUntil((route) => route.isFirst);
+            if (token != null && userId != null) {
+              _navigateAfterSignup(AuthService());
+            }
           },
         ),
       ),
