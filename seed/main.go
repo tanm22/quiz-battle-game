@@ -12,6 +12,8 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"golang.org/x/crypto/bcrypt"
+
+	"quiz-battle/pkg/coins"
 )
 
 type Question struct {
@@ -38,7 +40,7 @@ func main() {
 	}
 	defer client.Disconnect(ctx)
 
-	db := client.Database("quizbattle")
+	db := client.Database(coins.DefaultDBName)
 
 	// --- Create indexes ---
 	log.Println("[seed] creating indexes...")

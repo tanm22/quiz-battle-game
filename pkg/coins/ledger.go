@@ -2,6 +2,8 @@ package coins
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -10,6 +12,10 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
+
+// DefaultDBName is the canonical Mongo database for quiz-battle. Services
+// pass this to NewLedger so renaming the database touches one place.
+const DefaultDBName = "quizbattle"
 
 // LedgerEntry is one immutable row in the coin_ledger collection.
 //
@@ -181,22 +187,34 @@ func (l *Ledger) GetBalance(ctx context.Context, userID string) (int64, error) {
 }
 
 // GetLedger returns ledger entries for the user newest-first, paged by an
-// opaque cursor that encodes the createdAt of the last row of the previous
-// page. pageSize is clamped to [1, 100] with a default of 25.
+// opaque cursor encoding (createdAt, _id) of the last row of the previous
+// page. pageSize defaults to 25 if <= 0 and is clamped to 100.
+//
+// _id is included in the sort and the cursor as a tiebreaker — without it,
+// two entries sharing the same createdAt nanosecond would be skipped or
+// duplicated across pages.
 func (l *Ledger) GetLedger(ctx context.Context, userID string, pageSize int32, pageToken string) ([]*LedgerEntry, string, error) {
-	if pageSize <= 0 || pageSize > 100 {
+	if pageSize <= 0 {
 		pageSize = 25
+	}
+	if pageSize > 100 {
+		pageSize = 100
 	}
 	filter := bson.M{"userId": userID}
 	if pageToken != "" {
-		t, err := time.Parse(time.RFC3339Nano, pageToken)
+		t, id, err := decodeCursor(pageToken)
 		if err != nil {
 			return nil, "", fmt.Errorf("invalid pageToken: %w", err)
 		}
-		filter["createdAt"] = bson.M{"$lt": t}
+		filter["$or"] = []bson.M{
+			{"createdAt": bson.M{"$lt": t}},
+			{"createdAt": t, "_id": bson.M{"$lt": id}},
+		}
 	}
 	cur, err := l.ledger().Find(ctx, filter,
-		options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}).SetLimit(int64(pageSize)+1),
+		options.Find().
+			SetSort(bson.D{{Key: "createdAt", Value: -1}, {Key: "_id", Value: -1}}).
+			SetLimit(int64(pageSize)+1),
 	)
 	if err != nil {
 		return nil, "", err
@@ -209,8 +227,31 @@ func (l *Ledger) GetLedger(ctx context.Context, userID string, pageSize int32, p
 	}
 	var next string
 	if int32(len(rows)) > pageSize {
-		next = rows[pageSize-1].CreatedAt.Format(time.RFC3339Nano)
+		last := rows[pageSize-1]
+		next = encodeCursor(last.CreatedAt, last.ID)
 		rows = rows[:pageSize]
 	}
 	return rows, next, nil
+}
+
+type pageCursor struct {
+	T  time.Time `json:"t"`
+	ID string    `json:"i"`
+}
+
+func encodeCursor(t time.Time, id string) string {
+	raw, _ := json.Marshal(pageCursor{T: t, ID: id})
+	return base64.RawURLEncoding.EncodeToString(raw)
+}
+
+func decodeCursor(s string) (time.Time, string, error) {
+	raw, err := base64.RawURLEncoding.DecodeString(s)
+	if err != nil {
+		return time.Time{}, "", err
+	}
+	var c pageCursor
+	if err := json.Unmarshal(raw, &c); err != nil {
+		return time.Time{}, "", err
+	}
+	return c.T, c.ID, nil
 }

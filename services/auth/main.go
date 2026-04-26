@@ -591,20 +591,20 @@ func (s *authServer) GoogleSignIn(ctx context.Context, req *pb.GoogleSignInReque
 		StreakUpdated: streakUpdated,
 		Reward:        reward,
 		UserProfile: &pb.UserProfile{
-			UserId:       user.ID,
-			Username:     user.Username,
-			DisplayName:  user.DisplayName,
-			Email:        user.Email,
-			AvatarUrl:    user.AvatarUrl,
-			Rating:       user.Rating,
-			MatchesPlayed: user.MatchesPlayed,
-			Wins:         user.Wins,
-			Plan:         user.Plan,
-			Coins:        user.Coins,
-			Streak:       streakInfo,
-			ReferralCode: user.ReferralCode,
-			IsGuest:      false,
-			WinStreak:    user.WinStreak,
+			UserId:              user.ID,
+			Username:            user.Username,
+			DisplayName:         user.DisplayName,
+			Email:               user.Email,
+			AvatarUrl:           user.AvatarUrl,
+			Rating:              user.Rating,
+			MatchesPlayed:       user.MatchesPlayed,
+			Wins:                user.Wins,
+			Plan:                user.Plan,
+			Coins:               user.Coins,
+			Streak:              streakInfo,
+			ReferralCode:        user.ReferralCode,
+			IsGuest:             false,
+			WinStreak:           user.WinStreak,
 			PreferredTopics:     user.PreferredTopics,
 			OnboardingCompleted: user.OnboardingCompleted,
 		},
@@ -810,12 +810,12 @@ func (s *authServer) applyReferral(ctx context.Context, refereeID, code string) 
 
 	// Create referral document
 	s.mongoDB.Collection("referrals").InsertOne(ctx, bson.M{
-		"referrerId":   referrerID,
-		"refereeId":    refereeID,
-		"referralCode": code,
-		"status":       "pending",
+		"referrerId":    referrerID,
+		"refereeId":     refereeID,
+		"referralCode":  code,
+		"status":        "pending",
 		"rewardGranted": false,
-		"createdAt":    time.Now(),
+		"createdAt":     time.Now(),
 	})
 
 	// Set referredBy on the referee
@@ -928,7 +928,7 @@ func (s *authServer) dailyRewardNudgeCron(ctx context.Context) {
 		today := time.Now().In(ist).Format("2006-01-02")
 		cursor, err := s.mongoDB.Collection("users").Find(ctx, bson.M{
 			"streak.lastClaimedDate": bson.M{"$ne": today},
-			"isGuest":               false,
+			"isGuest":                false,
 		})
 		if err != nil {
 			log.Printf("[auth-cron] daily nudge query error: %v", err)
@@ -976,7 +976,7 @@ func main() {
 		log.Fatalf("mongodb connect failed: %v", err)
 	}
 	defer mongoClient.Disconnect(ctx)
-	db := mongoClient.Database("quizbattle")
+	db := mongoClient.Database(coins.DefaultDBName)
 
 	// Create indexes
 	db.Collection("users").Indexes().CreateOne(ctx, mongo.IndexModel{
@@ -1036,7 +1036,7 @@ func main() {
 
 	srv := &authServer{
 		mongoDB:   db,
-		ledger:    coins.NewLedger(mongoClient, "quizbattle"),
+		ledger:    coins.NewLedger(mongoClient, coins.DefaultDBName),
 		rdb:       rdb,
 		amqpConn:  amqpConn,
 		jwtSecret: jwtSecret,
@@ -1058,7 +1058,6 @@ func main() {
 		"/quiz.AuthService/CheckUsername",
 		"/quiz.AuthService/GoogleSignIn",
 	}
-
 
 	grpcServer := grpc.NewServer(
 		grpc.UnaryInterceptor(auth.UnaryInterceptor(jwtSecret, skipMethods)),
