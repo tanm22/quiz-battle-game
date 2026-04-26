@@ -619,8 +619,16 @@ func (s *authServer) processStreak(ctx context.Context, user *models.User) (*pb.
 	ist, _ := time.LoadLocation("Asia/Kolkata")
 	today := time.Now().In(ist).Format("2006-01-02")
 	yesterday := time.Now().In(ist).Add(-24 * time.Hour).Format("2006-01-02")
+	twoDaysAgo := time.Now().In(ist).AddDate(0, 0, -2).Format("2006-01-02")
 
 	streak := user.Streak
+	// freezeConsumed flips true when the gap-day branch consumed a held
+	// streak freeze instead of resetting the streak. Threaded out so the
+	// single UpdateOne below can flip streakFreezeHeld in the same write
+	// — keeping the freeze flag in lock-step with the streak fields means
+	// a crash between them can't desync ("freeze burned but streak reset"
+	// or "streak preserved but freeze still held").
+	freezeConsumed := false
 
 	switch {
 	case streak.LastClaimedDate == today:
@@ -636,14 +644,38 @@ func (s *authServer) processStreak(ctx context.Context, user *models.User) (*pb.
 		streak.LastClaimedDate = today
 
 	default:
-		// CASE C: gap >= 2 days (or first ever login)
+		// CASE C: gap >= 2 days (or first ever login).
+		//
+		// §4.3 (PR 5) streak freeze policy: a held freeze bridges EXACTLY
+		// ONE missed day — the lastClaimed-was-the-day-before-yesterday
+		// case. A user gone longer (3+ days) has the freeze stay held
+		// and the streak resets normally; the freeze remains spendable
+		// for the next time they miss exactly one day. This matches
+		// typical product semantics ("freeze covers a forgotten day,
+		// not a long absence") and keeps the freeze meaningful — without
+		// the gap cap, a 30-day disappearance would burn the freeze for
+		// a +1 advance from a long-stale streak, which doesn't match
+		// what users buy a freeze for.
+		if user.StreakFreezeHeld && streak.LastClaimedDate == twoDaysAgo {
+			streak.Current++
+			if streak.Current > streak.Longest {
+				streak.Longest = streak.Current
+			}
+			streak.LastClaimedDate = today
+			freezeConsumed = true
+			break
+		}
 		streak.Current = 1
 		streak.LastClaimedDate = today
 	}
 
+	update := bson.M{"streak": streak}
+	if freezeConsumed {
+		update["streakFreezeHeld"] = false
+	}
 	res, err := s.users().UpdateOne(ctx,
 		bson.M{"_id": user.ID, "streak.lastClaimedDate": bson.M{"$ne": today}},
-		bson.M{"$set": bson.M{"streak": streak}})
+		bson.M{"$set": update})
 	if err != nil {
 		log.Printf("[auth] streak update error for %s: %v", user.ID, err)
 	}
@@ -652,6 +684,9 @@ func (s *authServer) processStreak(ctx context.Context, user *models.User) (*pb.
 		return toStreakInfo(user.Streak), nil, false
 	}
 	user.Streak = streak
+	if freezeConsumed {
+		user.StreakFreezeHeld = false
+	}
 
 	reward := rewardForDay(streak.Current)
 	return toStreakInfo(streak), reward, true

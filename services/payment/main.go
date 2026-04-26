@@ -36,11 +36,20 @@ type paymentServer struct {
 	amqpConn       *amqp.Connection
 	amqpMu         sync.Mutex // AMQP channels are not thread-safe
 	amqpCh         *amqp.Channel
+	mongoClient    *mongo.Client // bound for the §4.3 PR 5 outbox consumer's collection access
 	mongoDB        *mongo.Database
+	dbName         string // "quizbattle" in prod; mirrors the scoringServer pattern from PR 1
 	jwtSecret      string
 	razorpayKeyID  string
 	razorpaySecret string
 	webhookSecret  string
+}
+
+// users returns the users collection on the configured DB. Mirrors the
+// helper added on scoringServer in PR 1 so the §4.3 PR 5 premium-trial
+// consumer can reach the user document without re-deriving the path.
+func (s *paymentServer) users() *mongo.Collection {
+	return s.mongoClient.Database(s.dbName).Collection("users")
 }
 
 // publish sends a message to the topic exchange with mutex protection.
@@ -602,11 +611,14 @@ func main() {
 		jwtSecret = "quiz-battle-dev-secret"
 	}
 
+	const dbName = "quizbattle"
 	srv := &paymentServer{
 		rdb:            rdb,
 		amqpConn:       conn,
 		amqpCh:         amqpCh,
-		mongoDB:        mongoClient.Database("quizbattle"),
+		mongoClient:    mongoClient,
+		mongoDB:        mongoClient.Database(dbName),
+		dbName:         dbName,
 		jwtSecret:      jwtSecret,
 		razorpayKeyID:  os.Getenv("RAZORPAY_KEY_ID"),
 		razorpaySecret: os.Getenv("RAZORPAY_KEY_SECRET"),
@@ -617,6 +629,11 @@ func main() {
 	go srv.planExpiryWorker(ctx)
 	// Background: 3-day premium expiry pre-warning worker
 	go srv.premiumExpiryWarningWorker(ctx)
+	// §4.3 PR 5: drains coin_effect_outbox rows of kind="premium_trial"
+	// and extends planExpiresAt. The shop's Purchase.Buy enqueues these
+	// inside its session, so the row commits atomically with the coin
+	// debit; this worker processes them as soon as they're visible.
+	srv.startPremiumTrialConsumer(ctx)
 
 	// gRPC server on :50055
 	grpcServer := grpc.NewServer(
