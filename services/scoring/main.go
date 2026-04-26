@@ -46,13 +46,13 @@ type Question struct {
 
 type scoringServer struct {
 	pb.UnimplementedScoringServiceServer
-	rdb          *redis.Client
-	amqpConn     *amqp.Connection
-	amqpCh       *amqp.Channel // for publishing only
-	amqpMu       sync.Mutex    // AMQP channels are not thread-safe
-	mongoDB      *mongo.Database
-	jwtSecret    string
-	selfClient   pb.ScoringServiceClient // gRPC loopback client for CalculateScore
+	rdb        *redis.Client
+	amqpConn   *amqp.Connection
+	amqpCh     *amqp.Channel // for publishing only
+	amqpMu     sync.Mutex    // AMQP channels are not thread-safe
+	mongoDB    *mongo.Database
+	jwtSecret  string
+	selfClient pb.ScoringServiceClient // gRPC loopback client for CalculateScore
 }
 
 // publish sends a message to the topic exchange with mutex protection.
@@ -371,16 +371,16 @@ func (s *scoringServer) GetHomeScreenData(ctx context.Context, _ *pb.GetHomeScre
 
 	return &pb.GetHomeScreenDataResponse{
 		Profile: &pb.UserProfile{
-			UserId:          user.ID,
-			Username:        user.Username,
-			DisplayName:     user.DisplayName,
-			Email:           user.Email,
-			AvatarUrl:       user.AvatarUrl,
-			Rating:          user.Rating,
-			MatchesPlayed:   user.MatchesPlayed,
-			Wins:            user.Wins,
-			Plan:            user.Plan,
-			Coins:           user.Coins,
+			UserId:        user.ID,
+			Username:      user.Username,
+			DisplayName:   user.DisplayName,
+			Email:         user.Email,
+			AvatarUrl:     user.AvatarUrl,
+			Rating:        user.Rating,
+			MatchesPlayed: user.MatchesPlayed,
+			Wins:          user.Wins,
+			Plan:          user.Plan,
+			Coins:         user.Coins,
 			Streak: &pb.StreakInfo{
 				Current:         int32(user.Streak.Current),
 				Longest:         int32(user.Streak.Longest),
@@ -393,8 +393,8 @@ func (s *scoringServer) GetHomeScreenData(ctx context.Context, _ *pb.GetHomeScre
 			PreferredTopics:     user.PreferredTopics,
 			OnboardingCompleted: user.OnboardingCompleted,
 		},
-		QuotaRemaining:    int32(int64(quotaLimit) - quotaUsed),
-		QuotaLimit:        quotaLimit,
+		QuotaRemaining:     int32(int64(quotaLimit) - quotaUsed),
+		QuotaLimit:         quotaLimit,
 		LeaderboardPreview: lbPreview,
 	}, nil
 }
@@ -701,10 +701,10 @@ func (s *scoringServer) processAnswer(ctx context.Context, msg amqp.Delivery) {
 		answerTimeMs = 15000
 	}
 	calcResp, err := s.selfClient.CalculateScore(ctx, &pb.CalculateScoreRequest{
-		RoomId:      answer.RoomID,
-		UserId:      answer.UserID,
-		Round:       int32(answer.Round),
-		OptionIndex: int32(answer.OptionIndex),
+		RoomId:       answer.RoomID,
+		UserId:       answer.UserID,
+		Round:        int32(answer.Round),
+		OptionIndex:  int32(answer.OptionIndex),
 		AnswerTimeMs: answerTimeMs,
 	})
 	if err != nil {
@@ -726,7 +726,7 @@ func (s *scoringServer) processAnswer(ctx context.Context, msg amqp.Delivery) {
 		"correct":         correct,
 		"score":           score,
 		"timestamp":       answer.ServerTimestamp,
-		"clientTimestamp":  answer.ClientTimestamp,
+		"clientTimestamp": answer.ClientTimestamp,
 	})
 	if err != nil {
 		log.Printf("[scoring] failed to marshal answer record: %v", err)
@@ -802,10 +802,10 @@ func getDeathCount(msg amqp.Delivery) int {
 // ---------------------------------------------------------------------------
 
 type matchFinishedEvent struct {
-	RoomID  string              `json:"roomId"`
-	Winner  string              `json:"winner"`
-	Rounds  int                 `json:"rounds"`
-	Players []*pb.PlayerResult  `json:"players"`
+	RoomID  string             `json:"roomId"`
+	Winner  string             `json:"winner"`
+	Rounds  int                `json:"rounds"`
+	Players []*pb.PlayerResult `json:"players"`
 }
 
 func (s *scoringServer) consumeMatchFinished(ctx context.Context) {
@@ -1008,7 +1008,7 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 	}
 
 	// Step 53: Upsert with $setOnInsert to prevent double-writes
-	_, err = s.mongoDB.Collection("match_history").UpdateOne(
+	historyRes, err := s.mongoDB.Collection("match_history").UpdateOne(
 		ctx,
 		bson.M{"roomId": event.RoomID},
 		bson.M{"$setOnInsert": matchDoc},
@@ -1019,6 +1019,11 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 		msg.Nack(false, true)
 		return
 	}
+	// firstInsert is the canonical "this is a fresh match.finished, not a
+	// queue redelivery" signal — UpsertedID is non-nil only on the row's
+	// initial insert. Downstream side-effects that aren't naturally
+	// idempotent (tournament standings $inc) gate on this flag.
+	firstInsert := historyRes.UpsertedID != nil
 
 	// Step 54: Update user stats and Elo ratings
 	// Elo formula: K=32, expected = 1/(1+10^((Rb-Ra)/400))
@@ -1108,6 +1113,24 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 	}
 
 	log.Printf("[persistence] match %s persisted — winner: %s, %d players", event.RoomID, winner, len(entries))
+
+	// Phase 3 (4.2): roll the match score into any active tournaments the
+	// participants are currently entered in. Points-based ranking — every
+	// completed match contributes its raw score to the participant's
+	// tournament standing. The quiz service's finalization worker reads
+	// from tournament_standings to compute top-N when the window closes.
+	//
+	// Gated on firstInsert because $inc isn't idempotent — a queue
+	// redelivery of match.finished (consumer crash before ack, channel
+	// drop mid-flight) would otherwise double the participant's standing
+	// score every time. The match_history $setOnInsert is the canonical
+	// dedup point, so we lean on its UpsertedID rather than introducing a
+	// parallel idempotency mechanism.
+	if firstInsert {
+		s.updateTournamentStandings(ctx, entries, resolveUsername)
+	} else {
+		log.Printf("[persistence] match %s redelivery — skipping tournament standings update", event.RoomID)
+	}
 
 	// Phase 2: Detect first quiz completion for referred users → trigger referral reward
 	for _, e := range entries {
@@ -1327,6 +1350,236 @@ func (s *scoringServer) consumeReferralEvents(ctx context.Context) {
 }
 
 // ---------------------------------------------------------------------------
+// Phase 3 (4.2): Tournament standings + finished-event consumer
+// ---------------------------------------------------------------------------
+
+// updateTournamentStandings rolls each participant's match score into their
+// row in the tournament_standings collection for every tournament whose
+// scoring window is currently open. Called from persistMatch after Elo /
+// user stats have been written so a single match contributes to global
+// ranking and tournament ranking in one unit of work.
+//
+// Window semantics: a tournament counts a match if status="active" AND
+// startTime <= now <= endTime AND the user is in participants[]. A tournament
+// can be in status="upcoming" and still have endTime in the future — those
+// don't count yet. Once the finalization worker flips status="completed",
+// further matches don't accumulate.
+//
+// $inc + upsert is the entire concurrency story: two simultaneous match
+// finishes for the same user in the same tournament both add safely.
+func (s *scoringServer) updateTournamentStandings(
+	ctx context.Context,
+	entries []redis.Z,
+	resolveUsername func(string) string,
+) {
+	if len(entries) == 0 {
+		return
+	}
+
+	userIDs := make([]string, 0, len(entries))
+	scoreByUser := make(map[string]int64, len(entries))
+	for _, e := range entries {
+		uid, ok := e.Member.(string)
+		if !ok || uid == "" {
+			continue
+		}
+		userIDs = append(userIDs, uid)
+		// Per-match score is float (speed multiplier produces fractional
+		// points); tournament aggregate stays int64. Round to nearest so
+		// totals don't drift on long-running tournaments.
+		scoreByUser[uid] = int64(math.Round(e.Score))
+	}
+	if len(userIDs) == 0 {
+		return
+	}
+
+	now := time.Now()
+	cursor, err := s.mongoDB.Collection("tournaments").Find(ctx, bson.M{
+		"status":       "active",
+		"startTime":    bson.M{"$lte": now},
+		"endTime":      bson.M{"$gt": now},
+		"participants": bson.M{"$in": userIDs},
+	})
+	if err != nil {
+		log.Printf("[tournament-standings] tournament lookup failed: %v", err)
+		return
+	}
+	defer cursor.Close(ctx)
+
+	standings := s.mongoDB.Collection("tournament_standings")
+	for cursor.Next(ctx) {
+		var t models.Tournament
+		if err := cursor.Decode(&t); err != nil {
+			log.Printf("[tournament-standings] decode failed: %v", err)
+			continue
+		}
+
+		// Fan out per participating user. Skip users not in this tournament's
+		// roster — the $in filter above is across all returned tournaments,
+		// so a single user might match one tournament but not another.
+		members := make(map[string]struct{}, len(t.Participants))
+		for _, p := range t.Participants {
+			members[p] = struct{}{}
+		}
+
+		for _, uid := range userIDs {
+			if _, in := members[uid]; !in {
+				continue
+			}
+			delta := scoreByUser[uid]
+			_, err := standings.UpdateOne(ctx,
+				bson.M{"tournamentId": t.ID, "userId": uid},
+				bson.M{
+					"$inc": bson.M{
+						"score":         delta,
+						"matchesPlayed": int32(1),
+					},
+					"$set": bson.M{
+						"username":  resolveUsername(uid),
+						"updatedAt": now,
+					},
+					"$setOnInsert": bson.M{
+						"tournamentId": t.ID,
+						"userId":       uid,
+						"createdAt":    now,
+					},
+				},
+				options.UpdateOne().SetUpsert(true),
+			)
+			if err != nil {
+				log.Printf("[tournament-standings] upsert failed for tournament=%s user=%s: %v", t.ID, uid, err)
+			}
+		}
+	}
+}
+
+// consumeTournamentFinished handles tournament.finished events (one per
+// winner) emitted by the quiz service finalization worker. Awards prize
+// coins via $inc and emits a per-user push notification.
+//
+// The quiz service is responsible for idempotency on the publish side
+// (Tournament.WinnersAwarded flag), so this consumer doesn't need its own
+// dedup — a duplicate would only reach us if the publish-side guard fails,
+// in which case the user has bigger problems than a double-coin grant.
+func (s *scoringServer) consumeTournamentFinished(ctx context.Context) {
+	ch, err := s.newChannel()
+	if err != nil {
+		log.Fatalf("[tournament-finished] failed to open channel: %v", err)
+	}
+	defer ch.Close()
+
+	msgs, err := ch.Consume("tournament-finished-queue", "", false, false, false, false, nil)
+	if err != nil {
+		log.Fatalf("[tournament-finished] failed to consume: %v", err)
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case msg, ok := <-msgs:
+			if !ok {
+				return
+			}
+
+			var event struct {
+				TournamentID   string `json:"tournamentId"`
+				TournamentName string `json:"tournamentName"`
+				UserID         string `json:"userId"`
+				Username       string `json:"username"`
+				Rank           int    `json:"rank"`
+				CoinsAwarded   int64  `json:"coinsAwarded"`
+				FinalScore     int64  `json:"finalScore"`
+			}
+			if err := json.Unmarshal(msg.Body, &event); err != nil {
+				log.Printf("[tournament-finished] bad payload: %v", err)
+				msg.Nack(false, false)
+				continue
+			}
+
+			// Idempotent transition on the tournament_payouts work-list:
+			// "pending" or "published" → "paid". A queue redelivery (or a
+			// drain-worker republish of the same payout) hits an already-
+			// "paid" row, sees ModifiedCount == 0, and ack-skips. Only the
+			// thread that wins this UpdateOne actually grants coins.
+			//
+			// This is the dedup point that lets the producer side
+			// re-publish freely on RabbitMQ failure without double-paying.
+			now := time.Now()
+			res, err := s.mongoDB.Collection("tournament_payouts").UpdateOne(ctx,
+				bson.M{
+					"tournamentId": event.TournamentID,
+					"userId":       event.UserID,
+					"status":       bson.M{"$ne": "paid"},
+				},
+				bson.M{"$set": bson.M{"status": "paid", "paidAt": now}},
+			)
+			if err != nil {
+				log.Printf("[tournament-finished] payout transition failed for user=%s tournament=%s: %v", event.UserID, event.TournamentID, err)
+				msg.Nack(false, true)
+				continue
+			}
+			if res.MatchedCount == 0 {
+				// No payout row exists for this (tournament, user) at all.
+				// Either the producer didn't write one (shouldn't happen
+				// under normal flow) or the row was manually pruned. Ack
+				// without granting coins so we don't pay out a phantom
+				// winner; log loudly so an operator can investigate.
+				log.Printf("[tournament-finished] no payout row for user=%s tournament=%s — discarding event", event.UserID, event.TournamentID)
+				msg.Ack(false)
+				continue
+			}
+			if res.ModifiedCount == 0 {
+				// Row exists but was already in "paid" state — this is the
+				// expected redelivery / drain-worker-republish path. Skip.
+				msg.Ack(false)
+				continue
+			}
+
+			if event.CoinsAwarded > 0 {
+				_, err := s.mongoDB.Collection("users").UpdateOne(ctx,
+					bson.M{"_id": event.UserID},
+					bson.M{"$inc": bson.M{"coins": event.CoinsAwarded}},
+				)
+				if err != nil {
+					// We already flipped the payout row to "paid" above —
+					// requeuing would only retry the $inc behind a row
+					// that the redelivery loop will now skip. Log loud
+					// and ack; manual reconciliation needed in this rare
+					// path. A real outbox would close this gap (out of
+					// scope here).
+					log.Printf("[tournament-finished] coin grant failed AFTER payout transition for user=%s tournament=%s: %v — manual reconciliation required", event.UserID, event.TournamentID, err)
+					msg.Ack(false)
+					continue
+				}
+			}
+
+			notifJSON, _ := json.Marshal(map[string]interface{}{
+				"event":          "notif.tournament.finished",
+				"userId":         event.UserID,
+				"username":       event.Username,
+				"tournamentId":   event.TournamentID,
+				"tournamentName": event.TournamentName,
+				"rank":           event.Rank,
+				"coinsAwarded":   event.CoinsAwarded,
+				"finalScore":     event.FinalScore,
+			})
+			// The publish error doesn't change the ack decision — the coin
+			// grant is already committed and requeuing would double-pay.
+			// Logging is the floor so prod triage can see push drops;
+			// durable retry of the FCM event would need its own outbox
+			// (out of scope here).
+			if err := s.publish(ctx, "notif.tournament.finished", notifJSON); err != nil {
+				log.Printf("[tournament-finished] notif publish failed for user=%s tournament=%s: %v", event.UserID, event.TournamentID, err)
+			}
+
+			log.Printf("[tournament-finished] user=%s tournament=%s rank=%d coins=%d", event.UserID, event.TournamentID, event.Rank, event.CoinsAwarded)
+			msg.Ack(false)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
 // RabbitMQ setup
 // ---------------------------------------------------------------------------
 
@@ -1367,6 +1620,28 @@ func setupRabbitMQ(ch *amqp.Channel) error {
 	}
 	if err := ch.QueueBind("push-notification-queue", "notif.#", "sx", false, nil); err != nil {
 		return fmt.Errorf("push-notification queue bind: %w", err)
+	}
+
+	// Phase 3 (4.2): tournament-finished-queue. Quiz service publishes
+	// tournament.finished once per top-N winner when the finalization
+	// worker closes a tournament. We consume to award coins + emit FCM.
+	//
+	// Mirrors the answer-processing-queue dead-letter pattern: a poison
+	// message (e.g. coin grant fails repeatedly because Mongo is down)
+	// gets diverted to tournament-finished-dlq after 3 redeliveries
+	// instead of head-of-line-blocking the queue forever.
+	if _, err := ch.QueueDeclare("tournament-finished-dlq", true, false, false, false, nil); err != nil {
+		return fmt.Errorf("tournament-finished DLQ declare: %w", err)
+	}
+	if _, err := ch.QueueDeclare("tournament-finished-queue", true, false, false, false, amqp.Table{
+		"x-dead-letter-exchange":    "",
+		"x-dead-letter-routing-key": "tournament-finished-dlq",
+		"x-max-delivery-count":      3,
+	}); err != nil {
+		return fmt.Errorf("tournament-finished queue declare: %w", err)
+	}
+	if err := ch.QueueBind("tournament-finished-queue", "tournament.finished", "sx", false, nil); err != nil {
+		return fmt.Errorf("tournament-finished queue bind: %w", err)
 	}
 
 	return nil
@@ -1475,11 +1750,12 @@ func main() {
 	srv.selfClient = pb.NewScoringServiceClient(selfConn)
 
 	// Start RabbitMQ consumers (3 goroutines)
-	go srv.consumeAnswers(ctx)          // 9.5: answer scoring
-	go srv.consumeMatchFinished(ctx)    // 9.6: persistence worker
-	go srv.consumeAnalytics(ctx)        // 9.6 note: analytics stub
-	go srv.consumePaymentCaptured(ctx)  // Phase 2: plan upgrade on payment
-	go srv.consumeReferralEvents(ctx)   // Phase 2: referral reward chain (ISSUE-06)
+	go srv.consumeAnswers(ctx)            // 9.5: answer scoring
+	go srv.consumeMatchFinished(ctx)      // 9.6: persistence worker
+	go srv.consumeAnalytics(ctx)          // 9.6 note: analytics stub
+	go srv.consumePaymentCaptured(ctx)    // Phase 2: plan upgrade on payment
+	go srv.consumeReferralEvents(ctx)     // Phase 2: referral reward chain (ISSUE-06)
+	go srv.consumeTournamentFinished(ctx) // Phase 3 (4.2): tournament prize coin awards
 
 	// Block forever (gRPC server runs in background goroutine)
 	select {}

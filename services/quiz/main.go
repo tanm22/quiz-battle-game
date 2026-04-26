@@ -23,6 +23,7 @@ import (
 
 	"quiz-battle/pkg/auth"
 	"quiz-battle/pkg/keys"
+	"quiz-battle/pkg/models"
 	pb "quiz-battle/proto"
 )
 
@@ -46,17 +47,17 @@ type Question struct {
 
 type quizServer struct {
 	pb.UnimplementedQuizServiceServer
-	rdb          *redis.Client
-	amqpConn     *amqp.Connection
-	amqpCh       *amqp.Channel // for publishing only
-	amqpMu       sync.Mutex    // AMQP channels are not thread-safe
-	mongoDB      *mongo.Database
-	jwtSecret    string
-	gameStreams  sync.Map // "roomId:userId" -> chan *pb.GameEvent
-	roomTimers  sync.Map // roomId -> *time.Timer (for round close)
-	seqCounters sync.Map // roomId -> *atomic.Int64
-	roomDeadlines  sync.Map // roomId -> int64 (current round deadline_unix)
-	roomQuestions  sync.Map // roomId -> []Question
+	rdb           *redis.Client
+	amqpConn      *amqp.Connection
+	amqpCh        *amqp.Channel // for publishing only
+	amqpMu        sync.Mutex    // AMQP channels are not thread-safe
+	mongoDB       *mongo.Database
+	jwtSecret     string
+	gameStreams   sync.Map // "roomId:userId" -> chan *pb.GameEvent
+	roomTimers    sync.Map // roomId -> *time.Timer (for round close)
+	seqCounters   sync.Map // roomId -> *atomic.Int64
+	roomDeadlines sync.Map // roomId -> int64 (current round deadline_unix)
+	roomQuestions sync.Map // roomId -> []Question
 }
 
 // publish sends a message to the topic exchange with mutex protection.
@@ -561,10 +562,10 @@ func (s *quizServer) finishMatch(ctx context.Context, roomID string, totalRounds
 
 	// Publish match.finished to RabbitMQ (consumed by persistence worker + analytics)
 	finishEvent, err := json.Marshal(map[string]interface{}{
-		"roomId":    roomID,
-		"winner":    winner,
-		"rounds":    totalRounds,
-		"players":   playerResults,
+		"roomId":  roomID,
+		"winner":  winner,
+		"rounds":  totalRounds,
+		"players": playerResults,
 	})
 	if err != nil {
 		log.Printf("[quiz] failed to marshal match.finished: %v", err)
@@ -884,6 +885,30 @@ func (s *quizServer) JoinTournament(ctx context.Context, req *pb.JoinTournamentR
 		return nil, status.Error(codes.PermissionDenied, "Tournaments require Premium.")
 	}
 
+	// Reject joins after the entry deadline has passed. Falls back to
+	// startTime when entryDeadline is unset (zero) so legacy seed docs
+	// without the field keep their previous behavior of "join until start".
+	now := time.Now()
+	deadline, _ := tournament["entryDeadline"].(time.Time)
+	if deadline.IsZero() {
+		if st, ok := tournament["startTime"].(time.Time); ok {
+			deadline = st
+		}
+	}
+	if !deadline.IsZero() && now.After(deadline) {
+		return nil, status.Error(codes.FailedPrecondition, "Entry window has closed for this tournament.")
+	}
+	// Reject joins for tournaments that have already ended. status="completed"
+	// alone isn't enough — a tournament can still be in active state past its
+	// endTime if the finalization worker hasn't run yet, and we shouldn't let
+	// stragglers slip in during that race.
+	if et, ok := tournament["endTime"].(time.Time); ok && now.After(et) {
+		return nil, status.Error(codes.FailedPrecondition, "Tournament has ended.")
+	}
+	if statusStr, _ := tournament["status"].(string); statusStr == "completed" {
+		return nil, status.Error(codes.FailedPrecondition, "Tournament has ended.")
+	}
+
 	// Add user to participants
 	s.mongoDB.Collection("tournaments").UpdateOne(ctx,
 		bson.M{"_id": req.TournamentId},
@@ -929,11 +954,23 @@ func (s *quizServer) SubmitAnswer(ctx context.Context, req *pb.SubmitAnswerReque
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// Phase 2: Tournament reminder ticker (every 5 min, ISSUE-09)
+// Phase 2/3: Tournament workers
+//   - reminder ticker  — fires "starting in 30 min" pushes
+//   - finalization     — closes tournaments past endTime, awards prizes
+//   - weekly creator   — auto-spawns one open tournament per ISO week
 // ---------------------------------------------------------------------------
 
+// tournamentReminderTicker fires every minute. The 30-min reminder is a
+// 2-minute window [now+29m, now+31m] keyed off Tournament.ReminderSent.
+//
+// Earlier behavior used a 5-minute tick and a 10-minute window (now+25 to
+// now+35), which silently missed any tournament whose startTime fell into
+// the 5-minute gap between consecutive ticks (any T_start in
+// [tick_n - 5m, tick_n + 0m) — half of all possible times). The 1-minute
+// cadence narrows the slop to ~30 seconds and the tighter window means a
+// reminder lands ~30 minutes ahead, not "somewhere in 25-35 minutes".
 func (s *quizServer) tournamentReminderTicker(ctx context.Context) {
-	ticker := time.NewTicker(5 * time.Minute)
+	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
 	for {
@@ -942,8 +979,8 @@ func (s *quizServer) tournamentReminderTicker(ctx context.Context) {
 			return
 		case <-ticker.C:
 			now := time.Now()
-			windowStart := now.Add(25 * time.Minute)
-			windowEnd := now.Add(35 * time.Minute)
+			windowStart := now.Add(29 * time.Minute)
+			windowEnd := now.Add(31 * time.Minute)
 
 			cursor, err := s.mongoDB.Collection("tournaments").Find(ctx, bson.M{
 				"startTime":    bson.M{"$gte": windowStart, "$lte": windowEnd},
@@ -993,6 +1030,427 @@ func (s *quizServer) tournamentReminderTicker(ctx context.Context) {
 	}
 }
 
+// tournamentFinalizationWorker runs every minute and closes tournaments
+// whose scoring window has ended. For each, it:
+//  1. Reads the top-N entries from tournament_standings (N = len(prizePool)).
+//  2. Publishes one `tournament.finished` event per winner with their rank
+//     and coin reward — consumed by the scoring service which writes the
+//     coin grant + emits notif.tournament.finished.
+//  3. Flips the tournament to status="completed" with winnersAwarded=true.
+//     Both flags are set in a single $set so the worker can re-poll safely:
+//     the next poll won't see this row because the filter requires
+//     winnersAwarded=false.
+//
+// Tournaments with empty prizePool still get marked completed, just without
+// any payouts — a "for fun" leaderboard mode. The finishing event fans out
+// to all participants in that case (zero coins) so they still see the FCM.
+func (s *quizServer) tournamentFinalizationWorker(ctx context.Context) {
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			now := time.Now()
+			s.promoteUpcomingTournaments(ctx, now)
+			s.finalizeExpiredTournaments(ctx, now)
+		}
+	}
+}
+
+// promoteUpcomingTournaments flips status="upcoming" → "active" for any
+// tournament whose start time has arrived. Without this, the scoring
+// service's standings updater (which filters on status="active") would
+// silently ignore matches played during the scoring window.
+func (s *quizServer) promoteUpcomingTournaments(ctx context.Context, now time.Time) {
+	res, err := s.mongoDB.Collection("tournaments").UpdateMany(ctx,
+		bson.M{
+			"status":    "upcoming",
+			"startTime": bson.M{"$lte": now},
+			"endTime":   bson.M{"$gt": now},
+		},
+		bson.M{"$set": bson.M{"status": "active"}},
+	)
+	if err != nil {
+		log.Printf("[quiz] promote upcoming→active failed: %v", err)
+		return
+	}
+	if res.ModifiedCount > 0 {
+		log.Printf("[quiz] promoted %d tournament(s) to active", res.ModifiedCount)
+	}
+}
+
+func (s *quizServer) finalizeExpiredTournaments(ctx context.Context, now time.Time) {
+	cursor, err := s.mongoDB.Collection("tournaments").Find(ctx, bson.M{
+		"status":         bson.M{"$in": []string{"upcoming", "active"}},
+		"endTime":        bson.M{"$lte": now},
+		"winnersAwarded": false,
+	})
+	if err != nil {
+		log.Printf("[quiz] finalize: tournament lookup failed: %v", err)
+		return
+	}
+	defer cursor.Close(ctx)
+
+	for cursor.Next(ctx) {
+		var t models.Tournament
+		if err := cursor.Decode(&t); err != nil {
+			log.Printf("[quiz] finalize: decode failed: %v", err)
+			continue
+		}
+
+		// Three-phase finalize, ordered specifically so any partial failure
+		// leaves the tournament eligible for a clean retry on the next tick:
+		//
+		//   Phase 1 — persist payouts. $setOnInsert on (tournamentId, userId)
+		//             is idempotent both for re-runs after a crash and for
+		//             two parallel finalizers racing on the same tournament.
+		//             Any error here aborts BEFORE the flip, so the
+		//             tournament keeps winnersAwarded=false and the next
+		//             tick re-enters from scratch.
+		//
+		//   Phase 2 — atomic claim flip. The race guard between parallel
+		//             finalizers — both finished phase 1 (idempotently),
+		//             only one wins this UpdateOne and proceeds to publish.
+		//             The loser sees ModifiedCount=0 and skips: its phase 1
+		//             work was the same upserts the winner just did, so no
+		//             harm done.
+		//
+		//   Phase 3 — immediate publish from the in-memory list built in
+		//             phase 1. Failures here leave individual rows in
+		//             status="pending"; the drain worker (1-min tick) keeps
+		//             re-publishing them until they succeed.
+		//
+		// Earlier ordering (flip → standings query → write+publish) had a
+		// durability gap: a Mongo error between the flip and the payout
+		// write would strand the tournament with winnersAwarded=true and
+		// zero payout rows, invisible to both the next finalize tick (filter
+		// excludes it) and the drain worker (no rows to find).
+
+		// Build winner cap. When prizePool is empty we still emit a
+		// finished event for every participant with zero coins so they get
+		// the closing notification. If neither is populated (admin error or
+		// fully unattended tournament), there's nothing to publish — skip.
+		topN := len(t.PrizePool)
+		if topN == 0 {
+			topN = len(t.Participants)
+		}
+		if topN == 0 {
+			// Nothing to pay out. Still flip so the row drops out of the
+			// finalize filter — otherwise we'd re-cursor it every minute.
+			// Mongo errors are non-fatal: next tick re-attempts the flip,
+			// the cost is just a noisy log line per tick until it succeeds.
+			if _, err := s.mongoDB.Collection("tournaments").UpdateOne(ctx,
+				bson.M{"_id": t.ID, "winnersAwarded": false},
+				bson.M{"$set": bson.M{"winnersAwarded": true, "status": "completed"}},
+			); err != nil {
+				log.Printf("[quiz] finalize: empty-payout flip failed for %s: %v", t.ID, err)
+				continue
+			}
+			log.Printf("[quiz] finalize: tournament %s closed with no participants and no prize pool", t.ID)
+			continue
+		}
+
+		// Phase 1: pull standings sorted by score desc, capped at topN, and
+		// persist each as a pending payout. Build the in-memory list as we
+		// go for phase 3.
+		findOpts := options.Find().SetSort(bson.M{"score": -1}).SetLimit(int64(topN))
+		standingsCursor, err := s.mongoDB.Collection("tournament_standings").Find(ctx,
+			bson.M{"tournamentId": t.ID},
+			findOpts,
+		)
+		if err != nil {
+			log.Printf("[quiz] finalize: standings lookup failed for %s: %v", t.ID, err)
+			continue
+		}
+
+		payouts := make([]models.TournamentPayout, 0, topN)
+		writeFailed := false
+		rank := 0
+		for standingsCursor.Next(ctx) {
+			var st models.TournamentStanding
+			if err := standingsCursor.Decode(&st); err != nil {
+				continue
+			}
+			rank++
+
+			var coins int64
+			if rank-1 < len(t.PrizePool) {
+				coins = t.PrizePool[rank-1]
+			}
+
+			payout := models.TournamentPayout{
+				TournamentID:   t.ID,
+				TournamentName: t.Name,
+				UserID:         st.UserID,
+				Username:       st.Username,
+				Rank:           rank,
+				CoinsAwarded:   coins,
+				FinalScore:     st.Score,
+				Status:         "pending",
+				CreatedAt:      now,
+			}
+			if _, err := s.mongoDB.Collection("tournament_payouts").UpdateOne(ctx,
+				bson.M{"tournamentId": t.ID, "userId": st.UserID},
+				bson.M{"$setOnInsert": bson.M{
+					"tournamentId":   payout.TournamentID,
+					"tournamentName": payout.TournamentName,
+					"userId":         payout.UserID,
+					"username":       payout.Username,
+					"rank":           payout.Rank,
+					"coinsAwarded":   payout.CoinsAwarded,
+					"finalScore":     payout.FinalScore,
+					"status":         payout.Status,
+					"createdAt":      payout.CreatedAt,
+				}},
+				options.UpdateOne().SetUpsert(true),
+			); err != nil {
+				// Fail loud and abort this tournament. winnersAwarded stays
+				// false, so the next tick re-runs phase 1 from scratch —
+				// $setOnInsert no-ops the rows that already landed and
+				// inserts the missing ones.
+				log.Printf("[quiz] finalize: payout upsert failed for tournament=%s user=%s: %v — aborting (will retry next tick)", t.ID, st.UserID, err)
+				writeFailed = true
+				break
+			}
+			payouts = append(payouts, payout)
+		}
+		standingsCursor.Close(ctx)
+
+		if writeFailed {
+			continue
+		}
+
+		// Phase 2: atomic claim flip. Loser of a parallel race sees
+		// ModifiedCount=0; the winner is the publisher of record.
+		res, err := s.mongoDB.Collection("tournaments").UpdateOne(ctx,
+			bson.M{"_id": t.ID, "winnersAwarded": false},
+			bson.M{"$set": bson.M{"winnersAwarded": true, "status": "completed"}},
+		)
+		if err != nil {
+			log.Printf("[quiz] finalize: claim flip failed for %s: %v — payouts persisted, will retry on next tick", t.ID, err)
+			continue
+		}
+		if res.ModifiedCount == 0 {
+			// Parallel finalizer already won the claim and is responsible
+			// for publishing. Our phase 1 was idempotent so no inconsistency.
+			continue
+		}
+
+		// Phase 3: publish from the persisted set.
+		for _, p := range payouts {
+			s.publishTournamentPayout(ctx, p)
+		}
+
+		log.Printf("[quiz] finalized tournament %s (%s): %d payouts persisted", t.ID, t.Name, rank)
+	}
+}
+
+// publishTournamentPayout fires one tournament.finished event for a single
+// payout row and flips its status from "pending" to "published" on
+// successful publish. Used by both the immediate-publish path in
+// finalizeExpiredTournaments and the drain worker's retry path.
+//
+// Idempotency on the consumer side is the scoring service's check-then-set
+// transition (status:{$ne:"paid"} → "paid"). Re-publishing the same payout
+// is therefore safe; this function leaves the row as "pending" if publish
+// fails, ensuring the drain worker retries.
+func (s *quizServer) publishTournamentPayout(ctx context.Context, p models.TournamentPayout) {
+	payload, _ := json.Marshal(map[string]interface{}{
+		"event":          "tournament.finished",
+		"tournamentId":   p.TournamentID,
+		"tournamentName": p.TournamentName,
+		"userId":         p.UserID,
+		"username":       p.Username,
+		"rank":           p.Rank,
+		"coinsAwarded":   p.CoinsAwarded,
+		"finalScore":     p.FinalScore,
+	})
+	if err := s.publish(ctx, "tournament.finished", payload); err != nil {
+		log.Printf("[quiz] tournament.finished publish failed for tournament=%s user=%s: %v", p.TournamentID, p.UserID, err)
+		return
+	}
+
+	// Status flip is best-effort breadcrumb for the drain worker. The
+	// consumer-side transition on tournament_payouts.status is what
+	// actually drives coin grants, so even if this UpdateOne fails the
+	// pipeline still works — at worst the drain worker re-publishes a
+	// message the consumer already handled, which is a no-op due to
+	// the {$ne:"paid"} guard.
+	publishedAt := time.Now()
+	if _, err := s.mongoDB.Collection("tournament_payouts").UpdateOne(ctx,
+		bson.M{"tournamentId": p.TournamentID, "userId": p.UserID, "status": "pending"},
+		bson.M{"$set": bson.M{"status": "published", "publishedAt": publishedAt}},
+	); err != nil {
+		log.Printf("[quiz] payout publish-flag update failed for tournament=%s user=%s: %v", p.TournamentID, p.UserID, err)
+	}
+}
+
+// tournamentPayoutDrainWorker re-publishes any payout still in "pending"
+// state. Drives the at-least-once delivery guarantee for tournament.finished
+// events: if the immediate publish from finalizeExpiredTournaments failed
+// (RabbitMQ blip, channel drop, broker overload), this worker keeps trying
+// every minute until the row transitions to "published".
+func (s *quizServer) tournamentPayoutDrainWorker(ctx context.Context) {
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			s.drainPendingPayouts(ctx)
+		}
+	}
+}
+
+// drainBatchSize bounds how many pending payouts a single drain tick will
+// attempt. Without it, a multi-day RabbitMQ outage that stranded thousands
+// of rows would blast the whole backlog through one publish-mutex'd channel
+// on a single tick — likely timing out and saturating the broker on
+// recovery. 500 is an arbitrary safe number; subsequent ticks pick up
+// whatever the previous one didn't reach. Real exponential backoff per row
+// (lastAttemptedAt + nextAttemptAt) is a follow-up.
+const drainBatchSize = 500
+
+func (s *quizServer) drainPendingPayouts(ctx context.Context) {
+	cursor, err := s.mongoDB.Collection("tournament_payouts").Find(ctx,
+		bson.M{"status": "pending"},
+		options.Find().SetLimit(drainBatchSize),
+	)
+	if err != nil {
+		log.Printf("[quiz] drain: pending payout lookup failed: %v", err)
+		return
+	}
+	defer cursor.Close(ctx)
+
+	for cursor.Next(ctx) {
+		var p models.TournamentPayout
+		if err := cursor.Decode(&p); err != nil {
+			log.Printf("[quiz] drain: decode failed: %v", err)
+			continue
+		}
+		s.publishTournamentPayout(ctx, p)
+	}
+}
+
+// weeklyTournamentCron ensures there is at least one open free-tier
+// tournament running each ISO week. Runs hourly so a fresh deployment
+// fills in the current week within an hour and recurring weeks roll over
+// automatically. The weekly slot is keyed by ISO year+week to make the
+// "already created this week" check trivial and timezone-stable.
+//
+// Schedule: Saturday 18:00 IST → Sunday 23:59 IST. Entry deadline is the
+// start time (joins close when scoring opens), prize pool is fixed at
+// [500, 300, 100] coins for top 3.
+//
+// Idempotency: the cron writes with bson.M{"weekKey": ...} as a unique
+// natural key. The seed/main.go index ensures only one auto-generated
+// tournament per weekKey can ever exist.
+func (s *quizServer) weeklyTournamentCron(ctx context.Context) {
+	// Tick once on startup so a fresh deployment doesn't wait an hour for
+	// the first run; subsequent ticks happen hourly.
+	s.ensureCurrentWeekTournament(ctx, time.Now())
+
+	ticker := time.NewTicker(1 * time.Hour)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			s.ensureCurrentWeekTournament(ctx, time.Now())
+		}
+	}
+}
+
+func (s *quizServer) ensureCurrentWeekTournament(ctx context.Context, now time.Time) {
+	istLocation, err := time.LoadLocation("Asia/Kolkata")
+	if err != nil {
+		// Fallback: the host's local time. The scheduling math still works,
+		// the tournament times will just be off by a TZ offset.
+		istLocation = time.Local
+	}
+	istNow := now.In(istLocation)
+	year, week := istNow.ISOWeek()
+	weekKey := fmt.Sprintf("%d-W%02d", year, week)
+
+	// Saturday 18:00 IST of the current ISO week.
+	// ISO weeks start Monday — find the Monday at 00:00 IST, then add 5d18h.
+	weekday := int(istNow.Weekday())
+	if weekday == 0 {
+		weekday = 7 // Sunday → 7 in ISO
+	}
+	monday := time.Date(istNow.Year(), istNow.Month(), istNow.Day(), 0, 0, 0, 0, istLocation).
+		AddDate(0, 0, -(weekday - 1))
+	startTime := monday.Add(5*24*time.Hour + 18*time.Hour) // Saturday 18:00 IST
+	endTime := startTime.Add(30 * time.Hour)               // Sunday 23:59:59 IST-ish
+
+	// Skip weeks where the slot has already passed — no point spawning a
+	// tournament that's already over before anyone could join.
+	if endTime.Before(istNow) {
+		return
+	}
+
+	// Compute the initial status at write time. Without this, a quiz
+	// service restart inside the active window (e.g. Sat 19:00 IST when
+	// startTime was Sat 18:00 IST) would create a fresh tournament doc
+	// with status="upcoming" — the standings updater filters on
+	// status="active", so any matches played in the gap before
+	// promoteUpcomingTournaments fires (~1 min later) would silently
+	// fail to score against this tournament.
+	initialStatus := "upcoming"
+	if !startTime.After(istNow) && endTime.After(istNow) {
+		initialStatus = "active"
+	}
+
+	doc := models.Tournament{
+		Name:             fmt.Sprintf("Weekly Open — %s", weekKey),
+		StartTime:        startTime,
+		EndTime:          endTime,
+		EntryDeadline:    startTime,
+		Status:           initialStatus,
+		Participants:     []string{},
+		RequiredPlan:     "free",
+		PrizeDescription: "Top 3 win 500 / 300 / 100 coins",
+		PrizePool:        []int64{500, 300, 100},
+		AutoGenerated:    true,
+		CreatedAt:        now,
+	}
+
+	// Upsert keyed by (autoGenerated, weekKey). The weekKey field is used
+	// only for idempotency lookup — it never appears in client responses.
+	_, err = s.mongoDB.Collection("tournaments").UpdateOne(ctx,
+		bson.M{"autoGenerated": true, "weekKey": weekKey},
+		bson.M{
+			"$setOnInsert": bson.M{
+				"name":             doc.Name,
+				"startTime":        doc.StartTime,
+				"endTime":          doc.EndTime,
+				"entryDeadline":    doc.EntryDeadline,
+				"status":           doc.Status,
+				"participants":     doc.Participants,
+				"requiredPlan":     doc.RequiredPlan,
+				"prizeDescription": doc.PrizeDescription,
+				"prizePool":        doc.PrizePool,
+				"autoGenerated":    true,
+				"weekKey":          weekKey,
+				"createdAt":        doc.CreatedAt,
+				"reminderSent":     false,
+				"winnersAwarded":   false,
+			},
+		},
+		options.UpdateOne().SetUpsert(true),
+	)
+	if err != nil {
+		log.Printf("[quiz] weekly tournament upsert failed for %s: %v", weekKey, err)
+		return
+	}
+}
+
 func setupRabbitMQ(ch *amqp.Channel) error {
 	// Ensure sx exchange exists
 	if err := ch.ExchangeDeclare("sx", "topic", true, false, false, false, nil); err != nil {
@@ -1001,9 +1459,9 @@ func setupRabbitMQ(ch *amqp.Channel) error {
 
 	// answer-processing-queue with DLQ (consumed by scoring service)
 	_, err := ch.QueueDeclare("answer-processing-queue", true, false, false, false, amqp.Table{
-		"x-dead-letter-exchange":  "",
+		"x-dead-letter-exchange":    "",
 		"x-dead-letter-routing-key": "answer-processing-dlq",
-		"x-max-delivery-count":   3,
+		"x-max-delivery-count":      3,
 	})
 	if err != nil {
 		return fmt.Errorf("answer queue declare: %w", err)
@@ -1269,11 +1727,14 @@ func main() {
 		jwtSecret: jwtSecret,
 	}
 
-	// Start RabbitMQ consumers
+	// Start RabbitMQ consumers + tournament workers
 	go srv.consumeMatchCreated(ctx)
 	go srv.consumeRoundCompleted(ctx)
 	go srv.consumeLeaderboardUpdated(ctx)
 	go srv.tournamentReminderTicker(ctx)
+	go srv.tournamentFinalizationWorker(ctx) // Phase 3 (4.2): close expired tournaments
+	go srv.tournamentPayoutDrainWorker(ctx)  // Phase 3 (4.2): retry stuck pending payouts
+	go srv.weeklyTournamentCron(ctx)         // Phase 3 (4.2): spawn weekly free tournament
 
 	grpcServer := grpc.NewServer(
 		grpc.UnaryInterceptor(auth.UnaryInterceptor(jwtSecret, nil)),

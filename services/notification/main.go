@@ -220,6 +220,67 @@ func buildMessage(event string, payload map[string]any) (string, string, map[str
 			fmt.Sprintf("%s begins in %d minutes.", tname, mins),
 			data
 
+	case "notif.tournament.finished":
+		// Phase 3 (4.2): emitted by scoring service after the quiz finalization
+		// worker publishes per-winner tournament.finished events. Every
+		// participant we awarded (top-N) gets one of these — top of the
+		// payload table when it's a coin win, polite "thanks for playing"
+		// when coinsAwarded == 0 (participant outside the prize pool).
+		tname := strField(payload, "tournamentName")
+		rank := intField(payload, "rank")
+		coins := intField(payload, "coinsAwarded")
+		if tname == "" {
+			tname = "Your tournament"
+		}
+		data["tournamentName"] = tname
+		data["rank"] = strconv.FormatInt(rank, 10)
+		data["coinsAwarded"] = strconv.FormatInt(coins, 10)
+		if coins > 0 {
+			medal := "🏆"
+			if rank == 2 {
+				medal = "🥈"
+			} else if rank == 3 {
+				medal = "🥉"
+			} else if rank > 3 {
+				medal = "🎖️"
+			}
+			return fmt.Sprintf("%s Tournament finished", medal),
+				fmt.Sprintf("You finished #%d in %s and earned %d coins!", rank, tname, coins),
+				data
+		}
+		return "🏁 Tournament finished",
+			fmt.Sprintf("%s wrapped up. You finished #%d — better luck next round!", tname, rank),
+			data
+
+	case "notif.tournament.rank_changed":
+		// Reserved for the live-leaderboard rank-shift event. The publisher
+		// (currently a TODO — would live in the scoring service after each
+		// standings update) sends tournamentName, oldRank, newRank. We
+		// render a non-spammy summary; the per-day cap and dedup live in
+		// the notification policy layer (problem-03 4.6, separate PR).
+		tname := strField(payload, "tournamentName")
+		oldRank := intField(payload, "oldRank")
+		newRank := intField(payload, "newRank")
+		if tname == "" {
+			tname = "Your tournament"
+		}
+		data["tournamentName"] = tname
+		data["oldRank"] = strconv.FormatInt(oldRank, 10)
+		data["newRank"] = strconv.FormatInt(newRank, 10)
+		if newRank > 0 && oldRank > 0 && newRank < oldRank {
+			return "📈 You moved up",
+				fmt.Sprintf("You're now #%d in %s (up from #%d). Keep going!", newRank, tname, oldRank),
+				data
+		}
+		if newRank > 0 && oldRank > 0 && newRank > oldRank {
+			return "📉 Rank update",
+				fmt.Sprintf("You dropped to #%d in %s — play another match to climb back.", newRank, tname),
+				data
+		}
+		return "🏟️ Tournament update",
+			fmt.Sprintf("Your standing in %s changed.", tname),
+			data
+
 	case "notif.match.invite":
 		name := strField(payload, "inviterName")
 		rating := intField(payload, "inviterRating")
