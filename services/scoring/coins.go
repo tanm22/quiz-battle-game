@@ -26,6 +26,11 @@ const (
 	referralRefereeCoins  int64 = 50
 )
 
+// errBadReferralPayload marks unrecoverable parse / shape errors on a
+// referral message so the consumer can dead-letter it instead of looping
+// the same broken payload forever.
+var errBadReferralPayload = errors.New("bad referral payload")
+
 // GetCoinBalance returns the authenticated user's cached balance from
 // users.coins. The cache is kept consistent with coin_ledger by every
 // Grant's transaction (ADR-0001), so this is a single-document read.
@@ -36,6 +41,9 @@ func (s *scoringServer) GetCoinBalance(ctx context.Context, _ *pb.GetCoinBalance
 	}
 	bal, err := s.ledger.GetBalance(ctx, userID)
 	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, status.Error(codes.NotFound, "user not found")
+		}
 		return nil, status.Errorf(codes.Internal, "load balance: %v", err)
 	}
 	return &pb.GetCoinBalanceResponse{Balance: bal}, nil
@@ -57,10 +65,10 @@ func (s *scoringServer) handleReferralEvent(ctx context.Context, body []byte) er
 		RefereeName string `json:"refereeName"`
 	}
 	if err := json.Unmarshal(body, &event); err != nil {
-		return fmt.Errorf("decode payload: %w", err)
+		return fmt.Errorf("%w: decode: %v", errBadReferralPayload, err)
 	}
 	if event.ReferrerID == "" || event.RefereeID == "" {
-		return fmt.Errorf("missing referrerId or refereeId: %+v", event)
+		return fmt.Errorf("%w: missing referrerId or refereeId: %+v", errBadReferralPayload, event)
 	}
 
 	var ref struct {

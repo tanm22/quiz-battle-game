@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -1305,8 +1306,15 @@ func (s *scoringServer) consumeReferralEvents(ctx context.Context) {
 				return
 			}
 			if err := s.handleReferralEvent(ctx, msg.Body); err != nil {
+				if errors.Is(err, errBadReferralPayload) {
+					log.Printf("[referral-consumer] bad payload, dropping: %v body=%s", err, string(msg.Body))
+					msg.Nack(false, false)
+					continue
+				}
 				log.Printf("[referral-consumer] error: %v body=%s", err, string(msg.Body))
-				msg.Nack(false, true) // requeue once; broker eventually dead-letters poison messages
+				// Transient error — requeue. The queue's x-max-delivery-count
+				// dead-letters the message after repeated failures.
+				msg.Nack(false, true)
 				continue
 			}
 			msg.Ack(false)
@@ -1571,8 +1579,17 @@ func setupRabbitMQ(ch *amqp.Channel) error {
 		return fmt.Errorf("payment queue bind: %w", err)
 	}
 
-	// Phase 2: referral-event-queue (consumed by this service to grant rewards)
-	if _, err := ch.QueueDeclare("referral-event-queue", true, false, false, false, nil); err != nil {
+	// Phase 2: referral-event-queue (consumed by this service to grant rewards).
+	// Mirrors the tournament-finished DLQ pattern: a poison message would
+	// otherwise head-of-line-block the queue forever once we requeue on error.
+	if _, err := ch.QueueDeclare("referral-event-dlq", true, false, false, false, nil); err != nil {
+		return fmt.Errorf("referral DLQ declare: %w", err)
+	}
+	if _, err := ch.QueueDeclare("referral-event-queue", true, false, false, false, amqp.Table{
+		"x-dead-letter-exchange":    "",
+		"x-dead-letter-routing-key": "referral-event-dlq",
+		"x-max-delivery-count":      3,
+	}); err != nil {
 		return fmt.Errorf("referral queue declare: %w", err)
 	}
 	if err := ch.QueueBind("referral-event-queue", "referral.*", "sx", false, nil); err != nil {
@@ -1676,8 +1693,8 @@ func main() {
 		rdb:       rdb,
 		amqpConn:  conn,
 		amqpCh:    amqpCh,
-		mongoDB:   mongoClient.Database("quizbattle"),
-		ledger:    coins.NewLedger(mongoClient, "quizbattle"),
+		mongoDB:   mongoClient.Database(coins.DefaultDBName),
+		ledger:    coins.NewLedger(mongoClient, coins.DefaultDBName),
 		jwtSecret: jwtSecret,
 	}
 
