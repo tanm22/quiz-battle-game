@@ -15,6 +15,7 @@ import '../proto/quiz.pbgrpc.dart';
 import 'coin_ledger_screen.dart';
 import 'shop/equip_screen.dart';
 import 'shop/shop_screen.dart';
+import 'profile_analytics_screen.dart';
 import 'match_history_screen.dart';
 import 'payment_screen.dart';
 import 'profile/edit_profile_screen.dart';
@@ -607,6 +608,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               builder: (_) => MatchHistoryScreen(currentUserId: gameState.userId ?? ''),
             ));
           }),
+          const SizedBox(height: 8),
+          _profileActionButton(Icons.insights, 'Stats & Recap', () {
+            Navigator.push(context, MaterialPageRoute(
+              builder: (_) => const ProfileAnalyticsScreen(),
+            ));
+          }, color: AppColors.accent),
           const SizedBox(height: 8),
           _profileActionButton(Icons.storefront, 'Coin Shop', () {
             Navigator.push(context, MaterialPageRoute(builder: (_) => const ShopScreen()));
