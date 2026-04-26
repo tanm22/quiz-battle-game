@@ -159,6 +159,18 @@ func main() {
 	}
 	log.Println("[seed] coin_ledger indexes ensured")
 
+	// PR 4 (§4.3 Shop): the effect outbox is consumed by services/payment in
+	// PR 5 to extend planExpiresAt for premium-trial purchases. The (kind,
+	// processedAt asc) index lets the dequeuer's "find unprocessed by kind,
+	// oldest first" query hit a covered scan.
+	if _, err := db.Collection("coin_effect_outbox").Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    bson.D{{Key: "processedAt", Value: 1}, {Key: "kind", Value: 1}},
+		Options: options.Index().SetName("idx_outbox_due"),
+	}); err != nil {
+		log.Fatalf("[seed] coin_effect_outbox index: %v", err)
+	}
+	log.Println("[seed] coin_effect_outbox index ensured")
+
 	log.Println("[seed] indexes created")
 
 	// --- Seed questions ---

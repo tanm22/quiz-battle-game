@@ -91,14 +91,8 @@ func (l *Ledger) ledger() *mongo.Collection {
 // Returns ErrInsufficientBalance if a negative delta would drive coins below
 // zero; the transaction aborts and balance is preserved.
 func (l *Ledger) Grant(ctx context.Context, userID string, delta int64, reason, refID string, metadata map[string]string) (*LedgerEntry, error) {
-	if delta == 0 {
-		return nil, ErrAmountInvalid
-	}
-	if _, ok := validReasons[reason]; !ok {
-		return nil, ErrUnknownReason
-	}
-	if refID == "" {
-		return nil, ErrMissingRefID
+	if err := validateGrantInputs(delta, reason, refID); err != nil {
+		return nil, err
 	}
 
 	// Fast path: idempotent replay. Skips the transaction overhead when we
@@ -119,34 +113,7 @@ func (l *Ledger) Grant(ctx context.Context, userID string, delta int64, reason, 
 	defer session.EndSession(ctx)
 
 	result, err := session.WithTransaction(ctx, func(sc context.Context) (any, error) {
-		var user struct {
-			Coins int64 `bson:"coins"`
-		}
-		if err := l.users().FindOne(sc, bson.M{"_id": userID}).Decode(&user); err != nil {
-			return nil, fmt.Errorf("load user: %w", err)
-		}
-		if delta < 0 && user.Coins+delta < 0 {
-			return nil, ErrInsufficientBalance
-		}
-
-		entry := &LedgerEntry{
-			ID:           bson.NewObjectID().Hex(),
-			UserID:       userID,
-			Delta:        delta,
-			Reason:       reason,
-			RefID:        refID,
-			BalanceAfter: user.Coins + delta,
-			Metadata:     metadata,
-			CreatedAt:    time.Now().UTC(),
-		}
-		if _, err := l.ledger().InsertOne(sc, entry); err != nil {
-			return nil, fmt.Errorf("insert ledger: %w", err)
-		}
-		if _, err := l.users().UpdateOne(sc, bson.M{"_id": userID},
-			bson.M{"$inc": bson.M{"coins": delta}}); err != nil {
-			return nil, fmt.Errorf("inc balance: %w", err)
-		}
-		return entry, nil
+		return l.GrantInSession(sc, userID, delta, reason, refID, metadata)
 	})
 	if err != nil {
 		// Concurrent identical grant: the unique index rejected our insert.
@@ -159,6 +126,68 @@ func (l *Ledger) Grant(ctx context.Context, userID string, delta int64, reason, 
 		return nil, err
 	}
 	return result.(*LedgerEntry), nil
+}
+
+// GrantInSession is the session-scoped variant of Grant: it performs the
+// balance check, ledger insert, and users.$inc against the supplied session
+// context (sc) without opening a new session. Use this when the caller is
+// already running inside its own WithTransaction and wants the ledger writes
+// to commit atomically with other side-effects (e.g. shop inventory mutations
+// in pkg/coins/shop.Purchase.Buy).
+//
+// The caller is responsible for the surrounding session lifecycle, including
+// translating duplicate-key errors into idempotency hits — GrantInSession
+// itself does not consult the (userId, refId, reason) fast path so concurrent
+// racers will surface mongo.IsDuplicateKeyError out of the InsertOne, which
+// the outer Grant/Buy translates into "fetch the winner and return it".
+//
+// Returns ErrInsufficientBalance for negative deltas that would underflow
+// coins; aborting via the returned error rolls back the transaction.
+func (l *Ledger) GrantInSession(sc context.Context, userID string, delta int64, reason, refID string, metadata map[string]string) (*LedgerEntry, error) {
+	if err := validateGrantInputs(delta, reason, refID); err != nil {
+		return nil, err
+	}
+	var user struct {
+		Coins int64 `bson:"coins"`
+	}
+	if err := l.users().FindOne(sc, bson.M{"_id": userID}).Decode(&user); err != nil {
+		return nil, fmt.Errorf("load user: %w", err)
+	}
+	if delta < 0 && user.Coins+delta < 0 {
+		return nil, ErrInsufficientBalance
+	}
+
+	entry := &LedgerEntry{
+		ID:           bson.NewObjectID().Hex(),
+		UserID:       userID,
+		Delta:        delta,
+		Reason:       reason,
+		RefID:        refID,
+		BalanceAfter: user.Coins + delta,
+		Metadata:     metadata,
+		CreatedAt:    time.Now().UTC(),
+	}
+	if _, err := l.ledger().InsertOne(sc, entry); err != nil {
+		return nil, fmt.Errorf("insert ledger: %w", err)
+	}
+	if _, err := l.users().UpdateOne(sc, bson.M{"_id": userID},
+		bson.M{"$inc": bson.M{"coins": delta}}); err != nil {
+		return nil, fmt.Errorf("inc balance: %w", err)
+	}
+	return entry, nil
+}
+
+func validateGrantInputs(delta int64, reason, refID string) error {
+	if delta == 0 {
+		return ErrAmountInvalid
+	}
+	if _, ok := validReasons[reason]; !ok {
+		return ErrUnknownReason
+	}
+	if refID == "" {
+		return ErrMissingRefID
+	}
+	return nil
 }
 
 func (l *Ledger) findExisting(ctx context.Context, userID, refID, reason string) (*LedgerEntry, error) {
