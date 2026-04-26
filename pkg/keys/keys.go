@@ -23,6 +23,14 @@ const (
 	WebhookIdempotency = "webhook:idempotency:%s"
 	// Notifications
 	MatchInviteThrottleKey = "match_invite:%s:%s" // fromUserID, toUserID
+	// Phase 3 (4.4): friend challenge throttle so one challenger can't
+	// spam-fire challenges at the same friend. Key per (from, to) pair,
+	// 60-second TTL set on send.
+	ChallengeThrottleKey = "challenge:throttle:%s:%s" // fromUserID, toUserID
+	// Phase 3 (4.4): online-presence TTL key. SET with 60s expiry on
+	// every Heartbeat RPC; GetFriendsList reads via EXISTS-equivalent
+	// (a non-zero TTL key means "online within the last minute").
+	PresenceKey = "presence:%s" // userID
 )
 
 // Key helper functions — one function per key to prevent fmt.Sprintf typos.
@@ -87,4 +95,16 @@ func WebhookIdem(paymentID string) string {
 // notif.match.invite push. Held for 30 min to avoid spamming the same opponent.
 func MatchInviteThrottle(fromUserID, toUserID string) string {
 	return fmt.Sprintf(MatchInviteThrottleKey, fromUserID, toUserID)
+}
+
+// ChallengeThrottle builds the Redis SETNX guard preventing rapid-fire
+// challenge spam from one user to the same friend.
+func ChallengeThrottle(fromUserID, toUserID string) string {
+	return fmt.Sprintf(ChallengeThrottleKey, fromUserID, toUserID)
+}
+
+// Presence builds the Redis TTL key whose existence indicates the user
+// has heartbeat'd within the configured window.
+func Presence(userID string) string {
+	return fmt.Sprintf(PresenceKey, userID)
 }

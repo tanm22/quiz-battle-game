@@ -297,6 +297,36 @@ func buildMessage(event string, payload map[string]any) (string, string, map[str
 			fmt.Sprintf("%s is looking for a match. Join now?", name),
 			data
 
+	case "notif.friend.request_received":
+		// Phase 3 (4.4): emitted by scoring's SendFriendRequest. Payload
+		// carries the sender's display name so the recipient sees who's
+		// asking before they open the app.
+		name := strField(payload, "fromUsername")
+		if name == "" {
+			name = "Someone"
+		}
+		if reqID := strField(payload, "requestId"); reqID != "" {
+			data["requestId"] = reqID
+		}
+		return "🤝 New friend request",
+			fmt.Sprintf("%s wants to be your friend.", name),
+			data
+
+	case "notif.friend.challenge":
+		// Phase 3 (4.4): emitted by scoring's ChallengeFriend. roomId is
+		// the active 1v1 room — the client routes the tap straight into
+		// the game flow rather than the friends list.
+		name := strField(payload, "fromUsername")
+		if name == "" {
+			name = "A friend"
+		}
+		if roomID := strField(payload, "roomId"); roomID != "" {
+			data["roomId"] = roomID
+		}
+		return "⚔️ Friend challenge",
+			fmt.Sprintf("%s challenged you to a quick quiz!", name),
+			data
+
 	case "notif.premium.activated":
 		return "💎 Premium activated",
 			"Enjoy unlimited quizzes, tournament access, and premium perks.",

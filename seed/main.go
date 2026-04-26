@@ -159,6 +159,30 @@ func main() {
 	}
 	log.Println("[seed] coin_ledger indexes ensured")
 
+	// §4.4 Friends & Challenges: the friend_requests collection holds one
+	// row per (fromUserId, toUserId) pair. Unique compound prevents two
+	// outbound requests in the same direction; the (toUserId, status) and
+	// (fromUserId, status) indexes back the incoming/outgoing pending-list
+	// queries.
+	friendReqs := db.Collection("friend_requests")
+	if _, err := friendReqs.Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "fromUserId", Value: 1}, {Key: "toUserId", Value: 1}},
+			Options: options.Index().SetUnique(true).SetName("uniq_from_to"),
+		},
+		{
+			Keys:    bson.D{{Key: "toUserId", Value: 1}, {Key: "status", Value: 1}},
+			Options: options.Index().SetName("idx_to_status"),
+		},
+		{
+			Keys:    bson.D{{Key: "fromUserId", Value: 1}, {Key: "status", Value: 1}},
+			Options: options.Index().SetName("idx_from_status"),
+		},
+	}); err != nil {
+		log.Fatalf("[seed] friend_requests indexes: %v", err)
+	}
+	log.Println("[seed] friend_requests indexes ensured")
+
 	// PR 4 (§4.3 Shop): the effect outbox is consumed by services/payment in
 	// PR 5 to extend planExpiresAt for premium-trial purchases. The (kind,
 	// processedAt asc) index lets the dequeuer's "find unprocessed by kind,

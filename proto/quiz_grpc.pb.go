@@ -461,21 +461,27 @@ var QuizService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	ScoringService_CalculateScore_FullMethodName       = "/quiz.ScoringService/CalculateScore"
-	ScoringService_GetLeaderboard_FullMethodName       = "/quiz.ScoringService/GetLeaderboard"
-	ScoringService_GetMatchHistory_FullMethodName      = "/quiz.ScoringService/GetMatchHistory"
-	ScoringService_GetHomeScreenData_FullMethodName    = "/quiz.ScoringService/GetHomeScreenData"
-	ScoringService_GetReferralDashboard_FullMethodName = "/quiz.ScoringService/GetReferralDashboard"
-	ScoringService_ApplyReferralCode_FullMethodName    = "/quiz.ScoringService/ApplyReferralCode"
-	ScoringService_UpdateFCMToken_FullMethodName       = "/quiz.ScoringService/UpdateFCMToken"
-	ScoringService_GetGlobalLeaderboard_FullMethodName = "/quiz.ScoringService/GetGlobalLeaderboard"
-	ScoringService_GetCoinBalance_FullMethodName       = "/quiz.ScoringService/GetCoinBalance"
-	ScoringService_GetCoinLedger_FullMethodName        = "/quiz.ScoringService/GetCoinLedger"
-	ScoringService_GetShopCatalog_FullMethodName       = "/quiz.ScoringService/GetShopCatalog"
-	ScoringService_GetShopInventory_FullMethodName     = "/quiz.ScoringService/GetShopInventory"
-	ScoringService_PurchaseShopItem_FullMethodName     = "/quiz.ScoringService/PurchaseShopItem"
-	ScoringService_EquipCosmetic_FullMethodName        = "/quiz.ScoringService/EquipCosmetic"
-	ScoringService_ConsumeReroll_FullMethodName        = "/quiz.ScoringService/ConsumeReroll"
+	ScoringService_CalculateScore_FullMethodName         = "/quiz.ScoringService/CalculateScore"
+	ScoringService_GetLeaderboard_FullMethodName         = "/quiz.ScoringService/GetLeaderboard"
+	ScoringService_GetMatchHistory_FullMethodName        = "/quiz.ScoringService/GetMatchHistory"
+	ScoringService_GetHomeScreenData_FullMethodName      = "/quiz.ScoringService/GetHomeScreenData"
+	ScoringService_GetReferralDashboard_FullMethodName   = "/quiz.ScoringService/GetReferralDashboard"
+	ScoringService_ApplyReferralCode_FullMethodName      = "/quiz.ScoringService/ApplyReferralCode"
+	ScoringService_UpdateFCMToken_FullMethodName         = "/quiz.ScoringService/UpdateFCMToken"
+	ScoringService_GetGlobalLeaderboard_FullMethodName   = "/quiz.ScoringService/GetGlobalLeaderboard"
+	ScoringService_GetCoinBalance_FullMethodName         = "/quiz.ScoringService/GetCoinBalance"
+	ScoringService_GetCoinLedger_FullMethodName          = "/quiz.ScoringService/GetCoinLedger"
+	ScoringService_GetShopCatalog_FullMethodName         = "/quiz.ScoringService/GetShopCatalog"
+	ScoringService_GetShopInventory_FullMethodName       = "/quiz.ScoringService/GetShopInventory"
+	ScoringService_PurchaseShopItem_FullMethodName       = "/quiz.ScoringService/PurchaseShopItem"
+	ScoringService_EquipCosmetic_FullMethodName          = "/quiz.ScoringService/EquipCosmetic"
+	ScoringService_ConsumeReroll_FullMethodName          = "/quiz.ScoringService/ConsumeReroll"
+	ScoringService_SendFriendRequest_FullMethodName      = "/quiz.ScoringService/SendFriendRequest"
+	ScoringService_RespondToFriendRequest_FullMethodName = "/quiz.ScoringService/RespondToFriendRequest"
+	ScoringService_GetFriendsList_FullMethodName         = "/quiz.ScoringService/GetFriendsList"
+	ScoringService_GetFriendRequests_FullMethodName      = "/quiz.ScoringService/GetFriendRequests"
+	ScoringService_Heartbeat_FullMethodName              = "/quiz.ScoringService/Heartbeat"
+	ScoringService_ChallengeFriend_FullMethodName        = "/quiz.ScoringService/ChallengeFriend"
 )
 
 // ScoringServiceClient is the client API for ScoringService service.
@@ -507,6 +513,28 @@ type ScoringServiceClient interface {
 	// post-decrement count so the caller can render "N left" without a
 	// second read.
 	ConsumeReroll(ctx context.Context, in *ConsumeRerollRequest, opts ...grpc.CallOption) (*ConsumeRerollResponse, error)
+	// Phase 3 (4.4): Friends & Challenges.
+	// SendFriendRequest takes EXACTLY ONE of target_username / target_referral_code.
+	// Idempotent on (fromUserId, toUserId): a duplicate send returns the
+	// existing pending request or the existing accepted relationship.
+	SendFriendRequest(ctx context.Context, in *SendFriendRequestRequest, opts ...grpc.CallOption) (*SendFriendRequestResponse, error)
+	// RespondToFriendRequest accepts or rejects a pending incoming request.
+	// The caller must be the request's recipient; otherwise PERMISSION_DENIED.
+	RespondToFriendRequest(ctx context.Context, in *RespondToFriendRequestRequest, opts ...grpc.CallOption) (*RespondToFriendRequestResponse, error)
+	// GetFriendsList returns accepted friendships for the caller, with each
+	// friend's online flag derived from the Redis presence:{userId} TTL key.
+	GetFriendsList(ctx context.Context, in *GetFriendsListRequest, opts ...grpc.CallOption) (*GetFriendsListResponse, error)
+	// GetFriendRequests returns pending incoming friend requests (the
+	// outgoing direction is implicit from SendFriendRequest's response).
+	GetFriendRequests(ctx context.Context, in *GetFriendRequestsRequest, opts ...grpc.CallOption) (*GetFriendRequestsResponse, error)
+	// Heartbeat refreshes the caller's presence TTL. Clients call this on
+	// app foreground / every ~30s while open. No-op safe.
+	Heartbeat(ctx context.Context, in *HeartbeatRequest, opts ...grpc.CallOption) (*HeartbeatResponse, error)
+	// ChallengeFriend creates a private 1v1 room with the caller and the
+	// friend, publishes notif.friend.challenge, and returns the room id
+	// both clients can use to enter the game flow. The friend must be in
+	// the caller's accepted friends; otherwise NOT_FRIENDS error code.
+	ChallengeFriend(ctx context.Context, in *ChallengeFriendRequest, opts ...grpc.CallOption) (*ChallengeFriendResponse, error)
 }
 
 type scoringServiceClient struct {
@@ -667,6 +695,66 @@ func (c *scoringServiceClient) ConsumeReroll(ctx context.Context, in *ConsumeRer
 	return out, nil
 }
 
+func (c *scoringServiceClient) SendFriendRequest(ctx context.Context, in *SendFriendRequestRequest, opts ...grpc.CallOption) (*SendFriendRequestResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SendFriendRequestResponse)
+	err := c.cc.Invoke(ctx, ScoringService_SendFriendRequest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scoringServiceClient) RespondToFriendRequest(ctx context.Context, in *RespondToFriendRequestRequest, opts ...grpc.CallOption) (*RespondToFriendRequestResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RespondToFriendRequestResponse)
+	err := c.cc.Invoke(ctx, ScoringService_RespondToFriendRequest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scoringServiceClient) GetFriendsList(ctx context.Context, in *GetFriendsListRequest, opts ...grpc.CallOption) (*GetFriendsListResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetFriendsListResponse)
+	err := c.cc.Invoke(ctx, ScoringService_GetFriendsList_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scoringServiceClient) GetFriendRequests(ctx context.Context, in *GetFriendRequestsRequest, opts ...grpc.CallOption) (*GetFriendRequestsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetFriendRequestsResponse)
+	err := c.cc.Invoke(ctx, ScoringService_GetFriendRequests_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scoringServiceClient) Heartbeat(ctx context.Context, in *HeartbeatRequest, opts ...grpc.CallOption) (*HeartbeatResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HeartbeatResponse)
+	err := c.cc.Invoke(ctx, ScoringService_Heartbeat_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scoringServiceClient) ChallengeFriend(ctx context.Context, in *ChallengeFriendRequest, opts ...grpc.CallOption) (*ChallengeFriendResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ChallengeFriendResponse)
+	err := c.cc.Invoke(ctx, ScoringService_ChallengeFriend_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ScoringServiceServer is the server API for ScoringService service.
 // All implementations must embed UnimplementedScoringServiceServer
 // for forward compatibility.
@@ -696,6 +784,28 @@ type ScoringServiceServer interface {
 	// post-decrement count so the caller can render "N left" without a
 	// second read.
 	ConsumeReroll(context.Context, *ConsumeRerollRequest) (*ConsumeRerollResponse, error)
+	// Phase 3 (4.4): Friends & Challenges.
+	// SendFriendRequest takes EXACTLY ONE of target_username / target_referral_code.
+	// Idempotent on (fromUserId, toUserId): a duplicate send returns the
+	// existing pending request or the existing accepted relationship.
+	SendFriendRequest(context.Context, *SendFriendRequestRequest) (*SendFriendRequestResponse, error)
+	// RespondToFriendRequest accepts or rejects a pending incoming request.
+	// The caller must be the request's recipient; otherwise PERMISSION_DENIED.
+	RespondToFriendRequest(context.Context, *RespondToFriendRequestRequest) (*RespondToFriendRequestResponse, error)
+	// GetFriendsList returns accepted friendships for the caller, with each
+	// friend's online flag derived from the Redis presence:{userId} TTL key.
+	GetFriendsList(context.Context, *GetFriendsListRequest) (*GetFriendsListResponse, error)
+	// GetFriendRequests returns pending incoming friend requests (the
+	// outgoing direction is implicit from SendFriendRequest's response).
+	GetFriendRequests(context.Context, *GetFriendRequestsRequest) (*GetFriendRequestsResponse, error)
+	// Heartbeat refreshes the caller's presence TTL. Clients call this on
+	// app foreground / every ~30s while open. No-op safe.
+	Heartbeat(context.Context, *HeartbeatRequest) (*HeartbeatResponse, error)
+	// ChallengeFriend creates a private 1v1 room with the caller and the
+	// friend, publishes notif.friend.challenge, and returns the room id
+	// both clients can use to enter the game flow. The friend must be in
+	// the caller's accepted friends; otherwise NOT_FRIENDS error code.
+	ChallengeFriend(context.Context, *ChallengeFriendRequest) (*ChallengeFriendResponse, error)
 	mustEmbedUnimplementedScoringServiceServer()
 }
 
@@ -750,6 +860,24 @@ func (UnimplementedScoringServiceServer) EquipCosmetic(context.Context, *EquipCo
 }
 func (UnimplementedScoringServiceServer) ConsumeReroll(context.Context, *ConsumeRerollRequest) (*ConsumeRerollResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ConsumeReroll not implemented")
+}
+func (UnimplementedScoringServiceServer) SendFriendRequest(context.Context, *SendFriendRequestRequest) (*SendFriendRequestResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SendFriendRequest not implemented")
+}
+func (UnimplementedScoringServiceServer) RespondToFriendRequest(context.Context, *RespondToFriendRequestRequest) (*RespondToFriendRequestResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RespondToFriendRequest not implemented")
+}
+func (UnimplementedScoringServiceServer) GetFriendsList(context.Context, *GetFriendsListRequest) (*GetFriendsListResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetFriendsList not implemented")
+}
+func (UnimplementedScoringServiceServer) GetFriendRequests(context.Context, *GetFriendRequestsRequest) (*GetFriendRequestsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetFriendRequests not implemented")
+}
+func (UnimplementedScoringServiceServer) Heartbeat(context.Context, *HeartbeatRequest) (*HeartbeatResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Heartbeat not implemented")
+}
+func (UnimplementedScoringServiceServer) ChallengeFriend(context.Context, *ChallengeFriendRequest) (*ChallengeFriendResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ChallengeFriend not implemented")
 }
 func (UnimplementedScoringServiceServer) mustEmbedUnimplementedScoringServiceServer() {}
 func (UnimplementedScoringServiceServer) testEmbeddedByValue()                        {}
@@ -1042,6 +1170,114 @@ func _ScoringService_ConsumeReroll_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ScoringService_SendFriendRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SendFriendRequestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScoringServiceServer).SendFriendRequest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScoringService_SendFriendRequest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScoringServiceServer).SendFriendRequest(ctx, req.(*SendFriendRequestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScoringService_RespondToFriendRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RespondToFriendRequestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScoringServiceServer).RespondToFriendRequest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScoringService_RespondToFriendRequest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScoringServiceServer).RespondToFriendRequest(ctx, req.(*RespondToFriendRequestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScoringService_GetFriendsList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetFriendsListRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScoringServiceServer).GetFriendsList(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScoringService_GetFriendsList_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScoringServiceServer).GetFriendsList(ctx, req.(*GetFriendsListRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScoringService_GetFriendRequests_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetFriendRequestsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScoringServiceServer).GetFriendRequests(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScoringService_GetFriendRequests_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScoringServiceServer).GetFriendRequests(ctx, req.(*GetFriendRequestsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScoringService_Heartbeat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HeartbeatRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScoringServiceServer).Heartbeat(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScoringService_Heartbeat_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScoringServiceServer).Heartbeat(ctx, req.(*HeartbeatRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScoringService_ChallengeFriend_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ChallengeFriendRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScoringServiceServer).ChallengeFriend(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScoringService_ChallengeFriend_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScoringServiceServer).ChallengeFriend(ctx, req.(*ChallengeFriendRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ScoringService_ServiceDesc is the grpc.ServiceDesc for ScoringService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1108,6 +1344,30 @@ var ScoringService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ConsumeReroll",
 			Handler:    _ScoringService_ConsumeReroll_Handler,
+		},
+		{
+			MethodName: "SendFriendRequest",
+			Handler:    _ScoringService_SendFriendRequest_Handler,
+		},
+		{
+			MethodName: "RespondToFriendRequest",
+			Handler:    _ScoringService_RespondToFriendRequest_Handler,
+		},
+		{
+			MethodName: "GetFriendsList",
+			Handler:    _ScoringService_GetFriendsList_Handler,
+		},
+		{
+			MethodName: "GetFriendRequests",
+			Handler:    _ScoringService_GetFriendRequests_Handler,
+		},
+		{
+			MethodName: "Heartbeat",
+			Handler:    _ScoringService_Heartbeat_Handler,
+		},
+		{
+			MethodName: "ChallengeFriend",
+			Handler:    _ScoringService_ChallengeFriend_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

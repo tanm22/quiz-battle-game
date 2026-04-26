@@ -194,6 +194,28 @@ service ScoringService {
   // post-decrement count so the caller can render "N left" without a
   // second read.
   rpc ConsumeReroll(ConsumeRerollRequest) returns (ConsumeRerollResponse);
+  // Phase 3 (4.4): Friends & Challenges.
+  // SendFriendRequest takes EXACTLY ONE of target_username / target_referral_code.
+  // Idempotent on (fromUserId, toUserId): a duplicate send returns the
+  // existing pending request or the existing accepted relationship.
+  rpc SendFriendRequest(SendFriendRequestRequest) returns (SendFriendRequestResponse);
+  // RespondToFriendRequest accepts or rejects a pending incoming request.
+  // The caller must be the request's recipient; otherwise PERMISSION_DENIED.
+  rpc RespondToFriendRequest(RespondToFriendRequestRequest) returns (RespondToFriendRequestResponse);
+  // GetFriendsList returns accepted friendships for the caller, with each
+  // friend's online flag derived from the Redis presence:{userId} TTL key.
+  rpc GetFriendsList(GetFriendsListRequest) returns (GetFriendsListResponse);
+  // GetFriendRequests returns pending incoming friend requests (the
+  // outgoing direction is implicit from SendFriendRequest's response).
+  rpc GetFriendRequests(GetFriendRequestsRequest) returns (GetFriendRequestsResponse);
+  // Heartbeat refreshes the caller's presence TTL. Clients call this on
+  // app foreground / every ~30s while open. No-op safe.
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  // ChallengeFriend creates a private 1v1 room with the caller and the
+  // friend, publishes notif.friend.challenge, and returns the room id
+  // both clients can use to enter the game flow. The friend must be in
+  // the caller's accepted friends; otherwise NOT_FRIENDS error code.
+  rpc ChallengeFriend(ChallengeFriendRequest) returns (ChallengeFriendResponse);
 }
 
 // ---------------------------------------------------------------------------
@@ -698,4 +720,91 @@ message ConsumeRerollResponse {
   // Empty on success. Domain error code: NO_CHARGES — user has zero
   // rerollCharges, so the spend was rejected without mutating state.
   string error_code       = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3 (4.4): Friends & Challenges
+// ---------------------------------------------------------------------------
+
+message SendFriendRequestRequest {
+  // Exactly one of these must be set. target_username is the friendly path
+  // (Add by name); target_referral_code is the share-link path.
+  string target_username       = 1;
+  string target_referral_code  = 2;
+}
+
+message SendFriendRequestResponse {
+  bool   success    = 1;
+  string request_id = 2;
+  // Empty on success. Domain error codes:
+  //   USER_NOT_FOUND     — username/code didn't resolve
+  //   ALREADY_FRIENDS    — relationship already accepted
+  //   ALREADY_PENDING    — outbound request already pending
+  //   SELF               — caller tried to friend themselves
+  //   INVALID_ARGUMENT   — both or neither identifier set
+  string error_code = 3;
+}
+
+message FriendRequest {
+  string id              = 1;
+  string from_user_id    = 2;
+  string from_username   = 3;
+  string to_user_id      = 4;
+  string to_username     = 5;
+  string status          = 6; // "pending" | "accepted" | "rejected"
+  int64  created_at_ms   = 7;
+  int64  responded_at_ms = 8;
+}
+
+message RespondToFriendRequestRequest {
+  string request_id = 1;
+  bool   accept     = 2;
+}
+
+message RespondToFriendRequestResponse {
+  bool   success    = 1;
+  // Domain error codes: NOT_FOUND, NOT_RECIPIENT, ALREADY_RESPONDED.
+  string error_code = 2;
+}
+
+message Friend {
+  string user_id     = 1;
+  string username    = 2;
+  bool   online      = 3;
+  int64  friended_at_ms = 4;
+}
+
+message GetFriendsListRequest {}
+
+message GetFriendsListResponse {
+  repeated Friend friends = 1;
+}
+
+message GetFriendRequestsRequest {}
+
+message GetFriendRequestsResponse {
+  // Incoming pending requests only — outgoing requests aren't surfaced
+  // here in v1 because they're known to the sender from
+  // SendFriendRequestResponse and don't need a separate listing screen.
+  repeated FriendRequest incoming = 1;
+}
+
+message HeartbeatRequest {}
+
+message HeartbeatResponse {
+  bool success = 1;
+}
+
+message ChallengeFriendRequest {
+  string friend_user_id = 1;
+}
+
+message ChallengeFriendResponse {
+  bool   success    = 1;
+  string room_id    = 2;
+  // Empty on success. Domain error codes:
+  //   NOT_FRIENDS         — caller and target are not accepted friends
+  //   FRIEND_OFFLINE      — target's presence TTL expired (best-effort hint)
+  //   THROTTLED           — caller already challenged this friend recently
+  string error_code = 3;
 }
