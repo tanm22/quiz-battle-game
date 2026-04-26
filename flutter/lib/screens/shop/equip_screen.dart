@@ -109,15 +109,23 @@ class _Section extends ConsumerWidget {
         if (items.isEmpty)
           Text(emptyHint,
               style: const TextStyle(color: AppColors.textMuted, fontSize: 13)),
+        // Stable key per item id — _EquipTile carries per-row state
+        // (`_busy`) so if a future change ever sorts/filters this list,
+        // Flutter must re-associate state to the right row by id rather
+        // than positional index.
         for (final it in items)
-          _EquipTile(item: it, equipped: it.id == equippedId),
+          _EquipTile(
+            key: ValueKey(it.id),
+            item: it,
+            equipped: it.id == equippedId,
+          ),
       ],
     );
   }
 }
 
 class _EquipTile extends ConsumerStatefulWidget {
-  const _EquipTile({required this.item, required this.equipped});
+  const _EquipTile({super.key, required this.item, required this.equipped});
 
   final ShopItem item;
   final bool equipped;
