@@ -1486,6 +1486,7 @@ func (s *scoringServer) consumeTournamentFinished(ctx context.Context) {
 				TournamentID   string `json:"tournamentId"`
 				TournamentName string `json:"tournamentName"`
 				UserID         string `json:"userId"`
+				Username       string `json:"username"`
 				Rank           int    `json:"rank"`
 				CoinsAwarded   int64  `json:"coinsAwarded"`
 				FinalScore     int64  `json:"finalScore"`
@@ -1556,6 +1557,7 @@ func (s *scoringServer) consumeTournamentFinished(ctx context.Context) {
 			notifJSON, _ := json.Marshal(map[string]interface{}{
 				"event":          "notif.tournament.finished",
 				"userId":         event.UserID,
+				"username":       event.Username,
 				"tournamentId":   event.TournamentID,
 				"tournamentName": event.TournamentName,
 				"rank":           event.Rank,

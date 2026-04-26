@@ -1140,10 +1140,15 @@ func (s *quizServer) finalizeExpiredTournaments(ctx context.Context, now time.Ti
 		if topN == 0 {
 			// Nothing to pay out. Still flip so the row drops out of the
 			// finalize filter — otherwise we'd re-cursor it every minute.
-			s.mongoDB.Collection("tournaments").UpdateOne(ctx,
+			// Mongo errors are non-fatal: next tick re-attempts the flip,
+			// the cost is just a noisy log line per tick until it succeeds.
+			if _, err := s.mongoDB.Collection("tournaments").UpdateOne(ctx,
 				bson.M{"_id": t.ID, "winnersAwarded": false},
 				bson.M{"$set": bson.M{"winnersAwarded": true, "status": "completed"}},
-			)
+			); err != nil {
+				log.Printf("[quiz] finalize: empty-payout flip failed for %s: %v", t.ID, err)
+				continue
+			}
 			log.Printf("[quiz] finalize: tournament %s closed with no participants and no prize pool", t.ID)
 			continue
 		}
@@ -1301,8 +1306,20 @@ func (s *quizServer) tournamentPayoutDrainWorker(ctx context.Context) {
 	}
 }
 
+// drainBatchSize bounds how many pending payouts a single drain tick will
+// attempt. Without it, a multi-day RabbitMQ outage that stranded thousands
+// of rows would blast the whole backlog through one publish-mutex'd channel
+// on a single tick — likely timing out and saturating the broker on
+// recovery. 500 is an arbitrary safe number; subsequent ticks pick up
+// whatever the previous one didn't reach. Real exponential backoff per row
+// (lastAttemptedAt + nextAttemptAt) is a follow-up.
+const drainBatchSize = 500
+
 func (s *quizServer) drainPendingPayouts(ctx context.Context) {
-	cursor, err := s.mongoDB.Collection("tournament_payouts").Find(ctx, bson.M{"status": "pending"})
+	cursor, err := s.mongoDB.Collection("tournament_payouts").Find(ctx,
+		bson.M{"status": "pending"},
+		options.Find().SetLimit(drainBatchSize),
+	)
 	if err != nil {
 		log.Printf("[quiz] drain: pending payout lookup failed: %v", err)
 		return
