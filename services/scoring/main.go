@@ -25,6 +25,7 @@ import (
 
 	"quiz-battle/pkg/auth"
 	"quiz-battle/pkg/coins"
+	"quiz-battle/pkg/coins/shop"
 	"quiz-battle/pkg/keys"
 	"quiz-battle/pkg/models"
 	pb "quiz-battle/proto"
@@ -48,13 +49,15 @@ type Question struct {
 
 type scoringServer struct {
 	pb.UnimplementedScoringServiceServer
-	rdb       *redis.Client
-	amqpConn  *amqp.Connection
-	amqpCh    *amqp.Channel // for publishing only
-	amqpMu    sync.Mutex    // AMQP channels are not thread-safe
-	mongoDB   *mongo.Database
-	ledger    *coins.Ledger // §4.3 — every balance change goes through Grant
-	jwtSecret string
+	rdb         *redis.Client
+	amqpConn    *amqp.Connection
+	amqpCh      *amqp.Channel // for publishing only
+	amqpMu      sync.Mutex    // AMQP channels are not thread-safe
+	mongoClient *mongo.Client // bound for shop.Purchase's session lifecycle
+	mongoDB     *mongo.Database
+	ledger      *coins.Ledger  // §4.3 — every balance change goes through Grant
+	purchase    *shop.Purchase // §4.3 PR 4 — shop spend orchestrator
+	jwtSecret   string
 	// publishHook, when non-nil, captures every publish call instead of
 	// sending to amqpCh. Set in tests so we can assert routing keys and
 	// payloads without standing up RabbitMQ. Nil in production.
@@ -1652,13 +1655,17 @@ func main() {
 		jwtSecret = "quiz-battle-dev-secret"
 	}
 
+	mongoDB := mongoClient.Database(coins.DefaultDBName)
+	ledger := coins.NewLedger(mongoClient, coins.DefaultDBName)
 	srv := &scoringServer{
-		rdb:       rdb,
-		amqpConn:  conn,
-		amqpCh:    amqpCh,
-		mongoDB:   mongoClient.Database(coins.DefaultDBName),
-		ledger:    coins.NewLedger(mongoClient, coins.DefaultDBName),
-		jwtSecret: jwtSecret,
+		rdb:         rdb,
+		amqpConn:    conn,
+		amqpCh:      amqpCh,
+		mongoClient: mongoClient,
+		mongoDB:     mongoDB,
+		ledger:      ledger,
+		purchase:    shop.NewPurchase(mongoClient, mongoDB, ledger),
+		jwtSecret:   jwtSecret,
 	}
 
 	// gRPC server — CalculateScore is called internally by the scoring worker

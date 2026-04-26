@@ -182,6 +182,10 @@ service ScoringService {
   // Phase 3 (4.3): Coins & Shop — balance read + ledger history.
   rpc GetCoinBalance(GetCoinBalanceRequest) returns (GetCoinBalanceResponse);
   rpc GetCoinLedger(GetCoinLedgerRequest) returns (GetCoinLedgerResponse);
+  // Phase 3 (4.3) PR 4: shop catalog + inventory + spend.
+  rpc GetShopCatalog(GetShopCatalogRequest) returns (GetShopCatalogResponse);
+  rpc GetShopInventory(GetShopInventoryRequest) returns (GetShopInventoryResponse);
+  rpc PurchaseShopItem(PurchaseShopItemRequest) returns (PurchaseShopItemResponse);
 }
 
 // ---------------------------------------------------------------------------
@@ -609,4 +613,51 @@ message GetCoinLedgerRequest {
 message GetCoinLedgerResponse {
   repeated CoinLedgerEntry entries = 1;
   string next_page_token = 2;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3 (4.3) PR 4: Shop catalog, inventory, and purchase
+// ---------------------------------------------------------------------------
+
+message ShopItem {
+  string id          = 1;
+  string kind        = 2; // see pkg/coins/shop Kind* constants
+  string name        = 3;
+  string description = 4;
+  int64  price_coins = 5;
+  bool   active      = 6;
+  map<string, string> metadata = 7;
+}
+
+message GetShopCatalogRequest {}
+
+message GetShopCatalogResponse {
+  repeated ShopItem items = 1;
+}
+
+message GetShopInventoryRequest {}
+
+message GetShopInventoryResponse {
+  repeated string owned_cosmetics       = 1;
+  string          equipped_cosmetic_id  = 2;
+  string          equipped_name_color   = 3;
+  int32           reroll_charges        = 4;
+  bool            streak_freeze_held    = 5;
+  string          streak_freeze_week_iso = 6;
+  int64           balance               = 7;
+}
+
+message PurchaseShopItemRequest {
+  string item_id         = 1;
+  string idempotency_key = 2;
+}
+
+message PurchaseShopItemResponse {
+  bool   success         = 1;
+  string ledger_entry_id = 2;
+  int64  new_balance     = 3;
+  // Empty on success. Domain error codes: INSUFFICIENT, INACTIVE, UNKNOWN,
+  // WEEKLY_CAP. gRPC-level errors (Unauthenticated, InvalidArgument) come
+  // back as status errors instead.
+  string error_code      = 4;
 }

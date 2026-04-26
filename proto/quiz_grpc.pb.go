@@ -471,6 +471,9 @@ const (
 	ScoringService_GetGlobalLeaderboard_FullMethodName = "/quiz.ScoringService/GetGlobalLeaderboard"
 	ScoringService_GetCoinBalance_FullMethodName       = "/quiz.ScoringService/GetCoinBalance"
 	ScoringService_GetCoinLedger_FullMethodName        = "/quiz.ScoringService/GetCoinLedger"
+	ScoringService_GetShopCatalog_FullMethodName       = "/quiz.ScoringService/GetShopCatalog"
+	ScoringService_GetShopInventory_FullMethodName     = "/quiz.ScoringService/GetShopInventory"
+	ScoringService_PurchaseShopItem_FullMethodName     = "/quiz.ScoringService/PurchaseShopItem"
 )
 
 // ScoringServiceClient is the client API for ScoringService service.
@@ -490,6 +493,10 @@ type ScoringServiceClient interface {
 	// Phase 3 (4.3): Coins & Shop — balance read + ledger history.
 	GetCoinBalance(ctx context.Context, in *GetCoinBalanceRequest, opts ...grpc.CallOption) (*GetCoinBalanceResponse, error)
 	GetCoinLedger(ctx context.Context, in *GetCoinLedgerRequest, opts ...grpc.CallOption) (*GetCoinLedgerResponse, error)
+	// Phase 3 (4.3) PR 4: shop catalog + inventory + spend.
+	GetShopCatalog(ctx context.Context, in *GetShopCatalogRequest, opts ...grpc.CallOption) (*GetShopCatalogResponse, error)
+	GetShopInventory(ctx context.Context, in *GetShopInventoryRequest, opts ...grpc.CallOption) (*GetShopInventoryResponse, error)
+	PurchaseShopItem(ctx context.Context, in *PurchaseShopItemRequest, opts ...grpc.CallOption) (*PurchaseShopItemResponse, error)
 }
 
 type scoringServiceClient struct {
@@ -600,6 +607,36 @@ func (c *scoringServiceClient) GetCoinLedger(ctx context.Context, in *GetCoinLed
 	return out, nil
 }
 
+func (c *scoringServiceClient) GetShopCatalog(ctx context.Context, in *GetShopCatalogRequest, opts ...grpc.CallOption) (*GetShopCatalogResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetShopCatalogResponse)
+	err := c.cc.Invoke(ctx, ScoringService_GetShopCatalog_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scoringServiceClient) GetShopInventory(ctx context.Context, in *GetShopInventoryRequest, opts ...grpc.CallOption) (*GetShopInventoryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetShopInventoryResponse)
+	err := c.cc.Invoke(ctx, ScoringService_GetShopInventory_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scoringServiceClient) PurchaseShopItem(ctx context.Context, in *PurchaseShopItemRequest, opts ...grpc.CallOption) (*PurchaseShopItemResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PurchaseShopItemResponse)
+	err := c.cc.Invoke(ctx, ScoringService_PurchaseShopItem_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ScoringServiceServer is the server API for ScoringService service.
 // All implementations must embed UnimplementedScoringServiceServer
 // for forward compatibility.
@@ -617,6 +654,10 @@ type ScoringServiceServer interface {
 	// Phase 3 (4.3): Coins & Shop — balance read + ledger history.
 	GetCoinBalance(context.Context, *GetCoinBalanceRequest) (*GetCoinBalanceResponse, error)
 	GetCoinLedger(context.Context, *GetCoinLedgerRequest) (*GetCoinLedgerResponse, error)
+	// Phase 3 (4.3) PR 4: shop catalog + inventory + spend.
+	GetShopCatalog(context.Context, *GetShopCatalogRequest) (*GetShopCatalogResponse, error)
+	GetShopInventory(context.Context, *GetShopInventoryRequest) (*GetShopInventoryResponse, error)
+	PurchaseShopItem(context.Context, *PurchaseShopItemRequest) (*PurchaseShopItemResponse, error)
 	mustEmbedUnimplementedScoringServiceServer()
 }
 
@@ -656,6 +697,15 @@ func (UnimplementedScoringServiceServer) GetCoinBalance(context.Context, *GetCoi
 }
 func (UnimplementedScoringServiceServer) GetCoinLedger(context.Context, *GetCoinLedgerRequest) (*GetCoinLedgerResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetCoinLedger not implemented")
+}
+func (UnimplementedScoringServiceServer) GetShopCatalog(context.Context, *GetShopCatalogRequest) (*GetShopCatalogResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetShopCatalog not implemented")
+}
+func (UnimplementedScoringServiceServer) GetShopInventory(context.Context, *GetShopInventoryRequest) (*GetShopInventoryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetShopInventory not implemented")
+}
+func (UnimplementedScoringServiceServer) PurchaseShopItem(context.Context, *PurchaseShopItemRequest) (*PurchaseShopItemResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PurchaseShopItem not implemented")
 }
 func (UnimplementedScoringServiceServer) mustEmbedUnimplementedScoringServiceServer() {}
 func (UnimplementedScoringServiceServer) testEmbeddedByValue()                        {}
@@ -858,6 +908,60 @@ func _ScoringService_GetCoinLedger_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ScoringService_GetShopCatalog_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetShopCatalogRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScoringServiceServer).GetShopCatalog(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScoringService_GetShopCatalog_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScoringServiceServer).GetShopCatalog(ctx, req.(*GetShopCatalogRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScoringService_GetShopInventory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetShopInventoryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScoringServiceServer).GetShopInventory(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScoringService_GetShopInventory_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScoringServiceServer).GetShopInventory(ctx, req.(*GetShopInventoryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScoringService_PurchaseShopItem_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PurchaseShopItemRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScoringServiceServer).PurchaseShopItem(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScoringService_PurchaseShopItem_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScoringServiceServer).PurchaseShopItem(ctx, req.(*PurchaseShopItemRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ScoringService_ServiceDesc is the grpc.ServiceDesc for ScoringService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -904,6 +1008,18 @@ var ScoringService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetCoinLedger",
 			Handler:    _ScoringService_GetCoinLedger_Handler,
+		},
+		{
+			MethodName: "GetShopCatalog",
+			Handler:    _ScoringService_GetShopCatalog_Handler,
+		},
+		{
+			MethodName: "GetShopInventory",
+			Handler:    _ScoringService_GetShopInventory_Handler,
+		},
+		{
+			MethodName: "PurchaseShopItem",
+			Handler:    _ScoringService_PurchaseShopItem_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

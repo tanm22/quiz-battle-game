@@ -1,6 +1,6 @@
 // This is a generated file - do not edit.
 //
-// Generated from proto/quiz.proto.
+// Generated from quiz.proto.
 
 // @dart = 3.3
 
@@ -6036,6 +6036,887 @@ class GetGlobalLeaderboardResponse extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(1)
   $pb.PbList<LeaderboardEntry> get entries => $_getList(0);
+}
+
+class GetCoinBalanceRequest extends $pb.GeneratedMessage {
+  factory GetCoinBalanceRequest() => create();
+
+  GetCoinBalanceRequest._();
+
+  factory GetCoinBalanceRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetCoinBalanceRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetCoinBalanceRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetCoinBalanceRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetCoinBalanceRequest copyWith(
+          void Function(GetCoinBalanceRequest) updates) =>
+      super.copyWith((message) => updates(message as GetCoinBalanceRequest))
+          as GetCoinBalanceRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetCoinBalanceRequest create() => GetCoinBalanceRequest._();
+  @$core.override
+  GetCoinBalanceRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetCoinBalanceRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetCoinBalanceRequest>(create);
+  static GetCoinBalanceRequest? _defaultInstance;
+}
+
+class GetCoinBalanceResponse extends $pb.GeneratedMessage {
+  factory GetCoinBalanceResponse({
+    $fixnum.Int64? balance,
+  }) {
+    final result = create();
+    if (balance != null) result.balance = balance;
+    return result;
+  }
+
+  GetCoinBalanceResponse._();
+
+  factory GetCoinBalanceResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetCoinBalanceResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetCoinBalanceResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aInt64(1, _omitFieldNames ? '' : 'balance')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetCoinBalanceResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetCoinBalanceResponse copyWith(
+          void Function(GetCoinBalanceResponse) updates) =>
+      super.copyWith((message) => updates(message as GetCoinBalanceResponse))
+          as GetCoinBalanceResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetCoinBalanceResponse create() => GetCoinBalanceResponse._();
+  @$core.override
+  GetCoinBalanceResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetCoinBalanceResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetCoinBalanceResponse>(create);
+  static GetCoinBalanceResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get balance => $_getI64(0);
+  @$pb.TagNumber(1)
+  set balance($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasBalance() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearBalance() => $_clearField(1);
+}
+
+class CoinLedgerEntry extends $pb.GeneratedMessage {
+  factory CoinLedgerEntry({
+    $core.String? id,
+    $fixnum.Int64? delta,
+    $core.String? reason,
+    $core.String? refId,
+    $fixnum.Int64? balanceAfter,
+    $fixnum.Int64? createdAtUnixMs,
+    $core.Iterable<$core.MapEntry<$core.String, $core.String>>? metadata,
+  }) {
+    final result = create();
+    if (id != null) result.id = id;
+    if (delta != null) result.delta = delta;
+    if (reason != null) result.reason = reason;
+    if (refId != null) result.refId = refId;
+    if (balanceAfter != null) result.balanceAfter = balanceAfter;
+    if (createdAtUnixMs != null) result.createdAtUnixMs = createdAtUnixMs;
+    if (metadata != null) result.metadata.addEntries(metadata);
+    return result;
+  }
+
+  CoinLedgerEntry._();
+
+  factory CoinLedgerEntry.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory CoinLedgerEntry.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CoinLedgerEntry',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aInt64(2, _omitFieldNames ? '' : 'delta')
+    ..aOS(3, _omitFieldNames ? '' : 'reason')
+    ..aOS(4, _omitFieldNames ? '' : 'refId')
+    ..aInt64(5, _omitFieldNames ? '' : 'balanceAfter')
+    ..aInt64(6, _omitFieldNames ? '' : 'createdAtUnixMs')
+    ..m<$core.String, $core.String>(7, _omitFieldNames ? '' : 'metadata',
+        entryClassName: 'CoinLedgerEntry.MetadataEntry',
+        keyFieldType: $pb.PbFieldType.OS,
+        valueFieldType: $pb.PbFieldType.OS,
+        packageName: const $pb.PackageName('quiz'))
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CoinLedgerEntry clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CoinLedgerEntry copyWith(void Function(CoinLedgerEntry) updates) =>
+      super.copyWith((message) => updates(message as CoinLedgerEntry))
+          as CoinLedgerEntry;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static CoinLedgerEntry create() => CoinLedgerEntry._();
+  @$core.override
+  CoinLedgerEntry createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static CoinLedgerEntry getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CoinLedgerEntry>(create);
+  static CoinLedgerEntry? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get delta => $_getI64(1);
+  @$pb.TagNumber(2)
+  set delta($fixnum.Int64 value) => $_setInt64(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasDelta() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearDelta() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get reason => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set reason($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasReason() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearReason() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get refId => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set refId($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasRefId() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearRefId() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $fixnum.Int64 get balanceAfter => $_getI64(4);
+  @$pb.TagNumber(5)
+  set balanceAfter($fixnum.Int64 value) => $_setInt64(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasBalanceAfter() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearBalanceAfter() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $fixnum.Int64 get createdAtUnixMs => $_getI64(5);
+  @$pb.TagNumber(6)
+  set createdAtUnixMs($fixnum.Int64 value) => $_setInt64(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasCreatedAtUnixMs() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearCreatedAtUnixMs() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(6);
+}
+
+class GetCoinLedgerRequest extends $pb.GeneratedMessage {
+  factory GetCoinLedgerRequest({
+    $core.int? pageSize,
+    $core.String? pageToken,
+  }) {
+    final result = create();
+    if (pageSize != null) result.pageSize = pageSize;
+    if (pageToken != null) result.pageToken = pageToken;
+    return result;
+  }
+
+  GetCoinLedgerRequest._();
+
+  factory GetCoinLedgerRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetCoinLedgerRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetCoinLedgerRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'pageSize')
+    ..aOS(2, _omitFieldNames ? '' : 'pageToken')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetCoinLedgerRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetCoinLedgerRequest copyWith(void Function(GetCoinLedgerRequest) updates) =>
+      super.copyWith((message) => updates(message as GetCoinLedgerRequest))
+          as GetCoinLedgerRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetCoinLedgerRequest create() => GetCoinLedgerRequest._();
+  @$core.override
+  GetCoinLedgerRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetCoinLedgerRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetCoinLedgerRequest>(create);
+  static GetCoinLedgerRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get pageSize => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set pageSize($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPageSize() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPageSize() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get pageToken => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set pageToken($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPageToken() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPageToken() => $_clearField(2);
+}
+
+class GetCoinLedgerResponse extends $pb.GeneratedMessage {
+  factory GetCoinLedgerResponse({
+    $core.Iterable<CoinLedgerEntry>? entries,
+    $core.String? nextPageToken,
+  }) {
+    final result = create();
+    if (entries != null) result.entries.addAll(entries);
+    if (nextPageToken != null) result.nextPageToken = nextPageToken;
+    return result;
+  }
+
+  GetCoinLedgerResponse._();
+
+  factory GetCoinLedgerResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetCoinLedgerResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetCoinLedgerResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..pPM<CoinLedgerEntry>(1, _omitFieldNames ? '' : 'entries',
+        subBuilder: CoinLedgerEntry.create)
+    ..aOS(2, _omitFieldNames ? '' : 'nextPageToken')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetCoinLedgerResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetCoinLedgerResponse copyWith(
+          void Function(GetCoinLedgerResponse) updates) =>
+      super.copyWith((message) => updates(message as GetCoinLedgerResponse))
+          as GetCoinLedgerResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetCoinLedgerResponse create() => GetCoinLedgerResponse._();
+  @$core.override
+  GetCoinLedgerResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetCoinLedgerResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetCoinLedgerResponse>(create);
+  static GetCoinLedgerResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<CoinLedgerEntry> get entries => $_getList(0);
+
+  @$pb.TagNumber(2)
+  $core.String get nextPageToken => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set nextPageToken($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasNextPageToken() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearNextPageToken() => $_clearField(2);
+}
+
+class ShopItem extends $pb.GeneratedMessage {
+  factory ShopItem({
+    $core.String? id,
+    $core.String? kind,
+    $core.String? name,
+    $core.String? description,
+    $fixnum.Int64? priceCoins,
+    $core.bool? active,
+    $core.Iterable<$core.MapEntry<$core.String, $core.String>>? metadata,
+  }) {
+    final result = create();
+    if (id != null) result.id = id;
+    if (kind != null) result.kind = kind;
+    if (name != null) result.name = name;
+    if (description != null) result.description = description;
+    if (priceCoins != null) result.priceCoins = priceCoins;
+    if (active != null) result.active = active;
+    if (metadata != null) result.metadata.addEntries(metadata);
+    return result;
+  }
+
+  ShopItem._();
+
+  factory ShopItem.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ShopItem.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ShopItem',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aOS(2, _omitFieldNames ? '' : 'kind')
+    ..aOS(3, _omitFieldNames ? '' : 'name')
+    ..aOS(4, _omitFieldNames ? '' : 'description')
+    ..aInt64(5, _omitFieldNames ? '' : 'priceCoins')
+    ..aOB(6, _omitFieldNames ? '' : 'active')
+    ..m<$core.String, $core.String>(7, _omitFieldNames ? '' : 'metadata',
+        entryClassName: 'ShopItem.MetadataEntry',
+        keyFieldType: $pb.PbFieldType.OS,
+        valueFieldType: $pb.PbFieldType.OS,
+        packageName: const $pb.PackageName('quiz'))
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ShopItem clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ShopItem copyWith(void Function(ShopItem) updates) =>
+      super.copyWith((message) => updates(message as ShopItem)) as ShopItem;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ShopItem create() => ShopItem._();
+  @$core.override
+  ShopItem createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ShopItem getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ShopItem>(create);
+  static ShopItem? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get kind => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set kind($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasKind() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearKind() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get name => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set name($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasName() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearName() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get description => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set description($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasDescription() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearDescription() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $fixnum.Int64 get priceCoins => $_getI64(4);
+  @$pb.TagNumber(5)
+  set priceCoins($fixnum.Int64 value) => $_setInt64(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasPriceCoins() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearPriceCoins() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.bool get active => $_getBF(5);
+  @$pb.TagNumber(6)
+  set active($core.bool value) => $_setBool(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasActive() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearActive() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(6);
+}
+
+class GetShopCatalogRequest extends $pb.GeneratedMessage {
+  factory GetShopCatalogRequest() => create();
+
+  GetShopCatalogRequest._();
+
+  factory GetShopCatalogRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetShopCatalogRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetShopCatalogRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetShopCatalogRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetShopCatalogRequest copyWith(
+          void Function(GetShopCatalogRequest) updates) =>
+      super.copyWith((message) => updates(message as GetShopCatalogRequest))
+          as GetShopCatalogRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetShopCatalogRequest create() => GetShopCatalogRequest._();
+  @$core.override
+  GetShopCatalogRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetShopCatalogRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetShopCatalogRequest>(create);
+  static GetShopCatalogRequest? _defaultInstance;
+}
+
+class GetShopCatalogResponse extends $pb.GeneratedMessage {
+  factory GetShopCatalogResponse({
+    $core.Iterable<ShopItem>? items,
+  }) {
+    final result = create();
+    if (items != null) result.items.addAll(items);
+    return result;
+  }
+
+  GetShopCatalogResponse._();
+
+  factory GetShopCatalogResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetShopCatalogResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetShopCatalogResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..pPM<ShopItem>(1, _omitFieldNames ? '' : 'items',
+        subBuilder: ShopItem.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetShopCatalogResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetShopCatalogResponse copyWith(
+          void Function(GetShopCatalogResponse) updates) =>
+      super.copyWith((message) => updates(message as GetShopCatalogResponse))
+          as GetShopCatalogResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetShopCatalogResponse create() => GetShopCatalogResponse._();
+  @$core.override
+  GetShopCatalogResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetShopCatalogResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetShopCatalogResponse>(create);
+  static GetShopCatalogResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<ShopItem> get items => $_getList(0);
+}
+
+class GetShopInventoryRequest extends $pb.GeneratedMessage {
+  factory GetShopInventoryRequest() => create();
+
+  GetShopInventoryRequest._();
+
+  factory GetShopInventoryRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetShopInventoryRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetShopInventoryRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetShopInventoryRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetShopInventoryRequest copyWith(
+          void Function(GetShopInventoryRequest) updates) =>
+      super.copyWith((message) => updates(message as GetShopInventoryRequest))
+          as GetShopInventoryRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetShopInventoryRequest create() => GetShopInventoryRequest._();
+  @$core.override
+  GetShopInventoryRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetShopInventoryRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetShopInventoryRequest>(create);
+  static GetShopInventoryRequest? _defaultInstance;
+}
+
+class GetShopInventoryResponse extends $pb.GeneratedMessage {
+  factory GetShopInventoryResponse({
+    $core.Iterable<$core.String>? ownedCosmetics,
+    $core.String? equippedCosmeticId,
+    $core.String? equippedNameColor,
+    $core.int? rerollCharges,
+    $core.bool? streakFreezeHeld,
+    $core.String? streakFreezeWeekIso,
+    $fixnum.Int64? balance,
+  }) {
+    final result = create();
+    if (ownedCosmetics != null) result.ownedCosmetics.addAll(ownedCosmetics);
+    if (equippedCosmeticId != null)
+      result.equippedCosmeticId = equippedCosmeticId;
+    if (equippedNameColor != null) result.equippedNameColor = equippedNameColor;
+    if (rerollCharges != null) result.rerollCharges = rerollCharges;
+    if (streakFreezeHeld != null) result.streakFreezeHeld = streakFreezeHeld;
+    if (streakFreezeWeekIso != null)
+      result.streakFreezeWeekIso = streakFreezeWeekIso;
+    if (balance != null) result.balance = balance;
+    return result;
+  }
+
+  GetShopInventoryResponse._();
+
+  factory GetShopInventoryResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetShopInventoryResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetShopInventoryResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..pPS(1, _omitFieldNames ? '' : 'ownedCosmetics')
+    ..aOS(2, _omitFieldNames ? '' : 'equippedCosmeticId')
+    ..aOS(3, _omitFieldNames ? '' : 'equippedNameColor')
+    ..aI(4, _omitFieldNames ? '' : 'rerollCharges')
+    ..aOB(5, _omitFieldNames ? '' : 'streakFreezeHeld')
+    ..aOS(6, _omitFieldNames ? '' : 'streakFreezeWeekIso')
+    ..aInt64(7, _omitFieldNames ? '' : 'balance')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetShopInventoryResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetShopInventoryResponse copyWith(
+          void Function(GetShopInventoryResponse) updates) =>
+      super.copyWith((message) => updates(message as GetShopInventoryResponse))
+          as GetShopInventoryResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetShopInventoryResponse create() => GetShopInventoryResponse._();
+  @$core.override
+  GetShopInventoryResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetShopInventoryResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetShopInventoryResponse>(create);
+  static GetShopInventoryResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<$core.String> get ownedCosmetics => $_getList(0);
+
+  @$pb.TagNumber(2)
+  $core.String get equippedCosmeticId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set equippedCosmeticId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasEquippedCosmeticId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearEquippedCosmeticId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get equippedNameColor => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set equippedNameColor($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasEquippedNameColor() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearEquippedNameColor() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get rerollCharges => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set rerollCharges($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasRerollCharges() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearRerollCharges() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.bool get streakFreezeHeld => $_getBF(4);
+  @$pb.TagNumber(5)
+  set streakFreezeHeld($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasStreakFreezeHeld() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearStreakFreezeHeld() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get streakFreezeWeekIso => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set streakFreezeWeekIso($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasStreakFreezeWeekIso() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearStreakFreezeWeekIso() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $fixnum.Int64 get balance => $_getI64(6);
+  @$pb.TagNumber(7)
+  set balance($fixnum.Int64 value) => $_setInt64(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasBalance() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearBalance() => $_clearField(7);
+}
+
+class PurchaseShopItemRequest extends $pb.GeneratedMessage {
+  factory PurchaseShopItemRequest({
+    $core.String? itemId,
+    $core.String? idempotencyKey,
+  }) {
+    final result = create();
+    if (itemId != null) result.itemId = itemId;
+    if (idempotencyKey != null) result.idempotencyKey = idempotencyKey;
+    return result;
+  }
+
+  PurchaseShopItemRequest._();
+
+  factory PurchaseShopItemRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory PurchaseShopItemRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PurchaseShopItemRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'itemId')
+    ..aOS(2, _omitFieldNames ? '' : 'idempotencyKey')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PurchaseShopItemRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PurchaseShopItemRequest copyWith(
+          void Function(PurchaseShopItemRequest) updates) =>
+      super.copyWith((message) => updates(message as PurchaseShopItemRequest))
+          as PurchaseShopItemRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static PurchaseShopItemRequest create() => PurchaseShopItemRequest._();
+  @$core.override
+  PurchaseShopItemRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static PurchaseShopItemRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PurchaseShopItemRequest>(create);
+  static PurchaseShopItemRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get itemId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set itemId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasItemId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearItemId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get idempotencyKey => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set idempotencyKey($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasIdempotencyKey() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearIdempotencyKey() => $_clearField(2);
+}
+
+class PurchaseShopItemResponse extends $pb.GeneratedMessage {
+  factory PurchaseShopItemResponse({
+    $core.bool? success,
+    $core.String? ledgerEntryId,
+    $fixnum.Int64? newBalance,
+    $core.String? errorCode,
+  }) {
+    final result = create();
+    if (success != null) result.success = success;
+    if (ledgerEntryId != null) result.ledgerEntryId = ledgerEntryId;
+    if (newBalance != null) result.newBalance = newBalance;
+    if (errorCode != null) result.errorCode = errorCode;
+    return result;
+  }
+
+  PurchaseShopItemResponse._();
+
+  factory PurchaseShopItemResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory PurchaseShopItemResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PurchaseShopItemResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'success')
+    ..aOS(2, _omitFieldNames ? '' : 'ledgerEntryId')
+    ..aInt64(3, _omitFieldNames ? '' : 'newBalance')
+    ..aOS(4, _omitFieldNames ? '' : 'errorCode')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PurchaseShopItemResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PurchaseShopItemResponse copyWith(
+          void Function(PurchaseShopItemResponse) updates) =>
+      super.copyWith((message) => updates(message as PurchaseShopItemResponse))
+          as PurchaseShopItemResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static PurchaseShopItemResponse create() => PurchaseShopItemResponse._();
+  @$core.override
+  PurchaseShopItemResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static PurchaseShopItemResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PurchaseShopItemResponse>(create);
+  static PurchaseShopItemResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get success => $_getBF(0);
+  @$pb.TagNumber(1)
+  set success($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSuccess() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSuccess() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get ledgerEntryId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set ledgerEntryId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasLedgerEntryId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearLedgerEntryId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get newBalance => $_getI64(2);
+  @$pb.TagNumber(3)
+  set newBalance($fixnum.Int64 value) => $_setInt64(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasNewBalance() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearNewBalance() => $_clearField(3);
+
+  /// Empty on success. Domain error codes: INSUFFICIENT, INACTIVE, UNKNOWN,
+  /// WEEKLY_CAP. gRPC-level errors (Unauthenticated, InvalidArgument) come
+  /// back as status errors instead.
+  @$pb.TagNumber(4)
+  $core.String get errorCode => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set errorCode($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasErrorCode() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearErrorCode() => $_clearField(4);
 }
 
 const $core.bool _omitFieldNames =

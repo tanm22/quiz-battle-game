@@ -1,6 +1,6 @@
 // This is a generated file - do not edit.
 //
-// Generated from proto/quiz.proto.
+// Generated from quiz.proto.
 
 // @dart = 3.3
 
@@ -1497,3 +1497,266 @@ final $typed_data.Uint8List getGlobalLeaderboardResponseDescriptor =
     $convert.base64Decode(
         'ChxHZXRHbG9iYWxMZWFkZXJib2FyZFJlc3BvbnNlEjAKB2VudHJpZXMYASADKAsyFi5xdWl6Lk'
         'xlYWRlcmJvYXJkRW50cnlSB2VudHJpZXM=');
+
+@$core.Deprecated('Use getCoinBalanceRequestDescriptor instead')
+const GetCoinBalanceRequest$json = {
+  '1': 'GetCoinBalanceRequest',
+};
+
+/// Descriptor for `GetCoinBalanceRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getCoinBalanceRequestDescriptor =
+    $convert.base64Decode('ChVHZXRDb2luQmFsYW5jZVJlcXVlc3Q=');
+
+@$core.Deprecated('Use getCoinBalanceResponseDescriptor instead')
+const GetCoinBalanceResponse$json = {
+  '1': 'GetCoinBalanceResponse',
+  '2': [
+    {'1': 'balance', '3': 1, '4': 1, '5': 3, '10': 'balance'},
+  ],
+};
+
+/// Descriptor for `GetCoinBalanceResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getCoinBalanceResponseDescriptor =
+    $convert.base64Decode(
+        'ChZHZXRDb2luQmFsYW5jZVJlc3BvbnNlEhgKB2JhbGFuY2UYASABKANSB2JhbGFuY2U=');
+
+@$core.Deprecated('Use coinLedgerEntryDescriptor instead')
+const CoinLedgerEntry$json = {
+  '1': 'CoinLedgerEntry',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+    {'1': 'delta', '3': 2, '4': 1, '5': 3, '10': 'delta'},
+    {'1': 'reason', '3': 3, '4': 1, '5': 9, '10': 'reason'},
+    {'1': 'ref_id', '3': 4, '4': 1, '5': 9, '10': 'refId'},
+    {'1': 'balance_after', '3': 5, '4': 1, '5': 3, '10': 'balanceAfter'},
+    {
+      '1': 'created_at_unix_ms',
+      '3': 6,
+      '4': 1,
+      '5': 3,
+      '10': 'createdAtUnixMs'
+    },
+    {
+      '1': 'metadata',
+      '3': 7,
+      '4': 3,
+      '5': 11,
+      '6': '.quiz.CoinLedgerEntry.MetadataEntry',
+      '10': 'metadata'
+    },
+  ],
+  '3': [CoinLedgerEntry_MetadataEntry$json],
+};
+
+@$core.Deprecated('Use coinLedgerEntryDescriptor instead')
+const CoinLedgerEntry_MetadataEntry$json = {
+  '1': 'MetadataEntry',
+  '2': [
+    {'1': 'key', '3': 1, '4': 1, '5': 9, '10': 'key'},
+    {'1': 'value', '3': 2, '4': 1, '5': 9, '10': 'value'},
+  ],
+  '7': {'7': true},
+};
+
+/// Descriptor for `CoinLedgerEntry`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List coinLedgerEntryDescriptor = $convert.base64Decode(
+    'Cg9Db2luTGVkZ2VyRW50cnkSDgoCaWQYASABKAlSAmlkEhQKBWRlbHRhGAIgASgDUgVkZWx0YR'
+    'IWCgZyZWFzb24YAyABKAlSBnJlYXNvbhIVCgZyZWZfaWQYBCABKAlSBXJlZklkEiMKDWJhbGFu'
+    'Y2VfYWZ0ZXIYBSABKANSDGJhbGFuY2VBZnRlchIrChJjcmVhdGVkX2F0X3VuaXhfbXMYBiABKA'
+    'NSD2NyZWF0ZWRBdFVuaXhNcxI/CghtZXRhZGF0YRgHIAMoCzIjLnF1aXouQ29pbkxlZGdlckVu'
+    'dHJ5Lk1ldGFkYXRhRW50cnlSCG1ldGFkYXRhGjsKDU1ldGFkYXRhRW50cnkSEAoDa2V5GAEgAS'
+    'gJUgNrZXkSFAoFdmFsdWUYAiABKAlSBXZhbHVlOgI4AQ==');
+
+@$core.Deprecated('Use getCoinLedgerRequestDescriptor instead')
+const GetCoinLedgerRequest$json = {
+  '1': 'GetCoinLedgerRequest',
+  '2': [
+    {'1': 'page_size', '3': 1, '4': 1, '5': 5, '10': 'pageSize'},
+    {'1': 'page_token', '3': 2, '4': 1, '5': 9, '10': 'pageToken'},
+  ],
+};
+
+/// Descriptor for `GetCoinLedgerRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getCoinLedgerRequestDescriptor = $convert.base64Decode(
+    'ChRHZXRDb2luTGVkZ2VyUmVxdWVzdBIbCglwYWdlX3NpemUYASABKAVSCHBhZ2VTaXplEh0KCn'
+    'BhZ2VfdG9rZW4YAiABKAlSCXBhZ2VUb2tlbg==');
+
+@$core.Deprecated('Use getCoinLedgerResponseDescriptor instead')
+const GetCoinLedgerResponse$json = {
+  '1': 'GetCoinLedgerResponse',
+  '2': [
+    {
+      '1': 'entries',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.quiz.CoinLedgerEntry',
+      '10': 'entries'
+    },
+    {'1': 'next_page_token', '3': 2, '4': 1, '5': 9, '10': 'nextPageToken'},
+  ],
+};
+
+/// Descriptor for `GetCoinLedgerResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getCoinLedgerResponseDescriptor = $convert.base64Decode(
+    'ChVHZXRDb2luTGVkZ2VyUmVzcG9uc2USLwoHZW50cmllcxgBIAMoCzIVLnF1aXouQ29pbkxlZG'
+    'dlckVudHJ5UgdlbnRyaWVzEiYKD25leHRfcGFnZV90b2tlbhgCIAEoCVINbmV4dFBhZ2VUb2tl'
+    'bg==');
+
+@$core.Deprecated('Use shopItemDescriptor instead')
+const ShopItem$json = {
+  '1': 'ShopItem',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+    {'1': 'kind', '3': 2, '4': 1, '5': 9, '10': 'kind'},
+    {'1': 'name', '3': 3, '4': 1, '5': 9, '10': 'name'},
+    {'1': 'description', '3': 4, '4': 1, '5': 9, '10': 'description'},
+    {'1': 'price_coins', '3': 5, '4': 1, '5': 3, '10': 'priceCoins'},
+    {'1': 'active', '3': 6, '4': 1, '5': 8, '10': 'active'},
+    {
+      '1': 'metadata',
+      '3': 7,
+      '4': 3,
+      '5': 11,
+      '6': '.quiz.ShopItem.MetadataEntry',
+      '10': 'metadata'
+    },
+  ],
+  '3': [ShopItem_MetadataEntry$json],
+};
+
+@$core.Deprecated('Use shopItemDescriptor instead')
+const ShopItem_MetadataEntry$json = {
+  '1': 'MetadataEntry',
+  '2': [
+    {'1': 'key', '3': 1, '4': 1, '5': 9, '10': 'key'},
+    {'1': 'value', '3': 2, '4': 1, '5': 9, '10': 'value'},
+  ],
+  '7': {'7': true},
+};
+
+/// Descriptor for `ShopItem`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List shopItemDescriptor = $convert.base64Decode(
+    'CghTaG9wSXRlbRIOCgJpZBgBIAEoCVICaWQSEgoEa2luZBgCIAEoCVIEa2luZBISCgRuYW1lGA'
+    'MgASgJUgRuYW1lEiAKC2Rlc2NyaXB0aW9uGAQgASgJUgtkZXNjcmlwdGlvbhIfCgtwcmljZV9j'
+    'b2lucxgFIAEoA1IKcHJpY2VDb2lucxIWCgZhY3RpdmUYBiABKAhSBmFjdGl2ZRI4CghtZXRhZG'
+    'F0YRgHIAMoCzIcLnF1aXouU2hvcEl0ZW0uTWV0YWRhdGFFbnRyeVIIbWV0YWRhdGEaOwoNTWV0'
+    'YWRhdGFFbnRyeRIQCgNrZXkYASABKAlSA2tleRIUCgV2YWx1ZRgCIAEoCVIFdmFsdWU6AjgB');
+
+@$core.Deprecated('Use getShopCatalogRequestDescriptor instead')
+const GetShopCatalogRequest$json = {
+  '1': 'GetShopCatalogRequest',
+};
+
+/// Descriptor for `GetShopCatalogRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getShopCatalogRequestDescriptor =
+    $convert.base64Decode('ChVHZXRTaG9wQ2F0YWxvZ1JlcXVlc3Q=');
+
+@$core.Deprecated('Use getShopCatalogResponseDescriptor instead')
+const GetShopCatalogResponse$json = {
+  '1': 'GetShopCatalogResponse',
+  '2': [
+    {
+      '1': 'items',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.quiz.ShopItem',
+      '10': 'items'
+    },
+  ],
+};
+
+/// Descriptor for `GetShopCatalogResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getShopCatalogResponseDescriptor =
+    $convert.base64Decode(
+        'ChZHZXRTaG9wQ2F0YWxvZ1Jlc3BvbnNlEiQKBWl0ZW1zGAEgAygLMg4ucXVpei5TaG9wSXRlbV'
+        'IFaXRlbXM=');
+
+@$core.Deprecated('Use getShopInventoryRequestDescriptor instead')
+const GetShopInventoryRequest$json = {
+  '1': 'GetShopInventoryRequest',
+};
+
+/// Descriptor for `GetShopInventoryRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getShopInventoryRequestDescriptor =
+    $convert.base64Decode('ChdHZXRTaG9wSW52ZW50b3J5UmVxdWVzdA==');
+
+@$core.Deprecated('Use getShopInventoryResponseDescriptor instead')
+const GetShopInventoryResponse$json = {
+  '1': 'GetShopInventoryResponse',
+  '2': [
+    {'1': 'owned_cosmetics', '3': 1, '4': 3, '5': 9, '10': 'ownedCosmetics'},
+    {
+      '1': 'equipped_cosmetic_id',
+      '3': 2,
+      '4': 1,
+      '5': 9,
+      '10': 'equippedCosmeticId'
+    },
+    {
+      '1': 'equipped_name_color',
+      '3': 3,
+      '4': 1,
+      '5': 9,
+      '10': 'equippedNameColor'
+    },
+    {'1': 'reroll_charges', '3': 4, '4': 1, '5': 5, '10': 'rerollCharges'},
+    {
+      '1': 'streak_freeze_held',
+      '3': 5,
+      '4': 1,
+      '5': 8,
+      '10': 'streakFreezeHeld'
+    },
+    {
+      '1': 'streak_freeze_week_iso',
+      '3': 6,
+      '4': 1,
+      '5': 9,
+      '10': 'streakFreezeWeekIso'
+    },
+    {'1': 'balance', '3': 7, '4': 1, '5': 3, '10': 'balance'},
+  ],
+};
+
+/// Descriptor for `GetShopInventoryResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getShopInventoryResponseDescriptor = $convert.base64Decode(
+    'ChhHZXRTaG9wSW52ZW50b3J5UmVzcG9uc2USJwoPb3duZWRfY29zbWV0aWNzGAEgAygJUg5vd2'
+    '5lZENvc21ldGljcxIwChRlcXVpcHBlZF9jb3NtZXRpY19pZBgCIAEoCVISZXF1aXBwZWRDb3Nt'
+    'ZXRpY0lkEi4KE2VxdWlwcGVkX25hbWVfY29sb3IYAyABKAlSEWVxdWlwcGVkTmFtZUNvbG9yEi'
+    'UKDnJlcm9sbF9jaGFyZ2VzGAQgASgFUg1yZXJvbGxDaGFyZ2VzEiwKEnN0cmVha19mcmVlemVf'
+    'aGVsZBgFIAEoCFIQc3RyZWFrRnJlZXplSGVsZBIzChZzdHJlYWtfZnJlZXplX3dlZWtfaXNvGA'
+    'YgASgJUhNzdHJlYWtGcmVlemVXZWVrSXNvEhgKB2JhbGFuY2UYByABKANSB2JhbGFuY2U=');
+
+@$core.Deprecated('Use purchaseShopItemRequestDescriptor instead')
+const PurchaseShopItemRequest$json = {
+  '1': 'PurchaseShopItemRequest',
+  '2': [
+    {'1': 'item_id', '3': 1, '4': 1, '5': 9, '10': 'itemId'},
+    {'1': 'idempotency_key', '3': 2, '4': 1, '5': 9, '10': 'idempotencyKey'},
+  ],
+};
+
+/// Descriptor for `PurchaseShopItemRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List purchaseShopItemRequestDescriptor =
+    $convert.base64Decode(
+        'ChdQdXJjaGFzZVNob3BJdGVtUmVxdWVzdBIXCgdpdGVtX2lkGAEgASgJUgZpdGVtSWQSJwoPaW'
+        'RlbXBvdGVuY3lfa2V5GAIgASgJUg5pZGVtcG90ZW5jeUtleQ==');
+
+@$core.Deprecated('Use purchaseShopItemResponseDescriptor instead')
+const PurchaseShopItemResponse$json = {
+  '1': 'PurchaseShopItemResponse',
+  '2': [
+    {'1': 'success', '3': 1, '4': 1, '5': 8, '10': 'success'},
+    {'1': 'ledger_entry_id', '3': 2, '4': 1, '5': 9, '10': 'ledgerEntryId'},
+    {'1': 'new_balance', '3': 3, '4': 1, '5': 3, '10': 'newBalance'},
+    {'1': 'error_code', '3': 4, '4': 1, '5': 9, '10': 'errorCode'},
+  ],
+};
+
+/// Descriptor for `PurchaseShopItemResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List purchaseShopItemResponseDescriptor = $convert.base64Decode(
+    'ChhQdXJjaGFzZVNob3BJdGVtUmVzcG9uc2USGAoHc3VjY2VzcxgBIAEoCFIHc3VjY2VzcxImCg'
+    '9sZWRnZXJfZW50cnlfaWQYAiABKAlSDWxlZGdlckVudHJ5SWQSHwoLbmV3X2JhbGFuY2UYAyAB'
+    'KANSCm5ld0JhbGFuY2USHQoKZXJyb3JfY29kZRgEIAEoCVIJZXJyb3JDb2Rl');

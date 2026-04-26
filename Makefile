@@ -15,10 +15,14 @@ proto-go:
 # Requires `dart pub global activate protoc_plugin` and ~/.pub-cache/bin on PATH.
 # Skip-friendly: `make proto-go` regenerates only Go stubs when the dart plugin
 # isn't installed (e.g. on CI runners that don't need Flutter codegen).
+#
+# `-I proto` (not `-I .`) so the dart_out path resolution drops the `proto/`
+# prefix — the generated files land at flutter/lib/proto/quiz.pb*.dart, which
+# is what every Flutter import (`import '../proto/quiz.pbgrpc.dart';`) reaches.
 proto-dart:
-	protoc -I . \
+	protoc -I proto \
 	  --dart_out=grpc:flutter/lib/proto \
-	  $(PROTO_SRC)
+	  quiz.proto
 
 test:
 	go test ./...
