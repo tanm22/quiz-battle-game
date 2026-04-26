@@ -1101,27 +1101,35 @@ func (s *quizServer) finalizeExpiredTournaments(ctx context.Context, now time.Ti
 			continue
 		}
 
-		// Race guard: flip winnersAwarded=true atomically with a $eq:false
-		// filter. Two parallel quiz instances would both see the row in their
-		// cursor; only one will land the update. The loser sees ModifiedCount=0
-		// and skips this row, leaving payout to the winner. This is the same
-		// pattern the auth service uses for streak claims.
+		// Three-phase finalize, ordered specifically so any partial failure
+		// leaves the tournament eligible for a clean retry on the next tick:
 		//
-		// We persist the per-winner payout rows BEFORE this flip is "real"
-		// for downstream consumers — the row insertion below is what actually
-		// drives the at-least-once delivery (drain worker + consumer
-		// transition). The flip itself just claims this tournament for one
-		// finalizer so we don't double-insert payouts on a parallel run.
-		res, err := s.mongoDB.Collection("tournaments").UpdateOne(ctx,
-			bson.M{"_id": t.ID, "winnersAwarded": false},
-			bson.M{"$set": bson.M{"winnersAwarded": true, "status": "completed"}},
-		)
-		if err != nil || res.ModifiedCount == 0 {
-			continue
-		}
+		//   Phase 1 — persist payouts. $setOnInsert on (tournamentId, userId)
+		//             is idempotent both for re-runs after a crash and for
+		//             two parallel finalizers racing on the same tournament.
+		//             Any error here aborts BEFORE the flip, so the
+		//             tournament keeps winnersAwarded=false and the next
+		//             tick re-enters from scratch.
+		//
+		//   Phase 2 — atomic claim flip. The race guard between parallel
+		//             finalizers — both finished phase 1 (idempotently),
+		//             only one wins this UpdateOne and proceeds to publish.
+		//             The loser sees ModifiedCount=0 and skips: its phase 1
+		//             work was the same upserts the winner just did, so no
+		//             harm done.
+		//
+		//   Phase 3 — immediate publish from the in-memory list built in
+		//             phase 1. Failures here leave individual rows in
+		//             status="pending"; the drain worker (1-min tick) keeps
+		//             re-publishing them until they succeed.
+		//
+		// Earlier ordering (flip → standings query → write+publish) had a
+		// durability gap: a Mongo error between the flip and the payout
+		// write would strand the tournament with winnersAwarded=true and
+		// zero payout rows, invisible to both the next finalize tick (filter
+		// excludes it) and the drain worker (no rows to find).
 
-		// Build the winner list: top-N from standings sorted by score desc,
-		// where N = len(prizePool). When prizePool is empty we still emit a
+		// Build winner cap. When prizePool is empty we still emit a
 		// finished event for every participant with zero coins so they get
 		// the closing notification. If neither is populated (admin error or
 		// fully unattended tournament), there's nothing to publish — skip.
@@ -1130,11 +1138,19 @@ func (s *quizServer) finalizeExpiredTournaments(ctx context.Context, now time.Ti
 			topN = len(t.Participants)
 		}
 		if topN == 0 {
+			// Nothing to pay out. Still flip so the row drops out of the
+			// finalize filter — otherwise we'd re-cursor it every minute.
+			s.mongoDB.Collection("tournaments").UpdateOne(ctx,
+				bson.M{"_id": t.ID, "winnersAwarded": false},
+				bson.M{"$set": bson.M{"winnersAwarded": true, "status": "completed"}},
+			)
 			log.Printf("[quiz] finalize: tournament %s closed with no participants and no prize pool", t.ID)
 			continue
 		}
 
-		// Pull standings sorted by score desc, capped at topN.
+		// Phase 1: pull standings sorted by score desc, capped at topN, and
+		// persist each as a pending payout. Build the in-memory list as we
+		// go for phase 3.
 		findOpts := options.Find().SetSort(bson.M{"score": -1}).SetLimit(int64(topN))
 		standingsCursor, err := s.mongoDB.Collection("tournament_standings").Find(ctx,
 			bson.M{"tournamentId": t.ID},
@@ -1145,11 +1161,8 @@ func (s *quizServer) finalizeExpiredTournaments(ctx context.Context, now time.Ti
 			continue
 		}
 
-		// Two-phase commit: persist every winner as a "pending" payout row
-		// FIRST (durable across crashes / RabbitMQ outages), then attempt to
-		// publish each. If publish fails for any row, the drain worker
-		// (tournamentPayoutDrainWorker) re-publishes on its 1-min tick.
-		// $setOnInsert on (tournamentId, userId) keeps re-runs idempotent.
+		payouts := make([]models.TournamentPayout, 0, topN)
+		writeFailed := false
 		rank := 0
 		for standingsCursor.Next(ctx) {
 			var st models.TournamentStanding
@@ -1189,15 +1202,42 @@ func (s *quizServer) finalizeExpiredTournaments(ctx context.Context, now time.Ti
 				}},
 				options.UpdateOne().SetUpsert(true),
 			); err != nil {
-				log.Printf("[quiz] finalize: payout upsert failed for tournament=%s user=%s: %v", t.ID, st.UserID, err)
-				// Soldier on — the drain worker will eventually try to
-				// publish whatever rows did make it in.
-				continue
+				// Fail loud and abort this tournament. winnersAwarded stays
+				// false, so the next tick re-runs phase 1 from scratch —
+				// $setOnInsert no-ops the rows that already landed and
+				// inserts the missing ones.
+				log.Printf("[quiz] finalize: payout upsert failed for tournament=%s user=%s: %v — aborting (will retry next tick)", t.ID, st.UserID, err)
+				writeFailed = true
+				break
 			}
-
-			s.publishTournamentPayout(ctx, payout)
+			payouts = append(payouts, payout)
 		}
 		standingsCursor.Close(ctx)
+
+		if writeFailed {
+			continue
+		}
+
+		// Phase 2: atomic claim flip. Loser of a parallel race sees
+		// ModifiedCount=0; the winner is the publisher of record.
+		res, err := s.mongoDB.Collection("tournaments").UpdateOne(ctx,
+			bson.M{"_id": t.ID, "winnersAwarded": false},
+			bson.M{"$set": bson.M{"winnersAwarded": true, "status": "completed"}},
+		)
+		if err != nil {
+			log.Printf("[quiz] finalize: claim flip failed for %s: %v — payouts persisted, will retry on next tick", t.ID, err)
+			continue
+		}
+		if res.ModifiedCount == 0 {
+			// Parallel finalizer already won the claim and is responsible
+			// for publishing. Our phase 1 was idempotent so no inconsistency.
+			continue
+		}
+
+		// Phase 3: publish from the persisted set.
+		for _, p := range payouts {
+			s.publishTournamentPayout(ctx, p)
+		}
 
 		log.Printf("[quiz] finalized tournament %s (%s): %d payouts persisted", t.ID, t.Name, rank)
 	}
