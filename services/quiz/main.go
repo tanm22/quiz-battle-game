@@ -22,10 +22,16 @@ import (
 	"google.golang.org/grpc/status"
 
 	"quiz-battle/pkg/auth"
+	"quiz-battle/pkg/coins"
 	"quiz-battle/pkg/keys"
 	"quiz-battle/pkg/models"
 	pb "quiz-battle/proto"
 )
+
+// matchWinCoinReward is the flat coin payout for taking 1st place in a
+// regular match. See ADR-0002 for calibration. Tournaments have their own
+// per-rank prize pool wired through the existing tournament_payouts work-list.
+const matchWinCoinReward int64 = 100
 
 // ---------------------------------------------------------------------------
 // Question document (matches MongoDB schema from section 3.1)
@@ -571,6 +577,29 @@ func (s *quizServer) finishMatch(ctx context.Context, roomID string, totalRounds
 		log.Printf("[quiz] failed to marshal match.finished: %v", err)
 	} else if err := s.publish(ctx, "match.finished", finishEvent); err != nil {
 		log.Printf("[quiz] failed to publish match.finished: %v", err)
+	}
+
+	// §4.3: award match-win coins to the leaderboard winner via the earn
+	// pipeline. RefID = "match:<roomId>:user:<winner>" — combined with
+	// the (userId, refId, reason) unique index in coin_ledger, a redelivered
+	// match.finished can't double-credit even if this branch fires twice.
+	// `winner == ""` happens when nobody scored (both abandoned before
+	// answering); skip silently in that case.
+	if winner != "" {
+		earnRouting := coins.EarnRoutingKey(coins.EarnSourceMatchWin)
+		earnBody, mErr := json.Marshal(coins.EarnEvent{
+			Event:    earnRouting,
+			UserID:   winner,
+			Amount:   matchWinCoinReward,
+			Reason:   coins.ReasonMatchWin,
+			RefID:    fmt.Sprintf("match:%s:user:%s", roomID, winner),
+			Metadata: map[string]string{"roomId": roomID},
+		})
+		if mErr != nil {
+			log.Printf("[quiz] failed to marshal %s: %v", earnRouting, mErr)
+		} else if err := s.publish(ctx, earnRouting, earnBody); err != nil {
+			log.Printf("[quiz] failed to publish %s: %v", earnRouting, err)
+		}
 	}
 
 	// Cleanup in-memory state
