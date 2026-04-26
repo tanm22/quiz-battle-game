@@ -1,6 +1,6 @@
 // This is a generated file - do not edit.
 //
-// Generated from proto/quiz.proto.
+// Generated from quiz.proto.
 
 // @dart = 3.3
 
@@ -379,6 +379,43 @@ class ScoringServiceClient extends $grpc.Client {
     return $createUnaryCall(_$getGlobalLeaderboard, request, options: options);
   }
 
+  /// Phase 3 (4.3): Coins & Shop — balance read + ledger history.
+  $grpc.ResponseFuture<$0.GetCoinBalanceResponse> getCoinBalance(
+    $0.GetCoinBalanceRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$getCoinBalance, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.GetCoinLedgerResponse> getCoinLedger(
+    $0.GetCoinLedgerRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$getCoinLedger, request, options: options);
+  }
+
+  /// Phase 3 (4.3) PR 4: shop catalog + inventory + spend.
+  $grpc.ResponseFuture<$0.GetShopCatalogResponse> getShopCatalog(
+    $0.GetShopCatalogRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$getShopCatalog, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.GetShopInventoryResponse> getShopInventory(
+    $0.GetShopInventoryRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$getShopInventory, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.PurchaseShopItemResponse> purchaseShopItem(
+    $0.PurchaseShopItemRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$purchaseShopItem, request, options: options);
+  }
+
   // method descriptors
 
   static final _$calculateScore =
@@ -421,6 +458,31 @@ class ScoringServiceClient extends $grpc.Client {
       '/quiz.ScoringService/GetGlobalLeaderboard',
       ($0.GetGlobalLeaderboardRequest value) => value.writeToBuffer(),
       $0.GetGlobalLeaderboardResponse.fromBuffer);
+  static final _$getCoinBalance =
+      $grpc.ClientMethod<$0.GetCoinBalanceRequest, $0.GetCoinBalanceResponse>(
+          '/quiz.ScoringService/GetCoinBalance',
+          ($0.GetCoinBalanceRequest value) => value.writeToBuffer(),
+          $0.GetCoinBalanceResponse.fromBuffer);
+  static final _$getCoinLedger =
+      $grpc.ClientMethod<$0.GetCoinLedgerRequest, $0.GetCoinLedgerResponse>(
+          '/quiz.ScoringService/GetCoinLedger',
+          ($0.GetCoinLedgerRequest value) => value.writeToBuffer(),
+          $0.GetCoinLedgerResponse.fromBuffer);
+  static final _$getShopCatalog =
+      $grpc.ClientMethod<$0.GetShopCatalogRequest, $0.GetShopCatalogResponse>(
+          '/quiz.ScoringService/GetShopCatalog',
+          ($0.GetShopCatalogRequest value) => value.writeToBuffer(),
+          $0.GetShopCatalogResponse.fromBuffer);
+  static final _$getShopInventory = $grpc.ClientMethod<
+          $0.GetShopInventoryRequest, $0.GetShopInventoryResponse>(
+      '/quiz.ScoringService/GetShopInventory',
+      ($0.GetShopInventoryRequest value) => value.writeToBuffer(),
+      $0.GetShopInventoryResponse.fromBuffer);
+  static final _$purchaseShopItem = $grpc.ClientMethod<
+          $0.PurchaseShopItemRequest, $0.PurchaseShopItemResponse>(
+      '/quiz.ScoringService/PurchaseShopItem',
+      ($0.PurchaseShopItemRequest value) => value.writeToBuffer(),
+      $0.PurchaseShopItemResponse.fromBuffer);
 }
 
 @$pb.GrpcServiceName('quiz.ScoringService')
@@ -500,6 +562,51 @@ abstract class ScoringServiceBase extends $grpc.Service {
         ($core.List<$core.int> value) =>
             $0.GetGlobalLeaderboardRequest.fromBuffer(value),
         ($0.GetGlobalLeaderboardResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.GetCoinBalanceRequest,
+            $0.GetCoinBalanceResponse>(
+        'GetCoinBalance',
+        getCoinBalance_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.GetCoinBalanceRequest.fromBuffer(value),
+        ($0.GetCoinBalanceResponse value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.GetCoinLedgerRequest, $0.GetCoinLedgerResponse>(
+            'GetCoinLedger',
+            getCoinLedger_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.GetCoinLedgerRequest.fromBuffer(value),
+            ($0.GetCoinLedgerResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.GetShopCatalogRequest,
+            $0.GetShopCatalogResponse>(
+        'GetShopCatalog',
+        getShopCatalog_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.GetShopCatalogRequest.fromBuffer(value),
+        ($0.GetShopCatalogResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.GetShopInventoryRequest,
+            $0.GetShopInventoryResponse>(
+        'GetShopInventory',
+        getShopInventory_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.GetShopInventoryRequest.fromBuffer(value),
+        ($0.GetShopInventoryResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.PurchaseShopItemRequest,
+            $0.PurchaseShopItemResponse>(
+        'PurchaseShopItem',
+        purchaseShopItem_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.PurchaseShopItemRequest.fromBuffer(value),
+        ($0.PurchaseShopItemResponse value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.CalculateScoreResponse> calculateScore_Pre(
@@ -573,6 +680,51 @@ abstract class ScoringServiceBase extends $grpc.Service {
 
   $async.Future<$0.GetGlobalLeaderboardResponse> getGlobalLeaderboard(
       $grpc.ServiceCall call, $0.GetGlobalLeaderboardRequest request);
+
+  $async.Future<$0.GetCoinBalanceResponse> getCoinBalance_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.GetCoinBalanceRequest> $request) async {
+    return getCoinBalance($call, await $request);
+  }
+
+  $async.Future<$0.GetCoinBalanceResponse> getCoinBalance(
+      $grpc.ServiceCall call, $0.GetCoinBalanceRequest request);
+
+  $async.Future<$0.GetCoinLedgerResponse> getCoinLedger_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.GetCoinLedgerRequest> $request) async {
+    return getCoinLedger($call, await $request);
+  }
+
+  $async.Future<$0.GetCoinLedgerResponse> getCoinLedger(
+      $grpc.ServiceCall call, $0.GetCoinLedgerRequest request);
+
+  $async.Future<$0.GetShopCatalogResponse> getShopCatalog_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.GetShopCatalogRequest> $request) async {
+    return getShopCatalog($call, await $request);
+  }
+
+  $async.Future<$0.GetShopCatalogResponse> getShopCatalog(
+      $grpc.ServiceCall call, $0.GetShopCatalogRequest request);
+
+  $async.Future<$0.GetShopInventoryResponse> getShopInventory_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.GetShopInventoryRequest> $request) async {
+    return getShopInventory($call, await $request);
+  }
+
+  $async.Future<$0.GetShopInventoryResponse> getShopInventory(
+      $grpc.ServiceCall call, $0.GetShopInventoryRequest request);
+
+  $async.Future<$0.PurchaseShopItemResponse> purchaseShopItem_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.PurchaseShopItemRequest> $request) async {
+    return purchaseShopItem($call, await $request);
+  }
+
+  $async.Future<$0.PurchaseShopItemResponse> purchaseShopItem(
+      $grpc.ServiceCall call, $0.PurchaseShopItemRequest request);
 }
 
 @$pb.GrpcServiceName('quiz.AuthService')

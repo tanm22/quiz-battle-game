@@ -14,6 +14,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"quiz-battle/pkg/coins"
+	"quiz-battle/pkg/coins/shop"
 )
 
 type Question struct {
@@ -158,6 +159,18 @@ func main() {
 	}
 	log.Println("[seed] coin_ledger indexes ensured")
 
+	// PR 4 (§4.3 Shop): the effect outbox is consumed by services/payment in
+	// PR 5 to extend planExpiresAt for premium-trial purchases. The (kind,
+	// processedAt asc) index lets the dequeuer's "find unprocessed by kind,
+	// oldest first" query hit a covered scan.
+	if _, err := db.Collection("coin_effect_outbox").Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    bson.D{{Key: "processedAt", Value: 1}, {Key: "kind", Value: 1}},
+		Options: options.Index().SetName("idx_outbox_due"),
+	}); err != nil {
+		log.Fatalf("[seed] coin_effect_outbox index: %v", err)
+	}
+	log.Println("[seed] coin_effect_outbox index ensured")
+
 	log.Println("[seed] indexes created")
 
 	// --- Seed questions ---
@@ -249,6 +262,23 @@ func main() {
 		log.Printf("[seed] migrated %d existing users to onboardingCompleted=true", migRes.ModifiedCount)
 	}
 
+	// §4.3 (PR 4) backfill: pre-shop users have no inventory fields. Seed
+	// rerollCharges=0 / streakFreezeHeld=false / streakFreezeWeekISO="" so
+	// the GetShopInventory RPC and Purchase.Buy weekly-cap predicate never
+	// have to special-case "field absent" vs "field zero".
+	shopBackfillRes, err := usersColl.UpdateMany(ctx,
+		bson.M{"rerollCharges": bson.M{"$exists": false}},
+		bson.M{"$set": bson.M{
+			"rerollCharges":       int32(0),
+			"streakFreezeHeld":    false,
+			"streakFreezeWeekISO": "",
+		}},
+	)
+	if err != nil {
+		log.Fatalf("[seed] shop field backfill: %v", err)
+	}
+	log.Printf("[seed] shop fields backfilled on %d users", shopBackfillRes.ModifiedCount)
+
 	// --- Seed tournaments ---
 	tournamentsColl := db.Collection("tournaments")
 	now := time.Now()
@@ -309,6 +339,25 @@ func main() {
 	}
 	tCount, _ := tournamentsColl.CountDocuments(ctx, bson.M{})
 	log.Printf("[seed] %d tournaments in database", tCount)
+
+	// PR 4 (§4.3): upsert shop catalog from JSON. We try the in-image path
+	// first (the Dockerfile copies seed/shop_items.json to /data) and fall
+	// back to the repo-relative path for local `go run ./seed` invocations.
+	shopPath := "/data/shop_items.json"
+	if _, err := os.Stat(shopPath); err != nil {
+		shopPath = "seed/shop_items.json"
+		if _, err := os.Stat(shopPath); err != nil {
+			shopPath = "shop_items.json"
+		}
+	}
+	items, err := shop.LoadFromFile(shopPath)
+	if err != nil {
+		log.Fatalf("[seed] load shop items from %s: %v", shopPath, err)
+	}
+	if err := shop.Upsert(ctx, db, items); err != nil {
+		log.Fatalf("[seed] upsert shop items: %v", err)
+	}
+	log.Printf("[seed] upserted %d shop items", len(items))
 
 	log.Println("[seed] done")
 }
