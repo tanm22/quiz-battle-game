@@ -1,6 +1,6 @@
 # Quiz Battle System
 
-Real-time multiplayer quiz game with Go microservices, RabbitMQ event bus, Redis state, MongoDB persistence, and a Flutter client. Includes premium subscriptions (Razorpay), referral system, login streaks, daily rewards, push notifications (FCM), tournaments, and a global leaderboard.
+Real-time multiplayer quiz game with Go microservices, RabbitMQ event bus, Redis state, MongoDB persistence, and a Flutter client. Includes premium subscriptions (Razorpay), referral system, login streaks, daily rewards, push notifications (FCM), tournaments, a global leaderboard, and a server-authoritative coin economy with shop ([architecture](docs/architecture.md), [API](docs/api.md), [runbook](docs/runbook-coins.md)).
 
 ## Architecture
 

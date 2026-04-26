@@ -5,13 +5,14 @@ import '../../proto/quiz.pb.dart';
 import '../../providers/coins_state.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/coin_balance_chip.dart';
+import '../../widgets/purchase_confirm_modal.dart';
+import '../coin_ledger_screen.dart';
 
 /// Detail view for a single shop item — full description, price, current
 /// ownership state, and the Buy button.
 ///
-/// In this PR (PR 6) the Buy button opens a placeholder dialog. PR 7
-/// replaces that with the real `PurchaseConfirmModal`; the rest of this
-/// screen is unchanged.
+/// In PR 6 the Buy button opens a placeholder dialog. PR 7 swaps that for
+/// [PurchaseConfirmModal]; the rest of this screen is unchanged.
 class ShopItemDetail extends ConsumerWidget {
   const ShopItemDetail({super.key, required this.item});
 
@@ -30,10 +31,17 @@ class ShopItemDetail extends ConsumerWidget {
         title: Text(item.name),
         backgroundColor: AppColors.bg,
         foregroundColor: AppColors.text,
-        actions: const [
+        actions: [
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 12),
-            child: Center(child: CoinBalanceChip()),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Center(
+              child: CoinBalanceChip(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CoinLedgerScreen()),
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -81,20 +89,17 @@ class ShopItemDetail extends ConsumerWidget {
                 ),
                 onPressed: equipped || owned
                     ? null
-                    : () => showDialog<void>(
+                    : () async {
+                        final ok = await showDialog<bool>(
                           context: context,
-                          builder: (_) => AlertDialog(
-                            title: const Text('Coming next'),
-                            content: const Text(
-                                'Purchase ships in PR 7 — modal + actual debit + provider invalidation.'),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.of(context).pop(),
-                                child: const Text('OK'),
-                              ),
-                            ],
-                          ),
-                        ),
+                          builder: (_) => PurchaseConfirmModal(item: item),
+                        );
+                        if (ok == true && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Purchased!')),
+                          );
+                        }
+                      },
                 icon: Icon(equipped
                     ? Icons.check_circle
                     : (owned ? Icons.inventory : Icons.shopping_cart)),
