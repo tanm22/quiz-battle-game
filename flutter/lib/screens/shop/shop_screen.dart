@@ -5,6 +5,7 @@ import '../../proto/quiz.pb.dart';
 import '../../providers/coins_state.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/coin_balance_chip.dart';
+import '../coin_ledger_screen.dart';
 import 'shop_item_detail.dart';
 
 /// Hard-coded category → kind mapping. Mirrors the kinds defined in
@@ -39,10 +40,17 @@ class ShopScreen extends ConsumerWidget {
           title: const Text('Coin Shop'),
           backgroundColor: AppColors.bg,
           foregroundColor: AppColors.text,
-          actions: const [
+          actions: [
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12),
-              child: Center(child: CoinBalanceChip()),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Center(
+                child: CoinBalanceChip(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CoinLedgerScreen()),
+                  ),
+                ),
+              ),
             ),
           ],
           bottom: TabBar(

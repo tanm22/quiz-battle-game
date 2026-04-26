@@ -5,35 +5,78 @@ import '../../proto/quiz.pb.dart';
 import '../../providers/coins_state.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/coin_balance_chip.dart';
+import '../../widgets/purchase_confirm_modal.dart';
+import '../coin_ledger_screen.dart';
 
 /// Detail view for a single shop item — full description, price, current
 /// ownership state, and the Buy button.
 ///
-/// In this PR (PR 6) the Buy button opens a placeholder dialog. PR 7
-/// replaces that with the real `PurchaseConfirmModal`; the rest of this
-/// screen is unchanged.
+/// The Buy button opens [PurchaseConfirmModal]. The button's enabled
+/// state is per-kind:
+///
+///  * Cosmetics (`cosmetic.avatar_frame` / `cosmetic.name_color`) — shows
+///    "Equipped" / "Already owned" once the user owns it; further taps
+///    are blocked. This is the legacy `ownedCosmetics` array on the user
+///    document.
+///  * Streak freeze (`streak_freeze.weekly`) — shows "Already held" while
+///    `streakFreezeHeld` is true; the server caps purchases at one per
+///    ISO week so a second tap would just return `WEEKLY_CAP`.
+///  * Reroll topic (`reroll_topic`) — always buyable; charges stack on
+///    purchase.
+///  * Premium trial (`premium_trial`) — always buyable; the consumer
+///    extends `planExpiresAt` from the existing expiry (ADR-0003), so
+///    overlapping purchases stack days rather than overwriting time.
 class ShopItemDetail extends ConsumerWidget {
   const ShopItemDetail({super.key, required this.item});
 
   final ShopItem item;
 
+  /// Per-kind "already obtained" state. Returns `null` if the item is
+  /// always buyable (reroll, premium trial), `'Equipped'` for the
+  /// currently-equipped cosmetic, or another short status string when
+  /// further purchases should be blocked.
+  String? _statusFor(GetShopInventoryResponse inv) {
+    switch (item.kind) {
+      case 'cosmetic.avatar_frame':
+      case 'cosmetic.name_color':
+        if (inv.equippedCosmeticId == item.id ||
+            inv.equippedNameColor == item.id) {
+          return 'Equipped';
+        }
+        if (inv.ownedCosmetics.contains(item.id)) return 'Already owned';
+        return null;
+      case 'streak_freeze':
+        return inv.streakFreezeHeld ? 'Already held' : null;
+      // reroll_topic and premium_trial intentionally fall through —
+      // both stack rather than block on prior ownership.
+      default:
+        return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final inventory = ref.watch(shopInventoryProvider).value;
-    final owned = inventory?.ownedCosmetics.contains(item.id) ?? false;
-    final equipped = inventory != null &&
-        (inventory.equippedCosmeticId == item.id ||
-            inventory.equippedNameColor == item.id);
+    final status = inventory == null ? null : _statusFor(inventory);
+    final blocked = status != null;
+    final equipped = status == 'Equipped';
 
     return Scaffold(
       appBar: AppBar(
         title: Text(item.name),
         backgroundColor: AppColors.bg,
         foregroundColor: AppColors.text,
-        actions: const [
+        actions: [
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 12),
-            child: Center(child: CoinBalanceChip()),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Center(
+              child: CoinBalanceChip(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CoinLedgerScreen()),
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -79,28 +122,23 @@ class ShopItemDetail extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: const RoundedRectangleBorder(borderRadius: AppRadius.button),
                 ),
-                onPressed: equipped || owned
+                onPressed: blocked
                     ? null
-                    : () => showDialog<void>(
+                    : () async {
+                        final ok = await showDialog<bool>(
                           context: context,
-                          builder: (_) => AlertDialog(
-                            title: const Text('Coming next'),
-                            content: const Text(
-                                'Purchase ships in PR 7 — modal + actual debit + provider invalidation.'),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.of(context).pop(),
-                                child: const Text('OK'),
-                              ),
-                            ],
-                          ),
-                        ),
+                          builder: (_) => PurchaseConfirmModal(item: item),
+                        );
+                        if (ok == true && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Purchased!')),
+                          );
+                        }
+                      },
                 icon: Icon(equipped
                     ? Icons.check_circle
-                    : (owned ? Icons.inventory : Icons.shopping_cart)),
-                label: Text(equipped
-                    ? 'Equipped'
-                    : (owned ? 'Already owned' : 'Buy')),
+                    : (blocked ? Icons.inventory : Icons.shopping_cart)),
+                label: Text(status ?? 'Buy'),
               ),
             ),
           ],
