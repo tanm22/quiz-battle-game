@@ -58,13 +58,30 @@ class ShopScreen extends ConsumerWidget {
             message: '$e',
             onRetry: () => ref.invalidate(shopCatalogProvider),
           ),
-          data: (items) => TabBarView(
+          data: (items) => Column(
             children: [
-              for (final entry in _categories.entries)
-                _CategoryGrid(
-                  items: items.where((it) => entry.value.contains(it.kind)).toList(),
-                  inventory: inventory.value,
+              // If inventory failed, the grid would otherwise silently
+              // render every cosmetic without an Owned/Equipped chip —
+              // indistinguishable from "the user owns nothing." Surface
+              // a non-blocking banner with a Retry so the user knows
+              // the indicators are stale and can recover.
+              if (inventory.hasError)
+                _InventoryErrorBanner(
+                  onRetry: () => ref.invalidate(shopInventoryProvider),
                 ),
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    for (final entry in _categories.entries)
+                      _CategoryGrid(
+                        items: items
+                            .where((it) => entry.value.contains(it.kind))
+                            .toList(),
+                        inventory: inventory.value,
+                      ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -81,8 +98,7 @@ class _CategoryGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visible = items.where((it) => it.active).toList();
-    if (visible.isEmpty) {
+    if (items.isEmpty) {
       return const Center(
         child: Text('Nothing here yet — check back soon.',
             style: TextStyle(color: AppColors.textMuted)),
@@ -96,8 +112,41 @@ class _CategoryGrid extends StatelessWidget {
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
       ),
-      itemCount: visible.length,
-      itemBuilder: (context, i) => _ShopCard(item: visible[i], inventory: inventory),
+      itemCount: items.length,
+      itemBuilder: (context, i) => _ShopCard(item: items[i], inventory: inventory),
+    );
+  }
+}
+
+/// Non-blocking banner shown when [shopInventoryProvider] is in the
+/// error state. The grid still renders so the user can browse, but the
+/// banner makes it clear that Owned / Equipped indicators may be wrong
+/// or missing — and gives them a one-tap retry.
+class _InventoryErrorBanner extends StatelessWidget {
+  const _InventoryErrorBanner({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: AppColors.danger.withAlpha(20),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          const Icon(Icons.warning_amber_rounded,
+              color: AppColors.danger, size: 18),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              "Couldn't load your inventory — Owned / Equipped indicators may be missing.",
+              style: TextStyle(color: AppColors.danger, fontSize: 12),
+            ),
+          ),
+          TextButton(onPressed: onRetry, child: const Text('Retry')),
+        ],
+      ),
     );
   }
 }

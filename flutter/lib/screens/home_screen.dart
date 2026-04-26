@@ -871,7 +871,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       Text('${profile.wins}W/${profile.matchesPlayed - profile.wins}L',
                         style: const TextStyle(color: AppColors.textMuted, fontSize: 13, fontWeight: FontWeight.w600)),
                       const SizedBox(width: 12),
-                      const CoinBalanceChip(),
+                      // Seed from profile.coins so we render the cached
+                      // value instantly without firing a redundant
+                      // GetCoinBalance — the home payload already has it.
+                      // The provider is still watched, so any later
+                      // invalidation (e.g. after a purchase) refreshes
+                      // the chip.
+                      CoinBalanceChip(initialBalance: profile.coins.toInt()),
                     ],
                   ],
                 ),

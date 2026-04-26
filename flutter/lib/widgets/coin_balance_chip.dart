@@ -5,21 +5,35 @@ import '../providers/coins_state.dart';
 import '../theme/app_theme.dart';
 
 /// Pill-shaped widget that renders the authenticated user's current coin
-/// balance. Reads [coinBalanceProvider] and renders one of three states
-/// via [AsyncValue.when]:
+/// balance.
 ///
-///  * Loading — small inline spinner.
-///  * Data    — coin icon + balance number.
-///  * Error   — red error icon (the chip stays visible so the layout
-///              doesn't reflow when an RPC blip resolves).
+/// Two render modes:
 ///
-/// The optional [onTap] makes the chip tappable; the ledger screen wires
-/// this in PR 7. When [onTap] is null, the chip is a non-interactive
-/// label.
+///  * `CoinBalanceChip()` — reads [coinBalanceProvider] and surfaces
+///    its loading / data / error state via [AsyncValue.when]. Use this
+///    on screens that don't already have the balance in hand (shop,
+///    detail, ledger).
+///
+///  * `CoinBalanceChip(initialBalance: n)` — renders [n] immediately
+///    without waiting for the provider's first frame. Use this on
+///    screens that already have a cached balance from another payload
+///    (the home screen reads it off `GetHomeScreenData.profile.coins`).
+///    Avoids a redundant `GetCoinBalance` round-trip on a hot path that
+///    already has the number. The provider is still watched, so a later
+///    refetch (e.g. via [invalidateCoinState] after a purchase) updates
+///    the chip without manual wiring.
+///
+/// The optional [onTap] makes the chip tappable; PR 7 wires it to push
+/// the ledger screen.
 class CoinBalanceChip extends ConsumerWidget {
-  const CoinBalanceChip({super.key, this.onTap});
+  const CoinBalanceChip({super.key, this.onTap, this.initialBalance});
 
   final VoidCallback? onTap;
+
+  /// Optional seed value to render before the provider's first frame
+  /// arrives (or as a fallback on transient error). When non-null the
+  /// chip never shows a spinner on first paint.
+  final int? initialBalance;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -37,20 +51,22 @@ class CoinBalanceChip extends ConsumerWidget {
           const Icon(Icons.monetization_on, size: 14, color: AppColors.primary),
           const SizedBox(width: 4),
           balance.when(
-            loading: () => const SizedBox(
-              width: 12,
-              height: 12,
-              child: CircularProgressIndicator(strokeWidth: 1.5, color: AppColors.primary),
-            ),
-            error: (_, _) => const Icon(Icons.error_outline, size: 14, color: AppColors.danger),
-            data: (n) => Text(
-              '$n',
-              style: const TextStyle(
-                color: AppColors.primary,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            loading: () => initialBalance != null
+                ? _balanceText(initialBalance!)
+                : const SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 1.5, color: AppColors.primary),
+                  ),
+            // On transient error, fall back to the seed if we have it —
+            // better than an error icon when the user already saw a valid
+            // number on the previous frame.
+            error: (_, _) => initialBalance != null
+                ? _balanceText(initialBalance!)
+                : const Icon(Icons.error_outline,
+                    size: 14, color: AppColors.danger),
+            data: _balanceText,
           ),
         ],
       ),
@@ -62,4 +78,13 @@ class CoinBalanceChip extends ConsumerWidget {
       child: pill,
     );
   }
+
+  Widget _balanceText(int n) => Text(
+        '$n',
+        style: const TextStyle(
+          color: AppColors.primary,
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+        ),
+      );
 }

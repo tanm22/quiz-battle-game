@@ -27,12 +27,16 @@ class CoinsService {
     return r.balance.toInt();
   }
 
-  /// Catalog of every shop item the user can browse. Active and inactive
-  /// items are returned; the UI hides inactive ones.
-  Future<List<ShopItem>> catalog() async {
+  /// Active catalog items only. Inactive SKUs are filtered out at this
+  /// boundary so every UI consumer (shop grid, search, equip picker)
+  /// gets the same active-only view — no per-caller `.where(active)`
+  /// filter to forget. Pass [includeInactive] for admin/diagnostic
+  /// surfaces that genuinely need the full set.
+  Future<List<ShopItem>> catalog({bool includeInactive = false}) async {
     final r =
         await _client.getShopCatalog(GetShopCatalogRequest(), options: _optsBuilder());
-    return r.items;
+    if (includeInactive) return r.items;
+    return r.items.where((it) => it.active).toList(growable: false);
   }
 
   /// Inventory snapshot — owned cosmetics, equipped IDs, reroll charges,
@@ -76,7 +80,13 @@ class CoinsService {
 
   /// Spend a reroll charge during a match. Returns the post-decrement
   /// charge count (or `NO_CHARGES`).
-  Future<ConsumeRerollResponse> consumeReroll(String roomId, String roundId) {
+  ///
+  /// [roomId] / [roundId] are optional — the server (`pkg/coins/shop`
+  /// after PR 15 review-fixes) accepts empty strings and only persists
+  /// them once the per-match audit-trail PR lands. Callers from the
+  /// match flow should still pass them so we don't lose the context
+  /// when the audit trail goes live.
+  Future<ConsumeRerollResponse> consumeReroll({String roomId = '', String roundId = ''}) {
     return _client.consumeReroll(
       ConsumeRerollRequest()
         ..roomId = roomId
