@@ -48,23 +48,33 @@ type Question struct {
 
 type scoringServer struct {
 	pb.UnimplementedScoringServiceServer
-	rdb        *redis.Client
-	amqpConn   *amqp.Connection
-	amqpCh     *amqp.Channel // for publishing only
-	amqpMu     sync.Mutex    // AMQP channels are not thread-safe
-	mongoDB    *mongo.Database
-	ledger     *coins.Ledger // §4.3 — every balance change goes through Grant
-	jwtSecret  string
-	selfClient pb.ScoringServiceClient // gRPC loopback client for CalculateScore
+	rdb       *redis.Client
+	amqpConn  *amqp.Connection
+	amqpCh    *amqp.Channel // for publishing only
+	amqpMu    sync.Mutex    // AMQP channels are not thread-safe
+	mongoDB   *mongo.Database
+	ledger    *coins.Ledger // §4.3 — every balance change goes through Grant
+	jwtSecret string
+	// publishHook, when non-nil, captures every publish call instead of
+	// sending to amqpCh. Set in tests so we can assert routing keys and
+	// payloads without standing up RabbitMQ. Nil in production.
+	publishHook func(routingKey string, body []byte)
+	selfClient  pb.ScoringServiceClient // gRPC loopback client for CalculateScore
 }
 
-// publish sends a message to the topic exchange with mutex protection. In
-// tests where amqpCh is left nil (we don't stand up RabbitMQ for unit tests
-// that only exercise Mongo state), publish is a no-op so callers don't need
-// to special-case the test seam.
+// publish sends a message to the topic exchange with mutex protection.
+// In tests, two seams short-circuit the broker hop:
+//   - publishHook captures (routingKey, body) so tests can assert what
+//     was published; preferred when the test cares about the wire shape.
+//   - nil amqpCh is a silent no-op so tests that only exercise Mongo
+//     state (where the publish is incidental) don't need any setup.
 func (s *scoringServer) publish(ctx context.Context, routingKey string, body []byte) error {
 	s.amqpMu.Lock()
 	defer s.amqpMu.Unlock()
+	if s.publishHook != nil {
+		s.publishHook(routingKey, body)
+		return nil
+	}
 	if s.amqpCh == nil {
 		return nil
 	}
@@ -1312,8 +1322,11 @@ func (s *scoringServer) consumeReferralEvents(ctx context.Context) {
 					continue
 				}
 				log.Printf("[referral-consumer] error: %v body=%s", err, string(msg.Body))
-				// Transient error — requeue. The queue's x-max-delivery-count
-				// dead-letters the message after repeated failures.
+				// Transient error — requeue. With classic queues there is no
+				// auto-DLQ on a delivery-count threshold, so a persistent
+				// failure (Mongo unreachable, etc.) loops until the
+				// underlying issue is fixed; an operator alert on
+				// referral-event-queue depth is the floor.
 				msg.Nack(false, true)
 				continue
 			}
@@ -1580,15 +1593,20 @@ func setupRabbitMQ(ch *amqp.Channel) error {
 	}
 
 	// Phase 2: referral-event-queue (consumed by this service to grant rewards).
-	// Mirrors the tournament-finished DLQ pattern: a poison message would
-	// otherwise head-of-line-block the queue forever once we requeue on error.
+	//
+	// Dead-letter wiring: x-dead-letter-exchange + x-dead-letter-routing-key
+	// route any explicitly-rejected delivery (Nack with requeue=false) to
+	// referral-event-dlq. That covers the bad-payload path. We do NOT use
+	// x-max-delivery-count — it's a quorum-queue-only argument that is
+	// silently ignored on classic queues, so a transient-error loop on a
+	// classic queue does NOT auto-DLQ after N redeliveries. Migrate to
+	// quorum queues + x-delivery-limit later if we want that behaviour.
 	if _, err := ch.QueueDeclare("referral-event-dlq", true, false, false, false, nil); err != nil {
 		return fmt.Errorf("referral DLQ declare: %w", err)
 	}
 	if _, err := ch.QueueDeclare("referral-event-queue", true, false, false, false, amqp.Table{
 		"x-dead-letter-exchange":    "",
 		"x-dead-letter-routing-key": "referral-event-dlq",
-		"x-max-delivery-count":      3,
 	}); err != nil {
 		return fmt.Errorf("referral queue declare: %w", err)
 	}
@@ -1608,22 +1626,45 @@ func setupRabbitMQ(ch *amqp.Channel) error {
 	// tournament.finished once per top-N winner when the finalization
 	// worker closes a tournament. We consume to award coins + emit FCM.
 	//
-	// Mirrors the answer-processing-queue dead-letter pattern: a poison
-	// message (e.g. coin grant fails repeatedly because Mongo is down)
-	// gets diverted to tournament-finished-dlq after 3 redeliveries
-	// instead of head-of-line-blocking the queue forever.
+	// Dead-letter wiring matches referral-event-queue above: explicit
+	// Nack(false, false) sends the delivery to tournament-finished-dlq.
+	// Transient-error retries (Nack false, true) loop until success; no
+	// classic-queue auto-DLQ on redelivery count.
 	if _, err := ch.QueueDeclare("tournament-finished-dlq", true, false, false, false, nil); err != nil {
 		return fmt.Errorf("tournament-finished DLQ declare: %w", err)
 	}
 	if _, err := ch.QueueDeclare("tournament-finished-queue", true, false, false, false, amqp.Table{
 		"x-dead-letter-exchange":    "",
 		"x-dead-letter-routing-key": "tournament-finished-dlq",
-		"x-max-delivery-count":      3,
 	}); err != nil {
 		return fmt.Errorf("tournament-finished queue declare: %w", err)
 	}
 	if err := ch.QueueBind("tournament-finished-queue", "tournament.finished", "sx", false, nil); err != nil {
 		return fmt.Errorf("tournament-finished queue bind: %w", err)
+	}
+
+	// Phase 3 (4.3): coin-earn-queue. Every earn source (match win,
+	// tournament placement, daily streak, referral fulfillment) publishes
+	// coins.earn.<source>; this queue funnels them to handleEarnEvent,
+	// which dispatches to ledger.Grant.
+	//
+	// Dead-letter wiring matches the other queues: explicit Nack(false,
+	// false) on errBadEarnPayload diverts the delivery to coin-earn-dlq,
+	// so a single broken producer can't head-of-line-block healthy
+	// events. Transient errors (Mongo down, etc.) retry forever via
+	// requeue — with classic queues there is no auto-DLQ on redelivery
+	// count, so monitor coin-earn-queue depth as the floor.
+	if _, err := ch.QueueDeclare("coin-earn-dlq", true, false, false, false, nil); err != nil {
+		return fmt.Errorf("coin-earn DLQ declare: %w", err)
+	}
+	if _, err := ch.QueueDeclare(coins.EarnQueueName, true, false, false, false, amqp.Table{
+		"x-dead-letter-exchange":    "",
+		"x-dead-letter-routing-key": "coin-earn-dlq",
+	}); err != nil {
+		return fmt.Errorf("coin-earn queue declare: %w", err)
+	}
+	if err := ch.QueueBind(coins.EarnQueueName, coins.EarnBindingPattern, coins.EarnExchange, false, nil); err != nil {
+		return fmt.Errorf("coin-earn queue bind: %w", err)
 	}
 
 	return nil
@@ -1739,6 +1780,7 @@ func main() {
 	go srv.consumePaymentCaptured(ctx)    // Phase 2: plan upgrade on payment
 	go srv.consumeReferralEvents(ctx)     // Phase 2: referral reward chain (ISSUE-06)
 	go srv.consumeTournamentFinished(ctx) // Phase 3 (4.2): tournament prize coin awards
+	go srv.consumeCoinEarn(ctx)           // Phase 3 (4.3): coins.earn.* → ledger.Grant
 
 	// Block forever (gRPC server runs in background goroutine)
 	select {}
