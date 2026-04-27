@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"math"
 	"sort"
 	"time"
@@ -187,6 +188,10 @@ func (s *scoringServer) aggregateTopicAccuracy(ctx context.Context, userID strin
 			Correct int64  `bson:"correct"`
 		}
 		if err := cursor.Decode(&doc); err != nil {
+			// Schema drift would otherwise produce empty/partial results
+			// indistinguishable from a real empty account — log so the
+			// anomaly is debuggable.
+			log.Printf("[analytics] aggregateTopicAccuracy decode error for user=%s: %v", userID, err)
 			continue
 		}
 		topic := doc.Topic
@@ -237,6 +242,7 @@ func (s *scoringServer) aggregatePercentiles(ctx context.Context, userID string)
 			ResponseTimeMs float64 `bson:"responseTimeMs"`
 		}
 		if err := cursor.Decode(&doc); err != nil {
+			log.Printf("[analytics] aggregatePercentiles decode error for user=%s: %v", userID, err)
 			continue
 		}
 		values = append(values, doc.ResponseTimeMs)
@@ -303,6 +309,7 @@ func (s *scoringServer) aggregateRatingHistory(ctx context.Context, userID strin
 			CreatedAt time.Time `bson:"createdAt"`
 		}
 		if err := cursor.Decode(&doc); err != nil {
+			log.Printf("[analytics] aggregateRatingHistory decode error for user=%s: %v", userID, err)
 			continue
 		}
 		t := doc.CreatedAt.UTC()

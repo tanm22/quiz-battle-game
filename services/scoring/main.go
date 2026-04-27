@@ -1170,39 +1170,57 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 		if len(set) > 0 {
 			update["$set"] = set
 		}
-		_, err := usersColl.UpdateOne(ctx, bson.M{"_id": userID}, update, options.UpdateOne().SetUpsert(true))
+		// §4.5: read the post-update rating back from the upsert so the
+		// snapshot is always consistent with users.rating — the prior
+		// `int32(ra) + delta` math broke on a brand-new upsert path
+		// where `$inc rating: delta` creates the doc with `rating=delta`,
+		// not `1200+delta`. Using FindOneAndUpdate(returnDocument=After)
+		// makes Mongo the single source of truth for the snapshot value.
+		var post struct {
+			Rating int32 `bson:"rating"`
+		}
+		err := usersColl.FindOneAndUpdate(ctx,
+			bson.M{"_id": userID},
+			update,
+			options.FindOneAndUpdate().
+				SetUpsert(true).
+				SetReturnDocument(options.After).
+				SetProjection(bson.M{"rating": 1}),
+		).Decode(&post)
 		if err != nil {
 			log.Printf("[persistence] user update failed for %s: %v", userID, err)
 			continue
 		}
 
 		// §4.5: snapshot the post-Elo rating for the rating-graph series.
-		// One row per (user × match). The chart aggregates these by UTC
-		// day on read so a user playing many matches in a day collapses
-		// to the last rating of that day. Failures are logged and
-		// dropped — losing a single point doesn't break the rest of
-		// the user's history, and re-deliveries are rare enough that an
-		// extra duplicate row at the same `now` is acceptable.
-		newRating := int32(ra) + delta
-		if _, err := s.mongoDB.Collection("rating_history").InsertOne(ctx, bson.M{
-			"userId":      userID,
-			"matchId":     event.RoomID,
-			"rating":      newRating,
-			"ratingDelta": delta,
-			"createdAt":   now,
-		}); err != nil {
-			log.Printf("[persistence] rating_history insert failed for %s: %v", userID, err)
+		// One row per (user × match), gated on `firstInsert` so a
+		// RabbitMQ redelivery doesn't write duplicates for the same
+		// match. Without this gate any future query that doesn't
+		// bucket-by-day (analytics export, ML feature pull, ad-hoc
+		// admin lookup) would see two rows per match for redelivered
+		// events.
+		if firstInsert {
+			if _, err := s.mongoDB.Collection("rating_history").InsertOne(ctx, bson.M{
+				"userId":      userID,
+				"matchId":     event.RoomID,
+				"rating":      post.Rating,
+				"ratingDelta": delta,
+				"createdAt":   now,
+			}); err != nil {
+				log.Printf("[persistence] rating_history insert failed for %s: %v", userID, err)
+			}
 		}
 	}
 
-	// §4.5: bulk-insert the answer_log rows accumulated during tallyStats.
-	// One InsertMany per match keeps the per-answer wire cost amortised.
-	// Failures are logged and the rest of persistMatch continues — the
-	// match document is already written, the user's match_history view
-	// works, only the analytics screen will be missing rows for this
-	// match. Better than rolling back the whole consumer for a metrics
-	// failure mode.
-	if len(answerLogDocs) > 0 {
+	// §4.5: bulk-insert the answer_log rows accumulated during tallyStats,
+	// gated on `firstInsert` for the same reason as rating_history above
+	// — without it a redelivered match.finished doubles every per-answer
+	// row, inflating sample_count and the favorite-topic count even
+	// though the per-topic accuracy ratio happens to stay stable.
+	// match_history's $setOnInsert is the canonical "fresh delivery vs
+	// redelivery" signal already used by the tournament-standings $inc
+	// further below.
+	if firstInsert && len(answerLogDocs) > 0 {
 		if _, err := s.mongoDB.Collection("answer_log").InsertMany(ctx, answerLogDocs); err != nil {
 			log.Printf("[persistence] answer_log insert failed for match %s: %v", event.RoomID, err)
 		}
