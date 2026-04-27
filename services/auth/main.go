@@ -930,7 +930,7 @@ func (s *authServer) streakWarningCron(ctx context.Context) {
 				"userId":        userID,
 				"currentStreak": current,
 			})
-			ch.PublishWithContext(ctx, "sx", "notif.streak.warning", false, false, amqp.Publishing{
+			log.PublishWithContext(ctx, ch, "sx", "notif.streak.warning", false, false, amqp.Publishing{
 				ContentType: "application/json",
 				Body:        payload,
 			})
@@ -987,7 +987,7 @@ func (s *authServer) dailyRewardNudgeCron(ctx context.Context) {
 				"event":  "notif.daily.reward",
 				"userId": userID,
 			})
-			ch.PublishWithContext(ctx, "sx", "notif.daily.reward", false, false, amqp.Publishing{
+			log.PublishWithContext(ctx, ch, "sx", "notif.daily.reward", false, false, amqp.Publishing{
 				ContentType: "application/json",
 				Body:        payload,
 			})
@@ -1102,8 +1102,14 @@ func main() {
 	}
 
 	grpcServer := grpc.NewServer(
-		grpc.UnaryInterceptor(auth.UnaryInterceptor(jwtSecret, skipMethods)),
-		grpc.StreamInterceptor(auth.StreamInterceptor(jwtSecret, nil)),
+		grpc.ChainUnaryInterceptor(
+			log.UnaryServerInterceptor(),
+			auth.UnaryInterceptor(jwtSecret, skipMethods),
+		),
+		grpc.ChainStreamInterceptor(
+			log.StreamServerInterceptor(),
+			auth.StreamInterceptor(jwtSecret, nil),
+		),
 	)
 	pb.RegisterAuthServiceServer(grpcServer, srv)
 
