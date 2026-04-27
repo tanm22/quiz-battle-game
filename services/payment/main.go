@@ -28,6 +28,7 @@ import (
 
 	"quiz-battle/pkg/auth"
 	"quiz-battle/pkg/keys"
+	"quiz-battle/pkg/lifecycle"
 	"quiz-battle/pkg/log"
 	"quiz-battle/pkg/metrics"
 	pb "quiz-battle/proto"
@@ -727,12 +728,10 @@ func main() {
 	if err != nil {
 		log.Fatal(ctx, "rabbitmq connect failed", "err", err)
 	}
-	defer conn.Close()
 	amqpCh, err := conn.Channel()
 	if err != nil {
 		log.Fatal(ctx, "rabbitmq channel failed", "err", err)
 	}
-	defer amqpCh.Close()
 	if err := setupRabbitMQ(amqpCh); err != nil {
 		log.Fatal(ctx, "rabbitmq setup failed", "err", err)
 	}
@@ -747,7 +746,6 @@ func main() {
 	if err != nil {
 		log.Fatal(ctx, "mongodb connect failed", "err", err)
 	}
-	defer mongoClient.Disconnect(ctx)
 	log.FromContext(ctx).Info("connected to MongoDB")
 
 	jwtSecret := os.Getenv("JWT_SECRET")
@@ -781,7 +779,7 @@ func main() {
 
 	// gRPC server on :50055
 	m := metrics.New("payment")
-	m.Serve(ctx, ":2112")
+	metricsSrv := m.Serve(ctx, ":2112")
 	srv.metrics = m
 
 	grpcServer := grpc.NewServer(
@@ -806,7 +804,7 @@ func main() {
 	go func() {
 		log.FromContext(ctx).Info("gRPC serving", "addr", ":50055")
 		if err := grpcServer.Serve(grpcLis); err != nil {
-			log.Fatal(ctx, "grpc serve failed", "err", err)
+			log.FromContext(ctx).Error("grpc serve exited", "err", err)
 		}
 	}()
 
@@ -817,9 +815,44 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok"))
 	})
-
-	log.FromContext(ctx).Info("HTTP serving", "addr", ":8080")
-	if err := http.ListenAndServe(":8080", mux); err != nil {
-		log.Fatal(ctx, "HTTP serve failed", "err", err)
+	httpSrv := &http.Server{
+		Addr:              ":8080",
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
 	}
+	go func() {
+		log.FromContext(ctx).Info("HTTP serving", "addr", ":8080")
+		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.FromContext(ctx).Error("HTTP serve exited", "err", err)
+		}
+	}()
+
+	// Block until SIGINT / SIGTERM, then drain gracefully.
+	lifecycle.WaitForSignal(ctx)
+	log.FromContext(ctx).Info("graceful shutdown starting")
+
+	cancel()
+	grpcServer.GracefulStop()
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+
+	// Webhook HTTP server holds the path Razorpay retries against; let
+	// any in-flight POST finish before closing.
+	if err := httpSrv.Shutdown(shutdownCtx); err != nil {
+		log.FromContext(ctx).Warn("http shutdown", "err", err)
+	}
+	if err := metricsSrv.Shutdown(shutdownCtx); err != nil {
+		log.FromContext(ctx).Warn("metrics shutdown", "err", err)
+	}
+	if err := amqpCh.Close(); err != nil {
+		log.FromContext(ctx).Warn("amqp channel close", "err", err)
+	}
+	if err := conn.Close(); err != nil {
+		log.FromContext(ctx).Warn("amqp conn close", "err", err)
+	}
+	if err := mongoClient.Disconnect(shutdownCtx); err != nil {
+		log.FromContext(ctx).Warn("mongo disconnect", "err", err)
+	}
+	log.FromContext(ctx).Info("graceful shutdown complete")
 }

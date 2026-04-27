@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"time"
 
 	firebase "firebase.google.com/go/v4"
 	"firebase.google.com/go/v4/messaging"
@@ -17,6 +18,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
+	"quiz-battle/pkg/lifecycle"
 	"quiz-battle/pkg/log"
 	"quiz-battle/pkg/metrics"
 )
@@ -472,7 +474,6 @@ func main() {
 	if err != nil {
 		log.Fatal(ctx, "rabbitmq connect failed", "err", err)
 	}
-	defer conn.Close()
 
 	setupCh, err := conn.Channel()
 	if err != nil {
@@ -493,7 +494,6 @@ func main() {
 	if err != nil {
 		log.Fatal(ctx, "mongodb connect failed", "err", err)
 	}
-	defer mongoClient.Disconnect(ctx)
 	log.FromContext(ctx).Info("connected to MongoDB")
 
 	// Redis: §4.6 policy gate stores cap/dedup/metric counters here.
@@ -562,13 +562,31 @@ func main() {
 	}
 
 	m := metrics.New("notification")
-	m.Serve(ctx, ":2112")
+	metricsSrv := m.Serve(ctx, ":2112")
 	svc.metrics = m
 
-	// Start consumers — one goroutine per queue.
+	// Start consumers — one goroutine per queue. Each select on
+	// ctx.Done() so the cancel() below unblocks them.
 	go svc.consume(ctx, "push-notification-queue")
 	go svc.consume(ctx, "premium-expiry-queue")
-
 	log.FromContext(ctx).Info("consumers running")
-	select {} // block forever
+
+	lifecycle.WaitForSignal(ctx)
+	log.FromContext(ctx).Info("graceful shutdown starting")
+
+	cancel()
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+
+	if err := metricsSrv.Shutdown(shutdownCtx); err != nil {
+		log.FromContext(ctx).Warn("metrics shutdown", "err", err)
+	}
+	if err := conn.Close(); err != nil {
+		log.FromContext(ctx).Warn("amqp conn close", "err", err)
+	}
+	if err := mongoClient.Disconnect(shutdownCtx); err != nil {
+		log.FromContext(ctx).Warn("mongo disconnect", "err", err)
+	}
+	log.FromContext(ctx).Info("graceful shutdown complete")
 }

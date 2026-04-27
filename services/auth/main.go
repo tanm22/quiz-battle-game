@@ -29,6 +29,7 @@ import (
 	"quiz-battle/pkg/coins"
 	"quiz-battle/pkg/email"
 	"quiz-battle/pkg/keys"
+	"quiz-battle/pkg/lifecycle"
 	"quiz-battle/pkg/log"
 	"quiz-battle/pkg/metrics"
 	"quiz-battle/pkg/models"
@@ -1005,7 +1006,10 @@ func (s *authServer) dailyRewardNudgeCron(ctx context.Context) {
 
 func main() {
 	slog.SetDefault(log.Init("auth"))
-	ctx := context.Background()
+	// Root ctx is cancelled by the shutdown sequence so consumer
+	// goroutines (cron loops, etc.) bail out of their selects.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// MongoDB
 	mongoURI := os.Getenv("MONGO_URI")
@@ -1018,7 +1022,6 @@ func main() {
 	if err != nil {
 		log.Fatal(ctx, "mongodb connect failed", "err", err)
 	}
-	defer mongoClient.Disconnect(ctx)
 	db := mongoClient.Database(coins.DefaultDBName)
 
 	// Create indexes
@@ -1052,7 +1055,6 @@ func main() {
 	if err != nil {
 		log.Fatal(ctx, "rabbitmq connect failed", "err", err)
 	}
-	defer amqpConn.Close()
 	// Ensure exchange exists (use a temporary channel)
 	setupCh, err := amqpConn.Channel()
 	if err != nil {
@@ -1103,7 +1105,7 @@ func main() {
 	}
 
 	m := metrics.New("auth")
-	m.Serve(ctx, ":2112")
+	metricsSrv := m.Serve(ctx, ":2112")
 
 	grpcServer := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
@@ -1124,8 +1126,41 @@ func main() {
 		log.Fatal(ctx, "listen failed", "addr", ":50054", "err", err)
 	}
 
-	log.FromContext(ctx).Info("gRPC serving", "addr", ":50054")
-	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatal(ctx, "grpc serve failed", "err", err)
+	go func() {
+		log.FromContext(ctx).Info("gRPC serving", "addr", ":50054")
+		if err := grpcServer.Serve(lis); err != nil {
+			log.FromContext(ctx).Error("grpc serve exited", "err", err)
+		}
+	}()
+
+	// Block until SIGINT / SIGTERM, then drain in-flight work.
+	lifecycle.WaitForSignal(ctx)
+	log.FromContext(ctx).Info("graceful shutdown starting")
+
+	// Cancel the root ctx so cron goroutines and any inbound ctx-bound
+	// work see <-ctx.Done() and bail out of their select loops.
+	cancel()
+
+	// GracefulStop drains in-flight RPCs but lets new ones reject. It
+	// blocks until all handlers return, so we don't need a separate
+	// barrier on grpc work.
+	grpcServer.GracefulStop()
+
+	// Stop accepting new metrics scrapes; existing in-flight scrape
+	// handlers get a 5s grace via shutdownCtx.
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+	if err := metricsSrv.Shutdown(shutdownCtx); err != nil {
+		log.FromContext(ctx).Warn("metrics shutdown", "err", err)
 	}
+
+	// Close AMQP last — cron goroutines may still be flushing their
+	// final publish during the cancel propagation above.
+	if err := amqpConn.Close(); err != nil {
+		log.FromContext(ctx).Warn("amqp close", "err", err)
+	}
+	if err := mongoClient.Disconnect(shutdownCtx); err != nil {
+		log.FromContext(ctx).Warn("mongo disconnect", "err", err)
+	}
+	log.FromContext(ctx).Info("graceful shutdown complete")
 }

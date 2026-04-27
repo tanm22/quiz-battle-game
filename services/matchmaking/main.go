@@ -23,6 +23,7 @@ import (
 
 	"quiz-battle/pkg/auth"
 	"quiz-battle/pkg/keys"
+	"quiz-battle/pkg/lifecycle"
 	"quiz-battle/pkg/log"
 	"quiz-battle/pkg/metrics"
 	"quiz-battle/pkg/models"
@@ -517,13 +518,11 @@ func main() {
 	if err != nil {
 		log.Fatal(ctx, "rabbitmq connect failed", "err", err)
 	}
-	defer conn.Close()
 
 	amqpCh, err := conn.Channel()
 	if err != nil {
 		log.Fatal(ctx, "rabbitmq channel failed", "err", err)
 	}
-	defer amqpCh.Close()
 
 	if err := setupRabbitMQ(amqpCh); err != nil {
 		log.Fatal(ctx, "rabbitmq setup failed", "err", err)
@@ -562,7 +561,7 @@ func main() {
 	go srv.startPoller(ctx)
 
 	m := metrics.New("matchmaking")
-	m.Serve(ctx, ":2112")
+	metricsSrv := m.Serve(ctx, ":2112")
 	srv.metrics = m
 
 	grpcServer := grpc.NewServer(
@@ -584,8 +583,33 @@ func main() {
 		log.Fatal(ctx, "listen failed", "addr", ":50051", "err", err)
 	}
 
-	log.FromContext(ctx).Info("gRPC serving", "addr", ":50051")
-	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatal(ctx, "grpc serve failed", "err", err)
+	go func() {
+		log.FromContext(ctx).Info("gRPC serving", "addr", ":50051")
+		if err := grpcServer.Serve(lis); err != nil {
+			log.FromContext(ctx).Error("grpc serve exited", "err", err)
+		}
+	}()
+
+	lifecycle.WaitForSignal(ctx)
+	log.FromContext(ctx).Info("graceful shutdown starting")
+
+	cancel()
+	grpcServer.GracefulStop()
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+
+	if err := metricsSrv.Shutdown(shutdownCtx); err != nil {
+		log.FromContext(ctx).Warn("metrics shutdown", "err", err)
 	}
+	if err := amqpCh.Close(); err != nil {
+		log.FromContext(ctx).Warn("amqp channel close", "err", err)
+	}
+	if err := conn.Close(); err != nil {
+		log.FromContext(ctx).Warn("amqp conn close", "err", err)
+	}
+	if err := mongoClient.Disconnect(shutdownCtx); err != nil {
+		log.FromContext(ctx).Warn("mongo disconnect", "err", err)
+	}
+	log.FromContext(ctx).Info("graceful shutdown complete")
 }
