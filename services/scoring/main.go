@@ -31,6 +31,7 @@ import (
 	"quiz-battle/pkg/log"
 	"quiz-battle/pkg/metrics"
 	"quiz-battle/pkg/models"
+	"quiz-battle/pkg/ratelimit"
 	pb "quiz-battle/proto"
 )
 
@@ -67,6 +68,11 @@ type scoringServer struct {
 	publishHook func(routingKey string, body []byte)
 	selfClient  pb.ScoringServiceClient // gRPC loopback client for CalculateScore
 	metrics     *metrics.Metrics        // nil in tests; non-nil in main()
+	// §4.7 PR-B1: anti-abuse limiter on ApplyReferralCode. 3 attempts
+	// per 10 minutes per userID — apply is a one-time-ish action and
+	// a tighter limiter would block legitimate retries on transient
+	// errors. Nil-safe via the limiter's nil check.
+	referralLimiter *ratelimit.Limiter
 }
 
 // publish sends a message to the topic exchange with mutex protection.
@@ -648,6 +654,15 @@ func (s *scoringServer) ApplyReferralCode(ctx context.Context, req *pb.ApplyRefe
 	userID, err := auth.UserIDFromContext(ctx)
 	if err != nil {
 		return nil, status.Error(codes.Unauthenticated, "not authenticated")
+	}
+
+	// §4.7 PR-B1: anti-abuse gate. Stops a script from probing every
+	// possible referral code looking for a hit. The "already referred"
+	// check below is a one-shot gate per user, but the lookup itself
+	// (keys.GetRefCode) is unguarded — without this limiter, a brand
+	// new account could enumerate the keyspace at full Redis speed.
+	if !s.referralLimiter.AllowWithLog(ctx, userID) {
+		return nil, status.Error(codes.ResourceExhausted, "too many referral attempts; try again later")
 	}
 
 	// Check user hasn't already been referred
@@ -1882,14 +1897,15 @@ func main() {
 	mongoDB := mongoClient.Database(coins.DefaultDBName)
 	ledger := coins.NewLedger(mongoClient, coins.DefaultDBName)
 	srv := &scoringServer{
-		rdb:         rdb,
-		amqpConn:    conn,
-		amqpCh:      amqpCh,
-		mongoClient: mongoClient,
-		mongoDB:     mongoDB,
-		ledger:      ledger,
-		purchase:    shop.NewPurchase(mongoClient, mongoDB, ledger),
-		jwtSecret:   jwtSecret,
+		rdb:             rdb,
+		amqpConn:        conn,
+		amqpCh:          amqpCh,
+		mongoClient:     mongoClient,
+		mongoDB:         mongoDB,
+		ledger:          ledger,
+		purchase:        shop.NewPurchase(mongoClient, mongoDB, ledger),
+		jwtSecret:       jwtSecret,
+		referralLimiter: ratelimit.New(rdb, "referral_apply", 3, 10*time.Minute),
 	}
 
 	// gRPC server — CalculateScore is called internally by the scoring worker

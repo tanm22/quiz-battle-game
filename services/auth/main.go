@@ -34,6 +34,7 @@ import (
 	"quiz-battle/pkg/log"
 	"quiz-battle/pkg/metrics"
 	"quiz-battle/pkg/models"
+	"quiz-battle/pkg/ratelimit"
 	pb "quiz-battle/proto"
 )
 
@@ -55,6 +56,10 @@ type authServer struct {
 	// check and accept tokens issued to any Google OAuth client).
 	googleClientID string
 	mailer         *email.Sender
+	// §4.7 PR-B1: brute-force gate on Login. 5 attempts per minute per
+	// username — generous for legitimate typos, tight enough that a
+	// dictionary attack hits the wall after one second of trying.
+	loginLimiter *ratelimit.Limiter
 }
 
 func (s *authServer) users() *mongo.Collection {
@@ -142,6 +147,15 @@ func (s *authServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb
 func (s *authServer) Login(ctx context.Context, req *pb.LoginRequest) (*pb.AuthResponse, error) {
 	if req.Username == "" || req.Password == "" {
 		return nil, status.Error(codes.InvalidArgument, "username and password required")
+	}
+
+	// §4.7 PR-B1: brute-force gate. Per-username because an attacker
+	// trying many passwords against ONE account is the threat we care
+	// about; per-IP would also catch coordinated attacks but conflates
+	// shared-NAT users (cafés, dorms, mobile carriers). Limiter fails
+	// open on Redis blip — see pkg/ratelimit/limiter.go for rationale.
+	if !s.loginLimiter.AllowWithLog(ctx, req.Username) {
+		return nil, status.Error(codes.ResourceExhausted, "too many login attempts; try again in a minute")
 	}
 
 	var user models.User
@@ -1088,6 +1102,7 @@ func main() {
 		jwtSecret:      jwtSecret,
 		googleClientID: googleClientID,
 		mailer:         email.NewSender(resendKey, resendFrom),
+		loginLimiter:   ratelimit.New(rdb, "login", 5, time.Minute),
 	}
 
 	// Phase 2: Start notification cron goroutines
