@@ -41,49 +41,47 @@ func TestContextFromDelivery_IgnoresNonStringHeader(t *testing.T) {
 	}
 }
 
-// TestPublishWithContext_AttachesHeader exercises the header-set logic via
-// a stub that captures the Publishing without round-tripping through a
-// real channel. PublishWithContext's signature accepts *amqp.Channel
-// directly, which is hard to stub without changing the API; we instead
-// test the in-place msg.Headers mutation by reaching past the helper
-// into a near-equivalent inline expansion.
-func TestPublishWithContext_AttachesHeaderViaHelper(t *testing.T) {
-	// We can't construct *amqp.Channel without a connection, so we
-	// validate the header-attach logic by testing the same code path
-	// the helper runs before delegating. Future refactor: extract
-	// the header-stamping into a small free function and exercise
-	// that directly here.
+// TestStampRequestID_AttachesHeader exercises the header-set logic on
+// the production code path. stampRequestID is the small free function
+// PublishWithContext delegates to before invoking ch.PublishWithContext,
+// so a future refactor that drops the header stamp inside the helper
+// will fail this test.
+func TestStampRequestID_AttachesHeader(t *testing.T) {
 	ctx := ContextWithRequestID(context.Background(), "rid-publish-test")
-	msg := amqp.Publishing{Body: []byte("hello")}
+	in := amqp.Publishing{Body: []byte("hello")}
 
-	// Inline the helper's header-stamp step.
-	if rid := RequestIDFromContext(ctx); rid != "" {
-		if msg.Headers == nil {
-			msg.Headers = amqp.Table{}
-		}
-		msg.Headers[AMQPRequestIDHeader] = rid
-	}
+	out := stampRequestID(ctx, in)
 
-	got, ok := msg.Headers[AMQPRequestIDHeader].(string)
+	got, ok := out.Headers[AMQPRequestIDHeader].(string)
 	if !ok {
-		t.Fatalf("header not a string: %T %v", msg.Headers[AMQPRequestIDHeader], msg.Headers[AMQPRequestIDHeader])
+		t.Fatalf("header not a string: %T %v", out.Headers[AMQPRequestIDHeader], out.Headers[AMQPRequestIDHeader])
 	}
 	if got != "rid-publish-test" {
 		t.Errorf("header = %q, want rid-publish-test", got)
 	}
 }
 
-func TestPublishWithContext_NoopWhenCtxHasNoID(t *testing.T) {
-	msg := amqp.Publishing{Body: []byte("hello")}
-	ctx := context.Background()
-	// Mirror the helper's pre-publish step.
-	if rid := RequestIDFromContext(ctx); rid != "" {
-		if msg.Headers == nil {
-			msg.Headers = amqp.Table{}
-		}
-		msg.Headers[AMQPRequestIDHeader] = rid
+func TestStampRequestID_NoopWhenCtxHasNoID(t *testing.T) {
+	in := amqp.Publishing{Body: []byte("hello")}
+	out := stampRequestID(context.Background(), in)
+	if out.Headers != nil {
+		t.Errorf("headers should remain nil when ctx has no rid, got %v", out.Headers)
 	}
-	if msg.Headers != nil {
-		t.Errorf("headers should remain nil when ctx has no rid, got %v", msg.Headers)
+}
+
+func TestStampRequestID_PreservesExistingHeaders(t *testing.T) {
+	// A caller that pre-populated msg.Headers with their own keys must
+	// not lose them when stampRequestID adds the rid.
+	ctx := ContextWithRequestID(context.Background(), "rid-pre")
+	in := amqp.Publishing{
+		Body:    []byte("hello"),
+		Headers: amqp.Table{"x-app-key": "value-a"},
+	}
+	out := stampRequestID(ctx, in)
+	if out.Headers["x-app-key"] != "value-a" {
+		t.Errorf("pre-existing header lost: %v", out.Headers)
+	}
+	if out.Headers[AMQPRequestIDHeader] != "rid-pre" {
+		t.Errorf("rid not stamped: %v", out.Headers)
 	}
 }

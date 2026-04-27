@@ -24,13 +24,23 @@ const AMQPRequestIDHeader = "x-request-id"
 // ContextFromDelivery). Direct ch.PublishWithContext calls remain valid
 // for cron / startup paths that have no inbound ctx.
 func PublishWithContext(ctx context.Context, ch *amqp.Channel, exchange, key string, mandatory, immediate bool, msg amqp.Publishing) error {
-	if rid := RequestIDFromContext(ctx); rid != "" {
-		if msg.Headers == nil {
-			msg.Headers = amqp.Table{}
-		}
-		msg.Headers[AMQPRequestIDHeader] = rid
+	return ch.PublishWithContext(ctx, exchange, key, mandatory, immediate, stampRequestID(ctx, msg))
+}
+
+// stampRequestID returns msg with the AMQPRequestIDHeader set when ctx
+// carries a request_id, otherwise returns msg unchanged. Extracted
+// from PublishWithContext as a free function so tests can exercise the
+// header-set logic without constructing a real *amqp.Channel.
+func stampRequestID(ctx context.Context, msg amqp.Publishing) amqp.Publishing {
+	rid := RequestIDFromContext(ctx)
+	if rid == "" {
+		return msg
 	}
-	return ch.PublishWithContext(ctx, exchange, key, mandatory, immediate, msg)
+	if msg.Headers == nil {
+		msg.Headers = amqp.Table{}
+	}
+	msg.Headers[AMQPRequestIDHeader] = rid
+	return msg
 }
 
 // ContextFromDelivery returns parent with a request_id attached: either

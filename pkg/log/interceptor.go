@@ -2,6 +2,8 @@ package log
 
 import (
 	"context"
+	"fmt"
+	"runtime/debug"
 	"time"
 
 	"google.golang.org/grpc"
@@ -31,9 +33,15 @@ func UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 
 		defer func() {
 			if r := recover(); r != nil {
+				// fmt.Sprintf around r dodges the slog-handler corner
+				// case where a panic value with a non-stringable field
+				// JSON-marshals oddly. debug.Stack() captures the frame
+				// at recovery time so a postmortem doesn't have to be
+				// re-derived from the call site alone.
 				FromContext(ctx).Error("rpc panic recovered",
 					"method", info.FullMethod,
-					"panic", r,
+					"panic", fmt.Sprintf("%v", r),
+					"stack", string(debug.Stack()),
 				)
 				err = status.Errorf(codes.Internal, "internal error")
 			}
@@ -63,17 +71,23 @@ func StreamServerInterceptor() grpc.StreamServerInterceptor {
 			if r := recover(); r != nil {
 				FromContext(ctx).Error("stream panic recovered",
 					"method", info.FullMethod,
-					"panic", r,
+					"panic", fmt.Sprintf("%v", r),
+					"stack", string(debug.Stack()),
 				)
 				err = status.Errorf(codes.Internal, "internal error")
 			}
 		}()
 
-		err = handler(srv, &wrappedStream{ServerStream: ss, ctx: ctx})
+		err = handler(srv, &loggingStream{ServerStream: ss, ctx: ctx})
+		// lifetime_ms (not duration_ms) because for streaming RPCs this
+		// is the wall-clock time the stream was open, NOT a per-request
+		// duration. Distinct attribute name keeps PR-A3's metrics
+		// histograms separable: unary handling-time has its own bucket
+		// shape from stream lifetime.
 		FromContext(ctx).Info("stream closed",
 			"method", info.FullMethod,
 			"code", status.Code(err).String(),
-			"duration_ms", time.Since(start).Milliseconds(),
+			"lifetime_ms", time.Since(start).Milliseconds(),
 		)
 		return err
 	}
@@ -120,11 +134,13 @@ func ensureRequestID(ctx context.Context) context.Context {
 	return ContextWithRequestID(ctx, NewRequestID())
 }
 
-// wrappedStream replaces ServerStream.Context() with the request-id-bearing
+// loggingStream replaces ServerStream.Context() with the request-id-bearing
 // ctx so downstream stream handler reads of stream.Context() see it.
-type wrappedStream struct {
+// Named distinctly from pkg/auth.wrappedStream so a stack trace during
+// debugging makes the layer obvious — same shape, different concern.
+type loggingStream struct {
 	grpc.ServerStream
 	ctx context.Context
 }
 
-func (w *wrappedStream) Context() context.Context { return w.ctx }
+func (w *loggingStream) Context() context.Context { return w.ctx }
