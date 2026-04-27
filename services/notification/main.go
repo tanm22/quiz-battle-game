@@ -18,6 +18,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
+	"quiz-battle/pkg/config"
 	"quiz-battle/pkg/lifecycle"
 	"quiz-battle/pkg/log"
 	"quiz-battle/pkg/metrics"
@@ -465,12 +466,10 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	cfg := config.MustCommon(ctx)
+
 	// RabbitMQ
-	rabbitURL := os.Getenv("RABBITMQ_URL")
-	if rabbitURL == "" {
-		rabbitURL = "amqp://guest:guest@localhost:5672/"
-	}
-	conn, err := amqp.Dial(rabbitURL)
+	conn, err := amqp.Dial(cfg.RabbitMQURL)
 	if err != nil {
 		log.Fatal(ctx, "rabbitmq connect failed", "err", err)
 	}
@@ -486,11 +485,7 @@ func main() {
 	log.FromContext(ctx).Info("connected to RabbitMQ")
 
 	// MongoDB (for FCM token lookups and invalid-token cleanup)
-	mongoURI := os.Getenv("MONGO_URI")
-	if mongoURI == "" {
-		mongoURI = "mongodb://localhost:27017/quizbattle"
-	}
-	mongoClient, err := mongo.Connect(options.Client().ApplyURI(mongoURI))
+	mongoClient, err := mongo.Connect(options.Client().ApplyURI(cfg.MongoURI))
 	if err != nil {
 		log.Fatal(ctx, "mongodb connect failed", "err", err)
 	}
@@ -499,11 +494,7 @@ func main() {
 	// Redis: §4.6 policy gate stores cap/dedup/metric counters here.
 	// Co-located with the rest of the platform (single redis container in
 	// docker-compose) so we don't need a separate connection budget.
-	redisAddr := os.Getenv("REDIS_ADDR")
-	if redisAddr == "" {
-		redisAddr = "localhost:6379"
-	}
-	rdb := redis.NewClient(&redis.Options{Addr: redisAddr})
+	rdb := redis.NewClient(&redis.Options{Addr: cfg.RedisAddr})
 	if err := rdb.Ping(ctx).Err(); err != nil {
 		log.FromContext(ctx).Warn("redis ping failed; policy gate disabled", "err", err)
 		rdb = nil
@@ -519,14 +510,10 @@ func main() {
 
 	// §4.6 policy gate. Disabled when Redis isn't reachable — better to
 	// dispatch unfiltered than swallow every push because of an infra
-	// outage. NOTIF_DAILY_CAP overrides the per-user push ceiling.
+	// outage. NOTIF_DAILY_CAP overrides the per-user push ceiling;
+	// 0 means "use the package default" (newPolicy substitutes notifDailyCap).
 	if rdb != nil {
-		dailyCap := 0
-		if v := os.Getenv("NOTIF_DAILY_CAP"); v != "" {
-			if n, err := strconv.Atoi(v); err == nil {
-				dailyCap = n
-			}
-		}
+		dailyCap := config.OptionalInt("NOTIF_DAILY_CAP", 0)
 		svc.policy = newPolicy(rdb, svc.mongoDB, dailyCap)
 		log.FromContext(ctx).Info("policy gate enabled", "daily_cap", svc.policy.dailyCap)
 	}

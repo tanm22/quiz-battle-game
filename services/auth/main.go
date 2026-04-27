@@ -27,6 +27,7 @@ import (
 
 	"quiz-battle/pkg/auth"
 	"quiz-battle/pkg/coins"
+	"quiz-battle/pkg/config"
 	"quiz-battle/pkg/email"
 	"quiz-battle/pkg/keys"
 	"quiz-battle/pkg/lifecycle"
@@ -1012,11 +1013,8 @@ func main() {
 	defer cancel()
 
 	// MongoDB
-	mongoURI := os.Getenv("MONGO_URI")
-	if mongoURI == "" {
-		mongoURI = "mongodb://localhost:27017/quizbattle"
-	}
-	mongoClient, err := mongo.Connect(options.Client().ApplyURI(mongoURI).SetBSONOptions(&options.BSONOptions{
+	cfg := config.MustCommon(ctx)
+	mongoClient, err := mongo.Connect(options.Client().ApplyURI(cfg.MongoURI).SetBSONOptions(&options.BSONOptions{
 		ObjectIDAsHexString: true,
 	}))
 	if err != nil {
@@ -1036,22 +1034,14 @@ func main() {
 	log.FromContext(ctx).Info("connected to MongoDB")
 
 	// Redis
-	redisAddr := os.Getenv("REDIS_ADDR")
-	if redisAddr == "" {
-		redisAddr = "localhost:6379"
-	}
-	rdb := redis.NewClient(&redis.Options{Addr: redisAddr})
+	rdb := redis.NewClient(&redis.Options{Addr: cfg.RedisAddr})
 	if err := rdb.Ping(ctx).Err(); err != nil {
 		log.Fatal(ctx, "redis connect failed", "err", err)
 	}
 	log.FromContext(ctx).Info("connected to Redis")
 
 	// RabbitMQ (Phase 2: for publishing notification events)
-	rabbitURL := os.Getenv("RABBITMQ_URL")
-	if rabbitURL == "" {
-		rabbitURL = "amqp://guest:guest@localhost:5672/"
-	}
-	amqpConn, err := amqp.Dial(rabbitURL)
+	amqpConn, err := amqp.Dial(cfg.RabbitMQURL)
 	if err != nil {
 		log.Fatal(ctx, "rabbitmq connect failed", "err", err)
 	}
@@ -1064,11 +1054,11 @@ func main() {
 	setupCh.Close()
 	log.FromContext(ctx).Info("connected to RabbitMQ")
 
-	// JWT + Resend
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		jwtSecret = "quiz-battle-dev-secret"
-	}
+	// JWT + Resend. JWTSecret is now required (no dev fallback) — see
+	// pkg/config. RESEND_API_KEY stays optional because emails work in
+	// stub mode for dev (DEV_MODE=true logs the OTP) and the Resend
+	// path is not load-bearing for booting.
+	jwtSecret := config.MustRequired(ctx, "JWT_SECRET")
 
 	resendKey := os.Getenv("RESEND_API_KEY")
 	resendFrom := os.Getenv("RESEND_FROM")
