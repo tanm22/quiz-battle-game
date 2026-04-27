@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -10,6 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"quiz-battle/pkg/keys"
+	"quiz-battle/pkg/log"
 	"quiz-battle/pkg/models"
 	"quiz-battle/pkg/notif"
 )
@@ -123,7 +123,7 @@ func (p *policy) allow(ctx context.Context, userID, event string) allowResult {
 			// Redis unavailable — fail open rather than drop the push.
 			// We'd rather risk a duplicate than swallow a real-time
 			// challenge notif because Redis is degraded.
-			log.Printf("[notif-policy] dedup SETNX failed for user=%s category=%s: %v", userID, category, err)
+			log.FromContext(ctx).Warn("dedup SETNX failed", "component", "policy", "user_id", userID, "category", category, "err", err)
 		} else if !first {
 			p.dropped(ctx, category, "deduped", metricDay)
 			return allowResult{Allowed: false, Category: category, Reason: "deduped"}
@@ -139,7 +139,7 @@ func (p *policy) allow(ctx context.Context, userID, event string) allowResult {
 	count, err := keys.IncrNotifDailyCap(ctx, p.rdb, userID, capDay)
 	if err != nil {
 		// Same fail-open posture as dedup. Logged so an operator notices.
-		log.Printf("[notif-policy] daily-cap INCR failed for user=%s: %v — allowing", userID, err)
+		log.FromContext(ctx).Warn("daily-cap INCR failed; allowing", "component", "policy", "user_id", userID, "err", err)
 	} else if count > int64(p.dailyCap) {
 		// We've already incremented; don't decrement on cap hit because
 		// the next day's first push would otherwise see count=10 and
@@ -155,14 +155,14 @@ func (p *policy) allow(ctx context.Context, userID, event string) allowResult {
 	// in services/scoring/notif_prefs.go (UTC) — opened/sent ratios
 	// across timezone boundaries are otherwise meaningless.
 	if err := keys.IncrNotifMetricSent(ctx, p.rdb, category, metricDay); err != nil {
-		log.Printf("[notif-policy] sent metric INCR failed for category=%s: %v", category, err)
+		log.FromContext(ctx).Warn("sent metric INCR failed", "component", "policy", "category", category, "err", err)
 	}
 	return allowResult{Allowed: true, Category: category}
 }
 
 func (p *policy) dropped(ctx context.Context, category, reason, metricDay string) {
 	if err := keys.IncrNotifMetricDropped(ctx, p.rdb, category, reason, metricDay); err != nil {
-		log.Printf("[notif-policy] dropped metric INCR failed: %v", err)
+		log.FromContext(ctx).Warn("dropped metric INCR failed", "component", "policy", "err", err)
 	}
 }
 
@@ -185,7 +185,7 @@ func (p *policy) loadPrefs(ctx context.Context, userID string) userPrefs {
 		// Missing user shouldn't normally happen — the consumer wouldn't
 		// have a userId in the payload otherwise — but if it does, fall
 		// through to defaults rather than fail the dispatch.
-		log.Printf("[notif-policy] load prefs for user=%s failed: %v — using defaults", userID, err)
+		log.FromContext(ctx).Warn("load prefs failed; using defaults", "component", "policy", "user_id", userID, "err", err)
 		return defaults
 	}
 	if doc.Prefs == nil {
@@ -196,8 +196,8 @@ func (p *policy) loadPrefs(ctx context.Context, userID string) userPrefs {
 		if loc, err := time.LoadLocation(doc.Prefs.Timezone); err == nil {
 			out.tz = loc
 		} else {
-			log.Printf("[notif-policy] bad timezone %q on user=%s: %v — using default",
-				doc.Prefs.Timezone, userID, err)
+			log.FromContext(ctx).Warn("bad timezone; using default",
+				"component", "policy", "timezone", doc.Prefs.Timezone, "user_id", userID, "err", err)
 		}
 	}
 	return out

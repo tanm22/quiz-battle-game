@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"strconv"
 	"sync"
@@ -16,6 +16,8 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
+
+	"quiz-battle/pkg/log"
 )
 
 type notificationService struct {
@@ -39,13 +41,13 @@ func (s *notificationService) newChannel() (*amqp.Channel, error) {
 func (s *notificationService) consume(ctx context.Context, queue string) {
 	ch, err := s.newChannel()
 	if err != nil {
-		log.Fatalf("[notification] failed to open channel for %s: %v", queue, err)
+		log.Fatal(ctx, "open channel failed", "queue", queue, "err", err)
 	}
 	defer ch.Close()
 
 	msgs, err := ch.Consume(queue, "", false, false, false, false, nil)
 	if err != nil {
-		log.Fatalf("[notification] failed to consume %s: %v", queue, err)
+		log.Fatal(ctx, "consume failed", "queue", queue, "err", err)
 	}
 
 	for {
@@ -67,21 +69,21 @@ func (s *notificationService) consume(ctx context.Context, queue string) {
 func (s *notificationService) dispatchNotification(ctx context.Context, msg amqp.Delivery) {
 	var payload map[string]any
 	if err := json.Unmarshal(msg.Body, &payload); err != nil {
-		log.Printf("[notification] bad payload: %v", err)
+		log.FromContext(ctx).Warn("bad payload", "err", err)
 		msg.Nack(false, false)
 		return
 	}
 
 	event, _ := payload["event"].(string)
 	if event == "" {
-		log.Printf("[notification] missing event field: %s", string(msg.Body))
+		log.FromContext(ctx).Warn("missing event field", "body", string(msg.Body))
 		msg.Ack(false)
 		return
 	}
 
 	userIDs := extractUserIDs(payload)
 	if len(userIDs) == 0 {
-		log.Printf("[notification] no target user(s) for %s: %s", event, string(msg.Body))
+		log.FromContext(ctx).Warn("no target user(s)", "event", event, "body", string(msg.Body))
 		msg.Ack(false)
 		return
 	}
@@ -95,8 +97,8 @@ func (s *notificationService) dispatchNotification(ctx context.Context, msg amqp
 		if s.policy != nil {
 			res := s.policy.allow(ctx, uid, event)
 			if !res.Allowed {
-				log.Printf("[notification] dropped event=%s user=%s reason=%s",
-					event, uid, res.Reason)
+				log.FromContext(ctx).Info("dropped",
+					"event", event, "user_id", uid, "reason", res.Reason)
 				continue
 			}
 			// Embed the resolved category so the Flutter client can
@@ -131,20 +133,20 @@ func extractUserIDs(payload map[string]any) []string {
 func (s *notificationService) deliverToUser(ctx context.Context, userID, title, body string, data map[string]string) {
 	var user bson.M
 	if err := s.mongoDB.Collection("users").FindOne(ctx, bson.M{"_id": userID}).Decode(&user); err != nil {
-		log.Printf("[notification] user %s not found: %v", userID, err)
+		log.FromContext(ctx).Warn("user not found", "user_id", userID, "err", err)
 		return
 	}
 	tokens, _ := user["fcmTokens"].(bson.A)
 	if len(tokens) == 0 {
-		log.Printf("[notification] user %s has no FCM tokens, skipping", userID)
+		log.FromContext(ctx).Info("user has no FCM tokens; skipping", "user_id", userID)
 		return
 	}
 
 	// Stub mode: Firebase not configured. Log and return so local dev without
 	// credentials still works end-to-end on the queue side.
 	if s.fcm == nil {
-		log.Printf("[notification] (stub) would dispatch to user %s (%d tokens): %s / %s",
-			userID, len(tokens), title, body)
+		log.FromContext(ctx).Info("(stub) would dispatch",
+			"user_id", userID, "tokens", len(tokens), "title", title, "body", body)
 		return
 	}
 
@@ -179,22 +181,23 @@ func (s *notificationService) deliverToUser(ctx context.Context, userID, title, 
 				// Async cleanup so we don't extend the per-message dispatch window
 				// waiting on a MongoDB round trip.
 				go s.pullInvalidToken(userID, token)
-				log.Printf("[notification] removing invalid token for user %s: %v", userID, err)
+				log.FromContext(ctx).Info("removing invalid token", "user_id", userID, "err", err)
 				return
 			}
-			log.Printf("[notification] fcm send failed for user %s: %v", userID, err)
+			log.FromContext(ctx).Error("fcm send failed", "user_id", userID, "err", err)
 		}(tok)
 	}
 	wg.Wait()
 }
 
 func (s *notificationService) pullInvalidToken(userID, token string) {
-	_, err := s.mongoDB.Collection("users").UpdateOne(context.Background(),
+	ctx := context.Background()
+	_, err := s.mongoDB.Collection("users").UpdateOne(ctx,
 		bson.M{"_id": userID},
 		bson.M{"$pull": bson.M{"fcmTokens": token}},
 	)
 	if err != nil {
-		log.Printf("[notification] failed to pull invalid token for %s: %v", userID, err)
+		log.FromContext(ctx).Error("pull invalid token failed", "user_id", userID, "err", err)
 	}
 }
 
@@ -449,6 +452,7 @@ func setupRabbitMQ(ch *amqp.Channel) error {
 // ---------------------------------------------------------------------------
 
 func main() {
+	slog.SetDefault(log.Init("notification"))
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -459,19 +463,19 @@ func main() {
 	}
 	conn, err := amqp.Dial(rabbitURL)
 	if err != nil {
-		log.Fatalf("rabbitmq connect failed: %v", err)
+		log.Fatal(ctx, "rabbitmq connect failed", "err", err)
 	}
 	defer conn.Close()
 
 	setupCh, err := conn.Channel()
 	if err != nil {
-		log.Fatalf("rabbitmq channel failed: %v", err)
+		log.Fatal(ctx, "rabbitmq channel failed", "err", err)
 	}
 	if err := setupRabbitMQ(setupCh); err != nil {
-		log.Fatalf("rabbitmq setup failed: %v", err)
+		log.Fatal(ctx, "rabbitmq setup failed", "err", err)
 	}
 	setupCh.Close()
-	log.Println("[notification] connected to RabbitMQ")
+	log.FromContext(ctx).Info("connected to RabbitMQ")
 
 	// MongoDB (for FCM token lookups and invalid-token cleanup)
 	mongoURI := os.Getenv("MONGO_URI")
@@ -480,10 +484,10 @@ func main() {
 	}
 	mongoClient, err := mongo.Connect(options.Client().ApplyURI(mongoURI))
 	if err != nil {
-		log.Fatalf("mongo connect failed: %v", err)
+		log.Fatal(ctx, "mongodb connect failed", "err", err)
 	}
 	defer mongoClient.Disconnect(ctx)
-	log.Println("[notification] connected to MongoDB")
+	log.FromContext(ctx).Info("connected to MongoDB")
 
 	// Redis: §4.6 policy gate stores cap/dedup/metric counters here.
 	// Co-located with the rest of the platform (single redis container in
@@ -494,10 +498,10 @@ func main() {
 	}
 	rdb := redis.NewClient(&redis.Options{Addr: redisAddr})
 	if err := rdb.Ping(ctx).Err(); err != nil {
-		log.Printf("[notification] WARN redis ping failed: %v — policy gate disabled", err)
+		log.FromContext(ctx).Warn("redis ping failed; policy gate disabled", "err", err)
 		rdb = nil
 	} else {
-		log.Println("[notification] connected to Redis")
+		log.FromContext(ctx).Info("connected to Redis")
 	}
 
 	svc := &notificationService{
@@ -517,7 +521,7 @@ func main() {
 			}
 		}
 		svc.policy = newPolicy(rdb, svc.mongoDB, dailyCap)
-		log.Printf("[notification] policy gate enabled (dailyCap=%d)", svc.policy.dailyCap)
+		log.FromContext(ctx).Info("policy gate enabled", "daily_cap", svc.policy.dailyCap)
 	}
 
 	// Firebase Admin SDK — optional. When GOOGLE_APPLICATION_CREDENTIALS is
@@ -536,24 +540,24 @@ func main() {
 		}
 		app, err := firebase.NewApp(ctx, cfg)
 		if err != nil {
-			log.Printf("[notification] WARN firebase init failed: %v — running in stub mode", err)
+			log.FromContext(ctx).Warn("firebase init failed; running in stub mode", "err", err)
 		} else {
 			msgClient, err := app.Messaging(ctx)
 			if err != nil {
-				log.Printf("[notification] WARN firebase messaging init failed: %v — running in stub mode", err)
+				log.FromContext(ctx).Warn("firebase messaging init failed; running in stub mode", "err", err)
 			} else {
 				svc.fcm = msgClient
-				log.Println("[notification] Firebase Admin SDK initialized")
+				log.FromContext(ctx).Info("Firebase Admin SDK initialized")
 			}
 		}
 	} else {
-		log.Println("[notification] WARN GOOGLE_APPLICATION_CREDENTIALS not set — running in stub mode (logs only)")
+		log.FromContext(ctx).Warn("GOOGLE_APPLICATION_CREDENTIALS not set; running in stub mode (logs only)")
 	}
 
 	// Start consumers — one goroutine per queue.
 	go svc.consume(ctx, "push-notification-queue")
 	go svc.consume(ctx, "premium-expiry-queue")
 
-	log.Println("[notification] consumers running")
+	log.FromContext(ctx).Info("consumers running")
 	select {} // block forever
 }
