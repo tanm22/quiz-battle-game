@@ -7,7 +7,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -18,6 +18,7 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"quiz-battle/pkg/auth"
+	"quiz-battle/pkg/log"
 	pb "quiz-battle/proto"
 )
 
@@ -29,6 +30,7 @@ const (
 )
 
 func main() {
+	slog.SetDefault(log.Init("test-matchinvite-nohistory"))
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
@@ -36,7 +38,7 @@ func main() {
 		ObjectIDAsHexString: true,
 	}))
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(ctx, "mongo connect failed", "err", err)
 	}
 	defer mc.Disconnect(ctx)
 	db := mc.Database("quizbattle")
@@ -53,17 +55,17 @@ func main() {
 		"createdAt": time.Now(),
 	})
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(ctx, "insert user failed", "err", err)
 	}
 
 	token, err := auth.GenerateToken(newbieID, "phase2_newbie", jwtSecret)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(ctx, "mint token failed", "err", err)
 	}
 
 	conn, err := grpc.NewClient(mmAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(ctx, "grpc dial failed", "err", err)
 	}
 	defer conn.Close()
 	client := pb.NewMatchmakingServiceClient(conn)
@@ -76,7 +78,7 @@ func main() {
 		Rating: 1200,
 	})
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(ctx, "join matchmaking failed", "err", err)
 	}
 	fmt.Printf("[newbie] JoinMatchmaking status=%s\n", resp.Status.String())
 

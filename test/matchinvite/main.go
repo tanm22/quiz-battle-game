@@ -16,7 +16,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -27,6 +27,7 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"quiz-battle/pkg/auth"
+	"quiz-battle/pkg/log"
 	pb "quiz-battle/proto"
 )
 
@@ -40,15 +41,19 @@ const (
 	opponent2 = "mi_test_opp2"
 )
 
+var ctxForFatal context.Context
+
 func must(err error, msg string) {
 	if err != nil {
-		log.Fatalf("%s: %v", msg, err)
+		log.Fatal(ctxForFatal, msg, "err", err)
 	}
 }
 
 func main() {
+	slog.SetDefault(log.Init("test-matchinvite"))
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
+	ctxForFatal = ctx
 
 	// ------------------------------------------------------------------
 	// 1. MongoDB setup — seed users (with FCM tokens on opponents) and a
@@ -110,7 +115,7 @@ func main() {
 	})
 	must(err, "insert match_history")
 
-	log.Println("[test] seeded 3 users + 1 match_history doc")
+	log.FromContext(ctx).Info("seeded 3 users + 1 match_history doc")
 
 	// ------------------------------------------------------------------
 	// 2. Mint JWT for the inviter and dial matchmaking.
