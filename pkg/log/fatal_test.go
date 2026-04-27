@@ -10,6 +10,8 @@ import (
 
 func TestFatalLogsAndExits(t *testing.T) {
 	var buf bytes.Buffer
+	prevDefault := slog.Default()
+	t.Cleanup(func() { slog.SetDefault(prevDefault) })
 	slog.SetDefault(newLogger("test", slog.LevelDebug, &buf))
 
 	var capturedCode int
@@ -39,6 +41,8 @@ func TestFatalLogsAndExits(t *testing.T) {
 
 func TestFatalAttachesRequestID(t *testing.T) {
 	var buf bytes.Buffer
+	prevDefault := slog.Default()
+	t.Cleanup(func() { slog.SetDefault(prevDefault) })
 	slog.SetDefault(newLogger("test", slog.LevelDebug, &buf))
 	exitFn = func(int) {}
 	t.Cleanup(func() { exitFn = origExit })

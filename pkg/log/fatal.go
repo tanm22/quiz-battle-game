@@ -18,7 +18,14 @@ var exitFn = origExit
 // attached when present — then terminates the process with exit code 1.
 //
 // args follows slog's variadic key-value pattern: Fatal(ctx, "msg", "err",
-// err, "host", host) emits {msg, err, host} as JSON attributes.
+// err, "host", host) emits {msg, err, host} as JSON attributes. Odd-numbered
+// arg counts silently degrade to slog's `!BADKEY` placeholder, so always
+// pass key/value pairs.
+//
+// Note: os.Exit skips deferred functions. Any defers registered before this
+// call (mongo.Disconnect, amqp.Close, etc.) will not run — close resources
+// explicitly first if cleanup matters, or return an error and let main()
+// unwind normally.
 //
 // Use this for unrecoverable startup errors. Do NOT use it inside RPC
 // handlers — return an error instead so the gRPC layer can surface a

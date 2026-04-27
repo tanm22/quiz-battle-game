@@ -11,9 +11,18 @@ import (
 // writes JSON to os.Stdout, takes its level from LOG_LEVEL, and pre-attaches
 // a `service` attribute. Call slog.SetDefault on the result so the global
 // slog package routes through this configuration.
+//
+// If LOG_LEVEL is set to an unrecognized value, Init emits a one-time WARN
+// recording the bad value and falls back to INFO — so typos like
+// LOG_LEVEL=warining surface in logs instead of silently masking output.
 func Init(serviceName string) *slog.Logger {
-	level := ParseLevel(os.Getenv("LOG_LEVEL"))
-	return newLogger(serviceName, level, os.Stdout)
+	raw := os.Getenv("LOG_LEVEL")
+	level, known := parseLevel(raw)
+	logger := newLogger(serviceName, level, os.Stdout)
+	if raw != "" && !known {
+		logger.Warn("unrecognized LOG_LEVEL; defaulting to INFO", "value", raw)
+	}
+	return logger
 }
 
 // newLogger is the internal factory used by Init and tests. Tests pass a

@@ -28,3 +28,26 @@ func TestParseLevel(t *testing.T) {
 		})
 	}
 }
+
+func TestParseLevelKnownFlag(t *testing.T) {
+	tests := []struct {
+		in    string
+		known bool
+	}{
+		{"debug", true},
+		{"INFO", true},
+		{"warn", true},
+		{"warning", true},
+		{"error", true},
+		{"", false},
+		{"warining", false},
+		{"trace", false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.in, func(t *testing.T) {
+			if _, got := parseLevel(tc.in); got != tc.known {
+				t.Errorf("parseLevel(%q) known = %v, want %v", tc.in, got, tc.known)
+			}
+		})
+	}
+}

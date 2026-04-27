@@ -59,6 +59,8 @@ func TestNewLoggerLevelFilter(t *testing.T) {
 
 func TestFromContextAttachesRequestID(t *testing.T) {
 	var buf bytes.Buffer
+	prev := slog.Default()
+	t.Cleanup(func() { slog.SetDefault(prev) })
 	slog.SetDefault(newLogger("test", slog.LevelInfo, &buf))
 
 	ctx := ContextWithRequestID(context.Background(), "rid-xyz")
@@ -72,6 +74,8 @@ func TestFromContextAttachesRequestID(t *testing.T) {
 
 func TestFromContextNoRequestID(t *testing.T) {
 	var buf bytes.Buffer
+	prev := slog.Default()
+	t.Cleanup(func() { slog.SetDefault(prev) })
 	slog.SetDefault(newLogger("test", slog.LevelInfo, &buf))
 
 	FromContext(context.Background()).Info("no-id")

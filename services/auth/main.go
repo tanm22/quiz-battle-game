@@ -270,8 +270,13 @@ func (s *authServer) SendEmailCode(ctx context.Context, req *pb.SendEmailCodeReq
 
 	if err := s.mailer.SendCode(req.Email, code, purpose); err != nil {
 		log.FromContext(ctx).Warn("email send failed", "err", err)
-		// Log code to stdout as fallback for dev
-		log.FromContext(ctx).Warn("dev fallback code", "email", req.Email, "purpose", purpose, "code", code)
+		// Dev convenience: when DEV_MODE=true, log the code so a developer can
+		// complete the flow without configured email. NEVER set DEV_MODE in
+		// production — the code becomes a queryable JSON attr in log
+		// aggregators and anyone with read access can mine recent OTPs.
+		if os.Getenv("DEV_MODE") == "true" {
+			log.FromContext(ctx).Debug("dev fallback code", "email", req.Email, "purpose", purpose, "code", code)
+		}
 	} else {
 		log.FromContext(ctx).Info("email code sent", "purpose", purpose, "email", req.Email)
 	}
@@ -879,7 +884,7 @@ func generateCode() string {
 func (s *authServer) streakWarningCron(ctx context.Context) {
 	ch, err := s.amqpConn.Channel()
 	if err != nil {
-		slog.ErrorContext(ctx, "open channel failed", "cron", "streak_warning", "err", err)
+		log.FromContext(ctx).Error("open channel failed", "cron", "streak_warning", "err", err)
 		return
 	}
 	defer ch.Close()
@@ -892,7 +897,7 @@ func (s *authServer) streakWarningCron(ctx context.Context) {
 			target = target.Add(24 * time.Hour)
 		}
 		sleepDur := target.Sub(now)
-		slog.InfoContext(ctx, "cron scheduled", "cron", "streak_warning", "sleep", sleepDur.Round(time.Minute).String())
+		log.FromContext(ctx).Info("cron scheduled", "cron", "streak_warning", "sleep", sleepDur.Round(time.Minute).String())
 
 		select {
 		case <-ctx.Done():
@@ -906,7 +911,7 @@ func (s *authServer) streakWarningCron(ctx context.Context) {
 			"streak.lastClaimedDate": bson.M{"$ne": today},
 		})
 		if err != nil {
-			slog.ErrorContext(ctx, "cron query failed", "cron", "streak_warning", "err", err)
+			log.FromContext(ctx).Error("cron query failed", "cron", "streak_warning", "err", err)
 			continue
 		}
 
@@ -932,7 +937,7 @@ func (s *authServer) streakWarningCron(ctx context.Context) {
 			count++
 		}
 		cursor.Close(ctx)
-		slog.InfoContext(ctx, "cron run complete", "cron", "streak_warning", "notified", count)
+		log.FromContext(ctx).Info("cron run complete", "cron", "streak_warning", "notified", count)
 	}
 }
 
@@ -940,7 +945,7 @@ func (s *authServer) streakWarningCron(ctx context.Context) {
 func (s *authServer) dailyRewardNudgeCron(ctx context.Context) {
 	ch, err := s.amqpConn.Channel()
 	if err != nil {
-		slog.ErrorContext(ctx, "open channel failed", "cron", "daily_reward_nudge", "err", err)
+		log.FromContext(ctx).Error("open channel failed", "cron", "daily_reward_nudge", "err", err)
 		return
 	}
 	defer ch.Close()
@@ -953,7 +958,7 @@ func (s *authServer) dailyRewardNudgeCron(ctx context.Context) {
 			target = target.Add(24 * time.Hour)
 		}
 		sleepDur := target.Sub(now)
-		slog.InfoContext(ctx, "cron scheduled", "cron", "daily_reward_nudge", "sleep", sleepDur.Round(time.Minute).String())
+		log.FromContext(ctx).Info("cron scheduled", "cron", "daily_reward_nudge", "sleep", sleepDur.Round(time.Minute).String())
 
 		select {
 		case <-ctx.Done():
@@ -967,7 +972,7 @@ func (s *authServer) dailyRewardNudgeCron(ctx context.Context) {
 			"isGuest":                false,
 		})
 		if err != nil {
-			slog.ErrorContext(ctx, "cron query failed", "cron", "daily_reward_nudge", "err", err)
+			log.FromContext(ctx).Error("cron query failed", "cron", "daily_reward_nudge", "err", err)
 			continue
 		}
 
@@ -989,7 +994,7 @@ func (s *authServer) dailyRewardNudgeCron(ctx context.Context) {
 			count++
 		}
 		cursor.Close(ctx)
-		slog.InfoContext(ctx, "cron run complete", "cron", "daily_reward_nudge", "notified", count)
+		log.FromContext(ctx).Info("cron run complete", "cron", "daily_reward_nudge", "notified", count)
 	}
 }
 
@@ -1024,7 +1029,7 @@ func main() {
 		Keys:    bson.D{{Key: "email", Value: 1}},
 		Options: options.Index().SetUnique(true).SetSparse(true),
 	})
-	slog.Info("connected to MongoDB")
+	log.FromContext(ctx).Info("connected to MongoDB")
 
 	// Redis
 	redisAddr := os.Getenv("REDIS_ADDR")
@@ -1035,7 +1040,7 @@ func main() {
 	if err := rdb.Ping(ctx).Err(); err != nil {
 		log.Fatal(ctx, "redis connect failed", "err", err)
 	}
-	slog.Info("connected to Redis")
+	log.FromContext(ctx).Info("connected to Redis")
 
 	// RabbitMQ (Phase 2: for publishing notification events)
 	rabbitURL := os.Getenv("RABBITMQ_URL")
@@ -1054,7 +1059,7 @@ func main() {
 	}
 	setupCh.ExchangeDeclare("sx", "topic", true, false, false, false, nil)
 	setupCh.Close()
-	slog.Info("connected to RabbitMQ")
+	log.FromContext(ctx).Info("connected to RabbitMQ")
 
 	// JWT + Resend
 	jwtSecret := os.Getenv("JWT_SECRET")
@@ -1068,7 +1073,7 @@ func main() {
 		resendFrom = "Quiz Battle <onboarding@resend.dev>"
 	}
 	if resendKey == "" {
-		slog.Warn("RESEND_API_KEY not set; email codes will only be logged to stdout")
+		log.FromContext(ctx).Warn("RESEND_API_KEY not set; email send will fail. Set DEV_MODE=true to log fallback codes locally")
 	}
 
 	srv := &authServer{
@@ -1107,7 +1112,7 @@ func main() {
 		log.Fatal(ctx, "listen failed", "addr", ":50054", "err", err)
 	}
 
-	slog.Info("gRPC serving", "addr", ":50054")
+	log.FromContext(ctx).Info("gRPC serving", "addr", ":50054")
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatal(ctx, "grpc serve failed", "err", err)
 	}
