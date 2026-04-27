@@ -528,6 +528,28 @@ class ScoringServiceClient extends $grpc.Client {
         options: options);
   }
 
+  /// §4.5 Deeper analytics. All numbers come from server aggregations on
+  /// the answer_log + rating_history collections (populated by
+  /// persistMatch); the client never computes statistics locally.
+  /// GetUserAnalytics returns lifetime per-topic accuracy + response-time
+  /// percentiles + a 30-day daily-snapshot rating series.
+  $grpc.ResponseFuture<$0.GetUserAnalyticsResponse> getUserAnalytics(
+    $0.GetUserAnalyticsRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$getUserAnalytics, request, options: options);
+  }
+
+  /// GetMonthlyRecap is the "your `<Month>`" recap card — matches
+  /// played, wins, win rate, the topic the user played most, and the
+  /// lifetime longest login streak as of the end of that month.
+  $grpc.ResponseFuture<$0.GetMonthlyRecapResponse> getMonthlyRecap(
+    $0.GetMonthlyRecapRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$getMonthlyRecap, request, options: options);
+  }
+
   // method descriptors
 
   static final _$calculateScore =
@@ -651,6 +673,16 @@ class ScoringServiceClient extends $grpc.Client {
       '/quiz.ScoringService/MarkNotificationOpened',
       ($0.MarkNotificationOpenedRequest value) => value.writeToBuffer(),
       $0.MarkNotificationOpenedResponse.fromBuffer);
+  static final _$getUserAnalytics = $grpc.ClientMethod<
+          $0.GetUserAnalyticsRequest, $0.GetUserAnalyticsResponse>(
+      '/quiz.ScoringService/GetUserAnalytics',
+      ($0.GetUserAnalyticsRequest value) => value.writeToBuffer(),
+      $0.GetUserAnalyticsResponse.fromBuffer);
+  static final _$getMonthlyRecap =
+      $grpc.ClientMethod<$0.GetMonthlyRecapRequest, $0.GetMonthlyRecapResponse>(
+          '/quiz.ScoringService/GetMonthlyRecap',
+          ($0.GetMonthlyRecapRequest value) => value.writeToBuffer(),
+          $0.GetMonthlyRecapResponse.fromBuffer);
 }
 
 @$pb.GrpcServiceName('quiz.ScoringService')
@@ -872,6 +904,24 @@ abstract class ScoringServiceBase extends $grpc.Service {
         ($core.List<$core.int> value) =>
             $0.MarkNotificationOpenedRequest.fromBuffer(value),
         ($0.MarkNotificationOpenedResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.GetUserAnalyticsRequest,
+            $0.GetUserAnalyticsResponse>(
+        'GetUserAnalytics',
+        getUserAnalytics_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.GetUserAnalyticsRequest.fromBuffer(value),
+        ($0.GetUserAnalyticsResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.GetMonthlyRecapRequest,
+            $0.GetMonthlyRecapResponse>(
+        'GetMonthlyRecap',
+        getMonthlyRecap_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.GetMonthlyRecapRequest.fromBuffer(value),
+        ($0.GetMonthlyRecapResponse value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.CalculateScoreResponse> calculateScore_Pre(
@@ -1088,6 +1138,24 @@ abstract class ScoringServiceBase extends $grpc.Service {
 
   $async.Future<$0.MarkNotificationOpenedResponse> markNotificationOpened(
       $grpc.ServiceCall call, $0.MarkNotificationOpenedRequest request);
+
+  $async.Future<$0.GetUserAnalyticsResponse> getUserAnalytics_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.GetUserAnalyticsRequest> $request) async {
+    return getUserAnalytics($call, await $request);
+  }
+
+  $async.Future<$0.GetUserAnalyticsResponse> getUserAnalytics(
+      $grpc.ServiceCall call, $0.GetUserAnalyticsRequest request);
+
+  $async.Future<$0.GetMonthlyRecapResponse> getMonthlyRecap_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.GetMonthlyRecapRequest> $request) async {
+    return getMonthlyRecap($call, await $request);
+  }
+
+  $async.Future<$0.GetMonthlyRecapResponse> getMonthlyRecap(
+      $grpc.ServiceCall call, $0.GetMonthlyRecapRequest request);
 }
 
 @$pb.GrpcServiceName('quiz.AuthService')

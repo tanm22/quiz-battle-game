@@ -8626,6 +8626,653 @@ class MarkNotificationOpenedResponse extends $pb.GeneratedMessage {
   void clearSuccess() => $_clearField(1);
 }
 
+class GetUserAnalyticsRequest extends $pb.GeneratedMessage {
+  factory GetUserAnalyticsRequest() => create();
+
+  GetUserAnalyticsRequest._();
+
+  factory GetUserAnalyticsRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetUserAnalyticsRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetUserAnalyticsRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetUserAnalyticsRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetUserAnalyticsRequest copyWith(
+          void Function(GetUserAnalyticsRequest) updates) =>
+      super.copyWith((message) => updates(message as GetUserAnalyticsRequest))
+          as GetUserAnalyticsRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetUserAnalyticsRequest create() => GetUserAnalyticsRequest._();
+  @$core.override
+  GetUserAnalyticsRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetUserAnalyticsRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetUserAnalyticsRequest>(create);
+  static GetUserAnalyticsRequest? _defaultInstance;
+}
+
+class GetUserAnalyticsResponse extends $pb.GeneratedMessage {
+  factory GetUserAnalyticsResponse({
+    $core.Iterable<TopicAccuracy>? topicAccuracy,
+    ResponseTimePercentiles? responseTime,
+    $core.Iterable<RatingPoint>? ratingHistory,
+    $core.int? lifetimeMatches,
+    $core.int? lifetimeWins,
+    $core.bool? hasData,
+  }) {
+    final result = create();
+    if (topicAccuracy != null) result.topicAccuracy.addAll(topicAccuracy);
+    if (responseTime != null) result.responseTime = responseTime;
+    if (ratingHistory != null) result.ratingHistory.addAll(ratingHistory);
+    if (lifetimeMatches != null) result.lifetimeMatches = lifetimeMatches;
+    if (lifetimeWins != null) result.lifetimeWins = lifetimeWins;
+    if (hasData != null) result.hasData = hasData;
+    return result;
+  }
+
+  GetUserAnalyticsResponse._();
+
+  factory GetUserAnalyticsResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetUserAnalyticsResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetUserAnalyticsResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..pPM<TopicAccuracy>(1, _omitFieldNames ? '' : 'topicAccuracy',
+        subBuilder: TopicAccuracy.create)
+    ..aOM<ResponseTimePercentiles>(2, _omitFieldNames ? '' : 'responseTime',
+        subBuilder: ResponseTimePercentiles.create)
+    ..pPM<RatingPoint>(3, _omitFieldNames ? '' : 'ratingHistory',
+        subBuilder: RatingPoint.create)
+    ..aI(4, _omitFieldNames ? '' : 'lifetimeMatches')
+    ..aI(5, _omitFieldNames ? '' : 'lifetimeWins')
+    ..aOB(6, _omitFieldNames ? '' : 'hasData')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetUserAnalyticsResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetUserAnalyticsResponse copyWith(
+          void Function(GetUserAnalyticsResponse) updates) =>
+      super.copyWith((message) => updates(message as GetUserAnalyticsResponse))
+          as GetUserAnalyticsResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetUserAnalyticsResponse create() => GetUserAnalyticsResponse._();
+  @$core.override
+  GetUserAnalyticsResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetUserAnalyticsResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetUserAnalyticsResponse>(create);
+  static GetUserAnalyticsResponse? _defaultInstance;
+
+  /// Lifetime per-topic accuracy, sorted by total questions answered (desc)
+  /// so the most-played topic surfaces first.
+  @$pb.TagNumber(1)
+  $pb.PbList<TopicAccuracy> get topicAccuracy => $_getList(0);
+
+  /// Lifetime response-time percentiles, computed across every answer the
+  /// user has ever submitted. Empty (zeros) until the user has at least
+  /// a few answers logged — the client should render "Not enough data
+  /// yet" rather than misleading 0 ms numbers.
+  @$pb.TagNumber(2)
+  ResponseTimePercentiles get responseTime => $_getN(1);
+  @$pb.TagNumber(2)
+  set responseTime(ResponseTimePercentiles value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasResponseTime() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearResponseTime() => $_clearField(2);
+  @$pb.TagNumber(2)
+  ResponseTimePercentiles ensureResponseTime() => $_ensure(1);
+
+  /// Daily rating snapshots for the last 30 days, oldest-first. One
+  /// entry per UTC day; days with no matches are omitted (the chart
+  /// should hold the previous value when rendering).
+  @$pb.TagNumber(3)
+  $pb.PbList<RatingPoint> get ratingHistory => $_getList(2);
+
+  /// Lifetime totals — convenient for headline display; the same numbers
+  /// exist on users.matchesPlayed / users.wins but surfacing them here
+  /// saves a second round trip from the analytics screen.
+  @$pb.TagNumber(4)
+  $core.int get lifetimeMatches => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set lifetimeMatches($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasLifetimeMatches() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearLifetimeMatches() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.int get lifetimeWins => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set lifetimeWins($core.int value) => $_setSignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasLifetimeWins() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearLifetimeWins() => $_clearField(5);
+
+  /// True iff at least one answer has been logged for this user.
+  /// The Flutter client uses this to swap an empty-state card in for
+  /// every panel rather than rendering empty charts that look broken.
+  @$pb.TagNumber(6)
+  $core.bool get hasData => $_getBF(5);
+  @$pb.TagNumber(6)
+  set hasData($core.bool value) => $_setBool(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasHasData() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearHasData() => $_clearField(6);
+}
+
+class TopicAccuracy extends $pb.GeneratedMessage {
+  factory TopicAccuracy({
+    $core.String? topic,
+    $core.int? total,
+    $core.int? correct,
+    $core.double? accuracyPct,
+  }) {
+    final result = create();
+    if (topic != null) result.topic = topic;
+    if (total != null) result.total = total;
+    if (correct != null) result.correct = correct;
+    if (accuracyPct != null) result.accuracyPct = accuracyPct;
+    return result;
+  }
+
+  TopicAccuracy._();
+
+  factory TopicAccuracy.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TopicAccuracy.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TopicAccuracy',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'topic')
+    ..aI(2, _omitFieldNames ? '' : 'total')
+    ..aI(3, _omitFieldNames ? '' : 'correct')
+    ..aD(4, _omitFieldNames ? '' : 'accuracyPct')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TopicAccuracy clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TopicAccuracy copyWith(void Function(TopicAccuracy) updates) =>
+      super.copyWith((message) => updates(message as TopicAccuracy))
+          as TopicAccuracy;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TopicAccuracy create() => TopicAccuracy._();
+  @$core.override
+  TopicAccuracy createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TopicAccuracy getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TopicAccuracy>(create);
+  static TopicAccuracy? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get topic => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set topic($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasTopic() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearTopic() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get total => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set total($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasTotal() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTotal() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get correct => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set correct($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasCorrect() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCorrect() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.double get accuracyPct => $_getN(3);
+  @$pb.TagNumber(4)
+  set accuracyPct($core.double value) => $_setDouble(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasAccuracyPct() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearAccuracyPct() => $_clearField(4);
+}
+
+class ResponseTimePercentiles extends $pb.GeneratedMessage {
+  factory ResponseTimePercentiles({
+    $core.double? p50Ms,
+    $core.double? p90Ms,
+    $core.double? p95Ms,
+    $core.double? p99Ms,
+    $fixnum.Int64? sampleCount,
+  }) {
+    final result = create();
+    if (p50Ms != null) result.p50Ms = p50Ms;
+    if (p90Ms != null) result.p90Ms = p90Ms;
+    if (p95Ms != null) result.p95Ms = p95Ms;
+    if (p99Ms != null) result.p99Ms = p99Ms;
+    if (sampleCount != null) result.sampleCount = sampleCount;
+    return result;
+  }
+
+  ResponseTimePercentiles._();
+
+  factory ResponseTimePercentiles.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ResponseTimePercentiles.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ResponseTimePercentiles',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aD(1, _omitFieldNames ? '' : 'p50Ms')
+    ..aD(2, _omitFieldNames ? '' : 'p90Ms')
+    ..aD(3, _omitFieldNames ? '' : 'p95Ms')
+    ..aD(4, _omitFieldNames ? '' : 'p99Ms')
+    ..aInt64(5, _omitFieldNames ? '' : 'sampleCount')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ResponseTimePercentiles clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ResponseTimePercentiles copyWith(
+          void Function(ResponseTimePercentiles) updates) =>
+      super.copyWith((message) => updates(message as ResponseTimePercentiles))
+          as ResponseTimePercentiles;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ResponseTimePercentiles create() => ResponseTimePercentiles._();
+  @$core.override
+  ResponseTimePercentiles createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ResponseTimePercentiles getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ResponseTimePercentiles>(create);
+  static ResponseTimePercentiles? _defaultInstance;
+
+  /// Each value is the actual response time in ms (server-reported
+  /// serverTimestamp - clientTimestamp at answer submit time, clamped
+  /// to [0, 15000] in scoring). Zero when n < 5 — the client should
+  /// treat zeros as "not enough data" rather than "answered instantly."
+  @$pb.TagNumber(1)
+  $core.double get p50Ms => $_getN(0);
+  @$pb.TagNumber(1)
+  set p50Ms($core.double value) => $_setDouble(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasP50Ms() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearP50Ms() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.double get p90Ms => $_getN(1);
+  @$pb.TagNumber(2)
+  set p90Ms($core.double value) => $_setDouble(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasP90Ms() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearP90Ms() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.double get p95Ms => $_getN(2);
+  @$pb.TagNumber(3)
+  set p95Ms($core.double value) => $_setDouble(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasP95Ms() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearP95Ms() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.double get p99Ms => $_getN(3);
+  @$pb.TagNumber(4)
+  set p99Ms($core.double value) => $_setDouble(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasP99Ms() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearP99Ms() => $_clearField(4);
+
+  /// Sample count — surfaced so the client can render the empty-state
+  /// copy ("4 answers logged — keep playing for more accurate stats").
+  @$pb.TagNumber(5)
+  $fixnum.Int64 get sampleCount => $_getI64(4);
+  @$pb.TagNumber(5)
+  set sampleCount($fixnum.Int64 value) => $_setInt64(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasSampleCount() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearSampleCount() => $_clearField(5);
+}
+
+class RatingPoint extends $pb.GeneratedMessage {
+  factory RatingPoint({
+    $fixnum.Int64? unixDay,
+    $core.int? rating,
+  }) {
+    final result = create();
+    if (unixDay != null) result.unixDay = unixDay;
+    if (rating != null) result.rating = rating;
+    return result;
+  }
+
+  RatingPoint._();
+
+  factory RatingPoint.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RatingPoint.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RatingPoint',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aInt64(1, _omitFieldNames ? '' : 'unixDay')
+    ..aI(2, _omitFieldNames ? '' : 'rating')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RatingPoint clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RatingPoint copyWith(void Function(RatingPoint) updates) =>
+      super.copyWith((message) => updates(message as RatingPoint))
+          as RatingPoint;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RatingPoint create() => RatingPoint._();
+  @$core.override
+  RatingPoint createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RatingPoint getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RatingPoint>(create);
+  static RatingPoint? _defaultInstance;
+
+  /// Unix seconds at 00:00:00 UTC of the day this snapshot represents.
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get unixDay => $_getI64(0);
+  @$pb.TagNumber(1)
+  set unixDay($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasUnixDay() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearUnixDay() => $_clearField(1);
+
+  /// The user's rating at the END of that day — i.e. the rating after
+  /// the last match they played that day. The series is oldest-first.
+  @$pb.TagNumber(2)
+  $core.int get rating => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set rating($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRating() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRating() => $_clearField(2);
+}
+
+class GetMonthlyRecapRequest extends $pb.GeneratedMessage {
+  factory GetMonthlyRecapRequest({
+    $core.int? year,
+    $core.int? month,
+  }) {
+    final result = create();
+    if (year != null) result.year = year;
+    if (month != null) result.month = month;
+    return result;
+  }
+
+  GetMonthlyRecapRequest._();
+
+  factory GetMonthlyRecapRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetMonthlyRecapRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetMonthlyRecapRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'year')
+    ..aI(2, _omitFieldNames ? '' : 'month')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetMonthlyRecapRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetMonthlyRecapRequest copyWith(
+          void Function(GetMonthlyRecapRequest) updates) =>
+      super.copyWith((message) => updates(message as GetMonthlyRecapRequest))
+          as GetMonthlyRecapRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetMonthlyRecapRequest create() => GetMonthlyRecapRequest._();
+  @$core.override
+  GetMonthlyRecapRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetMonthlyRecapRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetMonthlyRecapRequest>(create);
+  static GetMonthlyRecapRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get year => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set year($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasYear() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearYear() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get month => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set month($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasMonth() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearMonth() => $_clearField(2);
+}
+
+class GetMonthlyRecapResponse extends $pb.GeneratedMessage {
+  factory GetMonthlyRecapResponse({
+    $core.int? year,
+    $core.int? month,
+    $core.int? matchesPlayed,
+    $core.int? wins,
+    $core.double? winRate,
+    $core.String? favoriteTopic,
+    $core.int? longestStreakLifetime,
+    $core.bool? hasData,
+  }) {
+    final result = create();
+    if (year != null) result.year = year;
+    if (month != null) result.month = month;
+    if (matchesPlayed != null) result.matchesPlayed = matchesPlayed;
+    if (wins != null) result.wins = wins;
+    if (winRate != null) result.winRate = winRate;
+    if (favoriteTopic != null) result.favoriteTopic = favoriteTopic;
+    if (longestStreakLifetime != null)
+      result.longestStreakLifetime = longestStreakLifetime;
+    if (hasData != null) result.hasData = hasData;
+    return result;
+  }
+
+  GetMonthlyRecapResponse._();
+
+  factory GetMonthlyRecapResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetMonthlyRecapResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetMonthlyRecapResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'year')
+    ..aI(2, _omitFieldNames ? '' : 'month')
+    ..aI(3, _omitFieldNames ? '' : 'matchesPlayed')
+    ..aI(4, _omitFieldNames ? '' : 'wins')
+    ..aD(5, _omitFieldNames ? '' : 'winRate')
+    ..aOS(6, _omitFieldNames ? '' : 'favoriteTopic')
+    ..aI(7, _omitFieldNames ? '' : 'longestStreakLifetime')
+    ..aOB(8, _omitFieldNames ? '' : 'hasData')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetMonthlyRecapResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetMonthlyRecapResponse copyWith(
+          void Function(GetMonthlyRecapResponse) updates) =>
+      super.copyWith((message) => updates(message as GetMonthlyRecapResponse))
+          as GetMonthlyRecapResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetMonthlyRecapResponse create() => GetMonthlyRecapResponse._();
+  @$core.override
+  GetMonthlyRecapResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetMonthlyRecapResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetMonthlyRecapResponse>(create);
+  static GetMonthlyRecapResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get year => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set year($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasYear() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearYear() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get month => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set month($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasMonth() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearMonth() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get matchesPlayed => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set matchesPlayed($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasMatchesPlayed() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearMatchesPlayed() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get wins => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set wins($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasWins() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearWins() => $_clearField(4);
+
+  /// (wins / matches_played) — server-computed so the client never
+  /// divides by zero. 0 when matches_played is 0.
+  @$pb.TagNumber(5)
+  $core.double get winRate => $_getN(4);
+  @$pb.TagNumber(5)
+  set winRate($core.double value) => $_setDouble(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasWinRate() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearWinRate() => $_clearField(5);
+
+  /// The topic the user answered the most questions on this month.
+  /// Empty string when no answers were logged for the month.
+  @$pb.TagNumber(6)
+  $core.String get favoriteTopic => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set favoriteTopic($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasFavoriteTopic() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearFavoriteTopic() => $_clearField(6);
+
+  /// The user's lifetime longest login streak as of the end of this
+  /// month. We don't track per-month streak history (would need a
+  /// dedicated collection); this is honest about what we can measure.
+  @$pb.TagNumber(7)
+  $core.int get longestStreakLifetime => $_getIZ(6);
+  @$pb.TagNumber(7)
+  set longestStreakLifetime($core.int value) => $_setSignedInt32(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasLongestStreakLifetime() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearLongestStreakLifetime() => $_clearField(7);
+
+  /// True iff the user played at least one match this month — lets
+  /// the client render an "you didn't play in this month" card
+  /// instead of empty stats.
+  @$pb.TagNumber(8)
+  $core.bool get hasData => $_getBF(7);
+  @$pb.TagNumber(8)
+  set hasData($core.bool value) => $_setBool(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasHasData() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearHasData() => $_clearField(8);
+}
+
 const $core.bool _omitFieldNames =
     $core.bool.fromEnvironment('protobuf.omit_field_names');
 const $core.bool _omitMessageNames =

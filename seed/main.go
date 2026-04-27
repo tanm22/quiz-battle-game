@@ -219,6 +219,40 @@ func main() {
 	}
 	log.Println("[seed] coin_effect_outbox index ensured")
 
+	// §4.5 Deeper analytics — answer_log is one row per (user × question)
+	// answered, populated by the scoring service's match-finished consumer
+	// (services/scoring/main.go::persistMatch). The two indexes serve the
+	// two query shapes the analytics RPCs use:
+	//
+	//   • (userId, createdAt desc) — response-time percentiles + 30-day
+	//     time-window scan for monthly recap.
+	//   • (userId, topic) — per-topic accuracy aggregation.
+	if _, err := db.Collection("answer_log").Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "userId", Value: 1}, {Key: "createdAt", Value: -1}},
+			Options: options.Index().SetName("idx_user_recent"),
+		},
+		{
+			Keys:    bson.D{{Key: "userId", Value: 1}, {Key: "topic", Value: 1}},
+			Options: options.Index().SetName("idx_user_topic"),
+		},
+	}); err != nil {
+		log.Fatalf("[seed] answer_log indexes: %v", err)
+	}
+	log.Println("[seed] answer_log indexes ensured")
+
+	// §4.5 Deeper analytics — rating_history is one row per (user × match),
+	// recording the rating snapshot AFTER the post-match Elo update. The
+	// (userId, createdAt asc) index is the rating-graph read path: pull
+	// the last 30 days oldest-first, then bucket by UTC day in Go.
+	if _, err := db.Collection("rating_history").Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    bson.D{{Key: "userId", Value: 1}, {Key: "createdAt", Value: 1}},
+		Options: options.Index().SetName("idx_user_chronological"),
+	}); err != nil {
+		log.Fatalf("[seed] rating_history index: %v", err)
+	}
+	log.Println("[seed] rating_history index ensured")
+
 	log.Println("[seed] indexes created")
 
 	// --- Seed questions ---

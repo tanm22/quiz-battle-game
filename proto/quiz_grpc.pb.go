@@ -485,6 +485,8 @@ const (
 	ScoringService_GetNotificationPrefs_FullMethodName    = "/quiz.ScoringService/GetNotificationPrefs"
 	ScoringService_UpdateNotificationPrefs_FullMethodName = "/quiz.ScoringService/UpdateNotificationPrefs"
 	ScoringService_MarkNotificationOpened_FullMethodName  = "/quiz.ScoringService/MarkNotificationOpened"
+	ScoringService_GetUserAnalytics_FullMethodName        = "/quiz.ScoringService/GetUserAnalytics"
+	ScoringService_GetMonthlyRecap_FullMethodName         = "/quiz.ScoringService/GetMonthlyRecap"
 )
 
 // ScoringServiceClient is the client API for ScoringService service.
@@ -548,6 +550,16 @@ type ScoringServiceClient interface {
 	// taps a notification. Increments the per-category open counter so we
 	// can compute open-rate offline (sent vs opened, per type, per day).
 	MarkNotificationOpened(ctx context.Context, in *MarkNotificationOpenedRequest, opts ...grpc.CallOption) (*MarkNotificationOpenedResponse, error)
+	// §4.5 Deeper analytics. All numbers come from server aggregations on
+	// the answer_log + rating_history collections (populated by
+	// persistMatch); the client never computes statistics locally.
+	// GetUserAnalytics returns lifetime per-topic accuracy + response-time
+	// percentiles + a 30-day daily-snapshot rating series.
+	GetUserAnalytics(ctx context.Context, in *GetUserAnalyticsRequest, opts ...grpc.CallOption) (*GetUserAnalyticsResponse, error)
+	// GetMonthlyRecap is the "your `<Month>`" recap card — matches
+	// played, wins, win rate, the topic the user played most, and the
+	// lifetime longest login streak as of the end of that month.
+	GetMonthlyRecap(ctx context.Context, in *GetMonthlyRecapRequest, opts ...grpc.CallOption) (*GetMonthlyRecapResponse, error)
 }
 
 type scoringServiceClient struct {
@@ -798,6 +810,26 @@ func (c *scoringServiceClient) MarkNotificationOpened(ctx context.Context, in *M
 	return out, nil
 }
 
+func (c *scoringServiceClient) GetUserAnalytics(ctx context.Context, in *GetUserAnalyticsRequest, opts ...grpc.CallOption) (*GetUserAnalyticsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetUserAnalyticsResponse)
+	err := c.cc.Invoke(ctx, ScoringService_GetUserAnalytics_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scoringServiceClient) GetMonthlyRecap(ctx context.Context, in *GetMonthlyRecapRequest, opts ...grpc.CallOption) (*GetMonthlyRecapResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetMonthlyRecapResponse)
+	err := c.cc.Invoke(ctx, ScoringService_GetMonthlyRecap_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ScoringServiceServer is the server API for ScoringService service.
 // All implementations must embed UnimplementedScoringServiceServer
 // for forward compatibility.
@@ -859,6 +891,16 @@ type ScoringServiceServer interface {
 	// taps a notification. Increments the per-category open counter so we
 	// can compute open-rate offline (sent vs opened, per type, per day).
 	MarkNotificationOpened(context.Context, *MarkNotificationOpenedRequest) (*MarkNotificationOpenedResponse, error)
+	// §4.5 Deeper analytics. All numbers come from server aggregations on
+	// the answer_log + rating_history collections (populated by
+	// persistMatch); the client never computes statistics locally.
+	// GetUserAnalytics returns lifetime per-topic accuracy + response-time
+	// percentiles + a 30-day daily-snapshot rating series.
+	GetUserAnalytics(context.Context, *GetUserAnalyticsRequest) (*GetUserAnalyticsResponse, error)
+	// GetMonthlyRecap is the "your `<Month>`" recap card — matches
+	// played, wins, win rate, the topic the user played most, and the
+	// lifetime longest login streak as of the end of that month.
+	GetMonthlyRecap(context.Context, *GetMonthlyRecapRequest) (*GetMonthlyRecapResponse, error)
 	mustEmbedUnimplementedScoringServiceServer()
 }
 
@@ -940,6 +982,12 @@ func (UnimplementedScoringServiceServer) UpdateNotificationPrefs(context.Context
 }
 func (UnimplementedScoringServiceServer) MarkNotificationOpened(context.Context, *MarkNotificationOpenedRequest) (*MarkNotificationOpenedResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method MarkNotificationOpened not implemented")
+}
+func (UnimplementedScoringServiceServer) GetUserAnalytics(context.Context, *GetUserAnalyticsRequest) (*GetUserAnalyticsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetUserAnalytics not implemented")
+}
+func (UnimplementedScoringServiceServer) GetMonthlyRecap(context.Context, *GetMonthlyRecapRequest) (*GetMonthlyRecapResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetMonthlyRecap not implemented")
 }
 func (UnimplementedScoringServiceServer) mustEmbedUnimplementedScoringServiceServer() {}
 func (UnimplementedScoringServiceServer) testEmbeddedByValue()                        {}
@@ -1394,6 +1442,42 @@ func _ScoringService_MarkNotificationOpened_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ScoringService_GetUserAnalytics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetUserAnalyticsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScoringServiceServer).GetUserAnalytics(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScoringService_GetUserAnalytics_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScoringServiceServer).GetUserAnalytics(ctx, req.(*GetUserAnalyticsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScoringService_GetMonthlyRecap_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMonthlyRecapRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScoringServiceServer).GetMonthlyRecap(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScoringService_GetMonthlyRecap_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScoringServiceServer).GetMonthlyRecap(ctx, req.(*GetMonthlyRecapRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ScoringService_ServiceDesc is the grpc.ServiceDesc for ScoringService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1496,6 +1580,14 @@ var ScoringService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "MarkNotificationOpened",
 			Handler:    _ScoringService_MarkNotificationOpened_Handler,
+		},
+		{
+			MethodName: "GetUserAnalytics",
+			Handler:    _ScoringService_GetUserAnalytics_Handler,
+		},
+		{
+			MethodName: "GetMonthlyRecap",
+			Handler:    _ScoringService_GetMonthlyRecap_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

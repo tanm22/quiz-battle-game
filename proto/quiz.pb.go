@@ -6841,6 +6841,508 @@ func (x *MarkNotificationOpenedResponse) GetSuccess() bool {
 	return false
 }
 
+type GetUserAnalyticsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetUserAnalyticsRequest) Reset() {
+	*x = GetUserAnalyticsRequest{}
+	mi := &file_proto_quiz_proto_msgTypes[119]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetUserAnalyticsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetUserAnalyticsRequest) ProtoMessage() {}
+
+func (x *GetUserAnalyticsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[119]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetUserAnalyticsRequest.ProtoReflect.Descriptor instead.
+func (*GetUserAnalyticsRequest) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{119}
+}
+
+type GetUserAnalyticsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Lifetime per-topic accuracy, sorted by total questions answered (desc)
+	// so the most-played topic surfaces first.
+	TopicAccuracy []*TopicAccuracy `protobuf:"bytes,1,rep,name=topic_accuracy,json=topicAccuracy,proto3" json:"topic_accuracy,omitempty"`
+	// Lifetime response-time percentiles, computed across every answer the
+	// user has ever submitted. Empty (zeros) until the user has at least
+	// a few answers logged — the client should render "Not enough data
+	// yet" rather than misleading 0 ms numbers.
+	ResponseTime *ResponseTimePercentiles `protobuf:"bytes,2,opt,name=response_time,json=responseTime,proto3" json:"response_time,omitempty"`
+	// Daily rating snapshots for the last 30 days, oldest-first. One
+	// entry per UTC day; days with no matches are omitted (the chart
+	// should hold the previous value when rendering).
+	RatingHistory []*RatingPoint `protobuf:"bytes,3,rep,name=rating_history,json=ratingHistory,proto3" json:"rating_history,omitempty"`
+	// Lifetime totals — convenient for headline display; the same numbers
+	// exist on users.matchesPlayed / users.wins but surfacing them here
+	// saves a second round trip from the analytics screen.
+	LifetimeMatches int32 `protobuf:"varint,4,opt,name=lifetime_matches,json=lifetimeMatches,proto3" json:"lifetime_matches,omitempty"`
+	LifetimeWins    int32 `protobuf:"varint,5,opt,name=lifetime_wins,json=lifetimeWins,proto3" json:"lifetime_wins,omitempty"`
+	// True iff at least one answer has been logged for this user.
+	// The Flutter client uses this to swap an empty-state card in for
+	// every panel rather than rendering empty charts that look broken.
+	HasData       bool `protobuf:"varint,6,opt,name=has_data,json=hasData,proto3" json:"has_data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetUserAnalyticsResponse) Reset() {
+	*x = GetUserAnalyticsResponse{}
+	mi := &file_proto_quiz_proto_msgTypes[120]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetUserAnalyticsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetUserAnalyticsResponse) ProtoMessage() {}
+
+func (x *GetUserAnalyticsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[120]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetUserAnalyticsResponse.ProtoReflect.Descriptor instead.
+func (*GetUserAnalyticsResponse) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{120}
+}
+
+func (x *GetUserAnalyticsResponse) GetTopicAccuracy() []*TopicAccuracy {
+	if x != nil {
+		return x.TopicAccuracy
+	}
+	return nil
+}
+
+func (x *GetUserAnalyticsResponse) GetResponseTime() *ResponseTimePercentiles {
+	if x != nil {
+		return x.ResponseTime
+	}
+	return nil
+}
+
+func (x *GetUserAnalyticsResponse) GetRatingHistory() []*RatingPoint {
+	if x != nil {
+		return x.RatingHistory
+	}
+	return nil
+}
+
+func (x *GetUserAnalyticsResponse) GetLifetimeMatches() int32 {
+	if x != nil {
+		return x.LifetimeMatches
+	}
+	return 0
+}
+
+func (x *GetUserAnalyticsResponse) GetLifetimeWins() int32 {
+	if x != nil {
+		return x.LifetimeWins
+	}
+	return 0
+}
+
+func (x *GetUserAnalyticsResponse) GetHasData() bool {
+	if x != nil {
+		return x.HasData
+	}
+	return false
+}
+
+type TopicAccuracy struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Topic         string                 `protobuf:"bytes,1,opt,name=topic,proto3" json:"topic,omitempty"`
+	Total         int32                  `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"` // total questions answered with this topic
+	Correct       int32                  `protobuf:"varint,3,opt,name=correct,proto3" json:"correct,omitempty"`
+	AccuracyPct   float64                `protobuf:"fixed64,4,opt,name=accuracy_pct,json=accuracyPct,proto3" json:"accuracy_pct,omitempty"` // 0..1; (correct / total) — server-side, no
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TopicAccuracy) Reset() {
+	*x = TopicAccuracy{}
+	mi := &file_proto_quiz_proto_msgTypes[121]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TopicAccuracy) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TopicAccuracy) ProtoMessage() {}
+
+func (x *TopicAccuracy) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[121]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TopicAccuracy.ProtoReflect.Descriptor instead.
+func (*TopicAccuracy) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{121}
+}
+
+func (x *TopicAccuracy) GetTopic() string {
+	if x != nil {
+		return x.Topic
+	}
+	return ""
+}
+
+func (x *TopicAccuracy) GetTotal() int32 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+func (x *TopicAccuracy) GetCorrect() int32 {
+	if x != nil {
+		return x.Correct
+	}
+	return 0
+}
+
+func (x *TopicAccuracy) GetAccuracyPct() float64 {
+	if x != nil {
+		return x.AccuracyPct
+	}
+	return 0
+}
+
+type ResponseTimePercentiles struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Each value is the actual response time in ms (server-reported
+	// serverTimestamp - clientTimestamp at answer submit time, clamped
+	// to [0, 15000] in scoring). Zero when n < 5 — the client should
+	// treat zeros as "not enough data" rather than "answered instantly."
+	P50Ms float64 `protobuf:"fixed64,1,opt,name=p50_ms,json=p50Ms,proto3" json:"p50_ms,omitempty"`
+	P90Ms float64 `protobuf:"fixed64,2,opt,name=p90_ms,json=p90Ms,proto3" json:"p90_ms,omitempty"`
+	P95Ms float64 `protobuf:"fixed64,3,opt,name=p95_ms,json=p95Ms,proto3" json:"p95_ms,omitempty"`
+	P99Ms float64 `protobuf:"fixed64,4,opt,name=p99_ms,json=p99Ms,proto3" json:"p99_ms,omitempty"`
+	// Sample count — surfaced so the client can render the empty-state
+	// copy ("4 answers logged — keep playing for more accurate stats").
+	SampleCount   int64 `protobuf:"varint,5,opt,name=sample_count,json=sampleCount,proto3" json:"sample_count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResponseTimePercentiles) Reset() {
+	*x = ResponseTimePercentiles{}
+	mi := &file_proto_quiz_proto_msgTypes[122]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResponseTimePercentiles) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResponseTimePercentiles) ProtoMessage() {}
+
+func (x *ResponseTimePercentiles) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[122]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResponseTimePercentiles.ProtoReflect.Descriptor instead.
+func (*ResponseTimePercentiles) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{122}
+}
+
+func (x *ResponseTimePercentiles) GetP50Ms() float64 {
+	if x != nil {
+		return x.P50Ms
+	}
+	return 0
+}
+
+func (x *ResponseTimePercentiles) GetP90Ms() float64 {
+	if x != nil {
+		return x.P90Ms
+	}
+	return 0
+}
+
+func (x *ResponseTimePercentiles) GetP95Ms() float64 {
+	if x != nil {
+		return x.P95Ms
+	}
+	return 0
+}
+
+func (x *ResponseTimePercentiles) GetP99Ms() float64 {
+	if x != nil {
+		return x.P99Ms
+	}
+	return 0
+}
+
+func (x *ResponseTimePercentiles) GetSampleCount() int64 {
+	if x != nil {
+		return x.SampleCount
+	}
+	return 0
+}
+
+type RatingPoint struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Unix seconds at 00:00:00 UTC of the day this snapshot represents.
+	UnixDay int64 `protobuf:"varint,1,opt,name=unix_day,json=unixDay,proto3" json:"unix_day,omitempty"`
+	// The user's rating at the END of that day — i.e. the rating after
+	// the last match they played that day. The series is oldest-first.
+	Rating        int32 `protobuf:"varint,2,opt,name=rating,proto3" json:"rating,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RatingPoint) Reset() {
+	*x = RatingPoint{}
+	mi := &file_proto_quiz_proto_msgTypes[123]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RatingPoint) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RatingPoint) ProtoMessage() {}
+
+func (x *RatingPoint) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[123]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RatingPoint.ProtoReflect.Descriptor instead.
+func (*RatingPoint) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{123}
+}
+
+func (x *RatingPoint) GetUnixDay() int64 {
+	if x != nil {
+		return x.UnixDay
+	}
+	return 0
+}
+
+func (x *RatingPoint) GetRating() int32 {
+	if x != nil {
+		return x.Rating
+	}
+	return 0
+}
+
+type GetMonthlyRecapRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Year          int32                  `protobuf:"varint,1,opt,name=year,proto3" json:"year,omitempty"`   // four-digit, e.g. 2026
+	Month         int32                  `protobuf:"varint,2,opt,name=month,proto3" json:"month,omitempty"` // 1..12
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetMonthlyRecapRequest) Reset() {
+	*x = GetMonthlyRecapRequest{}
+	mi := &file_proto_quiz_proto_msgTypes[124]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMonthlyRecapRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMonthlyRecapRequest) ProtoMessage() {}
+
+func (x *GetMonthlyRecapRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[124]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMonthlyRecapRequest.ProtoReflect.Descriptor instead.
+func (*GetMonthlyRecapRequest) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{124}
+}
+
+func (x *GetMonthlyRecapRequest) GetYear() int32 {
+	if x != nil {
+		return x.Year
+	}
+	return 0
+}
+
+func (x *GetMonthlyRecapRequest) GetMonth() int32 {
+	if x != nil {
+		return x.Month
+	}
+	return 0
+}
+
+type GetMonthlyRecapResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Year          int32                  `protobuf:"varint,1,opt,name=year,proto3" json:"year,omitempty"`
+	Month         int32                  `protobuf:"varint,2,opt,name=month,proto3" json:"month,omitempty"`
+	MatchesPlayed int32                  `protobuf:"varint,3,opt,name=matches_played,json=matchesPlayed,proto3" json:"matches_played,omitempty"`
+	Wins          int32                  `protobuf:"varint,4,opt,name=wins,proto3" json:"wins,omitempty"`
+	// (wins / matches_played) — server-computed so the client never
+	// divides by zero. 0 when matches_played is 0.
+	WinRate float64 `protobuf:"fixed64,5,opt,name=win_rate,json=winRate,proto3" json:"win_rate,omitempty"`
+	// The topic the user answered the most questions on this month.
+	// Empty string when no answers were logged for the month.
+	FavoriteTopic string `protobuf:"bytes,6,opt,name=favorite_topic,json=favoriteTopic,proto3" json:"favorite_topic,omitempty"`
+	// The user's lifetime longest login streak as of the end of this
+	// month. We don't track per-month streak history (would need a
+	// dedicated collection); this is honest about what we can measure.
+	LongestStreakLifetime int32 `protobuf:"varint,7,opt,name=longest_streak_lifetime,json=longestStreakLifetime,proto3" json:"longest_streak_lifetime,omitempty"`
+	// True iff the user played at least one match this month — lets
+	// the client render an "you didn't play in this month" card
+	// instead of empty stats.
+	HasData       bool `protobuf:"varint,8,opt,name=has_data,json=hasData,proto3" json:"has_data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetMonthlyRecapResponse) Reset() {
+	*x = GetMonthlyRecapResponse{}
+	mi := &file_proto_quiz_proto_msgTypes[125]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMonthlyRecapResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMonthlyRecapResponse) ProtoMessage() {}
+
+func (x *GetMonthlyRecapResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_quiz_proto_msgTypes[125]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMonthlyRecapResponse.ProtoReflect.Descriptor instead.
+func (*GetMonthlyRecapResponse) Descriptor() ([]byte, []int) {
+	return file_proto_quiz_proto_rawDescGZIP(), []int{125}
+}
+
+func (x *GetMonthlyRecapResponse) GetYear() int32 {
+	if x != nil {
+		return x.Year
+	}
+	return 0
+}
+
+func (x *GetMonthlyRecapResponse) GetMonth() int32 {
+	if x != nil {
+		return x.Month
+	}
+	return 0
+}
+
+func (x *GetMonthlyRecapResponse) GetMatchesPlayed() int32 {
+	if x != nil {
+		return x.MatchesPlayed
+	}
+	return 0
+}
+
+func (x *GetMonthlyRecapResponse) GetWins() int32 {
+	if x != nil {
+		return x.Wins
+	}
+	return 0
+}
+
+func (x *GetMonthlyRecapResponse) GetWinRate() float64 {
+	if x != nil {
+		return x.WinRate
+	}
+	return 0
+}
+
+func (x *GetMonthlyRecapResponse) GetFavoriteTopic() string {
+	if x != nil {
+		return x.FavoriteTopic
+	}
+	return ""
+}
+
+func (x *GetMonthlyRecapResponse) GetLongestStreakLifetime() int32 {
+	if x != nil {
+		return x.LongestStreakLifetime
+	}
+	return 0
+}
+
+func (x *GetMonthlyRecapResponse) GetHasData() bool {
+	if x != nil {
+		return x.HasData
+	}
+	return false
+}
+
 var File_proto_quiz_proto protoreflect.FileDescriptor
 
 const file_proto_quiz_proto_rawDesc = "" +
@@ -7310,7 +7812,41 @@ const file_proto_quiz_proto_rawDesc = "" +
 	"\x1dMarkNotificationOpenedRequest\x12\x1a\n" +
 	"\bcategory\x18\x01 \x01(\tR\bcategory\":\n" +
 	"\x1eMarkNotificationOpenedResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess*5\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\"\x19\n" +
+	"\x17GetUserAnalyticsRequest\"\xbf\x02\n" +
+	"\x18GetUserAnalyticsResponse\x12:\n" +
+	"\x0etopic_accuracy\x18\x01 \x03(\v2\x13.quiz.TopicAccuracyR\rtopicAccuracy\x12B\n" +
+	"\rresponse_time\x18\x02 \x01(\v2\x1d.quiz.ResponseTimePercentilesR\fresponseTime\x128\n" +
+	"\x0erating_history\x18\x03 \x03(\v2\x11.quiz.RatingPointR\rratingHistory\x12)\n" +
+	"\x10lifetime_matches\x18\x04 \x01(\x05R\x0flifetimeMatches\x12#\n" +
+	"\rlifetime_wins\x18\x05 \x01(\x05R\flifetimeWins\x12\x19\n" +
+	"\bhas_data\x18\x06 \x01(\bR\ahasData\"x\n" +
+	"\rTopicAccuracy\x12\x14\n" +
+	"\x05topic\x18\x01 \x01(\tR\x05topic\x12\x14\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total\x12\x18\n" +
+	"\acorrect\x18\x03 \x01(\x05R\acorrect\x12!\n" +
+	"\faccuracy_pct\x18\x04 \x01(\x01R\vaccuracyPct\"\x98\x01\n" +
+	"\x17ResponseTimePercentiles\x12\x15\n" +
+	"\x06p50_ms\x18\x01 \x01(\x01R\x05p50Ms\x12\x15\n" +
+	"\x06p90_ms\x18\x02 \x01(\x01R\x05p90Ms\x12\x15\n" +
+	"\x06p95_ms\x18\x03 \x01(\x01R\x05p95Ms\x12\x15\n" +
+	"\x06p99_ms\x18\x04 \x01(\x01R\x05p99Ms\x12!\n" +
+	"\fsample_count\x18\x05 \x01(\x03R\vsampleCount\"@\n" +
+	"\vRatingPoint\x12\x19\n" +
+	"\bunix_day\x18\x01 \x01(\x03R\aunixDay\x12\x16\n" +
+	"\x06rating\x18\x02 \x01(\x05R\x06rating\"B\n" +
+	"\x16GetMonthlyRecapRequest\x12\x12\n" +
+	"\x04year\x18\x01 \x01(\x05R\x04year\x12\x14\n" +
+	"\x05month\x18\x02 \x01(\x05R\x05month\"\x93\x02\n" +
+	"\x17GetMonthlyRecapResponse\x12\x12\n" +
+	"\x04year\x18\x01 \x01(\x05R\x04year\x12\x14\n" +
+	"\x05month\x18\x02 \x01(\x05R\x05month\x12%\n" +
+	"\x0ematches_played\x18\x03 \x01(\x05R\rmatchesPlayed\x12\x12\n" +
+	"\x04wins\x18\x04 \x01(\x05R\x04wins\x12\x19\n" +
+	"\bwin_rate\x18\x05 \x01(\x01R\awinRate\x12%\n" +
+	"\x0efavorite_topic\x18\x06 \x01(\tR\rfavoriteTopic\x126\n" +
+	"\x17longest_streak_lifetime\x18\a \x01(\x05R\x15longestStreakLifetime\x12\x19\n" +
+	"\bhas_data\x18\b \x01(\bR\ahasData*5\n" +
 	"\x11MatchmakingStatus\x12\n" +
 	"\n" +
 	"\x06QUEUED\x10\x00\x12\x14\n" +
@@ -7324,7 +7860,7 @@ const file_proto_quiz_proto_rawDesc = "" +
 	"\fSubmitAnswer\x12\x19.quiz.SubmitAnswerRequest\x1a\x1a.quiz.SubmitAnswerResponse\x12D\n" +
 	"\x10StreamGameEvents\x12\x1d.quiz.StreamGameEventsRequest\x1a\x0f.quiz.GameEvent0\x01\x12T\n" +
 	"\x11GetTournamentList\x12\x1e.quiz.GetTournamentListRequest\x1a\x1f.quiz.GetTournamentListResponse\x12K\n" +
-	"\x0eJoinTournament\x12\x1b.quiz.JoinTournamentRequest\x1a\x1c.quiz.JoinTournamentResponse2\xe7\x0f\n" +
+	"\x0eJoinTournament\x12\x1b.quiz.JoinTournamentRequest\x1a\x1c.quiz.JoinTournamentResponse2\x8a\x11\n" +
 	"\x0eScoringService\x12K\n" +
 	"\x0eCalculateScore\x12\x1b.quiz.CalculateScoreRequest\x1a\x1c.quiz.CalculateScoreResponse\x12K\n" +
 	"\x0eGetLeaderboard\x12\x1b.quiz.GetLeaderboardRequest\x1a\x1c.quiz.GetLeaderboardResponse\x12N\n" +
@@ -7349,7 +7885,9 @@ const file_proto_quiz_proto_rawDesc = "" +
 	"\x0fChallengeFriend\x12\x1c.quiz.ChallengeFriendRequest\x1a\x1d.quiz.ChallengeFriendResponse\x12]\n" +
 	"\x14GetNotificationPrefs\x12!.quiz.GetNotificationPrefsRequest\x1a\".quiz.GetNotificationPrefsResponse\x12f\n" +
 	"\x17UpdateNotificationPrefs\x12$.quiz.UpdateNotificationPrefsRequest\x1a%.quiz.UpdateNotificationPrefsResponse\x12c\n" +
-	"\x16MarkNotificationOpened\x12#.quiz.MarkNotificationOpenedRequest\x1a$.quiz.MarkNotificationOpenedResponse2\x9a\b\n" +
+	"\x16MarkNotificationOpened\x12#.quiz.MarkNotificationOpenedRequest\x1a$.quiz.MarkNotificationOpenedResponse\x12Q\n" +
+	"\x10GetUserAnalytics\x12\x1d.quiz.GetUserAnalyticsRequest\x1a\x1e.quiz.GetUserAnalyticsResponse\x12N\n" +
+	"\x0fGetMonthlyRecap\x12\x1c.quiz.GetMonthlyRecapRequest\x1a\x1d.quiz.GetMonthlyRecapResponse2\x9a\b\n" +
 	"\vAuthService\x125\n" +
 	"\bRegister\x12\x15.quiz.RegisterRequest\x1a\x12.quiz.AuthResponse\x12/\n" +
 	"\x05Login\x12\x12.quiz.LoginRequest\x1a\x12.quiz.AuthResponse\x12<\n" +
@@ -7387,7 +7925,7 @@ func file_proto_quiz_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_quiz_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_proto_quiz_proto_msgTypes = make([]protoimpl.MessageInfo, 121)
+var file_proto_quiz_proto_msgTypes = make([]protoimpl.MessageInfo, 128)
 var file_proto_quiz_proto_goTypes = []any{
 	(MatchmakingStatus)(0),                  // 0: quiz.MatchmakingStatus
 	(*JoinMatchmakingRequest)(nil),          // 1: quiz.JoinMatchmakingRequest
@@ -7509,8 +8047,15 @@ var file_proto_quiz_proto_goTypes = []any{
 	(*UpdateNotificationPrefsResponse)(nil), // 117: quiz.UpdateNotificationPrefsResponse
 	(*MarkNotificationOpenedRequest)(nil),   // 118: quiz.MarkNotificationOpenedRequest
 	(*MarkNotificationOpenedResponse)(nil),  // 119: quiz.MarkNotificationOpenedResponse
-	nil,                                     // 120: quiz.CoinLedgerEntry.MetadataEntry
-	nil,                                     // 121: quiz.ShopItem.MetadataEntry
+	(*GetUserAnalyticsRequest)(nil),         // 120: quiz.GetUserAnalyticsRequest
+	(*GetUserAnalyticsResponse)(nil),        // 121: quiz.GetUserAnalyticsResponse
+	(*TopicAccuracy)(nil),                   // 122: quiz.TopicAccuracy
+	(*ResponseTimePercentiles)(nil),         // 123: quiz.ResponseTimePercentiles
+	(*RatingPoint)(nil),                     // 124: quiz.RatingPoint
+	(*GetMonthlyRecapRequest)(nil),          // 125: quiz.GetMonthlyRecapRequest
+	(*GetMonthlyRecapResponse)(nil),         // 126: quiz.GetMonthlyRecapResponse
+	nil,                                     // 127: quiz.CoinLedgerEntry.MetadataEntry
+	nil,                                     // 128: quiz.ShopItem.MetadataEntry
 }
 var file_proto_quiz_proto_depIdxs = []int32{
 	0,   // 0: quiz.JoinMatchmakingResponse.status:type_name -> quiz.MatchmakingStatus
@@ -7540,119 +8085,126 @@ var file_proto_quiz_proto_depIdxs = []int32{
 	76,  // 24: quiz.GetPaymentHistoryResponse.payments:type_name -> quiz.PaymentRecord
 	79,  // 25: quiz.GetTournamentListResponse.tournaments:type_name -> quiz.TournamentInfo
 	16,  // 26: quiz.GetGlobalLeaderboardResponse.entries:type_name -> quiz.LeaderboardEntry
-	120, // 27: quiz.CoinLedgerEntry.metadata:type_name -> quiz.CoinLedgerEntry.MetadataEntry
+	127, // 27: quiz.CoinLedgerEntry.metadata:type_name -> quiz.CoinLedgerEntry.MetadataEntry
 	86,  // 28: quiz.GetCoinLedgerResponse.entries:type_name -> quiz.CoinLedgerEntry
-	121, // 29: quiz.ShopItem.metadata:type_name -> quiz.ShopItem.MetadataEntry
+	128, // 29: quiz.ShopItem.metadata:type_name -> quiz.ShopItem.MetadataEntry
 	89,  // 30: quiz.GetShopCatalogResponse.items:type_name -> quiz.ShopItem
 	105, // 31: quiz.GetFriendsListResponse.friends:type_name -> quiz.Friend
 	102, // 32: quiz.GetFriendRequestsResponse.incoming:type_name -> quiz.FriendRequest
-	1,   // 33: quiz.MatchmakingService.JoinMatchmaking:input_type -> quiz.JoinMatchmakingRequest
-	3,   // 34: quiz.MatchmakingService.LeaveMatchmaking:input_type -> quiz.LeaveMatchmakingRequest
-	5,   // 35: quiz.MatchmakingService.SubscribeToMatch:input_type -> quiz.SubscribeToMatchRequest
-	7,   // 36: quiz.QuizService.GetRoomQuestions:input_type -> quiz.GetRoomQuestionsRequest
-	10,  // 37: quiz.QuizService.SubmitAnswer:input_type -> quiz.SubmitAnswerRequest
-	12,  // 38: quiz.QuizService.StreamGameEvents:input_type -> quiz.StreamGameEventsRequest
-	77,  // 39: quiz.QuizService.GetTournamentList:input_type -> quiz.GetTournamentListRequest
-	80,  // 40: quiz.QuizService.JoinTournament:input_type -> quiz.JoinTournamentRequest
-	43,  // 41: quiz.ScoringService.CalculateScore:input_type -> quiz.CalculateScoreRequest
-	45,  // 42: quiz.ScoringService.GetLeaderboard:input_type -> quiz.GetLeaderboardRequest
-	47,  // 43: quiz.ScoringService.GetMatchHistory:input_type -> quiz.GetMatchHistoryRequest
-	60,  // 44: quiz.ScoringService.GetHomeScreenData:input_type -> quiz.GetHomeScreenDataRequest
-	62,  // 45: quiz.ScoringService.GetReferralDashboard:input_type -> quiz.GetReferralDashboardRequest
-	64,  // 46: quiz.ScoringService.ApplyReferralCode:input_type -> quiz.ApplyReferralCodeRequest
-	66,  // 47: quiz.ScoringService.UpdateFCMToken:input_type -> quiz.UpdateFCMTokenRequest
-	82,  // 48: quiz.ScoringService.GetGlobalLeaderboard:input_type -> quiz.GetGlobalLeaderboardRequest
-	84,  // 49: quiz.ScoringService.GetCoinBalance:input_type -> quiz.GetCoinBalanceRequest
-	87,  // 50: quiz.ScoringService.GetCoinLedger:input_type -> quiz.GetCoinLedgerRequest
-	90,  // 51: quiz.ScoringService.GetShopCatalog:input_type -> quiz.GetShopCatalogRequest
-	92,  // 52: quiz.ScoringService.GetShopInventory:input_type -> quiz.GetShopInventoryRequest
-	94,  // 53: quiz.ScoringService.PurchaseShopItem:input_type -> quiz.PurchaseShopItemRequest
-	96,  // 54: quiz.ScoringService.EquipCosmetic:input_type -> quiz.EquipCosmeticRequest
-	98,  // 55: quiz.ScoringService.ConsumeReroll:input_type -> quiz.ConsumeRerollRequest
-	100, // 56: quiz.ScoringService.SendFriendRequest:input_type -> quiz.SendFriendRequestRequest
-	103, // 57: quiz.ScoringService.RespondToFriendRequest:input_type -> quiz.RespondToFriendRequestRequest
-	106, // 58: quiz.ScoringService.GetFriendsList:input_type -> quiz.GetFriendsListRequest
-	108, // 59: quiz.ScoringService.GetFriendRequests:input_type -> quiz.GetFriendRequestsRequest
-	110, // 60: quiz.ScoringService.Heartbeat:input_type -> quiz.HeartbeatRequest
-	112, // 61: quiz.ScoringService.ChallengeFriend:input_type -> quiz.ChallengeFriendRequest
-	114, // 62: quiz.ScoringService.GetNotificationPrefs:input_type -> quiz.GetNotificationPrefsRequest
-	116, // 63: quiz.ScoringService.UpdateNotificationPrefs:input_type -> quiz.UpdateNotificationPrefsRequest
-	118, // 64: quiz.ScoringService.MarkNotificationOpened:input_type -> quiz.MarkNotificationOpenedRequest
-	22,  // 65: quiz.AuthService.Register:input_type -> quiz.RegisterRequest
-	23,  // 66: quiz.AuthService.Login:input_type -> quiz.LoginRequest
-	25,  // 67: quiz.AuthService.GetProfile:input_type -> quiz.GetProfileRequest
-	27,  // 68: quiz.AuthService.GuestLogin:input_type -> quiz.GuestLoginRequest
-	28,  // 69: quiz.AuthService.LoginWithEmail:input_type -> quiz.EmailLoginRequest
-	29,  // 70: quiz.AuthService.SendEmailCode:input_type -> quiz.SendEmailCodeRequest
-	31,  // 71: quiz.AuthService.VerifyEmailCode:input_type -> quiz.VerifyEmailCodeRequest
-	33,  // 72: quiz.AuthService.LinkEmail:input_type -> quiz.LinkEmailRequest
-	35,  // 73: quiz.AuthService.ResetPassword:input_type -> quiz.ResetPasswordRequest
-	37,  // 74: quiz.AuthService.CheckUsername:input_type -> quiz.CheckUsernameRequest
-	39,  // 75: quiz.AuthService.DeleteAccount:input_type -> quiz.DeleteAccountRequest
-	53,  // 76: quiz.AuthService.GoogleSignIn:input_type -> quiz.GoogleSignInRequest
-	56,  // 77: quiz.AuthService.ClaimDailyReward:input_type -> quiz.ClaimDailyRewardRequest
-	58,  // 78: quiz.AuthService.GetStreakInfo:input_type -> quiz.GetStreakInfoRequest
-	41,  // 79: quiz.AuthService.UpdateProfile:input_type -> quiz.UpdateProfileRequest
-	68,  // 80: quiz.PaymentService.CreateOrder:input_type -> quiz.CreateOrderRequest
-	70,  // 81: quiz.PaymentService.VerifyPayment:input_type -> quiz.VerifyPaymentRequest
-	72,  // 82: quiz.PaymentService.GetPlanStatus:input_type -> quiz.GetPlanStatusRequest
-	74,  // 83: quiz.PaymentService.GetPaymentHistory:input_type -> quiz.GetPaymentHistoryRequest
-	2,   // 84: quiz.MatchmakingService.JoinMatchmaking:output_type -> quiz.JoinMatchmakingResponse
-	4,   // 85: quiz.MatchmakingService.LeaveMatchmaking:output_type -> quiz.LeaveMatchmakingResponse
-	6,   // 86: quiz.MatchmakingService.SubscribeToMatch:output_type -> quiz.MatchEvent
-	8,   // 87: quiz.QuizService.GetRoomQuestions:output_type -> quiz.GetRoomQuestionsResponse
-	11,  // 88: quiz.QuizService.SubmitAnswer:output_type -> quiz.SubmitAnswerResponse
-	13,  // 89: quiz.QuizService.StreamGameEvents:output_type -> quiz.GameEvent
-	78,  // 90: quiz.QuizService.GetTournamentList:output_type -> quiz.GetTournamentListResponse
-	81,  // 91: quiz.QuizService.JoinTournament:output_type -> quiz.JoinTournamentResponse
-	44,  // 92: quiz.ScoringService.CalculateScore:output_type -> quiz.CalculateScoreResponse
-	46,  // 93: quiz.ScoringService.GetLeaderboard:output_type -> quiz.GetLeaderboardResponse
-	48,  // 94: quiz.ScoringService.GetMatchHistory:output_type -> quiz.GetMatchHistoryResponse
-	61,  // 95: quiz.ScoringService.GetHomeScreenData:output_type -> quiz.GetHomeScreenDataResponse
-	63,  // 96: quiz.ScoringService.GetReferralDashboard:output_type -> quiz.GetReferralDashboardResponse
-	65,  // 97: quiz.ScoringService.ApplyReferralCode:output_type -> quiz.ApplyReferralCodeResponse
-	67,  // 98: quiz.ScoringService.UpdateFCMToken:output_type -> quiz.UpdateFCMTokenResponse
-	83,  // 99: quiz.ScoringService.GetGlobalLeaderboard:output_type -> quiz.GetGlobalLeaderboardResponse
-	85,  // 100: quiz.ScoringService.GetCoinBalance:output_type -> quiz.GetCoinBalanceResponse
-	88,  // 101: quiz.ScoringService.GetCoinLedger:output_type -> quiz.GetCoinLedgerResponse
-	91,  // 102: quiz.ScoringService.GetShopCatalog:output_type -> quiz.GetShopCatalogResponse
-	93,  // 103: quiz.ScoringService.GetShopInventory:output_type -> quiz.GetShopInventoryResponse
-	95,  // 104: quiz.ScoringService.PurchaseShopItem:output_type -> quiz.PurchaseShopItemResponse
-	97,  // 105: quiz.ScoringService.EquipCosmetic:output_type -> quiz.EquipCosmeticResponse
-	99,  // 106: quiz.ScoringService.ConsumeReroll:output_type -> quiz.ConsumeRerollResponse
-	101, // 107: quiz.ScoringService.SendFriendRequest:output_type -> quiz.SendFriendRequestResponse
-	104, // 108: quiz.ScoringService.RespondToFriendRequest:output_type -> quiz.RespondToFriendRequestResponse
-	107, // 109: quiz.ScoringService.GetFriendsList:output_type -> quiz.GetFriendsListResponse
-	109, // 110: quiz.ScoringService.GetFriendRequests:output_type -> quiz.GetFriendRequestsResponse
-	111, // 111: quiz.ScoringService.Heartbeat:output_type -> quiz.HeartbeatResponse
-	113, // 112: quiz.ScoringService.ChallengeFriend:output_type -> quiz.ChallengeFriendResponse
-	115, // 113: quiz.ScoringService.GetNotificationPrefs:output_type -> quiz.GetNotificationPrefsResponse
-	117, // 114: quiz.ScoringService.UpdateNotificationPrefs:output_type -> quiz.UpdateNotificationPrefsResponse
-	119, // 115: quiz.ScoringService.MarkNotificationOpened:output_type -> quiz.MarkNotificationOpenedResponse
-	24,  // 116: quiz.AuthService.Register:output_type -> quiz.AuthResponse
-	24,  // 117: quiz.AuthService.Login:output_type -> quiz.AuthResponse
-	26,  // 118: quiz.AuthService.GetProfile:output_type -> quiz.ProfileResponse
-	24,  // 119: quiz.AuthService.GuestLogin:output_type -> quiz.AuthResponse
-	30,  // 120: quiz.AuthService.LoginWithEmail:output_type -> quiz.SendEmailCodeResponse
-	30,  // 121: quiz.AuthService.SendEmailCode:output_type -> quiz.SendEmailCodeResponse
-	32,  // 122: quiz.AuthService.VerifyEmailCode:output_type -> quiz.VerifyEmailCodeResponse
-	34,  // 123: quiz.AuthService.LinkEmail:output_type -> quiz.LinkEmailResponse
-	36,  // 124: quiz.AuthService.ResetPassword:output_type -> quiz.ResetPasswordResponse
-	38,  // 125: quiz.AuthService.CheckUsername:output_type -> quiz.CheckUsernameResponse
-	40,  // 126: quiz.AuthService.DeleteAccount:output_type -> quiz.DeleteAccountResponse
-	54,  // 127: quiz.AuthService.GoogleSignIn:output_type -> quiz.GoogleSignInResponse
-	57,  // 128: quiz.AuthService.ClaimDailyReward:output_type -> quiz.ClaimDailyRewardResponse
-	59,  // 129: quiz.AuthService.GetStreakInfo:output_type -> quiz.GetStreakInfoResponse
-	42,  // 130: quiz.AuthService.UpdateProfile:output_type -> quiz.UpdateProfileResponse
-	69,  // 131: quiz.PaymentService.CreateOrder:output_type -> quiz.CreateOrderResponse
-	71,  // 132: quiz.PaymentService.VerifyPayment:output_type -> quiz.VerifyPaymentResponse
-	73,  // 133: quiz.PaymentService.GetPlanStatus:output_type -> quiz.GetPlanStatusResponse
-	75,  // 134: quiz.PaymentService.GetPaymentHistory:output_type -> quiz.GetPaymentHistoryResponse
-	84,  // [84:135] is the sub-list for method output_type
-	33,  // [33:84] is the sub-list for method input_type
-	33,  // [33:33] is the sub-list for extension type_name
-	33,  // [33:33] is the sub-list for extension extendee
-	0,   // [0:33] is the sub-list for field type_name
+	122, // 33: quiz.GetUserAnalyticsResponse.topic_accuracy:type_name -> quiz.TopicAccuracy
+	123, // 34: quiz.GetUserAnalyticsResponse.response_time:type_name -> quiz.ResponseTimePercentiles
+	124, // 35: quiz.GetUserAnalyticsResponse.rating_history:type_name -> quiz.RatingPoint
+	1,   // 36: quiz.MatchmakingService.JoinMatchmaking:input_type -> quiz.JoinMatchmakingRequest
+	3,   // 37: quiz.MatchmakingService.LeaveMatchmaking:input_type -> quiz.LeaveMatchmakingRequest
+	5,   // 38: quiz.MatchmakingService.SubscribeToMatch:input_type -> quiz.SubscribeToMatchRequest
+	7,   // 39: quiz.QuizService.GetRoomQuestions:input_type -> quiz.GetRoomQuestionsRequest
+	10,  // 40: quiz.QuizService.SubmitAnswer:input_type -> quiz.SubmitAnswerRequest
+	12,  // 41: quiz.QuizService.StreamGameEvents:input_type -> quiz.StreamGameEventsRequest
+	77,  // 42: quiz.QuizService.GetTournamentList:input_type -> quiz.GetTournamentListRequest
+	80,  // 43: quiz.QuizService.JoinTournament:input_type -> quiz.JoinTournamentRequest
+	43,  // 44: quiz.ScoringService.CalculateScore:input_type -> quiz.CalculateScoreRequest
+	45,  // 45: quiz.ScoringService.GetLeaderboard:input_type -> quiz.GetLeaderboardRequest
+	47,  // 46: quiz.ScoringService.GetMatchHistory:input_type -> quiz.GetMatchHistoryRequest
+	60,  // 47: quiz.ScoringService.GetHomeScreenData:input_type -> quiz.GetHomeScreenDataRequest
+	62,  // 48: quiz.ScoringService.GetReferralDashboard:input_type -> quiz.GetReferralDashboardRequest
+	64,  // 49: quiz.ScoringService.ApplyReferralCode:input_type -> quiz.ApplyReferralCodeRequest
+	66,  // 50: quiz.ScoringService.UpdateFCMToken:input_type -> quiz.UpdateFCMTokenRequest
+	82,  // 51: quiz.ScoringService.GetGlobalLeaderboard:input_type -> quiz.GetGlobalLeaderboardRequest
+	84,  // 52: quiz.ScoringService.GetCoinBalance:input_type -> quiz.GetCoinBalanceRequest
+	87,  // 53: quiz.ScoringService.GetCoinLedger:input_type -> quiz.GetCoinLedgerRequest
+	90,  // 54: quiz.ScoringService.GetShopCatalog:input_type -> quiz.GetShopCatalogRequest
+	92,  // 55: quiz.ScoringService.GetShopInventory:input_type -> quiz.GetShopInventoryRequest
+	94,  // 56: quiz.ScoringService.PurchaseShopItem:input_type -> quiz.PurchaseShopItemRequest
+	96,  // 57: quiz.ScoringService.EquipCosmetic:input_type -> quiz.EquipCosmeticRequest
+	98,  // 58: quiz.ScoringService.ConsumeReroll:input_type -> quiz.ConsumeRerollRequest
+	100, // 59: quiz.ScoringService.SendFriendRequest:input_type -> quiz.SendFriendRequestRequest
+	103, // 60: quiz.ScoringService.RespondToFriendRequest:input_type -> quiz.RespondToFriendRequestRequest
+	106, // 61: quiz.ScoringService.GetFriendsList:input_type -> quiz.GetFriendsListRequest
+	108, // 62: quiz.ScoringService.GetFriendRequests:input_type -> quiz.GetFriendRequestsRequest
+	110, // 63: quiz.ScoringService.Heartbeat:input_type -> quiz.HeartbeatRequest
+	112, // 64: quiz.ScoringService.ChallengeFriend:input_type -> quiz.ChallengeFriendRequest
+	114, // 65: quiz.ScoringService.GetNotificationPrefs:input_type -> quiz.GetNotificationPrefsRequest
+	116, // 66: quiz.ScoringService.UpdateNotificationPrefs:input_type -> quiz.UpdateNotificationPrefsRequest
+	118, // 67: quiz.ScoringService.MarkNotificationOpened:input_type -> quiz.MarkNotificationOpenedRequest
+	120, // 68: quiz.ScoringService.GetUserAnalytics:input_type -> quiz.GetUserAnalyticsRequest
+	125, // 69: quiz.ScoringService.GetMonthlyRecap:input_type -> quiz.GetMonthlyRecapRequest
+	22,  // 70: quiz.AuthService.Register:input_type -> quiz.RegisterRequest
+	23,  // 71: quiz.AuthService.Login:input_type -> quiz.LoginRequest
+	25,  // 72: quiz.AuthService.GetProfile:input_type -> quiz.GetProfileRequest
+	27,  // 73: quiz.AuthService.GuestLogin:input_type -> quiz.GuestLoginRequest
+	28,  // 74: quiz.AuthService.LoginWithEmail:input_type -> quiz.EmailLoginRequest
+	29,  // 75: quiz.AuthService.SendEmailCode:input_type -> quiz.SendEmailCodeRequest
+	31,  // 76: quiz.AuthService.VerifyEmailCode:input_type -> quiz.VerifyEmailCodeRequest
+	33,  // 77: quiz.AuthService.LinkEmail:input_type -> quiz.LinkEmailRequest
+	35,  // 78: quiz.AuthService.ResetPassword:input_type -> quiz.ResetPasswordRequest
+	37,  // 79: quiz.AuthService.CheckUsername:input_type -> quiz.CheckUsernameRequest
+	39,  // 80: quiz.AuthService.DeleteAccount:input_type -> quiz.DeleteAccountRequest
+	53,  // 81: quiz.AuthService.GoogleSignIn:input_type -> quiz.GoogleSignInRequest
+	56,  // 82: quiz.AuthService.ClaimDailyReward:input_type -> quiz.ClaimDailyRewardRequest
+	58,  // 83: quiz.AuthService.GetStreakInfo:input_type -> quiz.GetStreakInfoRequest
+	41,  // 84: quiz.AuthService.UpdateProfile:input_type -> quiz.UpdateProfileRequest
+	68,  // 85: quiz.PaymentService.CreateOrder:input_type -> quiz.CreateOrderRequest
+	70,  // 86: quiz.PaymentService.VerifyPayment:input_type -> quiz.VerifyPaymentRequest
+	72,  // 87: quiz.PaymentService.GetPlanStatus:input_type -> quiz.GetPlanStatusRequest
+	74,  // 88: quiz.PaymentService.GetPaymentHistory:input_type -> quiz.GetPaymentHistoryRequest
+	2,   // 89: quiz.MatchmakingService.JoinMatchmaking:output_type -> quiz.JoinMatchmakingResponse
+	4,   // 90: quiz.MatchmakingService.LeaveMatchmaking:output_type -> quiz.LeaveMatchmakingResponse
+	6,   // 91: quiz.MatchmakingService.SubscribeToMatch:output_type -> quiz.MatchEvent
+	8,   // 92: quiz.QuizService.GetRoomQuestions:output_type -> quiz.GetRoomQuestionsResponse
+	11,  // 93: quiz.QuizService.SubmitAnswer:output_type -> quiz.SubmitAnswerResponse
+	13,  // 94: quiz.QuizService.StreamGameEvents:output_type -> quiz.GameEvent
+	78,  // 95: quiz.QuizService.GetTournamentList:output_type -> quiz.GetTournamentListResponse
+	81,  // 96: quiz.QuizService.JoinTournament:output_type -> quiz.JoinTournamentResponse
+	44,  // 97: quiz.ScoringService.CalculateScore:output_type -> quiz.CalculateScoreResponse
+	46,  // 98: quiz.ScoringService.GetLeaderboard:output_type -> quiz.GetLeaderboardResponse
+	48,  // 99: quiz.ScoringService.GetMatchHistory:output_type -> quiz.GetMatchHistoryResponse
+	61,  // 100: quiz.ScoringService.GetHomeScreenData:output_type -> quiz.GetHomeScreenDataResponse
+	63,  // 101: quiz.ScoringService.GetReferralDashboard:output_type -> quiz.GetReferralDashboardResponse
+	65,  // 102: quiz.ScoringService.ApplyReferralCode:output_type -> quiz.ApplyReferralCodeResponse
+	67,  // 103: quiz.ScoringService.UpdateFCMToken:output_type -> quiz.UpdateFCMTokenResponse
+	83,  // 104: quiz.ScoringService.GetGlobalLeaderboard:output_type -> quiz.GetGlobalLeaderboardResponse
+	85,  // 105: quiz.ScoringService.GetCoinBalance:output_type -> quiz.GetCoinBalanceResponse
+	88,  // 106: quiz.ScoringService.GetCoinLedger:output_type -> quiz.GetCoinLedgerResponse
+	91,  // 107: quiz.ScoringService.GetShopCatalog:output_type -> quiz.GetShopCatalogResponse
+	93,  // 108: quiz.ScoringService.GetShopInventory:output_type -> quiz.GetShopInventoryResponse
+	95,  // 109: quiz.ScoringService.PurchaseShopItem:output_type -> quiz.PurchaseShopItemResponse
+	97,  // 110: quiz.ScoringService.EquipCosmetic:output_type -> quiz.EquipCosmeticResponse
+	99,  // 111: quiz.ScoringService.ConsumeReroll:output_type -> quiz.ConsumeRerollResponse
+	101, // 112: quiz.ScoringService.SendFriendRequest:output_type -> quiz.SendFriendRequestResponse
+	104, // 113: quiz.ScoringService.RespondToFriendRequest:output_type -> quiz.RespondToFriendRequestResponse
+	107, // 114: quiz.ScoringService.GetFriendsList:output_type -> quiz.GetFriendsListResponse
+	109, // 115: quiz.ScoringService.GetFriendRequests:output_type -> quiz.GetFriendRequestsResponse
+	111, // 116: quiz.ScoringService.Heartbeat:output_type -> quiz.HeartbeatResponse
+	113, // 117: quiz.ScoringService.ChallengeFriend:output_type -> quiz.ChallengeFriendResponse
+	115, // 118: quiz.ScoringService.GetNotificationPrefs:output_type -> quiz.GetNotificationPrefsResponse
+	117, // 119: quiz.ScoringService.UpdateNotificationPrefs:output_type -> quiz.UpdateNotificationPrefsResponse
+	119, // 120: quiz.ScoringService.MarkNotificationOpened:output_type -> quiz.MarkNotificationOpenedResponse
+	121, // 121: quiz.ScoringService.GetUserAnalytics:output_type -> quiz.GetUserAnalyticsResponse
+	126, // 122: quiz.ScoringService.GetMonthlyRecap:output_type -> quiz.GetMonthlyRecapResponse
+	24,  // 123: quiz.AuthService.Register:output_type -> quiz.AuthResponse
+	24,  // 124: quiz.AuthService.Login:output_type -> quiz.AuthResponse
+	26,  // 125: quiz.AuthService.GetProfile:output_type -> quiz.ProfileResponse
+	24,  // 126: quiz.AuthService.GuestLogin:output_type -> quiz.AuthResponse
+	30,  // 127: quiz.AuthService.LoginWithEmail:output_type -> quiz.SendEmailCodeResponse
+	30,  // 128: quiz.AuthService.SendEmailCode:output_type -> quiz.SendEmailCodeResponse
+	32,  // 129: quiz.AuthService.VerifyEmailCode:output_type -> quiz.VerifyEmailCodeResponse
+	34,  // 130: quiz.AuthService.LinkEmail:output_type -> quiz.LinkEmailResponse
+	36,  // 131: quiz.AuthService.ResetPassword:output_type -> quiz.ResetPasswordResponse
+	38,  // 132: quiz.AuthService.CheckUsername:output_type -> quiz.CheckUsernameResponse
+	40,  // 133: quiz.AuthService.DeleteAccount:output_type -> quiz.DeleteAccountResponse
+	54,  // 134: quiz.AuthService.GoogleSignIn:output_type -> quiz.GoogleSignInResponse
+	57,  // 135: quiz.AuthService.ClaimDailyReward:output_type -> quiz.ClaimDailyRewardResponse
+	59,  // 136: quiz.AuthService.GetStreakInfo:output_type -> quiz.GetStreakInfoResponse
+	42,  // 137: quiz.AuthService.UpdateProfile:output_type -> quiz.UpdateProfileResponse
+	69,  // 138: quiz.PaymentService.CreateOrder:output_type -> quiz.CreateOrderResponse
+	71,  // 139: quiz.PaymentService.VerifyPayment:output_type -> quiz.VerifyPaymentResponse
+	73,  // 140: quiz.PaymentService.GetPlanStatus:output_type -> quiz.GetPlanStatusResponse
+	75,  // 141: quiz.PaymentService.GetPaymentHistory:output_type -> quiz.GetPaymentHistoryResponse
+	89,  // [89:142] is the sub-list for method output_type
+	36,  // [36:89] is the sub-list for method input_type
+	36,  // [36:36] is the sub-list for extension type_name
+	36,  // [36:36] is the sub-list for extension extendee
+	0,   // [0:36] is the sub-list for field type_name
 }
 
 func init() { file_proto_quiz_proto_init() }
@@ -7674,7 +8226,7 @@ func file_proto_quiz_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_quiz_proto_rawDesc), len(file_proto_quiz_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   121,
+			NumMessages:   128,
 			NumExtensions: 0,
 			NumServices:   5,
 		},

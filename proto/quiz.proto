@@ -227,6 +227,16 @@ service ScoringService {
   // taps a notification. Increments the per-category open counter so we
   // can compute open-rate offline (sent vs opened, per type, per day).
   rpc MarkNotificationOpened(MarkNotificationOpenedRequest) returns (MarkNotificationOpenedResponse);
+  // §4.5 Deeper analytics. All numbers come from server aggregations on
+  // the answer_log + rating_history collections (populated by
+  // persistMatch); the client never computes statistics locally.
+  // GetUserAnalytics returns lifetime per-topic accuracy + response-time
+  // percentiles + a 30-day daily-snapshot rating series.
+  rpc GetUserAnalytics(GetUserAnalyticsRequest) returns (GetUserAnalyticsResponse);
+  // GetMonthlyRecap is the "your `<Month>`" recap card — matches
+  // played, wins, win rate, the topic the user played most, and the
+  // lifetime longest login streak as of the end of that month.
+  rpc GetMonthlyRecap(GetMonthlyRecapRequest) returns (GetMonthlyRecapResponse);
 }
 
 // ---------------------------------------------------------------------------
@@ -884,4 +894,91 @@ message MarkNotificationOpenedRequest {
 
 message MarkNotificationOpenedResponse {
   bool success = 1;
+}
+
+// ---------------------------------------------------------------------------
+// §4.5 Deeper analytics — all server-aggregated.
+// ---------------------------------------------------------------------------
+
+message GetUserAnalyticsRequest {}
+
+message GetUserAnalyticsResponse {
+  // Lifetime per-topic accuracy, sorted by total questions answered (desc)
+  // so the most-played topic surfaces first.
+  repeated TopicAccuracy topic_accuracy = 1;
+  // Lifetime response-time percentiles, computed across every answer the
+  // user has ever submitted. Empty (zeros) until the user has at least
+  // a few answers logged — the client should render "Not enough data
+  // yet" rather than misleading 0 ms numbers.
+  ResponseTimePercentiles response_time = 2;
+  // Daily rating snapshots for the last 30 days, oldest-first. One
+  // entry per UTC day; days with no matches are omitted (the chart
+  // should hold the previous value when rendering).
+  repeated RatingPoint rating_history = 3;
+  // Lifetime totals — convenient for headline display; the same numbers
+  // exist on users.matchesPlayed / users.wins but surfacing them here
+  // saves a second round trip from the analytics screen.
+  int32 lifetime_matches = 4;
+  int32 lifetime_wins    = 5;
+  // True iff at least one answer has been logged for this user.
+  // The Flutter client uses this to swap an empty-state card in for
+  // every panel rather than rendering empty charts that look broken.
+  bool  has_data = 6;
+}
+
+message TopicAccuracy {
+  string topic        = 1;
+  int32  total        = 2; // total questions answered with this topic
+  int32  correct      = 3;
+  double accuracy_pct = 4; // 0..1; (correct / total) — server-side, no
+                           // client division so a topic with 0 answered
+                           // never produces NaN client-side.
+}
+
+message ResponseTimePercentiles {
+  // Each value is the actual response time in ms (server-reported
+  // serverTimestamp - clientTimestamp at answer submit time, clamped
+  // to [0, 15000] in scoring). Zero when n < 5 — the client should
+  // treat zeros as "not enough data" rather than "answered instantly."
+  double p50_ms = 1;
+  double p90_ms = 2;
+  double p95_ms = 3;
+  double p99_ms = 4;
+  // Sample count — surfaced so the client can render the empty-state
+  // copy ("4 answers logged — keep playing for more accurate stats").
+  int64  sample_count = 5;
+}
+
+message RatingPoint {
+  // Unix seconds at 00:00:00 UTC of the day this snapshot represents.
+  int64 unix_day = 1;
+  // The user's rating at the END of that day — i.e. the rating after
+  // the last match they played that day. The series is oldest-first.
+  int32 rating = 2;
+}
+
+message GetMonthlyRecapRequest {
+  int32 year  = 1; // four-digit, e.g. 2026
+  int32 month = 2; // 1..12
+}
+
+message GetMonthlyRecapResponse {
+  int32  year           = 1;
+  int32  month          = 2;
+  int32  matches_played = 3;
+  int32  wins           = 4;
+  // (wins / matches_played) — server-computed so the client never
+  // divides by zero. 0 when matches_played is 0.
+  double win_rate       = 5;
+  // The topic the user answered the most questions on this month.
+  // Empty string when no answers were logged for the month.
+  string favorite_topic = 6;
+  // The user's lifetime longest login streak as of the end of this
+  // month. We don't track per-month streak history (would need a
+  // dedicated collection); this is honest about what we can measure.
+  int32  longest_streak_lifetime = 7;
+  // True iff the user played at least one match this month — lets
+  // the client render an "you didn't play in this month" card
+  // instead of empty stats.
+  bool   has_data = 8;
 }

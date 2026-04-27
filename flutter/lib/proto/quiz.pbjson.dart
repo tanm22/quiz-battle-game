@@ -2164,3 +2164,148 @@ final $typed_data.Uint8List markNotificationOpenedResponseDescriptor =
     $convert.base64Decode(
         'Ch5NYXJrTm90aWZpY2F0aW9uT3BlbmVkUmVzcG9uc2USGAoHc3VjY2VzcxgBIAEoCFIHc3VjY2'
         'Vzcw==');
+
+@$core.Deprecated('Use getUserAnalyticsRequestDescriptor instead')
+const GetUserAnalyticsRequest$json = {
+  '1': 'GetUserAnalyticsRequest',
+};
+
+/// Descriptor for `GetUserAnalyticsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getUserAnalyticsRequestDescriptor =
+    $convert.base64Decode('ChdHZXRVc2VyQW5hbHl0aWNzUmVxdWVzdA==');
+
+@$core.Deprecated('Use getUserAnalyticsResponseDescriptor instead')
+const GetUserAnalyticsResponse$json = {
+  '1': 'GetUserAnalyticsResponse',
+  '2': [
+    {
+      '1': 'topic_accuracy',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.quiz.TopicAccuracy',
+      '10': 'topicAccuracy'
+    },
+    {
+      '1': 'response_time',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.quiz.ResponseTimePercentiles',
+      '10': 'responseTime'
+    },
+    {
+      '1': 'rating_history',
+      '3': 3,
+      '4': 3,
+      '5': 11,
+      '6': '.quiz.RatingPoint',
+      '10': 'ratingHistory'
+    },
+    {'1': 'lifetime_matches', '3': 4, '4': 1, '5': 5, '10': 'lifetimeMatches'},
+    {'1': 'lifetime_wins', '3': 5, '4': 1, '5': 5, '10': 'lifetimeWins'},
+    {'1': 'has_data', '3': 6, '4': 1, '5': 8, '10': 'hasData'},
+  ],
+};
+
+/// Descriptor for `GetUserAnalyticsResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getUserAnalyticsResponseDescriptor = $convert.base64Decode(
+    'ChhHZXRVc2VyQW5hbHl0aWNzUmVzcG9uc2USOgoOdG9waWNfYWNjdXJhY3kYASADKAsyEy5xdW'
+    'l6LlRvcGljQWNjdXJhY3lSDXRvcGljQWNjdXJhY3kSQgoNcmVzcG9uc2VfdGltZRgCIAEoCzId'
+    'LnF1aXouUmVzcG9uc2VUaW1lUGVyY2VudGlsZXNSDHJlc3BvbnNlVGltZRI4Cg5yYXRpbmdfaG'
+    'lzdG9yeRgDIAMoCzIRLnF1aXouUmF0aW5nUG9pbnRSDXJhdGluZ0hpc3RvcnkSKQoQbGlmZXRp'
+    'bWVfbWF0Y2hlcxgEIAEoBVIPbGlmZXRpbWVNYXRjaGVzEiMKDWxpZmV0aW1lX3dpbnMYBSABKA'
+    'VSDGxpZmV0aW1lV2lucxIZCghoYXNfZGF0YRgGIAEoCFIHaGFzRGF0YQ==');
+
+@$core.Deprecated('Use topicAccuracyDescriptor instead')
+const TopicAccuracy$json = {
+  '1': 'TopicAccuracy',
+  '2': [
+    {'1': 'topic', '3': 1, '4': 1, '5': 9, '10': 'topic'},
+    {'1': 'total', '3': 2, '4': 1, '5': 5, '10': 'total'},
+    {'1': 'correct', '3': 3, '4': 1, '5': 5, '10': 'correct'},
+    {'1': 'accuracy_pct', '3': 4, '4': 1, '5': 1, '10': 'accuracyPct'},
+  ],
+};
+
+/// Descriptor for `TopicAccuracy`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List topicAccuracyDescriptor = $convert.base64Decode(
+    'Cg1Ub3BpY0FjY3VyYWN5EhQKBXRvcGljGAEgASgJUgV0b3BpYxIUCgV0b3RhbBgCIAEoBVIFdG'
+    '90YWwSGAoHY29ycmVjdBgDIAEoBVIHY29ycmVjdBIhCgxhY2N1cmFjeV9wY3QYBCABKAFSC2Fj'
+    'Y3VyYWN5UGN0');
+
+@$core.Deprecated('Use responseTimePercentilesDescriptor instead')
+const ResponseTimePercentiles$json = {
+  '1': 'ResponseTimePercentiles',
+  '2': [
+    {'1': 'p50_ms', '3': 1, '4': 1, '5': 1, '10': 'p50Ms'},
+    {'1': 'p90_ms', '3': 2, '4': 1, '5': 1, '10': 'p90Ms'},
+    {'1': 'p95_ms', '3': 3, '4': 1, '5': 1, '10': 'p95Ms'},
+    {'1': 'p99_ms', '3': 4, '4': 1, '5': 1, '10': 'p99Ms'},
+    {'1': 'sample_count', '3': 5, '4': 1, '5': 3, '10': 'sampleCount'},
+  ],
+};
+
+/// Descriptor for `ResponseTimePercentiles`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List responseTimePercentilesDescriptor = $convert.base64Decode(
+    'ChdSZXNwb25zZVRpbWVQZXJjZW50aWxlcxIVCgZwNTBfbXMYASABKAFSBXA1ME1zEhUKBnA5MF'
+    '9tcxgCIAEoAVIFcDkwTXMSFQoGcDk1X21zGAMgASgBUgVwOTVNcxIVCgZwOTlfbXMYBCABKAFS'
+    'BXA5OU1zEiEKDHNhbXBsZV9jb3VudBgFIAEoA1ILc2FtcGxlQ291bnQ=');
+
+@$core.Deprecated('Use ratingPointDescriptor instead')
+const RatingPoint$json = {
+  '1': 'RatingPoint',
+  '2': [
+    {'1': 'unix_day', '3': 1, '4': 1, '5': 3, '10': 'unixDay'},
+    {'1': 'rating', '3': 2, '4': 1, '5': 5, '10': 'rating'},
+  ],
+};
+
+/// Descriptor for `RatingPoint`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List ratingPointDescriptor = $convert.base64Decode(
+    'CgtSYXRpbmdQb2ludBIZCgh1bml4X2RheRgBIAEoA1IHdW5peERheRIWCgZyYXRpbmcYAiABKA'
+    'VSBnJhdGluZw==');
+
+@$core.Deprecated('Use getMonthlyRecapRequestDescriptor instead')
+const GetMonthlyRecapRequest$json = {
+  '1': 'GetMonthlyRecapRequest',
+  '2': [
+    {'1': 'year', '3': 1, '4': 1, '5': 5, '10': 'year'},
+    {'1': 'month', '3': 2, '4': 1, '5': 5, '10': 'month'},
+  ],
+};
+
+/// Descriptor for `GetMonthlyRecapRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getMonthlyRecapRequestDescriptor =
+    $convert.base64Decode(
+        'ChZHZXRNb250aGx5UmVjYXBSZXF1ZXN0EhIKBHllYXIYASABKAVSBHllYXISFAoFbW9udGgYAi'
+        'ABKAVSBW1vbnRo');
+
+@$core.Deprecated('Use getMonthlyRecapResponseDescriptor instead')
+const GetMonthlyRecapResponse$json = {
+  '1': 'GetMonthlyRecapResponse',
+  '2': [
+    {'1': 'year', '3': 1, '4': 1, '5': 5, '10': 'year'},
+    {'1': 'month', '3': 2, '4': 1, '5': 5, '10': 'month'},
+    {'1': 'matches_played', '3': 3, '4': 1, '5': 5, '10': 'matchesPlayed'},
+    {'1': 'wins', '3': 4, '4': 1, '5': 5, '10': 'wins'},
+    {'1': 'win_rate', '3': 5, '4': 1, '5': 1, '10': 'winRate'},
+    {'1': 'favorite_topic', '3': 6, '4': 1, '5': 9, '10': 'favoriteTopic'},
+    {
+      '1': 'longest_streak_lifetime',
+      '3': 7,
+      '4': 1,
+      '5': 5,
+      '10': 'longestStreakLifetime'
+    },
+    {'1': 'has_data', '3': 8, '4': 1, '5': 8, '10': 'hasData'},
+  ],
+};
+
+/// Descriptor for `GetMonthlyRecapResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getMonthlyRecapResponseDescriptor = $convert.base64Decode(
+    'ChdHZXRNb250aGx5UmVjYXBSZXNwb25zZRISCgR5ZWFyGAEgASgFUgR5ZWFyEhQKBW1vbnRoGA'
+    'IgASgFUgVtb250aBIlCg5tYXRjaGVzX3BsYXllZBgDIAEoBVINbWF0Y2hlc1BsYXllZBISCgR3'
+    'aW5zGAQgASgFUgR3aW5zEhkKCHdpbl9yYXRlGAUgASgBUgd3aW5SYXRlEiUKDmZhdm9yaXRlX3'
+    'RvcGljGAYgASgJUg1mYXZvcml0ZVRvcGljEjYKF2xvbmdlc3Rfc3RyZWFrX2xpZmV0aW1lGAcg'
+    'ASgFUhVsb25nZXN0U3RyZWFrTGlmZXRpbWUSGQoIaGFzX2RhdGEYCCABKAhSB2hhc0RhdGE=');
