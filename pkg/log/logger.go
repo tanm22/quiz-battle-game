@@ -40,8 +40,9 @@ func newLogger(serviceName string, level slog.Level, w io.Writer) *slog.Logger {
 }
 
 // FromContext returns a logger derived from slog.Default() with the
-// request-id from ctx attached as `request_id`. If ctx has no request-id
-// the attribute is omitted (callers can still log without one).
+// request-id from ctx attached as `request_id`, plus any attrs stored
+// on ctx via ContextWithAttrs. Missing values are omitted (callers can
+// still log without them).
 //
 // RPC handlers should use this in place of slog.InfoContext etc. so every
 // log line carries the correlation id without per-callsite plumbing.
@@ -49,6 +50,9 @@ func FromContext(ctx context.Context) *slog.Logger {
 	logger := slog.Default()
 	if rid := RequestIDFromContext(ctx); rid != "" {
 		logger = logger.With("request_id", rid)
+	}
+	if attrs := AttrsFromContext(ctx); len(attrs) > 0 {
+		logger = logger.With(attrs...)
 	}
 	return logger
 }

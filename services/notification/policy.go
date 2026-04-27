@@ -93,6 +93,12 @@ type allowResult struct {
 // burn one of the user's 10 daily slots. The cap is the last gate so
 // every counted push is actually dispatched.
 func (p *policy) allow(ctx context.Context, userID, event string) allowResult {
+	// Set component=policy on ctx once; every log line in allow,
+	// dropped, and loadPrefs (which all receive this ctx) will inherit
+	// the attr via FromContext, replacing the per-line `"component",
+	// "policy"` repetition that used to appear at every callsite.
+	ctx = log.ContextWithAttrs(ctx, "component", "policy")
+
 	category := notif.CategoryFromEvent(event)
 	// now is captured in UTC up front so every metric/dedup helper
 	// below sees the same day boundary. Per-user daily cap is the only
@@ -123,7 +129,7 @@ func (p *policy) allow(ctx context.Context, userID, event string) allowResult {
 			// Redis unavailable — fail open rather than drop the push.
 			// We'd rather risk a duplicate than swallow a real-time
 			// challenge notif because Redis is degraded.
-			log.FromContext(ctx).Warn("dedup SETNX failed", "component", "policy", "user_id", userID, "category", category, "err", err)
+			log.FromContext(ctx).Warn("dedup SETNX failed", "user_id", userID, "category", category, "err", err)
 		} else if !first {
 			p.dropped(ctx, category, "deduped", metricDay)
 			return allowResult{Allowed: false, Category: category, Reason: "deduped"}
@@ -139,7 +145,7 @@ func (p *policy) allow(ctx context.Context, userID, event string) allowResult {
 	count, err := keys.IncrNotifDailyCap(ctx, p.rdb, userID, capDay)
 	if err != nil {
 		// Same fail-open posture as dedup. Logged so an operator notices.
-		log.FromContext(ctx).Warn("daily-cap INCR failed; allowing", "component", "policy", "user_id", userID, "err", err)
+		log.FromContext(ctx).Warn("daily-cap INCR failed; allowing", "user_id", userID, "err", err)
 	} else if count > int64(p.dailyCap) {
 		// We've already incremented; don't decrement on cap hit because
 		// the next day's first push would otherwise see count=10 and
@@ -155,14 +161,14 @@ func (p *policy) allow(ctx context.Context, userID, event string) allowResult {
 	// in services/scoring/notif_prefs.go (UTC) — opened/sent ratios
 	// across timezone boundaries are otherwise meaningless.
 	if err := keys.IncrNotifMetricSent(ctx, p.rdb, category, metricDay); err != nil {
-		log.FromContext(ctx).Warn("sent metric INCR failed", "component", "policy", "category", category, "err", err)
+		log.FromContext(ctx).Warn("sent metric INCR failed", "category", category, "err", err)
 	}
 	return allowResult{Allowed: true, Category: category}
 }
 
 func (p *policy) dropped(ctx context.Context, category, reason, metricDay string) {
 	if err := keys.IncrNotifMetricDropped(ctx, p.rdb, category, reason, metricDay); err != nil {
-		log.FromContext(ctx).Warn("dropped metric INCR failed", "component", "policy", "err", err)
+		log.FromContext(ctx).Warn("dropped metric INCR failed", "err", err)
 	}
 }
 
@@ -185,7 +191,7 @@ func (p *policy) loadPrefs(ctx context.Context, userID string) userPrefs {
 		// Missing user shouldn't normally happen — the consumer wouldn't
 		// have a userId in the payload otherwise — but if it does, fall
 		// through to defaults rather than fail the dispatch.
-		log.FromContext(ctx).Warn("load prefs failed; using defaults", "component", "policy", "user_id", userID, "err", err)
+		log.FromContext(ctx).Warn("load prefs failed; using defaults", "user_id", userID, "err", err)
 		return defaults
 	}
 	if doc.Prefs == nil {
@@ -197,7 +203,7 @@ func (p *policy) loadPrefs(ctx context.Context, userID string) userPrefs {
 			out.tz = loc
 		} else {
 			log.FromContext(ctx).Warn("bad timezone; using default",
-				"component", "policy", "timezone", doc.Prefs.Timezone, "user_id", userID, "err", err)
+				"timezone", doc.Prefs.Timezone, "user_id", userID, "err", err)
 		}
 	}
 	return out

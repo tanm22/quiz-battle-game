@@ -174,9 +174,10 @@ func (s *quizServer) selectQuestions(ctx context.Context, allowedTopics []string
 // ---------------------------------------------------------------------------
 
 func (s *quizServer) consumeMatchCreated(ctx context.Context) {
+	ctx = log.ContextWithAttrs(ctx, "consumer", "match_created")
 	ch, err := s.newChannel()
 	if err != nil {
-		log.Fatal(ctx, "open channel failed", "consumer", "match_created", "err", err)
+		log.Fatal(ctx, "open channel failed", "err", err)
 	}
 	defer ch.Close()
 
@@ -186,18 +187,18 @@ func (s *quizServer) consumeMatchCreated(ctx context.Context) {
 	// wipe followed by quiz starting before matchmaking causes a 404 on the
 	// Consume below and the service exits 1.
 	if err := ch.ExchangeDeclare("sx", "topic", true, false, false, false, nil); err != nil {
-		log.Fatal(ctx, "declare sx exchange failed", "consumer", "match_created", "err", err)
+		log.Fatal(ctx, "declare sx exchange failed", "err", err)
 	}
 	if _, err := ch.QueueDeclare("match-created-queue", true, false, false, false, nil); err != nil {
-		log.Fatal(ctx, "declare match-created-queue failed", "consumer", "match_created", "err", err)
+		log.Fatal(ctx, "declare match-created-queue failed", "err", err)
 	}
 	if err := ch.QueueBind("match-created-queue", "match.created", "sx", false, nil); err != nil {
-		log.Fatal(ctx, "bind match-created-queue failed", "consumer", "match_created", "err", err)
+		log.Fatal(ctx, "bind match-created-queue failed", "err", err)
 	}
 
 	msgs, err := ch.Consume("match-created-queue", "", false, false, false, false, nil)
 	if err != nil {
-		log.Fatal(ctx, "consume failed", "consumer", "match_created", "queue", "match-created-queue", "err", err)
+		log.Fatal(ctx, "consume failed", "queue", "match-created-queue", "err", err)
 	}
 
 	for {
@@ -214,12 +215,12 @@ func (s *quizServer) consumeMatchCreated(ctx context.Context) {
 				PlayerIDs []string `json:"playerIds"`
 			}
 			if err := json.Unmarshal(msg.Body, &event); err != nil {
-				log.FromContext(ctx).Warn("bad payload", "consumer", "match_created", "err", err)
+				log.FromContext(ctx).Warn("bad payload", "err", err)
 				msg.Nack(false, false)
 				continue
 			}
 
-			log.FromContext(ctx).Info("match.created received", "consumer", "match_created", "room_id", event.RoomID, "player_ids", event.PlayerIDs)
+			log.FromContext(ctx).Info("match.created received", "room_id", event.RoomID, "player_ids", event.PlayerIDs)
 
 			// Determine allowed topics based on player plans.
 			// If any player is free, restrict to free topics for fairness.
@@ -247,7 +248,7 @@ func (s *quizServer) consumeMatchCreated(ctx context.Context) {
 			// Select questions and store in Redis
 			questions, err := s.selectQuestions(ctx, allowedTopics)
 			if err != nil {
-				log.FromContext(ctx).Error("selectQuestions failed", "consumer", "match_created", "err", err)
+				log.FromContext(ctx).Error("selectQuestions failed", "err", err)
 				msg.Nack(false, true) // requeue
 				continue
 			}
@@ -258,7 +259,7 @@ func (s *quizServer) consumeMatchCreated(ctx context.Context) {
 				questionIDs[i] = q.ID
 			}
 			if err := keys.SetQuestions(ctx, s.rdb, event.RoomID, questionIDs); err != nil {
-				log.FromContext(ctx).Error("store questions failed", "consumer", "match_created", "err", err)
+				log.FromContext(ctx).Error("store questions failed", "err", err)
 				msg.Nack(false, true)
 				continue
 			}
@@ -747,9 +748,13 @@ func (s *quizServer) StreamGameEvents(req *pb.StreamGameEventsRequest, stream pb
 		s.gameStreams.Delete(streamKey)
 		close(ch)
 
-		// Section 7.2: handle player disconnect
+		// Section 7.2: handle player disconnect.
+		// stream.Context() is cancelled the moment the player disconnects,
+		// so we use log.DetachContext to inherit the request_id (and any
+		// ctx attrs) for log correlation while running cleanup on a fresh
+		// background lifecycle that survives the cancellation.
 		remaining := s.connectedPlayersInRoom(req.RoomId)
-		bgCtx := context.Background()
+		bgCtx := log.DetachContext(stream.Context())
 
 		if remaining == 0 {
 			log.FromContext(bgCtx).Info("zero connected players; ending match", "room_id", req.RoomId)
@@ -1000,6 +1005,7 @@ func (s *quizServer) SubmitAnswer(ctx context.Context, req *pb.SubmitAnswerReque
 // cadence narrows the slop to ~30 seconds and the tighter window means a
 // reminder lands ~30 minutes ahead, not "somewhere in 25-35 minutes".
 func (s *quizServer) tournamentReminderTicker(ctx context.Context) {
+	ctx = log.ContextWithAttrs(ctx, "worker", "tournament_reminder")
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
@@ -1053,7 +1059,7 @@ func (s *quizServer) tournamentReminderTicker(ctx context.Context) {
 					bson.M{"_id": doc["_id"]},
 					bson.M{"$set": bson.M{"reminderSent": true}},
 				)
-				log.FromContext(ctx).Info("tournament reminder sent", "worker", "tournament_reminder", "tournament_id", tourID, "participants", len(userIDs))
+				log.FromContext(ctx).Info("tournament reminder sent", "tournament_id", tourID, "participants", len(userIDs))
 			}
 			cursor.Close(ctx)
 		}
@@ -1075,6 +1081,7 @@ func (s *quizServer) tournamentReminderTicker(ctx context.Context) {
 // any payouts — a "for fun" leaderboard mode. The finishing event fans out
 // to all participants in that case (zero coins) so they still see the FCM.
 func (s *quizServer) tournamentFinalizationWorker(ctx context.Context) {
+	ctx = log.ContextWithAttrs(ctx, "worker", "tournament_finalize")
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
@@ -1104,11 +1111,11 @@ func (s *quizServer) promoteUpcomingTournaments(ctx context.Context, now time.Ti
 		bson.M{"$set": bson.M{"status": "active"}},
 	)
 	if err != nil {
-		log.FromContext(ctx).Error("promote upcoming→active failed", "worker", "tournament_finalize", "err", err)
+		log.FromContext(ctx).Error("promote upcoming→active failed", "err", err)
 		return
 	}
 	if res.ModifiedCount > 0 {
-		log.FromContext(ctx).Info("promoted tournaments to active", "worker", "tournament_finalize", "count", res.ModifiedCount)
+		log.FromContext(ctx).Info("promoted tournaments to active", "count", res.ModifiedCount)
 	}
 }
 
@@ -1119,7 +1126,7 @@ func (s *quizServer) finalizeExpiredTournaments(ctx context.Context, now time.Ti
 		"winnersAwarded": false,
 	})
 	if err != nil {
-		log.FromContext(ctx).Error("tournament lookup failed", "worker", "tournament_finalize", "err", err)
+		log.FromContext(ctx).Error("tournament lookup failed", "err", err)
 		return
 	}
 	defer cursor.Close(ctx)
@@ -1127,7 +1134,7 @@ func (s *quizServer) finalizeExpiredTournaments(ctx context.Context, now time.Ti
 	for cursor.Next(ctx) {
 		var t models.Tournament
 		if err := cursor.Decode(&t); err != nil {
-			log.FromContext(ctx).Error("tournament decode failed", "worker", "tournament_finalize", "err", err)
+			log.FromContext(ctx).Error("tournament decode failed", "err", err)
 			continue
 		}
 
@@ -1176,10 +1183,10 @@ func (s *quizServer) finalizeExpiredTournaments(ctx context.Context, now time.Ti
 				bson.M{"_id": t.ID, "winnersAwarded": false},
 				bson.M{"$set": bson.M{"winnersAwarded": true, "status": "completed"}},
 			); err != nil {
-				log.FromContext(ctx).Error("empty-payout flip failed", "worker", "tournament_finalize", "tournament_id", t.ID, "err", err)
+				log.FromContext(ctx).Error("empty-payout flip failed", "tournament_id", t.ID, "err", err)
 				continue
 			}
-			log.FromContext(ctx).Info("tournament closed; no participants and no prize pool", "worker", "tournament_finalize", "tournament_id", t.ID)
+			log.FromContext(ctx).Info("tournament closed; no participants and no prize pool", "tournament_id", t.ID)
 			continue
 		}
 
@@ -1192,7 +1199,7 @@ func (s *quizServer) finalizeExpiredTournaments(ctx context.Context, now time.Ti
 			findOpts,
 		)
 		if err != nil {
-			log.FromContext(ctx).Error("standings lookup failed", "worker", "tournament_finalize", "tournament_id", t.ID, "err", err)
+			log.FromContext(ctx).Error("standings lookup failed", "tournament_id", t.ID, "err", err)
 			continue
 		}
 
@@ -1242,7 +1249,7 @@ func (s *quizServer) finalizeExpiredTournaments(ctx context.Context, now time.Ti
 				// $setOnInsert no-ops the rows that already landed and
 				// inserts the missing ones.
 				log.FromContext(ctx).Error("payout upsert failed; aborting (will retry next tick)",
-					"worker", "tournament_finalize", "tournament_id", t.ID, "user_id", st.UserID, "err", err)
+					"tournament_id", t.ID, "user_id", st.UserID, "err", err)
 				writeFailed = true
 				break
 			}
@@ -1262,7 +1269,7 @@ func (s *quizServer) finalizeExpiredTournaments(ctx context.Context, now time.Ti
 		)
 		if err != nil {
 			log.FromContext(ctx).Error("claim flip failed; payouts persisted, will retry on next tick",
-				"worker", "tournament_finalize", "tournament_id", t.ID, "err", err)
+				"tournament_id", t.ID, "err", err)
 			continue
 		}
 		if res.ModifiedCount == 0 {
@@ -1277,7 +1284,7 @@ func (s *quizServer) finalizeExpiredTournaments(ctx context.Context, now time.Ti
 		}
 
 		log.FromContext(ctx).Info("finalized tournament",
-			"worker", "tournament_finalize", "tournament_id", t.ID, "tournament_name", t.Name, "payouts", rank)
+			"tournament_id", t.ID, "tournament_name", t.Name, "payouts", rank)
 	}
 }
 
@@ -1329,6 +1336,7 @@ func (s *quizServer) publishTournamentPayout(ctx context.Context, p models.Tourn
 // (RabbitMQ blip, channel drop, broker overload), this worker keeps trying
 // every minute until the row transitions to "published".
 func (s *quizServer) tournamentPayoutDrainWorker(ctx context.Context) {
+	ctx = log.ContextWithAttrs(ctx, "worker", "tournament_drain")
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 	for {
@@ -1356,7 +1364,7 @@ func (s *quizServer) drainPendingPayouts(ctx context.Context) {
 		options.Find().SetLimit(drainBatchSize),
 	)
 	if err != nil {
-		log.FromContext(ctx).Error("pending payout lookup failed", "worker", "tournament_drain", "err", err)
+		log.FromContext(ctx).Error("pending payout lookup failed", "err", err)
 		return
 	}
 	defer cursor.Close(ctx)
@@ -1364,7 +1372,7 @@ func (s *quizServer) drainPendingPayouts(ctx context.Context) {
 	for cursor.Next(ctx) {
 		var p models.TournamentPayout
 		if err := cursor.Decode(&p); err != nil {
-			log.FromContext(ctx).Error("payout decode failed", "worker", "tournament_drain", "err", err)
+			log.FromContext(ctx).Error("payout decode failed", "err", err)
 			continue
 		}
 		s.publishTournamentPayout(ctx, p)
@@ -1385,6 +1393,7 @@ func (s *quizServer) drainPendingPayouts(ctx context.Context) {
 // natural key. The seed/main.go index ensures only one auto-generated
 // tournament per weekKey can ever exist.
 func (s *quizServer) weeklyTournamentCron(ctx context.Context) {
+	ctx = log.ContextWithAttrs(ctx, "worker", "weekly_tournament")
 	// Tick once on startup so a fresh deployment doesn't wait an hour for
 	// the first run; subsequent ticks happen hourly.
 	s.ensureCurrentWeekTournament(ctx, time.Now())
@@ -1481,7 +1490,7 @@ func (s *quizServer) ensureCurrentWeekTournament(ctx context.Context, now time.T
 		options.UpdateOne().SetUpsert(true),
 	)
 	if err != nil {
-		log.FromContext(ctx).Error("weekly tournament upsert failed", "worker", "weekly_tournament", "week_key", weekKey, "err", err)
+		log.FromContext(ctx).Error("weekly tournament upsert failed", "week_key", weekKey, "err", err)
 		return
 	}
 }
@@ -1555,15 +1564,16 @@ func setupRabbitMQ(ch *amqp.Channel) error {
 // ---------------------------------------------------------------------------
 
 func (s *quizServer) consumeRoundCompleted(ctx context.Context) {
+	ctx = log.ContextWithAttrs(ctx, "consumer", "round_completed")
 	ch, err := s.newChannel()
 	if err != nil {
-		log.Fatal(ctx, "open channel failed", "consumer", "round_completed", "err", err)
+		log.Fatal(ctx, "open channel failed", "err", err)
 	}
 	defer ch.Close()
 
 	msgs, err := ch.Consume("round-completed-queue", "", false, false, false, false, nil)
 	if err != nil {
-		log.Fatal(ctx, "consume failed", "consumer", "round_completed", "queue", "round-completed-queue", "err", err)
+		log.Fatal(ctx, "consume failed", "queue", "round-completed-queue", "err", err)
 	}
 
 	for {
@@ -1580,14 +1590,14 @@ func (s *quizServer) consumeRoundCompleted(ctx context.Context) {
 				Round  int    `json:"round"`
 			}
 			if err := json.Unmarshal(msg.Body, &event); err != nil {
-				log.FromContext(ctx).Warn("bad payload", "consumer", "round_completed", "err", err)
+				log.FromContext(ctx).Warn("bad payload", "err", err)
 				msg.Nack(false, false)
 				continue
 			}
 
 			questions, ok := s.getRoomQuestions(event.RoomID)
 			if !ok {
-				log.FromContext(ctx).Info("unknown room; skipping", "consumer", "round_completed", "room_id", event.RoomID)
+				log.FromContext(ctx).Info("unknown room; skipping", "room_id", event.RoomID)
 				msg.Ack(false)
 				continue
 			}
@@ -1613,15 +1623,16 @@ func (s *quizServer) consumeRoundCompleted(ctx context.Context) {
 // ---------------------------------------------------------------------------
 
 func (s *quizServer) consumeLeaderboardUpdated(ctx context.Context) {
+	ctx = log.ContextWithAttrs(ctx, "consumer", "leaderboard_broadcast")
 	ch, err := s.newChannel()
 	if err != nil {
-		log.Fatal(ctx, "open channel failed", "consumer", "leaderboard_broadcast", "err", err)
+		log.Fatal(ctx, "open channel failed", "err", err)
 	}
 	defer ch.Close()
 
 	msgs, err := ch.Consume("leaderboard-broadcast-queue", "", false, false, false, false, nil)
 	if err != nil {
-		log.Fatal(ctx, "consume failed", "consumer", "leaderboard_broadcast", "queue", "leaderboard-broadcast-queue", "err", err)
+		log.Fatal(ctx, "consume failed", "queue", "leaderboard-broadcast-queue", "err", err)
 	}
 
 	for {
@@ -1641,7 +1652,7 @@ func (s *quizServer) consumeLeaderboardUpdated(ctx context.Context) {
 				} `json:"entries"`
 			}
 			if err := json.Unmarshal(msg.Body, &event); err != nil {
-				log.FromContext(ctx).Warn("bad payload", "consumer", "leaderboard_broadcast", "err", err)
+				log.FromContext(ctx).Warn("bad payload", "err", err)
 				msg.Nack(false, false)
 				continue
 			}
@@ -1686,7 +1697,7 @@ func (s *quizServer) consumeLeaderboardUpdated(ctx context.Context) {
 			}
 			s.broadcastToRoom(event.RoomID, gameEvent)
 
-			log.FromContext(ctx).Info("LeaderboardUpdate broadcast", "consumer", "leaderboard_broadcast", "room_id", event.RoomID, "entries", len(entries))
+			log.FromContext(ctx).Info("LeaderboardUpdate broadcast", "room_id", event.RoomID, "entries", len(entries))
 			msg.Ack(false)
 		}
 	}

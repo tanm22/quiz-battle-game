@@ -41,19 +41,21 @@ const (
 	opponent2 = "mi_test_opp2"
 )
 
-var ctxForFatal context.Context
-
-func must(err error, msg string) {
-	if err != nil {
-		log.Fatal(ctxForFatal, msg, "err", err)
-	}
-}
-
 func main() {
 	slog.SetDefault(log.Init("test-matchinvite"))
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	ctxForFatal = ctx
+
+	// must is a closure capturing ctx so request_id (and any log attrs)
+	// on ctx flow into Fatal output without a package-level mutable
+	// global. Defining it inside main() also prevents accidental
+	// callsites from package init or other functions that wouldn't
+	// have a real ctx in scope.
+	must := func(err error, msg string) {
+		if err != nil {
+			log.Fatal(ctx, msg, "err", err)
+		}
+	}
 
 	// ------------------------------------------------------------------
 	// 1. MongoDB setup — seed users (with FCM tokens on opponents) and a

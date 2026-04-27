@@ -179,8 +179,11 @@ func (s *notificationService) deliverToUser(ctx context.Context, userID, title, 
 			}
 			if messaging.IsUnregistered(err) || messaging.IsInvalidArgument(err) {
 				// Async cleanup so we don't extend the per-message dispatch window
-				// waiting on a MongoDB round trip.
-				go s.pullInvalidToken(userID, token)
+				// waiting on a MongoDB round trip. DetachContext keeps the
+				// originating request_id (and any ctx attrs) so the cleanup
+				// log line correlates to the dispatch that triggered it,
+				// without inheriting the parent's cancellation.
+				go s.pullInvalidToken(log.DetachContext(ctx), userID, token)
 				log.FromContext(ctx).Info("removing invalid token", "user_id", userID, "err", err)
 				return
 			}
@@ -190,8 +193,7 @@ func (s *notificationService) deliverToUser(ctx context.Context, userID, title, 
 	wg.Wait()
 }
 
-func (s *notificationService) pullInvalidToken(userID, token string) {
-	ctx := context.Background()
+func (s *notificationService) pullInvalidToken(ctx context.Context, userID, token string) {
 	_, err := s.mongoDB.Collection("users").UpdateOne(ctx,
 		bson.M{"_id": userID},
 		bson.M{"$pull": bson.M{"fcmTokens": token}},
