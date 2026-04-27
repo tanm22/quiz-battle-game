@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"math/rand"
 	"net"
 	"os"
@@ -24,6 +24,7 @@ import (
 	"quiz-battle/pkg/auth"
 	"quiz-battle/pkg/coins"
 	"quiz-battle/pkg/keys"
+	"quiz-battle/pkg/log"
 	"quiz-battle/pkg/models"
 	pb "quiz-battle/proto"
 )
@@ -175,7 +176,7 @@ func (s *quizServer) selectQuestions(ctx context.Context, allowedTopics []string
 func (s *quizServer) consumeMatchCreated(ctx context.Context) {
 	ch, err := s.newChannel()
 	if err != nil {
-		log.Fatalf("[quiz] failed to open channel for match-created: %v", err)
+		log.Fatal(ctx, "open channel failed", "consumer", "match_created", "err", err)
 	}
 	defer ch.Close()
 
@@ -185,18 +186,18 @@ func (s *quizServer) consumeMatchCreated(ctx context.Context) {
 	// wipe followed by quiz starting before matchmaking causes a 404 on the
 	// Consume below and the service exits 1.
 	if err := ch.ExchangeDeclare("sx", "topic", true, false, false, false, nil); err != nil {
-		log.Fatalf("[quiz] failed to declare sx exchange: %v", err)
+		log.Fatal(ctx, "declare sx exchange failed", "consumer", "match_created", "err", err)
 	}
 	if _, err := ch.QueueDeclare("match-created-queue", true, false, false, false, nil); err != nil {
-		log.Fatalf("[quiz] failed to declare match-created-queue: %v", err)
+		log.Fatal(ctx, "declare match-created-queue failed", "consumer", "match_created", "err", err)
 	}
 	if err := ch.QueueBind("match-created-queue", "match.created", "sx", false, nil); err != nil {
-		log.Fatalf("[quiz] failed to bind match-created-queue: %v", err)
+		log.Fatal(ctx, "bind match-created-queue failed", "consumer", "match_created", "err", err)
 	}
 
 	msgs, err := ch.Consume("match-created-queue", "", false, false, false, false, nil)
 	if err != nil {
-		log.Fatalf("[quiz] failed to consume match-created-queue: %v", err)
+		log.Fatal(ctx, "consume failed", "consumer", "match_created", "queue", "match-created-queue", "err", err)
 	}
 
 	for {
@@ -213,12 +214,12 @@ func (s *quizServer) consumeMatchCreated(ctx context.Context) {
 				PlayerIDs []string `json:"playerIds"`
 			}
 			if err := json.Unmarshal(msg.Body, &event); err != nil {
-				log.Printf("[quiz] bad match.created payload: %v", err)
+				log.FromContext(ctx).Warn("bad payload", "consumer", "match_created", "err", err)
 				msg.Nack(false, false)
 				continue
 			}
 
-			log.Printf("[quiz] match.created for room %s with players %v", event.RoomID, event.PlayerIDs)
+			log.FromContext(ctx).Info("match.created received", "consumer", "match_created", "room_id", event.RoomID, "player_ids", event.PlayerIDs)
 
 			// Determine allowed topics based on player plans.
 			// If any player is free, restrict to free topics for fairness.
@@ -246,7 +247,7 @@ func (s *quizServer) consumeMatchCreated(ctx context.Context) {
 			// Select questions and store in Redis
 			questions, err := s.selectQuestions(ctx, allowedTopics)
 			if err != nil {
-				log.Printf("[quiz] selectQuestions error: %v", err)
+				log.FromContext(ctx).Error("selectQuestions failed", "consumer", "match_created", "err", err)
 				msg.Nack(false, true) // requeue
 				continue
 			}
@@ -257,7 +258,7 @@ func (s *quizServer) consumeMatchCreated(ctx context.Context) {
 				questionIDs[i] = q.ID
 			}
 			if err := keys.SetQuestions(ctx, s.rdb, event.RoomID, questionIDs); err != nil {
-				log.Printf("[quiz] failed to store questions: %v", err)
+				log.FromContext(ctx).Error("store questions failed", "consumer", "match_created", "err", err)
 				msg.Nack(false, true)
 				continue
 			}
@@ -298,7 +299,7 @@ func (s *quizServer) getRoomQuestions(roomID string) ([]Question, bool) {
 func (s *quizServer) startRound(ctx context.Context, roomID string, round int) {
 	// Section 7.2: abort if no players connected
 	if s.connectedPlayersInRoom(roomID) == 0 {
-		log.Printf("[quiz] room %s skipping round %d — no connected players", roomID, round)
+		log.FromContext(ctx).Info("skipping round; no connected players", "room_id", roomID, "round", round)
 		return
 	}
 
@@ -312,7 +313,7 @@ func (s *quizServer) startRound(ctx context.Context, roomID string, round int) {
 	q := questions[round-1]
 	deadlineUnix := time.Now().Add(15 * time.Second).Unix()
 
-	log.Printf("[quiz] room %s starting round %d — question: %s", roomID, round, q.Text)
+	log.FromContext(ctx).Info("starting round", "room_id", roomID, "round", round, "question", q.Text)
 
 	// Store deadline for reconnection snapshots and TimerSync
 	s.roomDeadlines.Store(roomID, deadlineUnix)
@@ -386,7 +387,7 @@ func (s *quizServer) closeRound(ctx context.Context, roomID string, round int) {
 
 	q := questions[round-1]
 
-	log.Printf("[quiz] room %s round %d closed — correct answer: %d", roomID, round, q.CorrectIndex)
+	log.FromContext(ctx).Info("round closed", "room_id", roomID, "round", round, "correct_index", q.CorrectIndex)
 
 	// Broadcast RoundResult GameEvent
 	seq := s.getSeqCounter(roomID).Add(1)
@@ -407,11 +408,11 @@ func (s *quizServer) closeRound(ctx context.Context, roomID string, round int) {
 		"round":  round,
 	})
 	if err != nil {
-		log.Printf("[quiz] failed to marshal round.completed: %v", err)
+		log.FromContext(ctx).Error("marshal round.completed failed", "err", err)
 		return
 	}
 	if err := s.publish(ctx, "round.completed", roundEvent); err != nil {
-		log.Printf("[quiz] failed to publish round.completed: %v", err)
+		log.FromContext(ctx).Error("publish round.completed failed", "err", err)
 	}
 
 	// Round advancement is handled by consumeRoundCompleted via RabbitMQ
@@ -422,7 +423,7 @@ func (s *quizServer) closeRound(ctx context.Context, roomID string, round int) {
 // ---------------------------------------------------------------------------
 
 func (s *quizServer) finishMatch(ctx context.Context, roomID string, totalRounds int) {
-	log.Printf("[quiz] room %s match finished after %d rounds", roomID, totalRounds)
+	log.FromContext(ctx).Info("match finished", "room_id", roomID, "rounds", totalRounds)
 
 	// Get leaderboard from Redis for final results
 	entries, _ := keys.GetLeaderboardEntries(ctx, s.rdb, roomID)
@@ -574,9 +575,9 @@ func (s *quizServer) finishMatch(ctx context.Context, roomID string, totalRounds
 		"players": playerResults,
 	})
 	if err != nil {
-		log.Printf("[quiz] failed to marshal match.finished: %v", err)
+		log.FromContext(ctx).Error("marshal match.finished failed", "err", err)
 	} else if err := s.publish(ctx, "match.finished", finishEvent); err != nil {
-		log.Printf("[quiz] failed to publish match.finished: %v", err)
+		log.FromContext(ctx).Error("publish match.finished failed", "err", err)
 	}
 
 	// §4.3: award match-win coins to the leaderboard winner via the earn
@@ -596,9 +597,9 @@ func (s *quizServer) finishMatch(ctx context.Context, roomID string, totalRounds
 			Metadata: map[string]string{"roomId": roomID},
 		})
 		if mErr != nil {
-			log.Printf("[quiz] failed to marshal %s: %v", earnRouting, mErr)
+			log.FromContext(ctx).Error("marshal earn event failed", "event", earnRouting, "err", mErr)
 		} else if err := s.publish(ctx, earnRouting, earnBody); err != nil {
-			log.Printf("[quiz] failed to publish %s: %v", earnRouting, err)
+			log.FromContext(ctx).Error("publish earn event failed", "event", earnRouting, "err", err)
 		}
 	}
 
@@ -642,7 +643,7 @@ func (s *quizServer) broadcastToRoom(roomID string, event *pb.GameEvent) {
 			select {
 			case ch <- event:
 			default:
-				log.Printf("[quiz] stream buffer full for %s", k)
+				slog.Warn("stream buffer full", "stream_key", k)
 			}
 		}
 		return true
@@ -751,24 +752,24 @@ func (s *quizServer) StreamGameEvents(req *pb.StreamGameEventsRequest, stream pb
 		bgCtx := context.Background()
 
 		if remaining == 0 {
-			log.Printf("[quiz] room %s has zero connected players — ending match", req.RoomId)
+			log.FromContext(bgCtx).Info("zero connected players; ending match", "room_id", req.RoomId)
 			s.cancelRoomTimer(req.RoomId)
 			if _, ok := s.getRoomQuestions(req.RoomId); ok {
 				s.finishMatch(bgCtx, req.RoomId, 0)
 			}
 		} else if remaining == 1 {
-			log.Printf("[quiz] room %s has one player left — opponent left, ending match", req.RoomId)
+			log.FromContext(bgCtx).Info("opponent left; ending match", "room_id", req.RoomId)
 			s.cancelRoomTimer(req.RoomId)
 			if _, ok := s.getRoomQuestions(req.RoomId); ok {
 				s.finishMatch(bgCtx, req.RoomId, -1) // -1 signals opponent abandoned
 			}
 		} else {
-			log.Printf("[quiz] player %s disconnected from room %s (%d remaining)",
-				userID, req.RoomId, remaining)
+			log.FromContext(bgCtx).Info("player disconnected",
+				"room_id", req.RoomId, "user_id", userID, "remaining", remaining)
 		}
 	}()
 
-	log.Printf("[quiz] player %s streaming game events for room %s", userID, req.RoomId)
+	log.FromContext(stream.Context()).Info("player streaming game events", "room_id", req.RoomId, "user_id", userID)
 
 	// Broadcast PlayerJoined to existing players in the room
 	username := userID
@@ -974,7 +975,7 @@ func (s *quizServer) SubmitAnswer(ctx context.Context, req *pb.SubmitAnswerReque
 		return nil, status.Errorf(codes.Internal, "failed to publish answer: %v", err)
 	}
 
-	log.Printf("[quiz] answer from %s for room %s round %d option %d", userID, req.RoomId, req.Round, req.OptionIndex)
+	log.FromContext(ctx).Info("answer submitted", "user_id", userID, "room_id", req.RoomId, "round", req.Round, "option_index", req.OptionIndex)
 	return &pb.SubmitAnswerResponse{Accepted: true}, nil
 }
 
@@ -1052,7 +1053,7 @@ func (s *quizServer) tournamentReminderTicker(ctx context.Context) {
 					bson.M{"_id": doc["_id"]},
 					bson.M{"$set": bson.M{"reminderSent": true}},
 				)
-				log.Printf("[quiz] tournament reminder sent for %s (%d participants)", tourID, len(userIDs))
+				log.FromContext(ctx).Info("tournament reminder sent", "worker", "tournament_reminder", "tournament_id", tourID, "participants", len(userIDs))
 			}
 			cursor.Close(ctx)
 		}
@@ -1103,11 +1104,11 @@ func (s *quizServer) promoteUpcomingTournaments(ctx context.Context, now time.Ti
 		bson.M{"$set": bson.M{"status": "active"}},
 	)
 	if err != nil {
-		log.Printf("[quiz] promote upcoming→active failed: %v", err)
+		log.FromContext(ctx).Error("promote upcoming→active failed", "worker", "tournament_finalize", "err", err)
 		return
 	}
 	if res.ModifiedCount > 0 {
-		log.Printf("[quiz] promoted %d tournament(s) to active", res.ModifiedCount)
+		log.FromContext(ctx).Info("promoted tournaments to active", "worker", "tournament_finalize", "count", res.ModifiedCount)
 	}
 }
 
@@ -1118,7 +1119,7 @@ func (s *quizServer) finalizeExpiredTournaments(ctx context.Context, now time.Ti
 		"winnersAwarded": false,
 	})
 	if err != nil {
-		log.Printf("[quiz] finalize: tournament lookup failed: %v", err)
+		log.FromContext(ctx).Error("tournament lookup failed", "worker", "tournament_finalize", "err", err)
 		return
 	}
 	defer cursor.Close(ctx)
@@ -1126,7 +1127,7 @@ func (s *quizServer) finalizeExpiredTournaments(ctx context.Context, now time.Ti
 	for cursor.Next(ctx) {
 		var t models.Tournament
 		if err := cursor.Decode(&t); err != nil {
-			log.Printf("[quiz] finalize: decode failed: %v", err)
+			log.FromContext(ctx).Error("tournament decode failed", "worker", "tournament_finalize", "err", err)
 			continue
 		}
 
@@ -1175,10 +1176,10 @@ func (s *quizServer) finalizeExpiredTournaments(ctx context.Context, now time.Ti
 				bson.M{"_id": t.ID, "winnersAwarded": false},
 				bson.M{"$set": bson.M{"winnersAwarded": true, "status": "completed"}},
 			); err != nil {
-				log.Printf("[quiz] finalize: empty-payout flip failed for %s: %v", t.ID, err)
+				log.FromContext(ctx).Error("empty-payout flip failed", "worker", "tournament_finalize", "tournament_id", t.ID, "err", err)
 				continue
 			}
-			log.Printf("[quiz] finalize: tournament %s closed with no participants and no prize pool", t.ID)
+			log.FromContext(ctx).Info("tournament closed; no participants and no prize pool", "worker", "tournament_finalize", "tournament_id", t.ID)
 			continue
 		}
 
@@ -1191,7 +1192,7 @@ func (s *quizServer) finalizeExpiredTournaments(ctx context.Context, now time.Ti
 			findOpts,
 		)
 		if err != nil {
-			log.Printf("[quiz] finalize: standings lookup failed for %s: %v", t.ID, err)
+			log.FromContext(ctx).Error("standings lookup failed", "worker", "tournament_finalize", "tournament_id", t.ID, "err", err)
 			continue
 		}
 
@@ -1240,7 +1241,8 @@ func (s *quizServer) finalizeExpiredTournaments(ctx context.Context, now time.Ti
 				// false, so the next tick re-runs phase 1 from scratch —
 				// $setOnInsert no-ops the rows that already landed and
 				// inserts the missing ones.
-				log.Printf("[quiz] finalize: payout upsert failed for tournament=%s user=%s: %v — aborting (will retry next tick)", t.ID, st.UserID, err)
+				log.FromContext(ctx).Error("payout upsert failed; aborting (will retry next tick)",
+					"worker", "tournament_finalize", "tournament_id", t.ID, "user_id", st.UserID, "err", err)
 				writeFailed = true
 				break
 			}
@@ -1259,7 +1261,8 @@ func (s *quizServer) finalizeExpiredTournaments(ctx context.Context, now time.Ti
 			bson.M{"$set": bson.M{"winnersAwarded": true, "status": "completed"}},
 		)
 		if err != nil {
-			log.Printf("[quiz] finalize: claim flip failed for %s: %v — payouts persisted, will retry on next tick", t.ID, err)
+			log.FromContext(ctx).Error("claim flip failed; payouts persisted, will retry on next tick",
+				"worker", "tournament_finalize", "tournament_id", t.ID, "err", err)
 			continue
 		}
 		if res.ModifiedCount == 0 {
@@ -1273,7 +1276,8 @@ func (s *quizServer) finalizeExpiredTournaments(ctx context.Context, now time.Ti
 			s.publishTournamentPayout(ctx, p)
 		}
 
-		log.Printf("[quiz] finalized tournament %s (%s): %d payouts persisted", t.ID, t.Name, rank)
+		log.FromContext(ctx).Info("finalized tournament",
+			"worker", "tournament_finalize", "tournament_id", t.ID, "tournament_name", t.Name, "payouts", rank)
 	}
 }
 
@@ -1298,7 +1302,8 @@ func (s *quizServer) publishTournamentPayout(ctx context.Context, p models.Tourn
 		"finalScore":     p.FinalScore,
 	})
 	if err := s.publish(ctx, "tournament.finished", payload); err != nil {
-		log.Printf("[quiz] tournament.finished publish failed for tournament=%s user=%s: %v", p.TournamentID, p.UserID, err)
+		log.FromContext(ctx).Error("tournament.finished publish failed",
+			"tournament_id", p.TournamentID, "user_id", p.UserID, "err", err)
 		return
 	}
 
@@ -1313,7 +1318,8 @@ func (s *quizServer) publishTournamentPayout(ctx context.Context, p models.Tourn
 		bson.M{"tournamentId": p.TournamentID, "userId": p.UserID, "status": "pending"},
 		bson.M{"$set": bson.M{"status": "published", "publishedAt": publishedAt}},
 	); err != nil {
-		log.Printf("[quiz] payout publish-flag update failed for tournament=%s user=%s: %v", p.TournamentID, p.UserID, err)
+		log.FromContext(ctx).Warn("payout publish-flag update failed",
+			"tournament_id", p.TournamentID, "user_id", p.UserID, "err", err)
 	}
 }
 
@@ -1350,7 +1356,7 @@ func (s *quizServer) drainPendingPayouts(ctx context.Context) {
 		options.Find().SetLimit(drainBatchSize),
 	)
 	if err != nil {
-		log.Printf("[quiz] drain: pending payout lookup failed: %v", err)
+		log.FromContext(ctx).Error("pending payout lookup failed", "worker", "tournament_drain", "err", err)
 		return
 	}
 	defer cursor.Close(ctx)
@@ -1358,7 +1364,7 @@ func (s *quizServer) drainPendingPayouts(ctx context.Context) {
 	for cursor.Next(ctx) {
 		var p models.TournamentPayout
 		if err := cursor.Decode(&p); err != nil {
-			log.Printf("[quiz] drain: decode failed: %v", err)
+			log.FromContext(ctx).Error("payout decode failed", "worker", "tournament_drain", "err", err)
 			continue
 		}
 		s.publishTournamentPayout(ctx, p)
@@ -1475,7 +1481,7 @@ func (s *quizServer) ensureCurrentWeekTournament(ctx context.Context, now time.T
 		options.UpdateOne().SetUpsert(true),
 	)
 	if err != nil {
-		log.Printf("[quiz] weekly tournament upsert failed for %s: %v", weekKey, err)
+		log.FromContext(ctx).Error("weekly tournament upsert failed", "worker", "weekly_tournament", "week_key", weekKey, "err", err)
 		return
 	}
 }
@@ -1551,13 +1557,13 @@ func setupRabbitMQ(ch *amqp.Channel) error {
 func (s *quizServer) consumeRoundCompleted(ctx context.Context) {
 	ch, err := s.newChannel()
 	if err != nil {
-		log.Fatalf("[quiz] failed to open channel for round-completed: %v", err)
+		log.Fatal(ctx, "open channel failed", "consumer", "round_completed", "err", err)
 	}
 	defer ch.Close()
 
 	msgs, err := ch.Consume("round-completed-queue", "", false, false, false, false, nil)
 	if err != nil {
-		log.Fatalf("[quiz] failed to consume round-completed-queue: %v", err)
+		log.Fatal(ctx, "consume failed", "consumer", "round_completed", "queue", "round-completed-queue", "err", err)
 	}
 
 	for {
@@ -1574,14 +1580,14 @@ func (s *quizServer) consumeRoundCompleted(ctx context.Context) {
 				Round  int    `json:"round"`
 			}
 			if err := json.Unmarshal(msg.Body, &event); err != nil {
-				log.Printf("[quiz] bad round.completed payload: %v", err)
+				log.FromContext(ctx).Warn("bad payload", "consumer", "round_completed", "err", err)
 				msg.Nack(false, false)
 				continue
 			}
 
 			questions, ok := s.getRoomQuestions(event.RoomID)
 			if !ok {
-				log.Printf("[quiz] round.completed for unknown room %s — skipping", event.RoomID)
+				log.FromContext(ctx).Info("unknown room; skipping", "consumer", "round_completed", "room_id", event.RoomID)
 				msg.Ack(false)
 				continue
 			}
@@ -1609,13 +1615,13 @@ func (s *quizServer) consumeRoundCompleted(ctx context.Context) {
 func (s *quizServer) consumeLeaderboardUpdated(ctx context.Context) {
 	ch, err := s.newChannel()
 	if err != nil {
-		log.Fatalf("[quiz] failed to open channel for leaderboard-broadcast: %v", err)
+		log.Fatal(ctx, "open channel failed", "consumer", "leaderboard_broadcast", "err", err)
 	}
 	defer ch.Close()
 
 	msgs, err := ch.Consume("leaderboard-broadcast-queue", "", false, false, false, false, nil)
 	if err != nil {
-		log.Fatalf("[quiz] failed to consume leaderboard-broadcast-queue: %v", err)
+		log.Fatal(ctx, "consume failed", "consumer", "leaderboard_broadcast", "queue", "leaderboard-broadcast-queue", "err", err)
 	}
 
 	for {
@@ -1635,7 +1641,7 @@ func (s *quizServer) consumeLeaderboardUpdated(ctx context.Context) {
 				} `json:"entries"`
 			}
 			if err := json.Unmarshal(msg.Body, &event); err != nil {
-				log.Printf("[quiz] bad leaderboard.updated payload: %v", err)
+				log.FromContext(ctx).Warn("bad payload", "consumer", "leaderboard_broadcast", "err", err)
 				msg.Nack(false, false)
 				continue
 			}
@@ -1680,7 +1686,7 @@ func (s *quizServer) consumeLeaderboardUpdated(ctx context.Context) {
 			}
 			s.broadcastToRoom(event.RoomID, gameEvent)
 
-			log.Printf("[quiz] broadcast LeaderboardUpdate for room %s (%d entries)", event.RoomID, len(entries))
+			log.FromContext(ctx).Info("LeaderboardUpdate broadcast", "consumer", "leaderboard_broadcast", "room_id", event.RoomID, "entries", len(entries))
 			msg.Ack(false)
 		}
 	}
@@ -1691,6 +1697,7 @@ func (s *quizServer) consumeLeaderboardUpdated(ctx context.Context) {
 // ---------------------------------------------------------------------------
 
 func main() {
+	slog.SetDefault(log.Init("quiz"))
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -1701,9 +1708,9 @@ func main() {
 	}
 	rdb := redis.NewClient(&redis.Options{Addr: redisAddr})
 	if err := rdb.Ping(ctx).Err(); err != nil {
-		log.Fatalf("redis connect failed: %v", err)
+		log.Fatal(ctx, "redis connect failed", "err", err)
 	}
-	log.Println("[quiz] connected to Redis")
+	log.FromContext(ctx).Info("connected to Redis")
 
 	// RabbitMQ
 	rabbitURL := os.Getenv("RABBITMQ_URL")
@@ -1712,20 +1719,20 @@ func main() {
 	}
 	conn, err := amqp.Dial(rabbitURL)
 	if err != nil {
-		log.Fatalf("rabbitmq connect failed: %v", err)
+		log.Fatal(ctx, "rabbitmq connect failed", "err", err)
 	}
 	defer conn.Close()
 
 	amqpCh, err := conn.Channel()
 	if err != nil {
-		log.Fatalf("rabbitmq channel failed: %v", err)
+		log.Fatal(ctx, "rabbitmq channel failed", "err", err)
 	}
 	defer amqpCh.Close()
 
 	if err := setupRabbitMQ(amqpCh); err != nil {
-		log.Fatalf("rabbitmq setup failed: %v", err)
+		log.Fatal(ctx, "rabbitmq setup failed", "err", err)
 	}
-	log.Println("[quiz] connected to RabbitMQ")
+	log.FromContext(ctx).Info("connected to RabbitMQ")
 
 	// MongoDB
 	mongoURI := os.Getenv("MONGO_URI")
@@ -1736,10 +1743,10 @@ func main() {
 		ObjectIDAsHexString: true,
 	}))
 	if err != nil {
-		log.Fatalf("mongodb connect failed: %v", err)
+		log.Fatal(ctx, "mongodb connect failed", "err", err)
 	}
 	defer mongoClient.Disconnect(ctx)
-	log.Println("[quiz] connected to MongoDB")
+	log.FromContext(ctx).Info("connected to MongoDB")
 
 	// JWT
 	jwtSecret := os.Getenv("JWT_SECRET")
@@ -1773,11 +1780,11 @@ func main() {
 
 	lis, err := net.Listen("tcp", ":50052")
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		log.Fatal(ctx, "listen failed", "addr", ":50052", "err", err)
 	}
 
-	log.Println("[quiz] serving on :50052")
+	log.FromContext(ctx).Info("gRPC serving", "addr", ":50052")
 	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+		log.Fatal(ctx, "grpc serve failed", "err", err)
 	}
 }
