@@ -731,7 +731,12 @@ func (s *scoringServer) processAnswer(ctx context.Context, msg amqp.Delivery) {
 		AnswerTimeMs: answerTimeMs,
 	})
 	if err != nil {
-		log.FromContext(ctx).Error("CalculateScore gRPC failed", "consumer", "scoring", "err", err)
+		log.FromContext(ctx).Error("CalculateScore gRPC failed",
+			"consumer", "scoring",
+			"user_id", answer.UserID,
+			"room_id", answer.RoomID,
+			"round", answer.Round,
+			"err", err)
 		if getDeathCount(msg) >= 3 {
 			msg.Nack(false, false)
 		} else {
@@ -752,13 +757,23 @@ func (s *scoringServer) processAnswer(ctx context.Context, msg amqp.Delivery) {
 		"clientTimestamp": answer.ClientTimestamp,
 	})
 	if err != nil {
-		log.FromContext(ctx).Error("marshal answer record failed", "consumer", "scoring", "err", err)
+		log.FromContext(ctx).Error("marshal answer record failed",
+			"consumer", "scoring",
+			"user_id", answer.UserID,
+			"room_id", answer.RoomID,
+			"round", answer.Round,
+			"err", err)
 		msg.Nack(false, true)
 		return
 	}
 	wasSet, err := keys.TrySetAnswer(ctx, s.rdb, answer.RoomID, answer.Round, answer.UserID, string(answerJSON))
 	if err != nil {
-		log.FromContext(ctx).Error("TrySetAnswer failed", "consumer", "scoring", "err", err)
+		log.FromContext(ctx).Error("TrySetAnswer failed",
+			"consumer", "scoring",
+			"user_id", answer.UserID,
+			"room_id", answer.RoomID,
+			"round", answer.Round,
+			"err", err)
 		msg.Nack(false, true)
 		return
 	}
@@ -771,7 +786,12 @@ func (s *scoringServer) processAnswer(ctx context.Context, msg amqp.Delivery) {
 	// Step 49: Update leaderboard via Lua script (atomic read-modify-write)
 	entries, err := keys.UpdateLeaderboard(ctx, s.rdb, answer.RoomID, answer.UserID, score)
 	if err != nil {
-		log.FromContext(ctx).Error("leaderboard update failed", "consumer", "scoring", "err", err)
+		log.FromContext(ctx).Error("leaderboard update failed",
+			"consumer", "scoring",
+			"user_id", answer.UserID,
+			"room_id", answer.RoomID,
+			"round", answer.Round,
+			"err", err)
 		msg.Nack(false, true)
 		return
 	}
@@ -879,7 +899,7 @@ func resolveRoundsForHistory(eventRounds, roundsPlayed int) int {
 func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 	var event matchFinishedEvent
 	if err := json.Unmarshal(msg.Body, &event); err != nil {
-		log.FromContext(ctx).Warn("bad payload", "consumer", "persistence", "event", "match.finished", "err", err)
+		log.FromContext(ctx).Warn("bad payload", "consumer", "persistence", "event", "match.finished", "body", string(msg.Body), "err", err)
 		msg.Nack(false, false)
 		return
 	}
@@ -1373,7 +1393,11 @@ func (s *scoringServer) consumeAnalytics(ctx context.Context) {
 			if !ok {
 				return
 			}
-			log.FromContext(ctx).Info("match.finished event received", "consumer", "analytics", "body", string(msg.Body))
+			// Stub: no real analytics yet (durable record lives in Mongo
+			// match_history). Debug-level so the body dump only appears
+			// when an operator opts in via LOG_LEVEL=debug — INFO would
+			// emit one body-carrying line per finished match in prod.
+			log.FromContext(ctx).Debug("match.finished event received", "consumer", "analytics", "body", string(msg.Body))
 			msg.Ack(false)
 		}
 	}
@@ -1409,7 +1433,7 @@ func (s *scoringServer) consumePaymentCaptured(ctx context.Context) {
 				PlanDuration string `json:"planDuration"`
 			}
 			if err := json.Unmarshal(msg.Body, &event); err != nil {
-				log.FromContext(ctx).Warn("bad payload", "consumer", "payment", "err", err)
+				log.FromContext(ctx).Warn("bad payload", "consumer", "payment", "body", string(msg.Body), "err", err)
 				msg.Nack(false, false)
 				continue
 			}
