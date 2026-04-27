@@ -44,12 +44,22 @@ class _CoinLedgerScreenState extends ConsumerState<CoinLedgerScreen> {
   }
 
   void _onScroll() {
-    if (!_scroll.hasClients || _loading || _exhausted) return;
+    // Gate on _error too: after a mid-list pagination failure the footer
+    // shows a Retry button, and recovery should be user-initiated.
+    // Without this, every scroll within 200 px of the bottom would
+    // silently retry the failed RPC in a tight loop.
+    if (!_scroll.hasClients || _loading || _exhausted || _error != null) {
+      return;
+    }
     final remaining = _scroll.position.maxScrollExtent - _scroll.position.pixels;
     if (remaining < 200) _loadMore();
   }
 
   Future<void> _loadMore() async {
+    // _error is intentionally NOT in this entry guard — the footer
+    // Retry button calls _loadMore directly and must be able to clear
+    // the error and try again. The scroll listener above is what
+    // enforces "no auto-retry on error."
     if (_loading || _exhausted) return;
     setState(() {
       _loading = true;
