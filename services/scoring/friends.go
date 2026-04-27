@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,6 +15,7 @@ import (
 
 	"quiz-battle/pkg/auth"
 	"quiz-battle/pkg/keys"
+	"quiz-battle/pkg/log"
 	"quiz-battle/pkg/models"
 	pb "quiz-battle/proto"
 )
@@ -49,8 +49,8 @@ func (s *scoringServer) publishFriendRequestAccepted(ctx context.Context, ev fri
 		"requestId":        ev.RequestID,
 	})
 	if err := s.publish(ctx, "notif.friend.request_accepted", body); err != nil {
-		log.Printf("[friends] publish notif.friend.request_accepted failed (recipient=%s): %v",
-			ev.RecipientUserID, err)
+		log.FromContext(ctx).Warn("publish notif.friend.request_accepted failed",
+			"component", "friends", "recipient_id", ev.RecipientUserID, "err", err)
 	}
 }
 
@@ -191,7 +191,8 @@ func (s *scoringServer) SendFriendRequest(ctx context.Context, req *pb.SendFrien
 		"requestId":    doc.ID,
 	})
 	if err := s.publish(ctx, "notif.friend.request_received", notifJSON); err != nil {
-		log.Printf("[friends] publish notif.friend.request_received failed: %v", err)
+		log.FromContext(ctx).Warn("publish notif.friend.request_received failed",
+			"component", "friends", "err", err)
 	}
 
 	return &pb.SendFriendRequestResponse{Success: true, RequestId: doc.ID}, nil
@@ -328,7 +329,8 @@ func (s *scoringServer) GetFriendsList(ctx context.Context, _ *pb.GetFriendsList
 		// Presence is best-effort — degrade to "everyone offline" rather
 		// than fail the list call. The accepted-friends list is still
 		// the authoritative answer.
-		log.Printf("[friends] AreOnline batch failed: %v — rendering all offline", err)
+		log.FromContext(ctx).Warn("AreOnline batch failed; rendering all offline",
+			"component", "friends", "err", err)
 		online = map[string]bool{}
 	}
 
@@ -463,8 +465,8 @@ func (s *scoringServer) ChallengeFriend(ctx context.Context, req *pb.ChallengeFr
 			// land or the caller stays locked out.
 			if delErr := s.rdb.Del(context.Background(),
 				keys.ChallengeThrottle(fromID, req.FriendUserId)).Err(); delErr != nil {
-				log.Printf("[friends] release throttle on error path failed (from=%s to=%s): %v",
-					fromID, req.FriendUserId, delErr)
+				log.FromContext(ctx).Warn("release throttle on error path failed",
+					"component", "friends", "from_id", fromID, "to_id", req.FriendUserId, "err", delErr)
 			}
 		}
 	}()
@@ -565,7 +567,8 @@ func (s *scoringServer) ChallengeFriend(ctx context.Context, req *pb.ChallengeFr
 		// Rare: Mongo write failed AFTER Redis room commit. Log loudly —
 		// the room exists but no push will fire. Don't fail the RPC: the
 		// challenger still has the roomId and can share it directly.
-		log.Printf("[friends] enqueue challenge notif outbox failed (room=%s): %v", roomID, err)
+		log.FromContext(ctx).Error("enqueue challenge notif outbox failed",
+			"component", "friends", "room_id", roomID, "err", err)
 	}
 
 	// match.created is what the quiz service consumes to start the
@@ -589,7 +592,8 @@ func (s *scoringServer) ChallengeFriend(ctx context.Context, req *pb.ChallengeFr
 		// roomId regardless. The quiz service will pick up the room
 		// when the event eventually flows OR when matchmaking republishes.
 		// (Worst case: client polls room state directly.)
-		log.Printf("[friends] publish match.created for challenge room %s failed: %v", roomID, err)
+		log.FromContext(ctx).Warn("publish match.created for challenge room failed",
+			"component", "friends", "room_id", roomID, "err", err)
 	}
 
 	// Notification: separate publish from match.created so the topic-
@@ -609,16 +613,16 @@ func (s *scoringServer) ChallengeFriend(ctx context.Context, req *pb.ChallengeFr
 	if err := s.publish(ctx, "notif.friend.challenge", notifJSON); err != nil {
 		// Don't mark the outbox row processed — the drain worker will
 		// retry on its next tick.
-		log.Printf("[friends] publish notif.friend.challenge failed (outbox=%s, will retry): %v",
-			outboxRow.ID, err)
+		log.FromContext(ctx).Warn("publish notif.friend.challenge failed; will retry",
+			"component", "friends", "outbox_id", outboxRow.ID, "err", err)
 	} else {
 		// Inline success path: mark processed so the drain worker doesn't
 		// re-fire the same notif. Failure to mark is acceptable — the
 		// drainer will publish again, and the consumer is idempotent on
 		// (recipient, roomId).
 		if err := s.markChallengeNotifProcessed(ctx, outboxRow.ID); err != nil {
-			log.Printf("[friends] mark challenge notif processed failed (outbox=%s): %v",
-				outboxRow.ID, err)
+			log.FromContext(ctx).Warn("mark challenge notif processed failed",
+				"component", "friends", "outbox_id", outboxRow.ID, "err", err)
 		}
 	}
 

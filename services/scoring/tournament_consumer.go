@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"quiz-battle/pkg/coins"
+	"quiz-battle/pkg/log"
 )
 
 // errBadTournamentPayload marks unrecoverable parse / shape errors on a
@@ -75,8 +75,10 @@ func (s *scoringServer) handleTournamentFinished(ctx context.Context, body []byt
 	}).Decode(&payout)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			log.Printf("[tournament-finished] no payout row for user=%s tournament=%s — discarding event",
-				event.UserID, event.TournamentID)
+			log.FromContext(ctx).Info("no payout row; discarding event",
+				"consumer", "tournament_finished",
+				"user_id", event.UserID,
+				"tournament_id", event.TournamentID)
 			return nil
 		}
 		return fmt.Errorf("load payout: %w", err)
@@ -144,10 +146,17 @@ func (s *scoringServer) handleTournamentFinished(ctx context.Context, body []byt
 		// publish. A true outbox (durable notif row + drain worker)
 		// would close this gap; out of scope for this PR. Operator
 		// floor: alert on tournament-finished log volume.
-		log.Printf("[tournament-finished] notif publish failed for user=%s tournament=%s: %v",
-			event.UserID, event.TournamentID, err)
+		log.FromContext(ctx).Warn("notif publish failed",
+			"consumer", "tournament_finished",
+			"user_id", event.UserID,
+			"tournament_id", event.TournamentID,
+			"err", err)
 	}
-	log.Printf("[tournament-finished] user=%s tournament=%s rank=%d coins=%d granted via ledger",
-		event.UserID, event.TournamentID, event.Rank, event.CoinsAwarded)
+	log.FromContext(ctx).Info("prize granted via ledger",
+		"consumer", "tournament_finished",
+		"user_id", event.UserID,
+		"tournament_id", event.TournamentID,
+		"rank", event.Rank,
+		"coins", event.CoinsAwarded)
 	return nil
 }

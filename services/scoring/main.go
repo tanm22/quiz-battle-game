@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"math"
 	"net"
 	"os"
@@ -27,6 +27,7 @@ import (
 	"quiz-battle/pkg/coins"
 	"quiz-battle/pkg/coins/shop"
 	"quiz-battle/pkg/keys"
+	"quiz-battle/pkg/log"
 	"quiz-battle/pkg/models"
 	pb "quiz-battle/proto"
 )
@@ -685,13 +686,13 @@ type answerMessage struct {
 func (s *scoringServer) consumeAnswers(ctx context.Context) {
 	ch, err := s.newChannel()
 	if err != nil {
-		log.Fatalf("[scoring] failed to open channel: %v", err)
+		log.Fatal(ctx, "open channel failed", "consumer", "scoring", "err", err)
 	}
 	defer ch.Close()
 
 	msgs, err := ch.Consume("answer-processing-queue", "", false, false, false, false, nil)
 	if err != nil {
-		log.Fatalf("[scoring] failed to consume answer-processing-queue: %v", err)
+		log.Fatal(ctx, "consume failed", "consumer", "scoring", "queue", "answer-processing-queue", "err", err)
 	}
 
 	for {
@@ -710,7 +711,7 @@ func (s *scoringServer) consumeAnswers(ctx context.Context) {
 func (s *scoringServer) processAnswer(ctx context.Context, msg amqp.Delivery) {
 	var answer answerMessage
 	if err := json.Unmarshal(msg.Body, &answer); err != nil {
-		log.Printf("[scoring] bad answer payload: %v", err)
+		log.FromContext(ctx).Warn("bad answer payload", "consumer", "scoring", "err", err)
 		msg.Nack(false, false) // don't requeue malformed messages
 		return
 	}
@@ -730,7 +731,7 @@ func (s *scoringServer) processAnswer(ctx context.Context, msg amqp.Delivery) {
 		AnswerTimeMs: answerTimeMs,
 	})
 	if err != nil {
-		log.Printf("[scoring] CalculateScore gRPC error: %v", err)
+		log.FromContext(ctx).Error("CalculateScore gRPC failed", "consumer", "scoring", "err", err)
 		if getDeathCount(msg) >= 3 {
 			msg.Nack(false, false)
 		} else {
@@ -751,18 +752,18 @@ func (s *scoringServer) processAnswer(ctx context.Context, msg amqp.Delivery) {
 		"clientTimestamp": answer.ClientTimestamp,
 	})
 	if err != nil {
-		log.Printf("[scoring] failed to marshal answer record: %v", err)
+		log.FromContext(ctx).Error("marshal answer record failed", "consumer", "scoring", "err", err)
 		msg.Nack(false, true)
 		return
 	}
 	wasSet, err := keys.TrySetAnswer(ctx, s.rdb, answer.RoomID, answer.Round, answer.UserID, string(answerJSON))
 	if err != nil {
-		log.Printf("[scoring] TrySetAnswer error: %v", err)
+		log.FromContext(ctx).Error("TrySetAnswer failed", "consumer", "scoring", "err", err)
 		msg.Nack(false, true)
 		return
 	}
 	if !wasSet {
-		log.Printf("[scoring] duplicate answer from %s for room %s round %d — skipping", answer.UserID, answer.RoomID, answer.Round)
+		log.FromContext(ctx).Info("duplicate answer skipped", "consumer", "scoring", "user_id", answer.UserID, "room_id", answer.RoomID, "round", answer.Round)
 		msg.Ack(false)
 		return
 	}
@@ -770,13 +771,19 @@ func (s *scoringServer) processAnswer(ctx context.Context, msg amqp.Delivery) {
 	// Step 49: Update leaderboard via Lua script (atomic read-modify-write)
 	entries, err := keys.UpdateLeaderboard(ctx, s.rdb, answer.RoomID, answer.UserID, score)
 	if err != nil {
-		log.Printf("[scoring] leaderboard update error: %v", err)
+		log.FromContext(ctx).Error("leaderboard update failed", "consumer", "scoring", "err", err)
 		msg.Nack(false, true)
 		return
 	}
 
-	log.Printf("[scoring] %s scored %.0f in room %s round %d (correct=%v, speed=%.1fx)",
-		answer.UserID, score, answer.RoomID, answer.Round, correct, calcResp.SpeedMultiplier)
+	log.FromContext(ctx).Info("answer scored",
+		"consumer", "scoring",
+		"user_id", answer.UserID,
+		"score", score,
+		"room_id", answer.RoomID,
+		"round", answer.Round,
+		"correct", correct,
+		"speed_multiplier", calcResp.SpeedMultiplier)
 
 	// Publish leaderboard.updated to RabbitMQ for real-time broadcast
 	leaderboardEvent, _ := json.Marshal(map[string]interface{}{
@@ -833,13 +840,13 @@ type matchFinishedEvent struct {
 func (s *scoringServer) consumeMatchFinished(ctx context.Context) {
 	ch, err := s.newChannel()
 	if err != nil {
-		log.Fatalf("[persistence] failed to open channel: %v", err)
+		log.Fatal(ctx, "open channel failed", "consumer", "persistence", "err", err)
 	}
 	defer ch.Close()
 
 	msgs, err := ch.Consume("match-finished-queue", "", false, false, false, false, nil)
 	if err != nil {
-		log.Fatalf("[persistence] failed to consume match-finished-queue: %v", err)
+		log.Fatal(ctx, "consume failed", "consumer", "persistence", "queue", "match-finished-queue", "err", err)
 	}
 
 	for {
@@ -872,12 +879,12 @@ func resolveRoundsForHistory(eventRounds, roundsPlayed int) int {
 func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 	var event matchFinishedEvent
 	if err := json.Unmarshal(msg.Body, &event); err != nil {
-		log.Printf("[persistence] bad match.finished payload: %v", err)
+		log.FromContext(ctx).Warn("bad payload", "consumer", "persistence", "event", "match.finished", "err", err)
 		msg.Nack(false, false)
 		return
 	}
 
-	log.Printf("[persistence] persisting match %s", event.RoomID)
+	log.FromContext(ctx).Info("persisting match", "consumer", "persistence", "room_id", event.RoomID)
 
 	// Build match_history document from room:{id}:leaderboard and room metadata
 	entries, _ := keys.GetLeaderboardEntries(ctx, s.rdb, event.RoomID)
@@ -1079,7 +1086,7 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 		options.UpdateOne().SetUpsert(true),
 	)
 	if err != nil {
-		log.Printf("[persistence] match_history upsert failed: %v", err)
+		log.FromContext(ctx).Error("match_history upsert failed", "consumer", "persistence", "err", err)
 		msg.Nack(false, true)
 		return
 	}
@@ -1188,7 +1195,7 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 				SetProjection(bson.M{"rating": 1}),
 		).Decode(&post)
 		if err != nil {
-			log.Printf("[persistence] user update failed for %s: %v", userID, err)
+			log.FromContext(ctx).Error("user update failed", "consumer", "persistence", "user_id", userID, "err", err)
 			continue
 		}
 
@@ -1207,7 +1214,7 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 				"ratingDelta": delta,
 				"createdAt":   now,
 			}); err != nil {
-				log.Printf("[persistence] rating_history insert failed for %s: %v", userID, err)
+				log.FromContext(ctx).Error("rating_history insert failed", "consumer", "persistence", "user_id", userID, "err", err)
 			}
 		}
 	}
@@ -1222,11 +1229,11 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 	// further below.
 	if firstInsert && len(answerLogDocs) > 0 {
 		if _, err := s.mongoDB.Collection("answer_log").InsertMany(ctx, answerLogDocs); err != nil {
-			log.Printf("[persistence] answer_log insert failed for match %s: %v", event.RoomID, err)
+			log.FromContext(ctx).Error("answer_log insert failed", "consumer", "persistence", "room_id", event.RoomID, "err", err)
 		}
 	}
 
-	log.Printf("[persistence] match %s persisted — winner: %s, %d players", event.RoomID, winner, len(entries))
+	log.FromContext(ctx).Info("match persisted", "consumer", "persistence", "room_id", event.RoomID, "winner", winner, "players", len(entries))
 
 	// Phase 3 (4.2): roll the match score into any active tournaments the
 	// participants are currently entered in. Points-based ranking — every
@@ -1243,7 +1250,7 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 	if firstInsert {
 		s.updateTournamentStandings(ctx, entries, resolveUsername)
 	} else {
-		log.Printf("[persistence] match %s redelivery — skipping tournament standings update", event.RoomID)
+		log.FromContext(ctx).Info("match redelivery skipped tournament update", "consumer", "persistence", "room_id", event.RoomID)
 	}
 
 	// Phase 2: Detect first quiz completion for referred users → trigger referral reward
@@ -1265,7 +1272,7 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 				"refereeName": user.Username,
 			})
 			s.publish(ctx, "referral.first_quiz_completed", refEvent)
-			log.Printf("[persistence] published referral.first_quiz_completed for user %s", userID)
+			log.FromContext(ctx).Info("published referral.first_quiz_completed", "consumer", "persistence", "user_id", userID)
 		}
 	}
 
@@ -1349,13 +1356,13 @@ func (s *scoringServer) loadTopicsForMatch(ctx context.Context, roomID string, r
 func (s *scoringServer) consumeAnalytics(ctx context.Context) {
 	ch, err := s.newChannel()
 	if err != nil {
-		log.Fatalf("[analytics] failed to open channel: %v", err)
+		log.Fatal(ctx, "open channel failed", "consumer", "analytics", "err", err)
 	}
 	defer ch.Close()
 
 	msgs, err := ch.Consume("match-analytics-queue", "", false, false, false, false, nil)
 	if err != nil {
-		log.Fatalf("[analytics] failed to consume match-analytics-queue: %v", err)
+		log.Fatal(ctx, "consume failed", "consumer", "analytics", "queue", "match-analytics-queue", "err", err)
 	}
 
 	for {
@@ -1366,7 +1373,7 @@ func (s *scoringServer) consumeAnalytics(ctx context.Context) {
 			if !ok {
 				return
 			}
-			log.Printf("[analytics] match.finished event: %s", string(msg.Body))
+			log.FromContext(ctx).Info("match.finished event received", "consumer", "analytics", "body", string(msg.Body))
 			msg.Ack(false)
 		}
 	}
@@ -1379,13 +1386,13 @@ func (s *scoringServer) consumeAnalytics(ctx context.Context) {
 func (s *scoringServer) consumePaymentCaptured(ctx context.Context) {
 	ch, err := s.newChannel()
 	if err != nil {
-		log.Fatalf("[payment-consumer] failed to open channel: %v", err)
+		log.Fatal(ctx, "open channel failed", "consumer", "payment", "err", err)
 	}
 	defer ch.Close()
 
 	msgs, err := ch.Consume("payment-success-queue", "", false, false, false, false, nil)
 	if err != nil {
-		log.Fatalf("[payment-consumer] failed to consume payment-success-queue: %v", err)
+		log.Fatal(ctx, "consume failed", "consumer", "payment", "queue", "payment-success-queue", "err", err)
 	}
 
 	for {
@@ -1402,7 +1409,7 @@ func (s *scoringServer) consumePaymentCaptured(ctx context.Context) {
 				PlanDuration string `json:"planDuration"`
 			}
 			if err := json.Unmarshal(msg.Body, &event); err != nil {
-				log.Printf("[payment-consumer] bad payload: %v", err)
+				log.FromContext(ctx).Warn("bad payload", "consumer", "payment", "err", err)
 				msg.Nack(false, false)
 				continue
 			}
@@ -1435,7 +1442,7 @@ func (s *scoringServer) consumePaymentCaptured(ctx context.Context) {
 				},
 			)
 			if err != nil {
-				log.Printf("[payment-consumer] plan upgrade failed for %s: %v", event.UserID, err)
+				log.FromContext(ctx).Error("plan upgrade failed", "consumer", "payment", "user_id", event.UserID, "err", err)
 				msg.Nack(false, true)
 				continue
 			}
@@ -1450,7 +1457,7 @@ func (s *scoringServer) consumePaymentCaptured(ctx context.Context) {
 			})
 			s.publish(ctx, "notif.premium.activated", notifJSON)
 
-			log.Printf("[payment-consumer] upgraded user %s to premium (expires %s)", event.UserID, expiresAt.Format("2006-01-02"))
+			log.FromContext(ctx).Info("user upgraded to premium", "consumer", "payment", "user_id", event.UserID, "expires_at", expiresAt.Format("2006-01-02"))
 			msg.Ack(false)
 		}
 	}
@@ -1463,13 +1470,13 @@ func (s *scoringServer) consumePaymentCaptured(ctx context.Context) {
 func (s *scoringServer) consumeReferralEvents(ctx context.Context) {
 	ch, err := s.newChannel()
 	if err != nil {
-		log.Fatalf("[referral-consumer] failed to open channel: %v", err)
+		log.Fatal(ctx, "open channel failed", "consumer", "referral", "err", err)
 	}
 	defer ch.Close()
 
 	msgs, err := ch.Consume("referral-event-queue", "", false, false, false, false, nil)
 	if err != nil {
-		log.Fatalf("[referral-consumer] failed to consume referral-event-queue: %v", err)
+		log.Fatal(ctx, "consume failed", "consumer", "referral", "queue", "referral-event-queue", "err", err)
 	}
 
 	for {
@@ -1482,11 +1489,11 @@ func (s *scoringServer) consumeReferralEvents(ctx context.Context) {
 			}
 			if err := s.handleReferralEvent(ctx, msg.Body); err != nil {
 				if errors.Is(err, errBadReferralPayload) {
-					log.Printf("[referral-consumer] bad payload, dropping: %v body=%s", err, string(msg.Body))
+					log.FromContext(ctx).Warn("bad payload dropping", "consumer", "referral", "body", string(msg.Body), "err", err)
 					msg.Nack(false, false)
 					continue
 				}
-				log.Printf("[referral-consumer] error: %v body=%s", err, string(msg.Body))
+				log.FromContext(ctx).Error("referral event processing failed", "consumer", "referral", "body", string(msg.Body), "err", err)
 				// Transient error — requeue. With classic queues there is no
 				// auto-DLQ on a delivery-count threshold, so a persistent
 				// failure (Mongo unreachable, etc.) loops until the
@@ -1552,7 +1559,7 @@ func (s *scoringServer) updateTournamentStandings(
 		"participants": bson.M{"$in": userIDs},
 	})
 	if err != nil {
-		log.Printf("[tournament-standings] tournament lookup failed: %v", err)
+		log.FromContext(ctx).Error("tournament lookup failed", "component", "tournament_standings", "err", err)
 		return
 	}
 	defer cursor.Close(ctx)
@@ -1561,7 +1568,7 @@ func (s *scoringServer) updateTournamentStandings(
 	for cursor.Next(ctx) {
 		var t models.Tournament
 		if err := cursor.Decode(&t); err != nil {
-			log.Printf("[tournament-standings] decode failed: %v", err)
+			log.FromContext(ctx).Error("tournament decode failed", "component", "tournament_standings", "err", err)
 			continue
 		}
 
@@ -1598,7 +1605,7 @@ func (s *scoringServer) updateTournamentStandings(
 				options.UpdateOne().SetUpsert(true),
 			)
 			if err != nil {
-				log.Printf("[tournament-standings] upsert failed for tournament=%s user=%s: %v", t.ID, uid, err)
+				log.FromContext(ctx).Error("standings upsert failed", "component", "tournament_standings", "tournament_id", t.ID, "user_id", uid, "err", err)
 			}
 		}
 	}
@@ -1615,13 +1622,13 @@ func (s *scoringServer) updateTournamentStandings(
 func (s *scoringServer) consumeTournamentFinished(ctx context.Context) {
 	ch, err := s.newChannel()
 	if err != nil {
-		log.Fatalf("[tournament-finished] failed to open channel: %v", err)
+		log.Fatal(ctx, "open channel failed", "consumer", "tournament_finished", "err", err)
 	}
 	defer ch.Close()
 
 	msgs, err := ch.Consume("tournament-finished-queue", "", false, false, false, false, nil)
 	if err != nil {
-		log.Fatalf("[tournament-finished] failed to consume: %v", err)
+		log.Fatal(ctx, "consume failed", "consumer", "tournament_finished", "queue", "tournament-finished-queue", "err", err)
 	}
 
 	for {
@@ -1634,11 +1641,11 @@ func (s *scoringServer) consumeTournamentFinished(ctx context.Context) {
 			}
 			if err := s.handleTournamentFinished(ctx, msg.Body); err != nil {
 				if errors.Is(err, errBadTournamentPayload) {
-					log.Printf("[tournament-finished] bad payload, dropping: %v body=%s", err, string(msg.Body))
+					log.FromContext(ctx).Warn("bad payload dropping", "consumer", "tournament_finished", "body", string(msg.Body), "err", err)
 					msg.Nack(false, false)
 					continue
 				}
-				log.Printf("[tournament-finished] error: %v body=%s", err, string(msg.Body))
+				log.FromContext(ctx).Error("tournament event processing failed", "consumer", "tournament_finished", "body", string(msg.Body), "err", err)
 				// Transient — requeue. With classic queues there is no
 				// auto-DLQ on a delivery-count threshold, so a persistent
 				// failure (Mongo unreachable, etc.) loops until the
@@ -1762,6 +1769,7 @@ func setupRabbitMQ(ch *amqp.Channel) error {
 // ---------------------------------------------------------------------------
 
 func main() {
+	slog.SetDefault(log.Init("scoring"))
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -1772,9 +1780,9 @@ func main() {
 	}
 	rdb := redis.NewClient(&redis.Options{Addr: redisAddr})
 	if err := rdb.Ping(ctx).Err(); err != nil {
-		log.Fatalf("redis connect failed: %v", err)
+		log.Fatal(ctx, "redis connect failed", "err", err)
 	}
-	log.Println("[scoring] connected to Redis")
+	log.FromContext(ctx).Info("connected to Redis")
 
 	// RabbitMQ
 	rabbitURL := os.Getenv("RABBITMQ_URL")
@@ -1783,20 +1791,20 @@ func main() {
 	}
 	conn, err := amqp.Dial(rabbitURL)
 	if err != nil {
-		log.Fatalf("rabbitmq connect failed: %v", err)
+		log.Fatal(ctx, "rabbitmq connect failed", "err", err)
 	}
 	defer conn.Close()
 
 	amqpCh, err := conn.Channel()
 	if err != nil {
-		log.Fatalf("rabbitmq channel failed: %v", err)
+		log.Fatal(ctx, "rabbitmq channel failed", "err", err)
 	}
 	defer amqpCh.Close()
 
 	if err := setupRabbitMQ(amqpCh); err != nil {
-		log.Fatalf("rabbitmq setup failed: %v", err)
+		log.Fatal(ctx, "rabbitmq setup failed", "err", err)
 	}
-	log.Println("[scoring] connected to RabbitMQ")
+	log.FromContext(ctx).Info("connected to RabbitMQ")
 
 	// MongoDB
 	mongoURI := os.Getenv("MONGO_URI")
@@ -1807,10 +1815,10 @@ func main() {
 		ObjectIDAsHexString: true,
 	}))
 	if err != nil {
-		log.Fatalf("mongodb connect failed: %v", err)
+		log.Fatal(ctx, "mongodb connect failed", "err", err)
 	}
 	defer mongoClient.Disconnect(ctx)
-	log.Println("[scoring] connected to MongoDB")
+	log.FromContext(ctx).Info("connected to MongoDB")
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
@@ -1843,14 +1851,14 @@ func main() {
 
 	lis, err := net.Listen("tcp", ":50053")
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		log.Fatal(ctx, "listen failed", "addr", ":50053", "err", err)
 	}
 
 	// Start gRPC server in background, then set up self-client for CalculateScore
 	go func() {
-		log.Println("[scoring] serving on :50053")
+		log.FromContext(ctx).Info("gRPC serving", "addr", ":50053")
 		if err := grpcServer.Serve(lis); err != nil {
-			log.Fatalf("failed to serve: %v", err)
+			log.Fatal(ctx, "grpc serve failed", "err", err)
 		}
 	}()
 
@@ -1859,7 +1867,7 @@ func main() {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
-		log.Fatalf("failed to create self-client: %v", err)
+		log.Fatal(ctx, "self-client create failed", "err", err)
 	}
 	defer selfConn.Close()
 	srv.selfClient = pb.NewScoringServiceClient(selfConn)

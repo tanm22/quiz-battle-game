@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"quiz-battle/pkg/coins"
+	"quiz-battle/pkg/log"
 )
 
 // errBadEarnPayload marks unrecoverable parse / shape errors on a
@@ -41,8 +41,13 @@ func (s *scoringServer) handleEarnEvent(ctx context.Context, body []byte) error 
 	if err != nil {
 		return fmt.Errorf("grant: %w", err)
 	}
-	log.Printf("[earn-consumer] user=%s reason=%s delta=%d balance=%d ref=%s",
-		ev.UserID, ev.Reason, entry.Delta, entry.BalanceAfter, ev.RefID)
+	log.FromContext(ctx).Info("earn granted",
+		"consumer", "earn",
+		"user_id", ev.UserID,
+		"reason", ev.Reason,
+		"delta", entry.Delta,
+		"balance", entry.BalanceAfter,
+		"ref_id", ev.RefID)
 	return nil
 }
 
@@ -55,19 +60,19 @@ func (s *scoringServer) handleEarnEvent(ctx context.Context, body []byte) error 
 func (s *scoringServer) consumeCoinEarn(ctx context.Context) {
 	ch, err := s.newChannel()
 	if err != nil {
-		log.Fatalf("[earn-consumer] open channel: %v", err)
+		log.Fatal(ctx, "open channel failed", "consumer", "earn", "err", err)
 	}
 	defer ch.Close()
 
 	// prefetch=16 gives backpressure when Mongo is slow without choking
 	// throughput on the happy path. Tune later via metrics if needed.
 	if err := ch.Qos(16, 0, false); err != nil {
-		log.Fatalf("[earn-consumer] qos: %v", err)
+		log.Fatal(ctx, "qos failed", "consumer", "earn", "err", err)
 	}
 
 	msgs, err := ch.Consume(coins.EarnQueueName, "", false, false, false, false, nil)
 	if err != nil {
-		log.Fatalf("[earn-consumer] consume %s: %v", coins.EarnQueueName, err)
+		log.Fatal(ctx, "consume failed", "consumer", "earn", "queue", coins.EarnQueueName, "err", err)
 	}
 
 	for {
@@ -86,10 +91,12 @@ func (s *scoringServer) consumeCoinEarn(ctx context.Context) {
 			case err == nil:
 				_ = msg.Ack(false)
 			case errors.Is(err, errBadEarnPayload):
-				log.Printf("[earn-consumer] dead-letter: %v body=%s", err, string(msg.Body))
+				log.FromContext(ctx).Warn("dead-letter bad payload",
+					"consumer", "earn", "body", string(msg.Body), "err", err)
 				_ = msg.Nack(false, false) // → coin-earn-dlq
 			default:
-				log.Printf("[earn-consumer] transient (will requeue): %v", err)
+				log.FromContext(ctx).Error("transient error; will requeue",
+					"consumer", "earn", "err", err)
 				_ = msg.Nack(false, true)
 			}
 		}

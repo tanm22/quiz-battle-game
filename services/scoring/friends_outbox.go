@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
+
+	"quiz-battle/pkg/log"
 )
 
 // challengeNotifOutboxCollection is the durable queue for
@@ -101,7 +102,8 @@ func (s *scoringServer) drainChallengeNotifOnce(ctx context.Context) {
 	)
 	if err != nil {
 		if !errors.Is(err, context.Canceled) {
-			log.Printf("[friends-outbox] find pending failed: %v", err)
+			log.FromContext(ctx).Error("find pending failed",
+				"component", "friends_outbox", "err", err)
 		}
 		return
 	}
@@ -110,7 +112,8 @@ func (s *scoringServer) drainChallengeNotifOnce(ctx context.Context) {
 	for cur.Next(ctx) {
 		var row challengeNotifOutboxRow
 		if err := cur.Decode(&row); err != nil {
-			log.Printf("[friends-outbox] decode failed: %v", err)
+			log.FromContext(ctx).Error("decode failed",
+				"component", "friends_outbox", "err", err)
 			continue
 		}
 		s.republishChallengeNotif(ctx, row)
@@ -132,12 +135,12 @@ func (s *scoringServer) republishChallengeNotif(ctx context.Context, row challen
 		_, _ = s.mongoDB.Collection(challengeNotifOutboxCollection).UpdateOne(ctx,
 			bson.M{"_id": row.ID},
 			bson.M{"$inc": bson.M{"attempts": 1}})
-		log.Printf("[friends-outbox] republish failed (id=%s attempts=%d): %v",
-			row.ID, row.Attempts+1, err)
+		log.FromContext(ctx).Warn("republish failed",
+			"component", "friends_outbox", "outbox_id", row.ID, "attempts", row.Attempts+1, "err", err)
 		return
 	}
 	if err := s.markChallengeNotifProcessed(ctx, row.ID); err != nil {
-		log.Printf("[friends-outbox] mark processed after republish failed (id=%s): %v",
-			row.ID, err)
+		log.FromContext(ctx).Warn("mark processed after republish failed",
+			"component", "friends_outbox", "outbox_id", row.ID, "err", err)
 	}
 }

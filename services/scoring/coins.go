@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -15,6 +14,7 @@ import (
 
 	"quiz-battle/pkg/auth"
 	"quiz-battle/pkg/coins"
+	"quiz-battle/pkg/log"
 	pb "quiz-battle/proto"
 )
 
@@ -78,13 +78,15 @@ func (s *scoringServer) handleReferralEvent(ctx context.Context, body []byte) er
 	err := s.mongoDB.Collection("referrals").FindOne(ctx, bson.M{"refereeId": event.RefereeID}).Decode(&ref)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			log.Printf("[referral-consumer] skip — no referral row for refereeId=%s", event.RefereeID)
+			log.FromContext(ctx).Info("skip — no referral row",
+				"consumer", "referral", "referee_id", event.RefereeID)
 			return nil
 		}
 		return fmt.Errorf("load referral: %w", err)
 	}
 	if ref.RewardGranted {
-		log.Printf("[referral-consumer] skip — already granted: %s", ref.ID)
+		log.FromContext(ctx).Info("skip — already granted",
+			"consumer", "referral", "referral_id", ref.ID)
 		return nil
 	}
 
@@ -143,10 +145,11 @@ func (s *scoringServer) handleReferralEvent(ctx context.Context, body []byte) er
 		// Notification is best-effort — log and move on rather than redelivering
 		// the whole message (which would re-grant via Grant's idempotency but
 		// also potentially re-fire the notification twice on the next attempt).
-		log.Printf("[referral-consumer] publish notif failed: %v", err)
+		log.FromContext(ctx).Warn("publish notif failed",
+			"consumer", "referral", "err", err)
 	}
-	log.Printf("[referral-consumer] referral converted: %s referred %s, earn events published",
-		event.ReferrerID, event.RefereeID)
+	log.FromContext(ctx).Info("referral converted; earn events published",
+		"consumer", "referral", "referrer_id", event.ReferrerID, "referee_id", event.RefereeID)
 	return nil
 }
 
