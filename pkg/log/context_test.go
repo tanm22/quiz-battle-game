@@ -67,7 +67,7 @@ func TestContextWithAttrsAccumulates(t *testing.T) {
 
 func TestContextWithAttrsEmpty(t *testing.T) {
 	parent := context.Background()
-	ctx := ContextWithAttrs(parent, /* no args */ )
+	ctx := ContextWithAttrs(parent /* no args */)
 	if got := AttrsFromContext(ctx); got != nil {
 		t.Errorf("empty ContextWithAttrs should not store; got %v", got)
 	}
