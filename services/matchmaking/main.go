@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"os"
 	"sync"
@@ -23,6 +23,7 @@ import (
 
 	"quiz-battle/pkg/auth"
 	"quiz-battle/pkg/keys"
+	"quiz-battle/pkg/log"
 	"quiz-battle/pkg/models"
 	pb "quiz-battle/proto"
 )
@@ -114,7 +115,7 @@ func (s *matchmakingServer) JoinMatchmaking(ctx context.Context, req *pb.JoinMat
 		s.publishMatchInvite(inviteCtx, uid, uname, r)
 	}(userID, inviterName, int64(rating))
 
-	log.Printf("[matchmaking] player %s joined pool (rating=%.0f)", userID, rating)
+	log.FromContext(ctx).Info("player joined pool", "user_id", userID, "rating", rating)
 	return &pb.JoinMatchmakingResponse{Status: pb.MatchmakingStatus_QUEUED}, nil
 }
 
@@ -136,7 +137,7 @@ func (s *matchmakingServer) publishMatchInvite(ctx context.Context, fromUserID, 
 			SetProjection(bson.M{"players.userId": 1}),
 	)
 	if err != nil {
-		log.Printf("[matchmaking] match_history query failed for %s: %v", fromUserID, err)
+		log.FromContext(ctx).Error("match_history query failed", "user_id", fromUserID, "err", err)
 		return
 	}
 	defer cursor.Close(ctx)
@@ -159,7 +160,7 @@ func (s *matchmakingServer) publishMatchInvite(ctx context.Context, fromUserID, 
 		}
 	}
 	if err := cursor.Err(); err != nil {
-		log.Printf("[matchmaking] match_history cursor error for %s: %v", fromUserID, err)
+		log.FromContext(ctx).Error("match_history cursor failed", "user_id", fromUserID, "err", err)
 	}
 	if len(seen) == 0 {
 		return
@@ -168,7 +169,7 @@ func (s *matchmakingServer) publishMatchInvite(ctx context.Context, fromUserID, 
 	for opponentID := range seen {
 		ok, err := keys.TrySetMatchInviteThrottle(ctx, s.rdb, fromUserID, opponentID)
 		if err != nil {
-			log.Printf("[matchmaking] match invite throttle check failed (%s→%s): %v", fromUserID, opponentID, err)
+			log.FromContext(ctx).Error("match invite throttle check failed", "from_id", fromUserID, "to_id", opponentID, "err", err)
 			continue
 		}
 		if !ok {
@@ -185,7 +186,7 @@ func (s *matchmakingServer) publishMatchInvite(ctx context.Context, fromUserID, 
 			"inviterRating": fromRating,
 		})
 		if err != nil {
-			log.Printf("[matchmaking] match invite marshal failed: %v", err)
+			log.FromContext(ctx).Error("match invite marshal failed", "err", err)
 			continue
 		}
 
@@ -196,10 +197,10 @@ func (s *matchmakingServer) publishMatchInvite(ctx context.Context, fromUserID, 
 			false,
 			amqp.Publishing{ContentType: "application/json", Body: payload},
 		); err != nil {
-			log.Printf("[matchmaking] match invite publish failed (%s→%s): %v", fromUserID, opponentID, err)
+			log.FromContext(ctx).Error("match invite publish failed", "from_id", fromUserID, "to_id", opponentID, "err", err)
 			continue
 		}
-		log.Printf("[matchmaking] match invite queued %s→%s", fromUserID, opponentID)
+		log.FromContext(ctx).Info("match invite queued", "from_id", fromUserID, "to_id", opponentID)
 	}
 }
 
@@ -227,13 +228,13 @@ func (s *matchmakingServer) LeaveMatchmaking(ctx context.Context, req *pb.LeaveM
 	// counter was never incremented) and for stale-key edge cases.
 	if removed > 0 {
 		if refunded, rerr := keys.RefundQuota(ctx, s.rdb, userID); rerr != nil {
-			log.Printf("[matchmaking] quota refund failed for %s: %v", userID, rerr)
+			log.FromContext(ctx).Error("quota refund failed", "user_id", userID, "err", rerr)
 		} else if refunded {
-			log.Printf("[matchmaking] refunded daily quota for %s on cancel", userID)
+			log.FromContext(ctx).Info("refunded daily quota on cancel", "user_id", userID)
 		}
 	}
 
-	log.Printf("[matchmaking] player %s left pool (removed=%d)", userID, removed)
+	log.FromContext(ctx).Info("player left pool", "user_id", userID, "removed", removed)
 	return &pb.LeaveMatchmakingResponse{Removed: removed > 0}, nil
 }
 
@@ -255,7 +256,7 @@ func (s *matchmakingServer) SubscribeToMatch(req *pb.SubscribeToMatchRequest, st
 	s.subscribers.Store(userID, ch)
 	defer s.subscribers.Delete(userID)
 
-	log.Printf("[matchmaking] player %s subscribed to match events", userID)
+	log.FromContext(stream.Context()).Info("player subscribed to match events", "user_id", userID)
 
 	for {
 		select {
@@ -294,7 +295,7 @@ func (s *matchmakingServer) tryCreateRoom(ctx context.Context) {
 	// ZCARD check — need at least 2 players
 	poolSize, err := keys.PoolSize(ctx, s.rdb)
 	if err != nil {
-		log.Printf("[matchmaking] pool size error: %v", err)
+		log.FromContext(ctx).Error("pool size failed", "err", err)
 		return
 	}
 	if poolSize < 2 {
@@ -308,7 +309,7 @@ func (s *matchmakingServer) tryCreateRoom(ctx context.Context) {
 	}
 	players, err := keys.PopPoolPlayers(ctx, s.rdb, count)
 	if err != nil {
-		log.Printf("[matchmaking] pop players error: %v", err)
+		log.FromContext(ctx).Error("pop players failed", "err", err)
 		return
 	}
 	if len(players) < 2 {
@@ -368,7 +369,7 @@ func (s *matchmakingServer) createRoom(ctx context.Context, players []redis.Z) {
 		}
 		infoJSON, err := json.Marshal(info)
 		if err != nil {
-			log.Printf("[matchmaking] failed to marshal player info: %v", err)
+			log.FromContext(ctx).Error("marshal player info failed", "err", err)
 			continue
 		}
 		pipe.HSet(ctx, keys.Players(roomID), userID, string(infoJSON))
@@ -385,7 +386,7 @@ func (s *matchmakingServer) createRoom(ctx context.Context, players []redis.Z) {
 	}
 	stateJSON, err := json.Marshal(state)
 	if err != nil {
-		log.Printf("[matchmaking] failed to marshal room state: %v", err)
+		log.FromContext(ctx).Error("marshal room state failed", "err", err)
 		return
 	}
 	pipe.Set(ctx, keys.State(roomID), string(stateJSON), keys.RoomTTL)
@@ -394,7 +395,7 @@ func (s *matchmakingServer) createRoom(ctx context.Context, players []redis.Z) {
 	pipe.Set(ctx, keys.Round(roomID), 0, keys.RoomTTL)
 
 	if _, err := pipe.Exec(ctx); err != nil {
-		log.Printf("[matchmaking] failed to write room keys: %v", err)
+		log.FromContext(ctx).Error("write room keys failed", "err", err)
 		// Put players back in pool
 		for _, p := range players {
 			s.rdb.ZAdd(ctx, keys.MatchmakingPool, p)
@@ -410,7 +411,7 @@ func (s *matchmakingServer) createRoom(ctx context.Context, players []redis.Z) {
 	}
 	eventJSON, err := json.Marshal(event)
 	if err != nil {
-		log.Printf("[matchmaking] failed to marshal match.created event: %v", err)
+		log.FromContext(ctx).Error("marshal match.created event failed", "err", err)
 		return
 	}
 
@@ -425,10 +426,10 @@ func (s *matchmakingServer) createRoom(ctx context.Context, players []redis.Z) {
 		},
 	)
 	if err != nil {
-		log.Printf("[matchmaking] failed to publish match.created: %v", err)
+		log.FromContext(ctx).Error("publish match.created failed", "err", err)
 	}
 
-	log.Printf("[matchmaking] room %s created with players %v", roomID, playerIDs)
+	log.FromContext(ctx).Info("room created", "room_id", roomID, "player_ids", playerIDs)
 
 	// Notify waiting subscribers
 	seq := s.seqCounter.Add(1)
@@ -443,7 +444,7 @@ func (s *matchmakingServer) createRoom(ctx context.Context, players []redis.Z) {
 			select {
 			case ch.(chan *pb.MatchEvent) <- matchEvent:
 			default:
-				log.Printf("[matchmaking] channel full for player %s", userID)
+				log.FromContext(ctx).Warn("channel full for player", "user_id", userID)
 			}
 		}
 	}
@@ -481,6 +482,7 @@ func setupRabbitMQ(ch *amqp.Channel) error {
 // ---------------------------------------------------------------------------
 
 func main() {
+	slog.SetDefault(log.Init("matchmaking"))
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -491,9 +493,9 @@ func main() {
 	}
 	rdb := redis.NewClient(&redis.Options{Addr: redisAddr})
 	if err := rdb.Ping(ctx).Err(); err != nil {
-		log.Fatalf("redis connect failed: %v", err)
+		log.Fatal(ctx, "redis connect failed", "err", err)
 	}
-	log.Println("[matchmaking] connected to Redis")
+	log.FromContext(ctx).Info("connected to Redis")
 
 	// RabbitMQ
 	rabbitURL := os.Getenv("RABBITMQ_URL")
@@ -502,20 +504,20 @@ func main() {
 	}
 	conn, err := amqp.Dial(rabbitURL)
 	if err != nil {
-		log.Fatalf("rabbitmq connect failed: %v", err)
+		log.Fatal(ctx, "rabbitmq connect failed", "err", err)
 	}
 	defer conn.Close()
 
 	amqpCh, err := conn.Channel()
 	if err != nil {
-		log.Fatalf("rabbitmq channel failed: %v", err)
+		log.Fatal(ctx, "rabbitmq channel failed", "err", err)
 	}
 	defer amqpCh.Close()
 
 	if err := setupRabbitMQ(amqpCh); err != nil {
-		log.Fatalf("rabbitmq setup failed: %v", err)
+		log.Fatal(ctx, "rabbitmq setup failed", "err", err)
 	}
-	log.Println("[matchmaking] connected to RabbitMQ")
+	log.FromContext(ctx).Info("connected to RabbitMQ")
 
 	// MongoDB
 	mongoURI := os.Getenv("MONGO_URI")
@@ -526,10 +528,10 @@ func main() {
 		ObjectIDAsHexString: true,
 	}))
 	if err != nil {
-		log.Fatalf("mongo connect failed: %v", err)
+		log.Fatal(ctx, "mongodb connect failed", "err", err)
 	}
 	mongoDB := mongoClient.Database("quizbattle")
-	log.Println("[matchmaking] connected to MongoDB")
+	log.FromContext(ctx).Info("connected to MongoDB")
 
 	// JWT secret
 	jwtSecret := os.Getenv("JWT_SECRET")
@@ -556,11 +558,11 @@ func main() {
 
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		log.Fatal(ctx, "listen failed", "addr", ":50051", "err", err)
 	}
 
-	log.Println("[matchmaking] serving on :50051")
+	log.FromContext(ctx).Info("gRPC serving", "addr", ":50051")
 	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+		log.Fatal(ctx, "grpc serve failed", "err", err)
 	}
 }
