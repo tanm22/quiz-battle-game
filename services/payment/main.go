@@ -10,7 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -28,6 +28,7 @@ import (
 
 	"quiz-battle/pkg/auth"
 	"quiz-battle/pkg/keys"
+	"quiz-battle/pkg/log"
 	pb "quiz-battle/proto"
 )
 
@@ -109,7 +110,7 @@ func (s *paymentServer) CreateOrder(ctx context.Context, req *pb.CreateOrderRequ
 
 	respBody, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
-		log.Printf("[payment] razorpay order creation failed (%d): %s", resp.StatusCode, string(respBody))
+		log.FromContext(ctx).Error("razorpay order creation failed", "status_code", resp.StatusCode, "body", string(respBody))
 		return nil, status.Errorf(codes.Internal, "razorpay order creation failed (%d)", resp.StatusCode)
 	}
 
@@ -287,7 +288,7 @@ func (s *paymentServer) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	// capturePayment is idempotent on paymentID via the SETNX guard, so
 	// receiving the same webhook twice is a no-op.
 	if err := s.capturePayment(ctx, orderID, paymentID); err != nil {
-		log.Printf("[payment] webhook capture error: %v", err)
+		log.FromContext(ctx).Error("webhook capture failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
@@ -346,7 +347,7 @@ func (s *paymentServer) capturePayment(ctx context.Context, orderID, paymentID s
 			// outside this system. Treat as success so callers stop
 			// retrying; the Redis idem key stays set so we don't
 			// re-process a future identical paymentID.
-			log.Printf("[payment] capturePayment: no payment doc for order %s", orderID)
+			log.FromContext(ctx).Warn("capturePayment: no payment doc", "order_id", orderID)
 			return nil
 		}
 		// Transient Mongo error (network blip, replica step-down, etc).
@@ -379,8 +380,8 @@ func (s *paymentServer) capturePayment(ctx context.Context, orderID, paymentID s
 		return fmt.Errorf("publish event: %w", err)
 	}
 
-	log.Printf("[payment] captured: payment=%s order=%s user=%v",
-		paymentID, orderID, payDoc["userId"])
+	log.FromContext(ctx).Info("payment captured",
+		"payment_id", paymentID, "order_id", orderID, "user_id", payDoc["userId"])
 	return nil
 }
 
@@ -414,8 +415,8 @@ func (s *paymentServer) VerifyPayment(ctx context.Context, req *pb.VerifyPayment
 	mac.Write([]byte(req.RazorpayOrderId + "|" + req.RazorpayPaymentId))
 	expected := hex.EncodeToString(mac.Sum(nil))
 	if !hmac.Equal([]byte(expected), []byte(req.RazorpaySignature)) {
-		log.Printf("[payment] VerifyPayment: signature mismatch user=%s order=%s",
-			userID, req.RazorpayOrderId)
+		log.FromContext(ctx).Error("VerifyPayment signature mismatch",
+			"user_id", userID, "order_id", req.RazorpayOrderId)
 		return nil, status.Error(codes.PermissionDenied, "invalid payment signature")
 	}
 
@@ -431,8 +432,8 @@ func (s *paymentServer) VerifyPayment(ctx context.Context, req *pb.VerifyPayment
 		return nil, status.Error(codes.NotFound, "order not found")
 	}
 	if owner.UserID != userID {
-		log.Printf("[payment] VerifyPayment: order ownership mismatch user=%s order=%s actual_owner=%s",
-			userID, req.RazorpayOrderId, owner.UserID)
+		log.FromContext(ctx).Error("VerifyPayment order ownership mismatch",
+			"user_id", userID, "order_id", req.RazorpayOrderId, "actual_owner", owner.UserID)
 		return nil, status.Error(codes.PermissionDenied, "order does not belong to caller")
 	}
 
@@ -508,7 +509,7 @@ func (s *paymentServer) checkExpiredPlans(ctx context.Context) {
 		"planExpiresAt": bson.M{"$lt": time.Now()},
 	})
 	if err != nil {
-		log.Printf("[payment] expiry query error: %v", err)
+		log.FromContext(ctx).Error("expiry query failed", "worker", "plan_expiry", "err", err)
 		return
 	}
 	defer cursor.Close(ctx)
@@ -542,9 +543,9 @@ func (s *paymentServer) checkExpiredPlans(ctx context.Context) {
 			"timestamp": time.Now().Format(time.RFC3339),
 		})
 		if err := s.publish(ctx, "premium.expired", eventJSON); err != nil {
-			log.Printf("[payment] failed to publish expiry for user %s: %v", userID, err)
+			log.FromContext(ctx).Error("publish expiry failed", "worker", "plan_expiry", "user_id", userID, "err", err)
 		}
-		log.Printf("[payment] downgraded user %s from premium to free", userID)
+		log.FromContext(ctx).Info("user downgraded from premium to free", "worker", "plan_expiry", "user_id", userID)
 	}
 }
 
@@ -603,7 +604,7 @@ func (s *paymentServer) sendPremiumExpiryWarnings(ctx context.Context) {
 		"premiumExpiryWarned": bson.M{"$ne": true},
 	})
 	if err != nil {
-		log.Printf("[payment] expiry-warning query error: %v", err)
+		log.FromContext(ctx).Error("expiry-warning query failed", "worker", "expiry_warning", "err", err)
 		return
 	}
 	defer cursor.Close(ctx)
@@ -626,7 +627,7 @@ func (s *paymentServer) sendPremiumExpiryWarnings(ctx context.Context) {
 			bson.M{"_id": userID},
 			bson.M{"$set": bson.M{"premiumExpiryWarned": true}},
 		); err != nil {
-			log.Printf("[payment] failed to mark user %s as warned: %v", userID, err)
+			log.FromContext(ctx).Error("mark user as warned failed", "worker", "expiry_warning", "user_id", userID, "err", err)
 			continue
 		}
 
@@ -637,7 +638,7 @@ func (s *paymentServer) sendPremiumExpiryWarnings(ctx context.Context) {
 			"timestamp": now.Format(time.RFC3339),
 		})
 		if err := s.publish(ctx, "notif.premium.expiry", eventJSON); err != nil {
-			log.Printf("[payment] failed to publish expiry warning for user %s: %v", userID, err)
+			log.FromContext(ctx).Error("publish expiry warning failed", "worker", "expiry_warning", "user_id", userID, "err", err)
 			// Roll back the warned flag so the next tick retries this user.
 			s.mongoDB.Collection("users").UpdateOne(ctx,
 				bson.M{"_id": userID},
@@ -646,11 +647,11 @@ func (s *paymentServer) sendPremiumExpiryWarnings(ctx context.Context) {
 			continue
 		}
 		count++
-		log.Printf("[payment] queued premium expiry warning for user %s (expires %s)",
-			userID, expiresAt.Format(time.RFC3339))
+		log.FromContext(ctx).Info("queued premium expiry warning",
+			"worker", "expiry_warning", "user_id", userID, "expires_at", expiresAt.Format(time.RFC3339))
 	}
 	if count > 0 {
-		log.Printf("[payment] sent %d premium expiry warning(s)", count)
+		log.FromContext(ctx).Info("expiry warning batch sent", "worker", "expiry_warning", "count", count)
 	}
 }
 
@@ -687,6 +688,7 @@ func setupRabbitMQ(ch *amqp.Channel) error {
 // ---------------------------------------------------------------------------
 
 func main() {
+	slog.SetDefault(log.Init("payment"))
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -697,9 +699,9 @@ func main() {
 	}
 	rdb := redis.NewClient(&redis.Options{Addr: redisAddr})
 	if err := rdb.Ping(ctx).Err(); err != nil {
-		log.Fatalf("redis connect failed: %v", err)
+		log.Fatal(ctx, "redis connect failed", "err", err)
 	}
-	log.Println("[payment] connected to Redis")
+	log.FromContext(ctx).Info("connected to Redis")
 
 	// RabbitMQ
 	rabbitURL := os.Getenv("RABBITMQ_URL")
@@ -708,18 +710,18 @@ func main() {
 	}
 	conn, err := amqp.Dial(rabbitURL)
 	if err != nil {
-		log.Fatalf("rabbitmq connect failed: %v", err)
+		log.Fatal(ctx, "rabbitmq connect failed", "err", err)
 	}
 	defer conn.Close()
 	amqpCh, err := conn.Channel()
 	if err != nil {
-		log.Fatalf("rabbitmq channel failed: %v", err)
+		log.Fatal(ctx, "rabbitmq channel failed", "err", err)
 	}
 	defer amqpCh.Close()
 	if err := setupRabbitMQ(amqpCh); err != nil {
-		log.Fatalf("rabbitmq setup failed: %v", err)
+		log.Fatal(ctx, "rabbitmq setup failed", "err", err)
 	}
-	log.Println("[payment] connected to RabbitMQ")
+	log.FromContext(ctx).Info("connected to RabbitMQ")
 
 	// MongoDB
 	mongoURI := os.Getenv("MONGO_URI")
@@ -728,10 +730,10 @@ func main() {
 	}
 	mongoClient, err := mongo.Connect(options.Client().ApplyURI(mongoURI))
 	if err != nil {
-		log.Fatalf("mongo connect failed: %v", err)
+		log.Fatal(ctx, "mongodb connect failed", "err", err)
 	}
 	defer mongoClient.Disconnect(ctx)
-	log.Println("[payment] connected to MongoDB")
+	log.FromContext(ctx).Info("connected to MongoDB")
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
@@ -771,13 +773,13 @@ func main() {
 
 	grpcLis, err := net.Listen("tcp", ":50055")
 	if err != nil {
-		log.Fatalf("failed to listen on :50055: %v", err)
+		log.Fatal(ctx, "listen failed", "addr", ":50055", "err", err)
 	}
 
 	go func() {
-		log.Println("[payment] gRPC serving on :50055")
+		log.FromContext(ctx).Info("gRPC serving", "addr", ":50055")
 		if err := grpcServer.Serve(grpcLis); err != nil {
-			log.Fatalf("gRPC serve failed: %v", err)
+			log.Fatal(ctx, "grpc serve failed", "err", err)
 		}
 	}()
 
@@ -789,8 +791,8 @@ func main() {
 		w.Write([]byte("ok"))
 	})
 
-	log.Println("[payment] HTTP serving on :8080")
+	log.FromContext(ctx).Info("HTTP serving", "addr", ":8080")
 	if err := http.ListenAndServe(":8080", mux); err != nil {
-		log.Fatalf("HTTP serve failed: %v", err)
+		log.Fatal(ctx, "HTTP serve failed", "err", err)
 	}
 }
