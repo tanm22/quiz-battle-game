@@ -96,3 +96,32 @@ func TestInitUsesEnvLogLevel(t *testing.T) {
 		t.Errorf("info should be disabled when LOG_LEVEL=warn")
 	}
 }
+
+func TestInitWarnsOnUnknownLevel(t *testing.T) {
+	tests := []struct {
+		name       string
+		envVal     string
+		wantWarn   bool
+		wantValTag bool
+	}{
+		{"unknown_value_warns", "warining", true, true},
+		{"valid_value_silent", "warn", false, false},
+		{"empty_value_silent", "", false, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("LOG_LEVEL", tc.envVal)
+			var buf bytes.Buffer
+			initWith("init-test", &buf)
+
+			out := buf.String()
+			gotWarn := strings.Contains(out, "unrecognized LOG_LEVEL")
+			if gotWarn != tc.wantWarn {
+				t.Errorf("warn presence = %v, want %v\noutput: %s", gotWarn, tc.wantWarn, out)
+			}
+			if tc.wantValTag && !strings.Contains(out, tc.envVal) {
+				t.Errorf("expected bad value %q in warn output, got: %s", tc.envVal, out)
+			}
+		})
+	}
+}

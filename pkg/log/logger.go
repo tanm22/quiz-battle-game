@@ -16,9 +16,16 @@ import (
 // recording the bad value and falls back to INFO — so typos like
 // LOG_LEVEL=warining surface in logs instead of silently masking output.
 func Init(serviceName string) *slog.Logger {
+	return initWith(serviceName, os.Stdout)
+}
+
+// initWith is the writer-injecting variant of Init. Tests pass a bytes.Buffer
+// to assert on the unrecognized-LOG_LEVEL warn output without redirecting
+// os.Stdout.
+func initWith(serviceName string, w io.Writer) *slog.Logger {
 	raw := os.Getenv("LOG_LEVEL")
 	level, known := parseLevel(raw)
-	logger := newLogger(serviceName, level, os.Stdout)
+	logger := newLogger(serviceName, level, w)
 	if raw != "" && !known {
 		logger.Warn("unrecognized LOG_LEVEL; defaulting to INFO", "value", raw)
 	}
