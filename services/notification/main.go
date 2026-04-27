@@ -62,7 +62,7 @@ func (s *notificationService) consume(ctx context.Context, queue string) {
 			}
 			s.dispatchNotification(log.ContextFromDelivery(ctx, msg), msg)
 			if s.metrics != nil {
-				s.metrics.RecordConsume(queue, "dispatched")
+				s.metrics.RecordDispatched(queue)
 			}
 		}
 	}

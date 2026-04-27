@@ -10,16 +10,12 @@ import (
 	"quiz-battle/pkg/log"
 )
 
-// Serve starts an HTTP server on addr (typically ":2112") that exposes
-// /metrics for Prometheus scraping and /healthz as a liveness probe.
-// Returns the *http.Server so the caller can shut it down gracefully
-// during process shutdown (PR-C1).
-//
-// The /healthz endpoint deliberately returns 200 if the process is
-// running. It does NOT check Mongo/Redis/RabbitMQ liveness — that is
-// readiness, a separate concern, and overloading /healthz with
-// dependency checks creates restart storms when one dep blips.
-func (m *Metrics) Serve(ctx context.Context, addr string) *http.Server {
+// Handler returns an http.Handler that serves /metrics (Prometheus +
+// OpenMetrics text formats) and /healthz (liveness, always 200 if the
+// process is running). Exposed as a public method so tests can wire
+// the production handler directly into httptest.NewServer instead of
+// rebuilding a parallel mux.
+func (m *Metrics) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.HandlerFor(m.registry, promhttp.HandlerOpts{
 		// EnableOpenMetrics produces the OpenMetrics text format
@@ -31,10 +27,21 @@ func (m *Metrics) Serve(ctx context.Context, addr string) *http.Server {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
+	return mux
+}
 
+// Serve starts an HTTP server on addr (typically ":2112") that exposes
+// the same handler tree as Handler(). Returns the *http.Server so the
+// caller can shut it down gracefully during process shutdown (PR-C1).
+//
+// The /healthz endpoint deliberately returns 200 if the process is
+// running. It does NOT check Mongo/Redis/RabbitMQ liveness — that is
+// readiness, a separate concern, and overloading /healthz with
+// dependency checks creates restart storms when one dep blips.
+func (m *Metrics) Serve(ctx context.Context, addr string) *http.Server {
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           mux,
+		Handler:           m.Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

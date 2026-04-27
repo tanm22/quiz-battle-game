@@ -19,11 +19,12 @@ import (
 // single Prometheus scrape config can target every service and the
 // queries can filter by service= without per-service relabel rules.
 type Metrics struct {
-	RPCRequestsTotal   *prometheus.CounterVec
-	RPCDurationSeconds *prometheus.HistogramVec
-	AMQPPublishesTotal *prometheus.CounterVec
-	AMQPConsumesTotal  *prometheus.CounterVec
-	WebhookEventsTotal *prometheus.CounterVec
+	RPCRequestsTotal    *prometheus.CounterVec
+	RPCDurationSeconds  *prometheus.HistogramVec
+	AMQPPublishesTotal  *prometheus.CounterVec
+	AMQPConsumesTotal   *prometheus.CounterVec
+	AMQPDispatchedTotal *prometheus.CounterVec
+	WebhookEventsTotal  *prometheus.CounterVec
 
 	registry *prometheus.Registry
 	service  string
@@ -69,9 +70,16 @@ func New(serviceName string) *Metrics {
 		AMQPConsumesTotal: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Name: "amqp_consumes_total",
-				Help: "Total AMQP messages consumed and dispositioned, partitioned by queue and ack status.",
+				Help: "Total AMQP messages consumed and dispositioned, partitioned by queue and ack status. Status is one of: ack, nack_requeue, nack_drop.",
 			},
 			[]string{"queue", "status"},
+		),
+		AMQPDispatchedTotal: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "amqp_dispatched_total",
+				Help: "Total AMQP messages handed to a consumer for processing, partitioned by queue. Counts messages that were dispatched to the per-message handler regardless of whether the handler later acked or nacked. Operators can compute amqp_dispatched_total - amqp_consumes_total per queue to spot handlers that don't disposition properly.",
+			},
+			[]string{"queue"},
 		),
 		WebhookEventsTotal: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
@@ -87,6 +95,7 @@ func New(serviceName string) *Metrics {
 		m.RPCDurationSeconds,
 		m.AMQPPublishesTotal,
 		m.AMQPConsumesTotal,
+		m.AMQPDispatchedTotal,
 		m.WebhookEventsTotal,
 	)
 	return m

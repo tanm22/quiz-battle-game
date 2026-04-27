@@ -88,6 +88,15 @@ func (s *quizServer) newChannel() (*amqp.Channel, error) {
 	return s.amqpConn.Channel()
 }
 
+// recordConsume increments amqp_consumes_total{queue, status} when the
+// service has a non-nil metrics registry. Nil-safe so test instances
+// without metrics still call this without crashing.
+func (s *quizServer) recordConsume(queue, status string) {
+	if s.metrics != nil {
+		s.metrics.RecordConsume(queue, status)
+	}
+}
+
 func (s *quizServer) getSeqCounter(roomID string) *atomic.Int64 {
 	val, _ := s.seqCounters.LoadOrStore(roomID, &atomic.Int64{})
 	return val.(*atomic.Int64)
@@ -224,6 +233,7 @@ func (s *quizServer) consumeMatchCreated(ctx context.Context) {
 			if err := json.Unmarshal(msg.Body, &event); err != nil {
 				log.FromContext(msgCtx).Warn("bad payload", "err", err)
 				msg.Nack(false, false)
+				s.recordConsume("match-created-queue", metrics.StatusNackDrop)
 				continue
 			}
 
@@ -257,6 +267,7 @@ func (s *quizServer) consumeMatchCreated(ctx context.Context) {
 			if err != nil {
 				log.FromContext(msgCtx).Error("selectQuestions failed", "err", err)
 				msg.Nack(false, true) // requeue
+				s.recordConsume("match-created-queue", metrics.StatusNackRequeue)
 				continue
 			}
 
@@ -268,6 +279,7 @@ func (s *quizServer) consumeMatchCreated(ctx context.Context) {
 			if err := keys.SetQuestions(msgCtx, s.rdb, event.RoomID, questionIDs); err != nil {
 				log.FromContext(msgCtx).Error("store questions failed", "err", err)
 				msg.Nack(false, true)
+				s.recordConsume("match-created-queue", metrics.StatusNackRequeue)
 				continue
 			}
 
@@ -278,6 +290,7 @@ func (s *quizServer) consumeMatchCreated(ctx context.Context) {
 			keys.SetRoomRound(msgCtx, s.rdb, event.RoomID, 1)
 
 			msg.Ack(false)
+			s.recordConsume("match-created-queue", metrics.StatusAck)
 
 			// Start first round after a brief delay for clients to connect.
 			// Detach msgCtx so the goroutine carries the request_id but is
@@ -1602,6 +1615,7 @@ func (s *quizServer) consumeRoundCompleted(ctx context.Context) {
 			if err := json.Unmarshal(msg.Body, &event); err != nil {
 				log.FromContext(msgCtx).Warn("bad payload", "err", err)
 				msg.Nack(false, false)
+				s.recordConsume("round-complete-queue", metrics.StatusNackDrop)
 				continue
 			}
 
@@ -1609,10 +1623,12 @@ func (s *quizServer) consumeRoundCompleted(ctx context.Context) {
 			if !ok {
 				log.FromContext(msgCtx).Info("unknown room; skipping", "room_id", event.RoomID)
 				msg.Ack(false)
+				s.recordConsume("round-complete-queue", metrics.StatusAck)
 				continue
 			}
 
 			msg.Ack(false)
+			s.recordConsume("round-complete-queue", metrics.StatusAck)
 
 			if event.Round < len(questions) {
 				// Advance to next round after a 2s pause. Detach so the
@@ -1666,6 +1682,7 @@ func (s *quizServer) consumeLeaderboardUpdated(ctx context.Context) {
 			if err := json.Unmarshal(msg.Body, &event); err != nil {
 				log.FromContext(msgCtx).Warn("bad payload", "err", err)
 				msg.Nack(false, false)
+				s.recordConsume("leaderboard-broadcast-queue", metrics.StatusNackDrop)
 				continue
 			}
 
@@ -1711,6 +1728,7 @@ func (s *quizServer) consumeLeaderboardUpdated(ctx context.Context) {
 
 			log.FromContext(msgCtx).Info("LeaderboardUpdate broadcast", "room_id", event.RoomID, "entries", len(entries))
 			msg.Ack(false)
+			s.recordConsume("leaderboard-broadcast-queue", metrics.StatusAck)
 		}
 	}
 }

@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -29,6 +28,7 @@ func TestNewRegistersAllCollectors(t *testing.T) {
 	m.RPCDurationSeconds.WithLabelValues("/probe", "OK").Observe(0)
 	m.AMQPPublishesTotal.WithLabelValues("probe", OutcomeOK).Inc()
 	m.AMQPConsumesTotal.WithLabelValues("probe", StatusAck).Inc()
+	m.AMQPDispatchedTotal.WithLabelValues("probe").Inc()
 	m.WebhookEventsTotal.WithLabelValues("probe", OutcomeOK).Inc()
 
 	mfs, err := m.Registry().Gather()
@@ -37,11 +37,12 @@ func TestNewRegistersAllCollectors(t *testing.T) {
 	}
 
 	want := map[string]bool{
-		"rpc_requests_total":   false,
-		"rpc_duration_seconds": false,
-		"amqp_publishes_total": false,
-		"amqp_consumes_total":  false,
-		"webhook_events_total": false,
+		"rpc_requests_total":    false,
+		"rpc_duration_seconds":  false,
+		"amqp_publishes_total":  false,
+		"amqp_consumes_total":   false,
+		"amqp_dispatched_total": false,
+		"webhook_events_total":  false,
 	}
 	for _, mf := range mfs {
 		if _, ok := want[mf.GetName()]; ok {
@@ -190,21 +191,17 @@ func TestRecordWebhook(t *testing.T) {
 	}
 }
 
-func TestServeExposesEndpoints(t *testing.T) {
+func TestHandlerExposesEndpoints(t *testing.T) {
 	m := New("test")
 	// Touch one counter so /metrics has at least one observation of
 	// our custom families to assert on.
 	m.RPCRequestsTotal.WithLabelValues("/probe", "OK").Inc()
 
-	// Drive the registered handler via httptest rather than binding a
-	// real port — keeps the test hermetic.
-	mux := http.NewServeMux()
-	mux.Handle("/metrics", promhttp.HandlerFor(m.Registry(), promhttp.HandlerOpts{}))
-	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
-	})
-	srv := httptest.NewServer(mux)
+	// Drive the production handler directly. A future change to
+	// Handler() — different mux path, different promhttp options — is
+	// caught by this test because we exercise the real method, not a
+	// hand-rolled near-clone.
+	srv := httptest.NewServer(m.Handler())
 	defer srv.Close()
 
 	// /metrics must respond with the Prometheus text format and contain
@@ -230,6 +227,70 @@ func TestServeExposesEndpoints(t *testing.T) {
 	defer resp2.Body.Close()
 	if resp2.StatusCode != 200 {
 		t.Errorf("healthz status = %d", resp2.StatusCode)
+	}
+}
+
+func TestRecordDispatched(t *testing.T) {
+	m := New("test")
+	m.RecordDispatched("answer-processing-queue")
+	m.RecordDispatched("answer-processing-queue")
+	m.RecordDispatched("match-finished-queue")
+
+	if got := testutil.ToFloat64(m.AMQPDispatchedTotal.WithLabelValues("answer-processing-queue")); got != 2 {
+		t.Errorf("answer-processing-queue dispatched = %v, want 2", got)
+	}
+	if got := testutil.ToFloat64(m.AMQPDispatchedTotal.WithLabelValues("match-finished-queue")); got != 1 {
+		t.Errorf("match-finished-queue dispatched = %v, want 1", got)
+	}
+}
+
+func TestUnaryServerInterceptor_RecordsPanicAsInternal(t *testing.T) {
+	m := New("test")
+	interceptor := m.UnaryServerInterceptor()
+
+	handler := func(ctx context.Context, req any) (any, error) {
+		panic("boom")
+	}
+
+	// The interceptor re-panics so an outer recover (typically pkg/log)
+	// can convert to a status error. The test wraps the call in its own
+	// recover so the test process doesn't die.
+	func() {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Fatal("expected panic to be re-raised so outer interceptors can recover")
+			}
+		}()
+		_, _ = interceptor(context.Background(), nil, &grpc.UnaryServerInfo{FullMethod: "/svc/Method"}, handler)
+	}()
+
+	if got := testutil.ToFloat64(m.RPCRequestsTotal.WithLabelValues("/svc/Method", "Internal")); got != 1 {
+		t.Errorf("counter for panic = %v, want 1 with code=Internal", got)
+	}
+	if c := testutil.CollectAndCount(m.RPCDurationSeconds, "rpc_duration_seconds"); c == 0 {
+		t.Errorf("histogram should record panic duration, got 0 observations")
+	}
+}
+
+func TestStreamServerInterceptor_RecordsPanicAsInternal(t *testing.T) {
+	m := New("test")
+	interceptor := m.StreamServerInterceptor()
+
+	handler := func(srv any, ss grpc.ServerStream) error {
+		panic("stream boom")
+	}
+
+	func() {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Fatal("expected panic to be re-raised so outer interceptors can recover")
+			}
+		}()
+		_ = interceptor(nil, &fakeServerStream{ctx: context.Background()}, &grpc.StreamServerInfo{FullMethod: "/svc/Stream"}, handler)
+	}()
+
+	if got := testutil.ToFloat64(m.RPCRequestsTotal.WithLabelValues("/svc/Stream", "Internal")); got != 1 {
+		t.Errorf("stream panic counter = %v, want 1", got)
 	}
 }
 
