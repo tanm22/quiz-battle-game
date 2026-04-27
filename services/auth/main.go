@@ -278,7 +278,7 @@ func (s *authServer) SendEmailCode(ctx context.Context, req *pb.SendEmailCodeReq
 			log.FromContext(ctx).Debug("dev fallback code", "email", req.Email, "purpose", purpose, "code", code)
 		}
 	} else {
-		log.FromContext(ctx).Info("email code sent", "purpose", purpose, "email", req.Email)
+		log.FromContext(ctx).Info("email code sent", "purpose", purpose, "email", log.RedactEmail(req.Email))
 	}
 
 	return &pb.SendEmailCodeResponse{Sent: true}, nil
@@ -310,7 +310,7 @@ func (s *authServer) VerifyEmailCode(ctx context.Context, req *pb.VerifyEmailCod
 				if err != nil {
 					return nil, status.Errorf(codes.Internal, "token error: %v", err)
 				}
-				log.FromContext(ctx).Info("email login verified", "email", req.Email)
+				log.FromContext(ctx).Info("email login verified", "email", log.RedactEmail(req.Email))
 				return &pb.VerifyEmailCodeResponse{Verified: true, Token: token, UserId: user.ID}, nil
 			}
 
@@ -369,7 +369,7 @@ func (s *authServer) LinkEmail(ctx context.Context, req *pb.LinkEmailRequest) (*
 		return nil, status.Errorf(codes.Internal, "update error: %v", err)
 	}
 
-	log.FromContext(ctx).Info("email linked", "email", req.Email, "user_id", userID)
+	log.FromContext(ctx).Info("email linked", "email", log.RedactEmail(req.Email), "user_id", userID)
 	return &pb.LinkEmailResponse{Linked: true}, nil
 }
 
@@ -403,7 +403,7 @@ func (s *authServer) ResetPassword(ctx context.Context, req *pb.ResetPasswordReq
 		return nil, status.Error(codes.NotFound, "no account with this email")
 	}
 
-	log.FromContext(ctx).Info("password reset", "email", req.Email)
+	log.FromContext(ctx).Info("password reset", "email", log.RedactEmail(req.Email))
 	return &pb.ResetPasswordResponse{Success: true}, nil
 }
 
