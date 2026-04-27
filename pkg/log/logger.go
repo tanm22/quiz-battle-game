@@ -1,0 +1,38 @@
+package log
+
+import (
+	"context"
+	"io"
+	"log/slog"
+	"os"
+)
+
+// Init returns a slog.Logger configured for the named service. The logger
+// writes JSON to os.Stdout, takes its level from LOG_LEVEL, and pre-attaches
+// a `service` attribute. Call slog.SetDefault on the result so the global
+// slog package routes through this configuration.
+func Init(serviceName string) *slog.Logger {
+	level := ParseLevel(os.Getenv("LOG_LEVEL"))
+	return newLogger(serviceName, level, os.Stdout)
+}
+
+// newLogger is the internal factory used by Init and tests. Tests pass a
+// bytes.Buffer to capture output without touching stdout.
+func newLogger(serviceName string, level slog.Level, w io.Writer) *slog.Logger {
+	h := slog.NewJSONHandler(w, &slog.HandlerOptions{Level: level})
+	return slog.New(h).With("service", serviceName)
+}
+
+// FromContext returns a logger derived from slog.Default() with the
+// request-id from ctx attached as `request_id`. If ctx has no request-id
+// the attribute is omitted (callers can still log without one).
+//
+// RPC handlers should use this in place of slog.InfoContext etc. so every
+// log line carries the correlation id without per-callsite plumbing.
+func FromContext(ctx context.Context) *slog.Logger {
+	logger := slog.Default()
+	if rid := RequestIDFromContext(ctx); rid != "" {
+		logger = logger.With("request_id", rid)
+	}
+	return logger
+}
