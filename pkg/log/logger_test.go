@@ -72,6 +72,43 @@ func TestFromContextAttachesRequestID(t *testing.T) {
 	}
 }
 
+func TestFromContextAttachesAttrs(t *testing.T) {
+	var buf bytes.Buffer
+	prev := slog.Default()
+	t.Cleanup(func() { slog.SetDefault(prev) })
+	slog.SetDefault(newLogger("test", slog.LevelInfo, &buf))
+
+	ctx := ContextWithAttrs(context.Background(), "consumer", "match_created", "extra", 42)
+	FromContext(ctx).Info("with-attrs")
+
+	out := decode(t, buf.Bytes())
+	if out["consumer"] != "match_created" {
+		t.Errorf("consumer attr = %v, want match_created", out["consumer"])
+	}
+	if v, _ := out["extra"].(float64); v != 42 {
+		t.Errorf("extra attr = %v, want 42", out["extra"])
+	}
+}
+
+func TestFromContextRequestIDAndAttrsTogether(t *testing.T) {
+	var buf bytes.Buffer
+	prev := slog.Default()
+	t.Cleanup(func() { slog.SetDefault(prev) })
+	slog.SetDefault(newLogger("test", slog.LevelInfo, &buf))
+
+	ctx := ContextWithRequestID(context.Background(), "rid-1")
+	ctx = ContextWithAttrs(ctx, "component", "policy")
+	FromContext(ctx).Info("both")
+
+	out := decode(t, buf.Bytes())
+	if out["request_id"] != "rid-1" {
+		t.Errorf("request_id missing: %v", out["request_id"])
+	}
+	if out["component"] != "policy" {
+		t.Errorf("component missing: %v", out["component"])
+	}
+}
+
 func TestFromContextNoRequestID(t *testing.T) {
 	var buf bytes.Buffer
 	prev := slog.Default()

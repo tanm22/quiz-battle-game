@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"time"
 
@@ -15,6 +15,7 @@ import (
 
 	"quiz-battle/pkg/coins"
 	"quiz-battle/pkg/coins/shop"
+	"quiz-battle/pkg/log"
 )
 
 type Question struct {
@@ -27,6 +28,7 @@ type Question struct {
 }
 
 func main() {
+	slog.SetDefault(log.Init("seed"))
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -37,14 +39,14 @@ func main() {
 
 	client, err := mongo.Connect(options.Client().ApplyURI(mongoURI))
 	if err != nil {
-		log.Fatalf("mongo connect: %v", err)
+		log.Fatal(ctx, "mongodb connect failed", "err", err)
 	}
 	defer client.Disconnect(ctx)
 
 	db := client.Database(coins.DefaultDBName)
 
 	// --- Create indexes ---
-	log.Println("[seed] creating indexes...")
+	log.FromContext(ctx).Info("creating indexes")
 
 	usersColl := db.Collection("users")
 	usersColl.Indexes().CreateOne(ctx, mongo.IndexModel{
@@ -155,9 +157,9 @@ func main() {
 			Options: options.Index().SetName("idx_user_recent"),
 		},
 	}); err != nil {
-		log.Fatalf("[seed] coin_ledger indexes: %v", err)
+		log.Fatal(ctx, "coin_ledger indexes failed", "err", err)
 	}
-	log.Println("[seed] coin_ledger indexes ensured")
+	log.FromContext(ctx).Info("coin_ledger indexes ensured")
 
 	// §4.4 Friends & Challenges: the friend_requests collection holds one
 	// row per (fromUserId, toUserId) pair. Unique compound prevents two
@@ -191,9 +193,9 @@ func main() {
 			Options: options.Index().SetName("idx_to_from"),
 		},
 	}); err != nil {
-		log.Fatalf("[seed] friend_requests indexes: %v", err)
+		log.Fatal(ctx, "friend_requests indexes failed", "err", err)
 	}
-	log.Println("[seed] friend_requests indexes ensured")
+	log.FromContext(ctx).Info("friend_requests indexes ensured")
 
 	// §4.4 Friends & Challenges: friend_challenge_outbox is the durable
 	// queue for notif.friend.challenge pushes. The drainer in
@@ -203,9 +205,9 @@ func main() {
 		Keys:    bson.D{{Key: "processedAt", Value: 1}, {Key: "createdAt", Value: 1}},
 		Options: options.Index().SetName("idx_outbox_pending"),
 	}); err != nil {
-		log.Fatalf("[seed] friend_challenge_outbox index: %v", err)
+		log.Fatal(ctx, "friend_challenge_outbox index failed", "err", err)
 	}
-	log.Println("[seed] friend_challenge_outbox index ensured")
+	log.FromContext(ctx).Info("friend_challenge_outbox index ensured")
 
 	// PR 4 (§4.3 Shop): the effect outbox is consumed by services/payment in
 	// PR 5 to extend planExpiresAt for premium-trial purchases. The (kind,
@@ -215,9 +217,9 @@ func main() {
 		Keys:    bson.D{{Key: "processedAt", Value: 1}, {Key: "kind", Value: 1}},
 		Options: options.Index().SetName("idx_outbox_due"),
 	}); err != nil {
-		log.Fatalf("[seed] coin_effect_outbox index: %v", err)
+		log.Fatal(ctx, "coin_effect_outbox index failed", "err", err)
 	}
-	log.Println("[seed] coin_effect_outbox index ensured")
+	log.FromContext(ctx).Info("coin_effect_outbox index ensured")
 
 	// §4.5 Deeper analytics — answer_log is one row per (user × question)
 	// answered, populated by the scoring service's match-finished consumer
@@ -237,9 +239,9 @@ func main() {
 			Options: options.Index().SetName("idx_user_topic"),
 		},
 	}); err != nil {
-		log.Fatalf("[seed] answer_log indexes: %v", err)
+		log.Fatal(ctx, "answer_log indexes failed", "err", err)
 	}
-	log.Println("[seed] answer_log indexes ensured")
+	log.FromContext(ctx).Info("answer_log indexes ensured")
 
 	// §4.5 Deeper analytics — rating_history is one row per (user × match),
 	// recording the rating snapshot AFTER the post-match Elo update. The
@@ -249,11 +251,11 @@ func main() {
 		Keys:    bson.D{{Key: "userId", Value: 1}, {Key: "createdAt", Value: 1}},
 		Options: options.Index().SetName("idx_user_chronological"),
 	}); err != nil {
-		log.Fatalf("[seed] rating_history index: %v", err)
+		log.Fatal(ctx, "rating_history index failed", "err", err)
 	}
-	log.Println("[seed] rating_history index ensured")
+	log.FromContext(ctx).Info("rating_history index ensured")
 
-	log.Println("[seed] indexes created")
+	log.FromContext(ctx).Info("indexes created")
 
 	// --- Seed questions ---
 	data, err := os.ReadFile("questions.json")
@@ -261,13 +263,13 @@ func main() {
 		// Try alternate path (when run from project root)
 		data, err = os.ReadFile("seed/questions.json")
 		if err != nil {
-			log.Fatalf("read questions.json: %v", err)
+			log.Fatal(ctx, "read questions.json failed", "err", err)
 		}
 	}
 
 	var questions []Question
 	if err := json.Unmarshal(data, &questions); err != nil {
-		log.Fatalf("parse questions.json: %v", err)
+		log.Fatal(ctx, "parse questions.json failed", "err", err)
 	}
 
 	// Upsert questions to avoid duplicates on re-run
@@ -276,11 +278,11 @@ func main() {
 		update := bson.M{"$setOnInsert": q}
 		_, err := questionsColl.UpdateOne(ctx, filter, update, options.UpdateOne().SetUpsert(true))
 		if err != nil {
-			log.Printf("[seed] question %d upsert error: %v", i, err)
+			log.FromContext(ctx).Error("question upsert failed", "index", i, "err", err)
 		}
 	}
 	count, _ := questionsColl.CountDocuments(ctx, bson.M{})
-	log.Printf("[seed] %d questions in database", count)
+	log.FromContext(ctx).Info("questions in database", "count", count)
 
 	// --- Seed test users ---
 	testUsers := []struct {
@@ -324,11 +326,11 @@ func main() {
 		}
 		_, err := usersColl.UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$setOnInsert": doc}, options.UpdateOne().SetUpsert(true))
 		if err != nil {
-			log.Printf("[seed] user %s upsert error: %v", u.Username, err)
+			log.FromContext(ctx).Error("user upsert failed", "username", u.Username, "err", err)
 		}
 	}
 	userCount, _ := usersColl.CountDocuments(ctx, bson.M{})
-	log.Printf("[seed] %d users in database", userCount)
+	log.FromContext(ctx).Info("users in database", "count", userCount)
 
 	// One-shot migration for existing users that pre-date the onboarding flag.
 	// Anyone with matchesPlayed > 0 has implicitly "onboarded" — mark them
@@ -341,7 +343,7 @@ func main() {
 		bson.M{"$set": bson.M{"onboardingCompleted": true}},
 	)
 	if err == nil && migRes.ModifiedCount > 0 {
-		log.Printf("[seed] migrated %d existing users to onboardingCompleted=true", migRes.ModifiedCount)
+		log.FromContext(ctx).Info("migrated existing users to onboardingCompleted=true", "count", migRes.ModifiedCount)
 	}
 
 	// §4.3 (PR 4) backfill: pre-shop users have no inventory fields. Seed
@@ -357,9 +359,9 @@ func main() {
 		}},
 	)
 	if err != nil {
-		log.Fatalf("[seed] shop field backfill: %v", err)
+		log.Fatal(ctx, "shop field backfill failed", "err", err)
 	}
-	log.Printf("[seed] shop fields backfilled on %d users", shopBackfillRes.ModifiedCount)
+	log.FromContext(ctx).Info("shop fields backfilled", "count", shopBackfillRes.ModifiedCount)
 
 	// --- Seed tournaments ---
 	tournamentsColl := db.Collection("tournaments")
@@ -420,7 +422,7 @@ func main() {
 		)
 	}
 	tCount, _ := tournamentsColl.CountDocuments(ctx, bson.M{})
-	log.Printf("[seed] %d tournaments in database", tCount)
+	log.FromContext(ctx).Info("tournaments in database", "count", tCount)
 
 	// PR 4 (§4.3): upsert shop catalog from JSON. We try the in-image path
 	// first (the Dockerfile copies seed/shop_items.json to /data) and fall
@@ -434,12 +436,12 @@ func main() {
 	}
 	items, err := shop.LoadFromFile(shopPath)
 	if err != nil {
-		log.Fatalf("[seed] load shop items from %s: %v", shopPath, err)
+		log.Fatal(ctx, "load shop items failed", "path", shopPath, "err", err)
 	}
 	if err := shop.Upsert(ctx, db, items); err != nil {
-		log.Fatalf("[seed] upsert shop items: %v", err)
+		log.Fatal(ctx, "upsert shop items failed", "err", err)
 	}
-	log.Printf("[seed] upserted %d shop items", len(items))
+	log.FromContext(ctx).Info("upserted shop items", "count", len(items))
 
-	log.Println("[seed] done")
+	log.FromContext(ctx).Info("done")
 }
