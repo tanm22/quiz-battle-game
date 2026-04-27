@@ -12,6 +12,8 @@ import '../widgets/coin_balance_chip.dart';
 import '../widgets/local_avatar.dart';
 import '../widgets/streak_calendar.dart';
 import '../proto/quiz.pbgrpc.dart';
+import 'coin_ledger_screen.dart';
+import 'shop/equip_screen.dart';
 import 'shop/shop_screen.dart';
 import 'match_history_screen.dart';
 import 'payment_screen.dart';
@@ -610,6 +612,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             Navigator.push(context, MaterialPageRoute(builder: (_) => const ShopScreen()));
           }, color: AppColors.primary),
           const SizedBox(height: 8),
+          _profileActionButton(Icons.checkroom, 'Equip Cosmetics', () {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const EquipScreen()));
+          }, color: AppColors.accent),
+          const SizedBox(height: 8),
           _profileActionButton(Icons.workspace_premium, 'Premium', () {
             _openPaymentScreen();
           }, color: AppColors.gold),
@@ -922,13 +928,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       Text('${profile.wins}W/${profile.matchesPlayed - profile.wins}L',
                         style: const TextStyle(color: AppColors.textMuted, fontSize: 13, fontWeight: FontWeight.w600)),
                       const SizedBox(width: 12),
-                      // Seed from profile.coins so we render the cached
-                      // value instantly without firing a redundant
-                      // GetCoinBalance — the home payload already has it.
-                      // The provider is still watched, so any later
-                      // invalidation (e.g. after a purchase) refreshes
-                      // the chip.
-                      CoinBalanceChip(initialBalance: profile.coins.toInt()),
+                      // Seed from profile.coins so the cached value
+                      // renders instantly without a redundant
+                      // GetCoinBalance round-trip — the home payload
+                      // already has it. The provider is still watched,
+                      // so any later invalidation (e.g. after a
+                      // purchase) refreshes the chip. Tapping the chip
+                      // opens the lifetime ledger history.
+                      CoinBalanceChip(
+                        initialBalance: profile.coins.toInt(),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const CoinLedgerScreen()),
+                        ),
+                      ),
                     ],
                   ],
                 ),
