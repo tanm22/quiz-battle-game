@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"math"
 	"sort"
 	"time"
@@ -16,6 +15,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"quiz-battle/pkg/auth"
+	"quiz-battle/pkg/log"
 	pb "quiz-battle/proto"
 )
 
@@ -191,7 +191,8 @@ func (s *scoringServer) aggregateTopicAccuracy(ctx context.Context, userID strin
 			// Schema drift would otherwise produce empty/partial results
 			// indistinguishable from a real empty account — log so the
 			// anomaly is debuggable.
-			log.Printf("[analytics] aggregateTopicAccuracy decode error for user=%s: %v", userID, err)
+			log.FromContext(ctx).Warn("aggregateTopicAccuracy decode error",
+				"component", "analytics", "user_id", userID, "err", err)
 			continue
 		}
 		topic := doc.Topic
@@ -242,7 +243,8 @@ func (s *scoringServer) aggregatePercentiles(ctx context.Context, userID string)
 			ResponseTimeMs float64 `bson:"responseTimeMs"`
 		}
 		if err := cursor.Decode(&doc); err != nil {
-			log.Printf("[analytics] aggregatePercentiles decode error for user=%s: %v", userID, err)
+			log.FromContext(ctx).Warn("aggregatePercentiles decode error",
+				"component", "analytics", "user_id", userID, "err", err)
 			continue
 		}
 		values = append(values, doc.ResponseTimeMs)
@@ -309,7 +311,8 @@ func (s *scoringServer) aggregateRatingHistory(ctx context.Context, userID strin
 			CreatedAt time.Time `bson:"createdAt"`
 		}
 		if err := cursor.Decode(&doc); err != nil {
-			log.Printf("[analytics] aggregateRatingHistory decode error for user=%s: %v", userID, err)
+			log.FromContext(ctx).Warn("aggregateRatingHistory decode error",
+				"component", "analytics", "user_id", userID, "err", err)
 			continue
 		}
 		t := doc.CreatedAt.UTC()
