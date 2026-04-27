@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"os"
 	"regexp"
@@ -29,6 +29,7 @@ import (
 	"quiz-battle/pkg/coins"
 	"quiz-battle/pkg/email"
 	"quiz-battle/pkg/keys"
+	"quiz-battle/pkg/log"
 	"quiz-battle/pkg/models"
 	pb "quiz-battle/proto"
 )
@@ -116,7 +117,7 @@ func (s *authServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb
 		return nil, status.Errorf(codes.Internal, "token error: %v", err)
 	}
 
-	log.Printf("[auth] registered user %s (%s)", req.Username, userID)
+	log.FromContext(ctx).Info("registered user", "username", req.Username, "user_id", userID)
 	return &pb.AuthResponse{
 		UserId: userID, Username: req.Username, Token: token,
 		Rating: 1200, MatchesPlayed: 0, Wins: 0, Email: req.Email, IsGuest: false,
@@ -156,7 +157,7 @@ func (s *authServer) Login(ctx context.Context, req *pb.LoginRequest) (*pb.AuthR
 	// Process streak on login
 	streakInfo, reward, streakUpdated := s.processStreak(ctx, &user)
 
-	log.Printf("[auth] login user %s (%s)", user.Username, user.ID)
+	log.FromContext(ctx).Info("login", "username", user.Username, "user_id", user.ID)
 	return &pb.AuthResponse{
 		UserId: user.ID, Username: user.Username, Token: token,
 		Rating: user.Rating, MatchesPlayed: user.MatchesPlayed, Wins: user.Wins,
@@ -224,7 +225,7 @@ func (s *authServer) GuestLogin(ctx context.Context, _ *pb.GuestLoginRequest) (*
 		return nil, status.Errorf(codes.Internal, "token error: %v", err)
 	}
 
-	log.Printf("[auth] guest login %s (%s)", username, userID)
+	log.FromContext(ctx).Info("guest login", "username", username, "user_id", userID)
 	return &pb.AuthResponse{
 		UserId: userID, Username: username, Token: token,
 		Rating: 1200, IsGuest: true, ReferralCode: refCode,
@@ -268,11 +269,16 @@ func (s *authServer) SendEmailCode(ctx context.Context, req *pb.SendEmailCodeReq
 	}
 
 	if err := s.mailer.SendCode(req.Email, code, purpose); err != nil {
-		log.Printf("[auth] email send failed: %v", err)
-		// Log code to stdout as fallback for dev
-		log.Printf("[auth] DEV FALLBACK — code for %s (%s): %s", req.Email, purpose, code)
+		log.FromContext(ctx).Warn("email send failed", "err", err)
+		// Dev convenience: when DEV_MODE=true, log the code so a developer can
+		// complete the flow without configured email. NEVER set DEV_MODE in
+		// production — the code becomes a queryable JSON attr in log
+		// aggregators and anyone with read access can mine recent OTPs.
+		if os.Getenv("DEV_MODE") == "true" {
+			log.FromContext(ctx).Debug("dev fallback code", "email", req.Email, "purpose", purpose, "code", code)
+		}
 	} else {
-		log.Printf("[auth] sent %s code to %s", purpose, req.Email)
+		log.FromContext(ctx).Info("email code sent", "purpose", purpose, "email", log.RedactEmail(req.Email))
 	}
 
 	return &pb.SendEmailCodeResponse{Sent: true}, nil
@@ -304,7 +310,7 @@ func (s *authServer) VerifyEmailCode(ctx context.Context, req *pb.VerifyEmailCod
 				if err != nil {
 					return nil, status.Errorf(codes.Internal, "token error: %v", err)
 				}
-				log.Printf("[auth] email login verified for %s", req.Email)
+				log.FromContext(ctx).Info("email login verified", "email", log.RedactEmail(req.Email))
 				return &pb.VerifyEmailCodeResponse{Verified: true, Token: token, UserId: user.ID}, nil
 			}
 
@@ -363,7 +369,7 @@ func (s *authServer) LinkEmail(ctx context.Context, req *pb.LinkEmailRequest) (*
 		return nil, status.Errorf(codes.Internal, "update error: %v", err)
 	}
 
-	log.Printf("[auth] linked email %s to user %s", req.Email, userID)
+	log.FromContext(ctx).Info("email linked", "email", log.RedactEmail(req.Email), "user_id", userID)
 	return &pb.LinkEmailResponse{Linked: true}, nil
 }
 
@@ -397,7 +403,7 @@ func (s *authServer) ResetPassword(ctx context.Context, req *pb.ResetPasswordReq
 		return nil, status.Error(codes.NotFound, "no account with this email")
 	}
 
-	log.Printf("[auth] password reset for %s", req.Email)
+	log.FromContext(ctx).Info("password reset", "email", log.RedactEmail(req.Email))
 	return &pb.ResetPasswordResponse{Success: true}, nil
 }
 
@@ -433,7 +439,7 @@ func (s *authServer) DeleteAccount(ctx context.Context, _ *pb.DeleteAccountReque
 		return nil, status.Error(codes.NotFound, "user not found")
 	}
 
-	log.Printf("[auth] deleted account %s", userID)
+	log.FromContext(ctx).Info("account deleted", "user_id", userID)
 	return &pb.DeleteAccountResponse{Deleted: true}, nil
 }
 
@@ -677,7 +683,7 @@ func (s *authServer) processStreak(ctx context.Context, user *models.User) (*pb.
 		bson.M{"_id": user.ID, "streak.lastClaimedDate": bson.M{"$ne": today}},
 		bson.M{"$set": update})
 	if err != nil {
-		log.Printf("[auth] streak update error for %s: %v", user.ID, err)
+		log.FromContext(ctx).Error("streak update failed", "user_id", user.ID, "err", err)
 	}
 	if res != nil && res.ModifiedCount == 0 {
 		// Race: another request already claimed today
@@ -818,20 +824,20 @@ func (s *authServer) generateUniqueReferralCode(ctx context.Context, userID stri
 func (s *authServer) applyReferral(ctx context.Context, refereeID, code string) {
 	referrerID, err := keys.GetRefCode(ctx, s.rdb, code)
 	if err != nil || referrerID == "" {
-		log.Printf("[auth] invalid referral code %s", code)
+		log.FromContext(ctx).Info("invalid referral code", "code", code)
 		return
 	}
 
 	// Anti-abuse: reject self-referral
 	if referrerID == refereeID {
-		log.Printf("[auth] rejected self-referral: user %s", refereeID)
+		log.FromContext(ctx).Info("rejected self-referral", "referee_id", refereeID)
 		return
 	}
 
 	// Anti-abuse: refuse to reward referrals of guest accounts (farmable)
 	var referee models.User
 	if err := s.users().FindOne(ctx, bson.M{"_id": refereeID}).Decode(&referee); err == nil && referee.IsGuest {
-		log.Printf("[auth] rejected referral: referee %s is a guest", refereeID)
+		log.FromContext(ctx).Info("rejected guest referral", "referee_id", refereeID)
 		return
 	}
 
@@ -839,7 +845,7 @@ func (s *authServer) applyReferral(ctx context.Context, refereeID, code string) 
 	count, _ := s.mongoDB.Collection("referrals").CountDocuments(ctx,
 		bson.M{"referrerId": referrerID, "status": "converted"})
 	if count >= 20 {
-		log.Printf("[auth] referrer %s hit 20-referral cap", referrerID)
+		log.FromContext(ctx).Info("referral cap reached", "referrer_id", referrerID)
 		return
 	}
 
@@ -855,7 +861,7 @@ func (s *authServer) applyReferral(ctx context.Context, refereeID, code string) 
 
 	// Set referredBy on the referee
 	s.users().UpdateOne(ctx, bson.M{"_id": refereeID}, bson.M{"$set": bson.M{"referredBy": referrerID}})
-	log.Printf("[auth] applied referral: %s referred by %s (code %s)", refereeID, referrerID, code)
+	log.FromContext(ctx).Info("referral applied", "referee_id", refereeID, "referrer_id", referrerID, "code", code)
 }
 
 // ---------------------------------------------------------------------------
@@ -878,7 +884,7 @@ func generateCode() string {
 func (s *authServer) streakWarningCron(ctx context.Context) {
 	ch, err := s.amqpConn.Channel()
 	if err != nil {
-		log.Printf("[auth-cron] failed to open channel for streak warning: %v", err)
+		log.FromContext(ctx).Error("open channel failed", "cron", "streak_warning", "err", err)
 		return
 	}
 	defer ch.Close()
@@ -891,7 +897,7 @@ func (s *authServer) streakWarningCron(ctx context.Context) {
 			target = target.Add(24 * time.Hour)
 		}
 		sleepDur := target.Sub(now)
-		log.Printf("[auth-cron] streak warning scheduled in %v", sleepDur.Round(time.Minute))
+		log.FromContext(ctx).Info("cron scheduled", "cron", "streak_warning", "sleep", sleepDur.Round(time.Minute).String())
 
 		select {
 		case <-ctx.Done():
@@ -905,7 +911,7 @@ func (s *authServer) streakWarningCron(ctx context.Context) {
 			"streak.lastClaimedDate": bson.M{"$ne": today},
 		})
 		if err != nil {
-			log.Printf("[auth-cron] streak warning query error: %v", err)
+			log.FromContext(ctx).Error("cron query failed", "cron", "streak_warning", "err", err)
 			continue
 		}
 
@@ -931,7 +937,7 @@ func (s *authServer) streakWarningCron(ctx context.Context) {
 			count++
 		}
 		cursor.Close(ctx)
-		log.Printf("[auth-cron] streak warning: notified %d users", count)
+		log.FromContext(ctx).Info("cron run complete", "cron", "streak_warning", "notified", count)
 	}
 }
 
@@ -939,7 +945,7 @@ func (s *authServer) streakWarningCron(ctx context.Context) {
 func (s *authServer) dailyRewardNudgeCron(ctx context.Context) {
 	ch, err := s.amqpConn.Channel()
 	if err != nil {
-		log.Printf("[auth-cron] failed to open channel for daily nudge: %v", err)
+		log.FromContext(ctx).Error("open channel failed", "cron", "daily_reward_nudge", "err", err)
 		return
 	}
 	defer ch.Close()
@@ -952,7 +958,7 @@ func (s *authServer) dailyRewardNudgeCron(ctx context.Context) {
 			target = target.Add(24 * time.Hour)
 		}
 		sleepDur := target.Sub(now)
-		log.Printf("[auth-cron] daily reward nudge scheduled in %v", sleepDur.Round(time.Minute))
+		log.FromContext(ctx).Info("cron scheduled", "cron", "daily_reward_nudge", "sleep", sleepDur.Round(time.Minute).String())
 
 		select {
 		case <-ctx.Done():
@@ -966,7 +972,7 @@ func (s *authServer) dailyRewardNudgeCron(ctx context.Context) {
 			"isGuest":                false,
 		})
 		if err != nil {
-			log.Printf("[auth-cron] daily nudge query error: %v", err)
+			log.FromContext(ctx).Error("cron query failed", "cron", "daily_reward_nudge", "err", err)
 			continue
 		}
 
@@ -988,7 +994,7 @@ func (s *authServer) dailyRewardNudgeCron(ctx context.Context) {
 			count++
 		}
 		cursor.Close(ctx)
-		log.Printf("[auth-cron] daily reward nudge: notified %d users", count)
+		log.FromContext(ctx).Info("cron run complete", "cron", "daily_reward_nudge", "notified", count)
 	}
 }
 
@@ -997,6 +1003,7 @@ func (s *authServer) dailyRewardNudgeCron(ctx context.Context) {
 // ---------------------------------------------------------------------------
 
 func main() {
+	slog.SetDefault(log.Init("auth"))
 	ctx := context.Background()
 
 	// MongoDB
@@ -1008,7 +1015,7 @@ func main() {
 		ObjectIDAsHexString: true,
 	}))
 	if err != nil {
-		log.Fatalf("mongodb connect failed: %v", err)
+		log.Fatal(ctx, "mongodb connect failed", "err", err)
 	}
 	defer mongoClient.Disconnect(ctx)
 	db := mongoClient.Database(coins.DefaultDBName)
@@ -1022,7 +1029,7 @@ func main() {
 		Keys:    bson.D{{Key: "email", Value: 1}},
 		Options: options.Index().SetUnique(true).SetSparse(true),
 	})
-	log.Println("[auth] connected to MongoDB")
+	log.FromContext(ctx).Info("connected to MongoDB")
 
 	// Redis
 	redisAddr := os.Getenv("REDIS_ADDR")
@@ -1031,9 +1038,9 @@ func main() {
 	}
 	rdb := redis.NewClient(&redis.Options{Addr: redisAddr})
 	if err := rdb.Ping(ctx).Err(); err != nil {
-		log.Fatalf("redis connect failed: %v", err)
+		log.Fatal(ctx, "redis connect failed", "err", err)
 	}
-	log.Println("[auth] connected to Redis")
+	log.FromContext(ctx).Info("connected to Redis")
 
 	// RabbitMQ (Phase 2: for publishing notification events)
 	rabbitURL := os.Getenv("RABBITMQ_URL")
@@ -1042,17 +1049,17 @@ func main() {
 	}
 	amqpConn, err := amqp.Dial(rabbitURL)
 	if err != nil {
-		log.Fatalf("rabbitmq connect failed: %v", err)
+		log.Fatal(ctx, "rabbitmq connect failed", "err", err)
 	}
 	defer amqpConn.Close()
 	// Ensure exchange exists (use a temporary channel)
 	setupCh, err := amqpConn.Channel()
 	if err != nil {
-		log.Fatalf("rabbitmq channel failed: %v", err)
+		log.Fatal(ctx, "rabbitmq channel failed", "err", err)
 	}
 	setupCh.ExchangeDeclare("sx", "topic", true, false, false, false, nil)
 	setupCh.Close()
-	log.Println("[auth] connected to RabbitMQ")
+	log.FromContext(ctx).Info("connected to RabbitMQ")
 
 	// JWT + Resend
 	jwtSecret := os.Getenv("JWT_SECRET")
@@ -1066,7 +1073,7 @@ func main() {
 		resendFrom = "Quiz Battle <onboarding@resend.dev>"
 	}
 	if resendKey == "" {
-		log.Println("[auth] WARNING: RESEND_API_KEY not set — email codes will only be logged to stdout")
+		log.FromContext(ctx).Warn("RESEND_API_KEY not set; email send will fail. Set DEV_MODE=true to log fallback codes locally")
 	}
 
 	srv := &authServer{
@@ -1102,11 +1109,11 @@ func main() {
 
 	lis, err := net.Listen("tcp", ":50054")
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		log.Fatal(ctx, "listen failed", "addr", ":50054", "err", err)
 	}
 
-	log.Println("[auth] serving on :50054")
+	log.FromContext(ctx).Info("gRPC serving", "addr", ":50054")
 	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+		log.Fatal(ctx, "grpc serve failed", "err", err)
 	}
 }
