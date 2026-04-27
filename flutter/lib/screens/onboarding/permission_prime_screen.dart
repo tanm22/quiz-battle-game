@@ -33,8 +33,16 @@ class _PermissionPrimeScreenState extends ConsumerState<PermissionPrimeScreen> {
       // internally) so the system dialog fires only after the user has
       // seen the bullet-list context. Earlier signup flows deferred this
       // call exactly so it would land here. Failures are non-fatal:
-      // denial just means push won't reach this device.
-      await FcmService.instance.registerForUser();
+      // denial just means push won't reach this device — but a thrown
+      // exception from the Firebase plugin (no Play Services, network
+      // hiccup during getToken, etc.) MUST NOT prevent us from marking
+      // onboarding complete, or the user is wedged on this screen with
+      // no recovery beyond tapping the button again.
+      try {
+        await FcmService.instance.registerForUser();
+      } catch (e, st) {
+        debugPrint('FCM registration failed during onboarding finish: $e\n$st');
+      }
       await AuthService().updateProfile(markOnboardingCompleted: true);
       if (!mounted) return;
       ref.read(gameStateProvider.notifier).navigateToHome();

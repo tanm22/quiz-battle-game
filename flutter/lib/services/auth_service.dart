@@ -392,18 +392,25 @@ class AuthService {
   }
 
   Future<void> _saveToPrefs() async {
+    // Each setX call returns Future<bool> — they MUST be awaited.
+    // Callers do `await _saveToPrefs()` and then resolve their own
+    // future (e.g. updateProfile), so a process kill in the gap would
+    // otherwise lose just-saved onboarding fields and bounce the user
+    // back through onboarding on the next launch.
     final prefs = await SharedPreferences.getInstance();
-    if (_token != null) prefs.setString('auth_token', _token!);
-    if (_userId != null) prefs.setString('auth_user_id', _userId!);
-    if (_username != null) prefs.setString('auth_username', _username!);
-    if (_email != null) prefs.setString('auth_email', _email!);
-    prefs.setBool('auth_is_guest', _isGuest);
-    prefs.setInt('auth_rating', _rating);
-    prefs.setInt('auth_matches_played', _matchesPlayed);
-    prefs.setInt('auth_wins', _wins);
-    prefs.setBool('auth_onboarding_completed', _onboardingCompleted);
-    if (_displayName != null) prefs.setString('auth_display_name', _displayName!);
-    if (_avatarUrl != null) prefs.setString('auth_avatar_url', _avatarUrl!);
-    prefs.setStringList('auth_preferred_topics', _preferredTopics);
+    await Future.wait<void>([
+      if (_token != null) prefs.setString('auth_token', _token!),
+      if (_userId != null) prefs.setString('auth_user_id', _userId!),
+      if (_username != null) prefs.setString('auth_username', _username!),
+      if (_email != null) prefs.setString('auth_email', _email!),
+      prefs.setBool('auth_is_guest', _isGuest),
+      prefs.setInt('auth_rating', _rating),
+      prefs.setInt('auth_matches_played', _matchesPlayed),
+      prefs.setInt('auth_wins', _wins),
+      prefs.setBool('auth_onboarding_completed', _onboardingCompleted),
+      if (_displayName != null) prefs.setString('auth_display_name', _displayName!),
+      if (_avatarUrl != null) prefs.setString('auth_avatar_url', _avatarUrl!),
+      prefs.setStringList('auth_preferred_topics', _preferredTopics),
+    ]);
   }
 }

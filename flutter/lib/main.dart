@@ -148,7 +148,14 @@ class _AppShellState extends ConsumerState<AppShell> {
             email: auth.email,
             isGuest: auth.isGuest,
           );
-      if (auth.onboardingCompleted) {
+      // Grandfather pre-existing accounts: a user with matches under
+      // their belt was created before the onboarding fields existed and
+      // gets `onboardingCompleted=false` from the proto default. Don't
+      // drop those users into onboarding — they earned their way past
+      // it. Treat them as completed and route to home.
+      final isGrandfathered =
+          !auth.onboardingCompleted && auth.matchesPlayed > 0;
+      if (auth.onboardingCompleted || isGrandfathered) {
         // Onboarded users get FCM registered immediately so push reaches
         // them. The OS dialog (if not previously answered) appears here,
         // which is fine for established accounts.
