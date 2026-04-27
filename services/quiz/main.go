@@ -25,6 +25,7 @@ import (
 	"quiz-battle/pkg/coins"
 	"quiz-battle/pkg/keys"
 	"quiz-battle/pkg/log"
+	"quiz-battle/pkg/metrics"
 	"quiz-battle/pkg/models"
 	pb "quiz-battle/proto"
 )
@@ -60,21 +61,26 @@ type quizServer struct {
 	amqpMu        sync.Mutex    // AMQP channels are not thread-safe
 	mongoDB       *mongo.Database
 	jwtSecret     string
-	gameStreams   sync.Map // "roomId:userId" -> chan *pb.GameEvent
-	roomTimers    sync.Map // roomId -> *time.Timer (for round close)
-	seqCounters   sync.Map // roomId -> *atomic.Int64
-	roomDeadlines sync.Map // roomId -> int64 (current round deadline_unix)
-	roomQuestions sync.Map // roomId -> []Question
+	gameStreams   sync.Map         // "roomId:userId" -> chan *pb.GameEvent
+	roomTimers    sync.Map         // roomId -> *time.Timer (for round close)
+	seqCounters   sync.Map         // roomId -> *atomic.Int64
+	roomDeadlines sync.Map         // roomId -> int64 (current round deadline_unix)
+	roomQuestions sync.Map         // roomId -> []Question
+	metrics       *metrics.Metrics // nil in tests; non-nil in main()
 }
 
 // publish sends a message to the topic exchange with mutex protection.
 func (s *quizServer) publish(ctx context.Context, routingKey string, body []byte) error {
 	s.amqpMu.Lock()
 	defer s.amqpMu.Unlock()
-	return log.PublishWithContext(ctx, s.amqpCh, "sx", routingKey, false, false, amqp.Publishing{
+	err := log.PublishWithContext(ctx, s.amqpCh, "sx", routingKey, false, false, amqp.Publishing{
 		ContentType: "application/json",
 		Body:        body,
 	})
+	if s.metrics != nil {
+		s.metrics.RecordPublish(routingKey, err)
+	}
+	return err
 }
 
 // newChannel creates a dedicated AMQP channel per consumer (channels are not thread-safe).
@@ -1789,13 +1795,19 @@ func main() {
 	go srv.tournamentPayoutDrainWorker(ctx)  // Phase 3 (4.2): retry stuck pending payouts
 	go srv.weeklyTournamentCron(ctx)         // Phase 3 (4.2): spawn weekly free tournament
 
+	m := metrics.New("quiz")
+	m.Serve(ctx, ":2112")
+	srv.metrics = m
+
 	grpcServer := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			log.UnaryServerInterceptor(),
+			m.UnaryServerInterceptor(),
 			auth.UnaryInterceptor(jwtSecret, nil),
 		),
 		grpc.ChainStreamInterceptor(
 			log.StreamServerInterceptor(),
+			m.StreamServerInterceptor(),
 			auth.StreamInterceptor(jwtSecret, nil),
 		),
 	)

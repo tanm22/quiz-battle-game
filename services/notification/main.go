@@ -18,6 +18,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"quiz-battle/pkg/log"
+	"quiz-battle/pkg/metrics"
 )
 
 type notificationService struct {
@@ -26,6 +27,7 @@ type notificationService struct {
 	rdb      *redis.Client     // §4.6: cap, dedup, metrics counters
 	fcm      *messaging.Client // nil => stub mode (logs only, no FCM delivery)
 	policy   *policy           // §4.6: mute/quiet/dedup/cap gate; nil disables all gates
+	metrics  *metrics.Metrics  // nil in tests; non-nil in main()
 }
 
 func (s *notificationService) newChannel() (*amqp.Channel, error) {
@@ -59,6 +61,9 @@ func (s *notificationService) consume(ctx context.Context, queue string) {
 				return
 			}
 			s.dispatchNotification(log.ContextFromDelivery(ctx, msg), msg)
+			if s.metrics != nil {
+				s.metrics.RecordConsume(queue, "dispatched")
+			}
 		}
 	}
 }
@@ -555,6 +560,10 @@ func main() {
 	} else {
 		log.FromContext(ctx).Warn("GOOGLE_APPLICATION_CREDENTIALS not set; running in stub mode (logs only)")
 	}
+
+	m := metrics.New("notification")
+	m.Serve(ctx, ":2112")
+	svc.metrics = m
 
 	// Start consumers — one goroutine per queue.
 	go svc.consume(ctx, "push-notification-queue")

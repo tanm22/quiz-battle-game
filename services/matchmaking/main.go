@@ -24,6 +24,7 @@ import (
 	"quiz-battle/pkg/auth"
 	"quiz-battle/pkg/keys"
 	"quiz-battle/pkg/log"
+	"quiz-battle/pkg/metrics"
 	"quiz-battle/pkg/models"
 	pb "quiz-battle/proto"
 )
@@ -40,6 +41,7 @@ type matchmakingServer struct {
 	jwtSecret   string
 	subscribers sync.Map // userId -> chan *pb.MatchEvent
 	seqCounter  atomic.Int64
+	metrics     *metrics.Metrics // nil in tests; non-nil in main()
 }
 
 // ---------------------------------------------------------------------------
@@ -190,14 +192,18 @@ func (s *matchmakingServer) publishMatchInvite(ctx context.Context, fromUserID, 
 			continue
 		}
 
-		if err := log.PublishWithContext(ctx,
+		err = log.PublishWithContext(ctx,
 			s.amqpCh,
 			"sx",
 			"notif.match.invite",
 			false,
 			false,
 			amqp.Publishing{ContentType: "application/json", Body: payload},
-		); err != nil {
+		)
+		if s.metrics != nil {
+			s.metrics.RecordPublish("notif.match.invite", err)
+		}
+		if err != nil {
 			log.FromContext(ctx).Error("match invite publish failed", "from_id", fromUserID, "to_id", opponentID, "err", err)
 			continue
 		}
@@ -427,6 +433,9 @@ func (s *matchmakingServer) createRoom(ctx context.Context, players []redis.Z) {
 			Body:        eventJSON,
 		},
 	)
+	if s.metrics != nil {
+		s.metrics.RecordPublish("match.created", err)
+	}
 	if err != nil {
 		log.FromContext(ctx).Error("publish match.created failed", "err", err)
 	}
@@ -552,13 +561,19 @@ func main() {
 	// Start background goroutines
 	go srv.startPoller(ctx)
 
+	m := metrics.New("matchmaking")
+	m.Serve(ctx, ":2112")
+	srv.metrics = m
+
 	grpcServer := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			log.UnaryServerInterceptor(),
+			m.UnaryServerInterceptor(),
 			auth.UnaryInterceptor(jwtSecret, nil),
 		),
 		grpc.ChainStreamInterceptor(
 			log.StreamServerInterceptor(),
+			m.StreamServerInterceptor(),
 			auth.StreamInterceptor(jwtSecret, nil),
 		),
 	)

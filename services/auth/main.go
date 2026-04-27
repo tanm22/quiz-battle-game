@@ -30,6 +30,7 @@ import (
 	"quiz-battle/pkg/email"
 	"quiz-battle/pkg/keys"
 	"quiz-battle/pkg/log"
+	"quiz-battle/pkg/metrics"
 	"quiz-battle/pkg/models"
 	pb "quiz-battle/proto"
 )
@@ -1101,13 +1102,18 @@ func main() {
 		"/quiz.AuthService/GoogleSignIn",
 	}
 
+	m := metrics.New("auth")
+	m.Serve(ctx, ":2112")
+
 	grpcServer := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			log.UnaryServerInterceptor(),
+			m.UnaryServerInterceptor(),
 			auth.UnaryInterceptor(jwtSecret, skipMethods),
 		),
 		grpc.ChainStreamInterceptor(
 			log.StreamServerInterceptor(),
+			m.StreamServerInterceptor(),
 			auth.StreamInterceptor(jwtSecret, nil),
 		),
 	)

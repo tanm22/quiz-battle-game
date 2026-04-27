@@ -28,6 +28,7 @@ import (
 	"quiz-battle/pkg/coins/shop"
 	"quiz-battle/pkg/keys"
 	"quiz-battle/pkg/log"
+	"quiz-battle/pkg/metrics"
 	"quiz-battle/pkg/models"
 	pb "quiz-battle/proto"
 )
@@ -64,6 +65,7 @@ type scoringServer struct {
 	// payloads without standing up RabbitMQ. Nil in production.
 	publishHook func(routingKey string, body []byte)
 	selfClient  pb.ScoringServiceClient // gRPC loopback client for CalculateScore
+	metrics     *metrics.Metrics        // nil in tests; non-nil in main()
 }
 
 // publish sends a message to the topic exchange with mutex protection.
@@ -82,10 +84,23 @@ func (s *scoringServer) publish(ctx context.Context, routingKey string, body []b
 	if s.amqpCh == nil {
 		return nil
 	}
-	return log.PublishWithContext(ctx, s.amqpCh, "sx", routingKey, false, false, amqp.Publishing{
+	err := log.PublishWithContext(ctx, s.amqpCh, "sx", routingKey, false, false, amqp.Publishing{
 		ContentType: "application/json",
 		Body:        body,
 	})
+	if s.metrics != nil {
+		s.metrics.RecordPublish(routingKey, err)
+	}
+	return err
+}
+
+// recordConsume increments amqp_consumes_total{queue, status} on the
+// service's per-process metrics registry. Nil-safe so test scoringServer
+// instances (which don't construct metrics) can call this freely.
+func (s *scoringServer) recordConsume(queue, status string) {
+	if s.metrics != nil {
+		s.metrics.RecordConsume(queue, status)
+	}
 }
 
 // newChannel creates a dedicated AMQP channel per consumer (channels are not thread-safe).
@@ -704,6 +719,7 @@ func (s *scoringServer) consumeAnswers(ctx context.Context) {
 				return
 			}
 			s.processAnswer(log.ContextFromDelivery(ctx, msg), msg)
+			s.recordConsume("answer-processing-queue", "dispatched")
 		}
 	}
 }
@@ -878,6 +894,9 @@ func (s *scoringServer) consumeMatchFinished(ctx context.Context) {
 				return
 			}
 			s.persistMatch(log.ContextFromDelivery(ctx, msg), msg)
+			// persistMatch handles the ack/nack itself; treat each
+			// dispatched message as one consume tick on the queue.
+			s.recordConsume("match-finished-queue", "dispatched")
 		}
 	}
 }
@@ -1871,13 +1890,19 @@ func main() {
 	skipMethods := []string{
 		"/quiz.ScoringService/CalculateScore",
 	}
+	m := metrics.New("scoring")
+	m.Serve(ctx, ":2112")
+	srv.metrics = m
+
 	grpcServer := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			log.UnaryServerInterceptor(),
+			m.UnaryServerInterceptor(),
 			auth.UnaryInterceptor(jwtSecret, skipMethods),
 		),
 		grpc.ChainStreamInterceptor(
 			log.StreamServerInterceptor(),
+			m.StreamServerInterceptor(),
 			auth.StreamInterceptor(jwtSecret, skipMethods),
 		),
 	)
