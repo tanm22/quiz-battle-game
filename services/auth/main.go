@@ -407,8 +407,8 @@ func (s *authServer) ResetPassword(ctx context.Context, req *pb.ResetPasswordReq
 	if err := validate.Email(req.Email); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	if len(req.NewPassword) < 6 {
-		return nil, status.Error(codes.InvalidArgument, "password must be at least 6 characters")
+	if err := validate.Password(req.NewPassword); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	// Verify the code
