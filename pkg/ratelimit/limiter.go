@@ -67,8 +67,10 @@ func (l *Limiter) Allow(ctx context.Context, subject string) (bool, error) {
 	}
 
 	// Fixed window: bucket = floor(now / window). Same window for the
-	// duration of l.window, then rolls forward.
-	windowStart := time.Now().Unix() / int64(l.window.Seconds())
+	// duration of l.window, then rolls forward. UnixNano / Nanoseconds
+	// (not Unix / Seconds) so any positive window is safe — Seconds()
+	// truncates a sub-1s duration to 0 and the divide would panic.
+	windowStart := time.Now().UnixNano() / l.window.Nanoseconds()
 	key := fmt.Sprintf("ratelimit:%s:%s:%d", l.name, subject, windowStart)
 
 	pipe := l.rdb.TxPipeline()

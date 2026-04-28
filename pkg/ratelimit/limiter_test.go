@@ -148,3 +148,25 @@ func TestAllow_EmptySubjectIsPassthrough(t *testing.T) {
 		}
 	}
 }
+
+func TestAllow_RedisErrorFailsOpen(t *testing.T) {
+	// Documented contract (limiter.go L52–L57): on Redis error, return
+	// (true, err) — failing CLOSED would let a brief Redis blip take
+	// down login. Pin it with a test so a future refactor can't silently
+	// flip the polarity. Dial a port nothing is listening on; the
+	// short timeout keeps the test under a second.
+	rdb := redis.NewClient(&redis.Options{
+		Addr:        "127.0.0.1:1",
+		DialTimeout: 200 * time.Millisecond,
+	})
+	t.Cleanup(func() { _ = rdb.Close() })
+
+	l := New(rdb, "test_fail_open", 1, time.Minute)
+	ok, err := l.Allow(context.Background(), "alice")
+	if err == nil {
+		t.Fatal("expected redis error, got nil")
+	}
+	if !ok {
+		t.Error("limiter must fail open on Redis error; got denied")
+	}
+}

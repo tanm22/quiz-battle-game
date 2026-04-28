@@ -148,6 +148,13 @@ func (s *authServer) Login(ctx context.Context, req *pb.LoginRequest) (*pb.AuthR
 	if req.Username == "" || req.Password == "" {
 		return nil, status.Error(codes.InvalidArgument, "username and password required")
 	}
+	// Length cap before the limiter — Register's usernameRegex caps at
+	// 20, so 64 is well clear of legitimate input. Without this, a
+	// multi-MB username flows through to the Redis key and burns memory
+	// even on the rate-limited path.
+	if len(req.Username) > 64 {
+		return nil, status.Error(codes.InvalidArgument, "username too long")
+	}
 
 	// §4.7 PR-B1: brute-force gate. Per-username because an attacker
 	// trying many passwords against ONE account is the threat we care
