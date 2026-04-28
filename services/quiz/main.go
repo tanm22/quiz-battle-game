@@ -25,6 +25,7 @@ import (
 	"quiz-battle/pkg/coins"
 	"quiz-battle/pkg/keys"
 	"quiz-battle/pkg/log"
+	"quiz-battle/pkg/metrics"
 	"quiz-battle/pkg/models"
 	pb "quiz-battle/proto"
 )
@@ -60,26 +61,40 @@ type quizServer struct {
 	amqpMu        sync.Mutex    // AMQP channels are not thread-safe
 	mongoDB       *mongo.Database
 	jwtSecret     string
-	gameStreams   sync.Map // "roomId:userId" -> chan *pb.GameEvent
-	roomTimers    sync.Map // roomId -> *time.Timer (for round close)
-	seqCounters   sync.Map // roomId -> *atomic.Int64
-	roomDeadlines sync.Map // roomId -> int64 (current round deadline_unix)
-	roomQuestions sync.Map // roomId -> []Question
+	gameStreams   sync.Map         // "roomId:userId" -> chan *pb.GameEvent
+	roomTimers    sync.Map         // roomId -> *time.Timer (for round close)
+	seqCounters   sync.Map         // roomId -> *atomic.Int64
+	roomDeadlines sync.Map         // roomId -> int64 (current round deadline_unix)
+	roomQuestions sync.Map         // roomId -> []Question
+	metrics       *metrics.Metrics // nil in tests; non-nil in main()
 }
 
 // publish sends a message to the topic exchange with mutex protection.
 func (s *quizServer) publish(ctx context.Context, routingKey string, body []byte) error {
 	s.amqpMu.Lock()
 	defer s.amqpMu.Unlock()
-	return log.PublishWithContext(ctx, s.amqpCh, "sx", routingKey, false, false, amqp.Publishing{
+	err := log.PublishWithContext(ctx, s.amqpCh, "sx", routingKey, false, false, amqp.Publishing{
 		ContentType: "application/json",
 		Body:        body,
 	})
+	if s.metrics != nil {
+		s.metrics.RecordPublish(routingKey, err)
+	}
+	return err
 }
 
 // newChannel creates a dedicated AMQP channel per consumer (channels are not thread-safe).
 func (s *quizServer) newChannel() (*amqp.Channel, error) {
 	return s.amqpConn.Channel()
+}
+
+// recordConsume increments amqp_consumes_total{queue, status} when the
+// service has a non-nil metrics registry. Nil-safe so test instances
+// without metrics still call this without crashing.
+func (s *quizServer) recordConsume(queue, status string) {
+	if s.metrics != nil {
+		s.metrics.RecordConsume(queue, status)
+	}
 }
 
 func (s *quizServer) getSeqCounter(roomID string) *atomic.Int64 {
@@ -218,6 +233,7 @@ func (s *quizServer) consumeMatchCreated(ctx context.Context) {
 			if err := json.Unmarshal(msg.Body, &event); err != nil {
 				log.FromContext(msgCtx).Warn("bad payload", "err", err)
 				msg.Nack(false, false)
+				s.recordConsume("match-created-queue", metrics.StatusNackDrop)
 				continue
 			}
 
@@ -251,6 +267,7 @@ func (s *quizServer) consumeMatchCreated(ctx context.Context) {
 			if err != nil {
 				log.FromContext(msgCtx).Error("selectQuestions failed", "err", err)
 				msg.Nack(false, true) // requeue
+				s.recordConsume("match-created-queue", metrics.StatusNackRequeue)
 				continue
 			}
 
@@ -262,6 +279,7 @@ func (s *quizServer) consumeMatchCreated(ctx context.Context) {
 			if err := keys.SetQuestions(msgCtx, s.rdb, event.RoomID, questionIDs); err != nil {
 				log.FromContext(msgCtx).Error("store questions failed", "err", err)
 				msg.Nack(false, true)
+				s.recordConsume("match-created-queue", metrics.StatusNackRequeue)
 				continue
 			}
 
@@ -272,6 +290,7 @@ func (s *quizServer) consumeMatchCreated(ctx context.Context) {
 			keys.SetRoomRound(msgCtx, s.rdb, event.RoomID, 1)
 
 			msg.Ack(false)
+			s.recordConsume("match-created-queue", metrics.StatusAck)
 
 			// Start first round after a brief delay for clients to connect.
 			// Detach msgCtx so the goroutine carries the request_id but is
@@ -1596,6 +1615,7 @@ func (s *quizServer) consumeRoundCompleted(ctx context.Context) {
 			if err := json.Unmarshal(msg.Body, &event); err != nil {
 				log.FromContext(msgCtx).Warn("bad payload", "err", err)
 				msg.Nack(false, false)
+				s.recordConsume("round-complete-queue", metrics.StatusNackDrop)
 				continue
 			}
 
@@ -1603,10 +1623,12 @@ func (s *quizServer) consumeRoundCompleted(ctx context.Context) {
 			if !ok {
 				log.FromContext(msgCtx).Info("unknown room; skipping", "room_id", event.RoomID)
 				msg.Ack(false)
+				s.recordConsume("round-complete-queue", metrics.StatusAck)
 				continue
 			}
 
 			msg.Ack(false)
+			s.recordConsume("round-complete-queue", metrics.StatusAck)
 
 			if event.Round < len(questions) {
 				// Advance to next round after a 2s pause. Detach so the
@@ -1660,6 +1682,7 @@ func (s *quizServer) consumeLeaderboardUpdated(ctx context.Context) {
 			if err := json.Unmarshal(msg.Body, &event); err != nil {
 				log.FromContext(msgCtx).Warn("bad payload", "err", err)
 				msg.Nack(false, false)
+				s.recordConsume("leaderboard-broadcast-queue", metrics.StatusNackDrop)
 				continue
 			}
 
@@ -1705,6 +1728,7 @@ func (s *quizServer) consumeLeaderboardUpdated(ctx context.Context) {
 
 			log.FromContext(msgCtx).Info("LeaderboardUpdate broadcast", "room_id", event.RoomID, "entries", len(entries))
 			msg.Ack(false)
+			s.recordConsume("leaderboard-broadcast-queue", metrics.StatusAck)
 		}
 	}
 }
@@ -1789,13 +1813,19 @@ func main() {
 	go srv.tournamentPayoutDrainWorker(ctx)  // Phase 3 (4.2): retry stuck pending payouts
 	go srv.weeklyTournamentCron(ctx)         // Phase 3 (4.2): spawn weekly free tournament
 
+	m := metrics.New("quiz")
+	m.Serve(ctx, ":2112")
+	srv.metrics = m
+
 	grpcServer := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			log.UnaryServerInterceptor(),
+			m.UnaryServerInterceptor(),
 			auth.UnaryInterceptor(jwtSecret, nil),
 		),
 		grpc.ChainStreamInterceptor(
 			log.StreamServerInterceptor(),
+			m.StreamServerInterceptor(),
 			auth.StreamInterceptor(jwtSecret, nil),
 		),
 	)

@@ -66,6 +66,7 @@ services:
     command: matchmaking
     ports:
       - "50051:50051"
+      - "21251:2112" # /metrics
     depends_on:
       redis:
         condition: service_healthy
@@ -86,6 +87,7 @@ services:
     command: quiz
     ports:
       - "50052:50052"
+      - "21252:2112" # /metrics
     depends_on:
       redis:
         condition: service_healthy
@@ -106,6 +108,7 @@ services:
     command: scoring
     ports:
       - "50053:50053"
+      - "21253:2112" # /metrics
     depends_on:
       redis:
         condition: service_healthy
@@ -126,6 +129,7 @@ services:
     command: auth
     ports:
       - "50054:50054"
+      - "21254:2112" # /metrics
     depends_on:
       redis:
         condition: service_healthy
@@ -149,6 +153,7 @@ services:
     ports:
       - "50055:50055"
       - "8080:8080"
+      - "21255:2112" # /metrics
     depends_on:
       redis:
         condition: service_healthy
@@ -170,6 +175,8 @@ services:
   notification:
     build: .
     command: notification
+    ports:
+      - "21256:2112" # /metrics
     depends_on:
       rabbitmq:
         condition: service_healthy

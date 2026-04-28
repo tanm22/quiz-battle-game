@@ -9,6 +9,7 @@ import (
 
 	"quiz-battle/pkg/coins"
 	"quiz-battle/pkg/log"
+	"quiz-battle/pkg/metrics"
 )
 
 // errBadEarnPayload marks unrecoverable parse / shape errors on a
@@ -91,14 +92,17 @@ func (s *scoringServer) consumeCoinEarn(ctx context.Context) {
 			switch {
 			case err == nil:
 				_ = msg.Ack(false)
+				s.recordConsume(coins.EarnQueueName, metrics.StatusAck)
 			case errors.Is(err, errBadEarnPayload):
 				log.FromContext(msgCtx).Warn("dead-letter bad payload",
 					"consumer", "earn", "body", string(msg.Body), "err", err)
 				_ = msg.Nack(false, false) // → coin-earn-dlq
+				s.recordConsume(coins.EarnQueueName, metrics.StatusNackDrop)
 			default:
 				log.FromContext(msgCtx).Error("transient error; will requeue",
 					"consumer", "earn", "err", err)
 				_ = msg.Nack(false, true)
+				s.recordConsume(coins.EarnQueueName, metrics.StatusNackRequeue)
 			}
 		}
 	}

@@ -29,6 +29,7 @@ import (
 	"quiz-battle/pkg/auth"
 	"quiz-battle/pkg/keys"
 	"quiz-battle/pkg/log"
+	"quiz-battle/pkg/metrics"
 	pb "quiz-battle/proto"
 )
 
@@ -45,6 +46,7 @@ type paymentServer struct {
 	razorpayKeyID  string
 	razorpaySecret string
 	webhookSecret  string
+	metrics        *metrics.Metrics // nil in tests; non-nil in main()
 }
 
 // users returns the users collection on the configured DB. Mirrors the
@@ -58,10 +60,14 @@ func (s *paymentServer) users() *mongo.Collection {
 func (s *paymentServer) publish(ctx context.Context, routingKey string, body []byte) error {
 	s.amqpMu.Lock()
 	defer s.amqpMu.Unlock()
-	return log.PublishWithContext(ctx, s.amqpCh, "sx", routingKey, false, false, amqp.Publishing{
+	err := log.PublishWithContext(ctx, s.amqpCh, "sx", routingKey, false, false, amqp.Publishing{
 		ContentType: "application/json",
 		Body:        body,
 	})
+	if s.metrics != nil {
+		s.metrics.RecordPublish(routingKey, err)
+	}
+	return err
 }
 
 // ---------------------------------------------------------------------------
@@ -249,6 +255,9 @@ func (s *paymentServer) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	// Step 2: Verify HMAC-SHA256 signature
 	sig := r.Header.Get("X-Razorpay-Signature")
 	if !verifyRazorpaySignature(rawBody, sig, s.webhookSecret) {
+		if s.metrics != nil {
+			s.metrics.RecordWebhook("razorpay", errors.New("invalid signature"))
+		}
 		http.Error(w, "invalid signature", http.StatusBadRequest)
 		return
 	}
@@ -288,11 +297,17 @@ func (s *paymentServer) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	// capturePayment is idempotent on paymentID via the SETNX guard, so
 	// receiving the same webhook twice is a no-op.
 	if err := s.capturePayment(ctx, orderID, paymentID); err != nil {
+		if s.metrics != nil {
+			s.metrics.RecordWebhook("razorpay", err)
+		}
 		log.FromContext(ctx).Error("webhook capture failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
+	if s.metrics != nil {
+		s.metrics.RecordWebhook("razorpay", nil)
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -765,13 +780,19 @@ func main() {
 	srv.startPremiumTrialConsumer(ctx)
 
 	// gRPC server on :50055
+	m := metrics.New("payment")
+	m.Serve(ctx, ":2112")
+	srv.metrics = m
+
 	grpcServer := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			log.UnaryServerInterceptor(),
+			m.UnaryServerInterceptor(),
 			auth.UnaryInterceptor(jwtSecret, nil),
 		),
 		grpc.ChainStreamInterceptor(
 			log.StreamServerInterceptor(),
+			m.StreamServerInterceptor(),
 			auth.StreamInterceptor(jwtSecret, nil),
 		),
 	)

@@ -28,6 +28,7 @@ import (
 	"quiz-battle/pkg/coins/shop"
 	"quiz-battle/pkg/keys"
 	"quiz-battle/pkg/log"
+	"quiz-battle/pkg/metrics"
 	"quiz-battle/pkg/models"
 	pb "quiz-battle/proto"
 )
@@ -64,6 +65,7 @@ type scoringServer struct {
 	// payloads without standing up RabbitMQ. Nil in production.
 	publishHook func(routingKey string, body []byte)
 	selfClient  pb.ScoringServiceClient // gRPC loopback client for CalculateScore
+	metrics     *metrics.Metrics        // nil in tests; non-nil in main()
 }
 
 // publish sends a message to the topic exchange with mutex protection.
@@ -82,10 +84,33 @@ func (s *scoringServer) publish(ctx context.Context, routingKey string, body []b
 	if s.amqpCh == nil {
 		return nil
 	}
-	return log.PublishWithContext(ctx, s.amqpCh, "sx", routingKey, false, false, amqp.Publishing{
+	err := log.PublishWithContext(ctx, s.amqpCh, "sx", routingKey, false, false, amqp.Publishing{
 		ContentType: "application/json",
 		Body:        body,
 	})
+	if s.metrics != nil {
+		s.metrics.RecordPublish(routingKey, err)
+	}
+	return err
+}
+
+// recordConsume increments amqp_consumes_total{queue, status} on the
+// service's per-process metrics registry. Nil-safe so test scoringServer
+// instances (which don't construct metrics) can call this freely.
+func (s *scoringServer) recordConsume(queue, status string) {
+	if s.metrics != nil {
+		s.metrics.RecordConsume(queue, status)
+	}
+}
+
+// recordDispatched increments amqp_dispatched_total{queue}. Use this
+// for consumers whose per-message handler does its own ack/nack
+// internally (processAnswer, persistMatch) and the consume loop only
+// observes "a message was handed off."
+func (s *scoringServer) recordDispatched(queue string) {
+	if s.metrics != nil {
+		s.metrics.RecordDispatched(queue)
+	}
 }
 
 // newChannel creates a dedicated AMQP channel per consumer (channels are not thread-safe).
@@ -704,6 +729,7 @@ func (s *scoringServer) consumeAnswers(ctx context.Context) {
 				return
 			}
 			s.processAnswer(log.ContextFromDelivery(ctx, msg), msg)
+			s.recordDispatched("answer-processing-queue")
 		}
 	}
 }
@@ -878,6 +904,11 @@ func (s *scoringServer) consumeMatchFinished(ctx context.Context) {
 				return
 			}
 			s.persistMatch(log.ContextFromDelivery(ctx, msg), msg)
+			// persistMatch handles the ack/nack itself; record this
+			// as a dispatch event. Operators can compute the gap
+			// between amqp_dispatched_total and amqp_consumes_total
+			// per queue to spot handlers that don't disposition.
+			s.recordDispatched("match-finished-queue")
 		}
 	}
 }
@@ -1400,6 +1431,7 @@ func (s *scoringServer) consumeAnalytics(ctx context.Context) {
 			// emit one body-carrying line per finished match in prod.
 			log.FromContext(msgCtx).Debug("match.finished event received", "consumer", "analytics", "body", string(msg.Body))
 			msg.Ack(false)
+			s.recordConsume("match-analytics-queue", metrics.StatusAck)
 		}
 	}
 }
@@ -1437,6 +1469,7 @@ func (s *scoringServer) consumePaymentCaptured(ctx context.Context) {
 			if err := json.Unmarshal(msg.Body, &event); err != nil {
 				log.FromContext(msgCtx).Warn("bad payload", "consumer", "payment", "body", string(msg.Body), "err", err)
 				msg.Nack(false, false)
+				s.recordConsume("payment-success-queue", metrics.StatusNackDrop)
 				continue
 			}
 
@@ -1470,6 +1503,7 @@ func (s *scoringServer) consumePaymentCaptured(ctx context.Context) {
 			if err != nil {
 				log.FromContext(msgCtx).Error("plan upgrade failed", "consumer", "payment", "user_id", event.UserID, "err", err)
 				msg.Nack(false, true)
+				s.recordConsume("payment-success-queue", metrics.StatusNackRequeue)
 				continue
 			}
 
@@ -1485,6 +1519,7 @@ func (s *scoringServer) consumePaymentCaptured(ctx context.Context) {
 
 			log.FromContext(msgCtx).Info("user upgraded to premium", "consumer", "payment", "user_id", event.UserID, "expires_at", expiresAt.Format("2006-01-02"))
 			msg.Ack(false)
+			s.recordConsume("payment-success-queue", metrics.StatusAck)
 		}
 	}
 }
@@ -1518,6 +1553,7 @@ func (s *scoringServer) consumeReferralEvents(ctx context.Context) {
 				if errors.Is(err, errBadReferralPayload) {
 					log.FromContext(msgCtx).Warn("bad payload dropping", "consumer", "referral", "body", string(msg.Body), "err", err)
 					msg.Nack(false, false)
+					s.recordConsume("referral-event-queue", metrics.StatusNackDrop)
 					continue
 				}
 				log.FromContext(msgCtx).Error("referral event processing failed", "consumer", "referral", "body", string(msg.Body), "err", err)
@@ -1527,9 +1563,11 @@ func (s *scoringServer) consumeReferralEvents(ctx context.Context) {
 				// underlying issue is fixed; an operator alert on
 				// referral-event-queue depth is the floor.
 				msg.Nack(false, true)
+				s.recordConsume("referral-event-queue", metrics.StatusNackRequeue)
 				continue
 			}
 			msg.Ack(false)
+			s.recordConsume("referral-event-queue", metrics.StatusAck)
 		}
 	}
 }
@@ -1671,6 +1709,7 @@ func (s *scoringServer) consumeTournamentFinished(ctx context.Context) {
 				if errors.Is(err, errBadTournamentPayload) {
 					log.FromContext(msgCtx).Warn("bad payload dropping", "consumer", "tournament_finished", "body", string(msg.Body), "err", err)
 					msg.Nack(false, false)
+					s.recordConsume("tournament-finished-queue", metrics.StatusNackDrop)
 					continue
 				}
 				log.FromContext(msgCtx).Error("tournament event processing failed", "consumer", "tournament_finished", "body", string(msg.Body), "err", err)
@@ -1680,9 +1719,11 @@ func (s *scoringServer) consumeTournamentFinished(ctx context.Context) {
 				// underlying issue is fixed; an operator alert on
 				// tournament-finished-queue depth is the floor.
 				msg.Nack(false, true)
+				s.recordConsume("tournament-finished-queue", metrics.StatusNackRequeue)
 				continue
 			}
 			msg.Ack(false)
+			s.recordConsume("tournament-finished-queue", metrics.StatusAck)
 		}
 	}
 }
@@ -1871,13 +1912,19 @@ func main() {
 	skipMethods := []string{
 		"/quiz.ScoringService/CalculateScore",
 	}
+	m := metrics.New("scoring")
+	m.Serve(ctx, ":2112")
+	srv.metrics = m
+
 	grpcServer := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			log.UnaryServerInterceptor(),
+			m.UnaryServerInterceptor(),
 			auth.UnaryInterceptor(jwtSecret, skipMethods),
 		),
 		grpc.ChainStreamInterceptor(
 			log.StreamServerInterceptor(),
+			m.StreamServerInterceptor(),
 			auth.StreamInterceptor(jwtSecret, skipMethods),
 		),
 	)
