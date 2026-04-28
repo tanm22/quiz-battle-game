@@ -27,6 +27,7 @@ import (
 	"quiz-battle/pkg/coins"
 	"quiz-battle/pkg/coins/shop"
 	"quiz-battle/pkg/keys"
+	"quiz-battle/pkg/lifecycle"
 	"quiz-battle/pkg/log"
 	"quiz-battle/pkg/metrics"
 	"quiz-battle/pkg/models"
@@ -1862,13 +1863,11 @@ func main() {
 	if err != nil {
 		log.Fatal(ctx, "rabbitmq connect failed", "err", err)
 	}
-	defer conn.Close()
 
 	amqpCh, err := conn.Channel()
 	if err != nil {
 		log.Fatal(ctx, "rabbitmq channel failed", "err", err)
 	}
-	defer amqpCh.Close()
 
 	if err := setupRabbitMQ(amqpCh); err != nil {
 		log.Fatal(ctx, "rabbitmq setup failed", "err", err)
@@ -1886,7 +1885,6 @@ func main() {
 	if err != nil {
 		log.Fatal(ctx, "mongodb connect failed", "err", err)
 	}
-	defer mongoClient.Disconnect(ctx)
 	log.FromContext(ctx).Info("connected to MongoDB")
 
 	jwtSecret := os.Getenv("JWT_SECRET")
@@ -1913,7 +1911,7 @@ func main() {
 		"/quiz.ScoringService/CalculateScore",
 	}
 	m := metrics.New("scoring")
-	m.Serve(ctx, ":2112")
+	metricsSrv := m.Serve(ctx, ":2112")
 	srv.metrics = m
 
 	grpcServer := grpc.NewServer(
@@ -1952,10 +1950,10 @@ func main() {
 	if err != nil {
 		log.Fatal(ctx, "self-client create failed", "err", err)
 	}
-	defer selfConn.Close()
 	srv.selfClient = pb.NewScoringServiceClient(selfConn)
 
-	// Start RabbitMQ consumers (3 goroutines)
+	// Start RabbitMQ consumers — each goroutine selects on ctx.Done()
+	// and exits cleanly when the root ctx is cancelled below.
 	go srv.consumeAnswers(ctx)            // 9.5: answer scoring
 	go srv.consumeMatchFinished(ctx)      // 9.6: persistence worker
 	go srv.consumeAnalytics(ctx)          // 9.6 note: analytics stub
@@ -1965,6 +1963,33 @@ func main() {
 	go srv.consumeCoinEarn(ctx)           // Phase 3 (4.3): coins.earn.* → ledger.Grant
 	go srv.drainChallengeNotifOutbox(ctx) // Phase 3 (4.4): retry stuck friend-challenge pushes
 
-	// Block forever (gRPC server runs in background goroutine)
-	select {}
+	// Block until SIGINT / SIGTERM, then drain gracefully.
+	lifecycle.WaitForSignal(ctx)
+	log.FromContext(ctx).Info("graceful shutdown starting")
+
+	// Cancel root ctx so consumer goroutines exit their selects.
+	cancel()
+
+	// GracefulStop drains in-flight RPCs and blocks until they finish.
+	grpcServer.GracefulStop()
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+
+	if err := metricsSrv.Shutdown(shutdownCtx); err != nil {
+		log.FromContext(ctx).Warn("metrics shutdown", "err", err)
+	}
+	if err := selfConn.Close(); err != nil {
+		log.FromContext(ctx).Warn("self gRPC conn close", "err", err)
+	}
+	if err := amqpCh.Close(); err != nil {
+		log.FromContext(ctx).Warn("amqp channel close", "err", err)
+	}
+	if err := conn.Close(); err != nil {
+		log.FromContext(ctx).Warn("amqp conn close", "err", err)
+	}
+	if err := mongoClient.Disconnect(shutdownCtx); err != nil {
+		log.FromContext(ctx).Warn("mongo disconnect", "err", err)
+	}
+	log.FromContext(ctx).Info("graceful shutdown complete")
 }
