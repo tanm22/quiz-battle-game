@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"math"
 	"net"
-	"os"
 	"sync"
 	"time"
 
@@ -26,6 +25,7 @@ import (
 	"quiz-battle/pkg/auth"
 	"quiz-battle/pkg/coins"
 	"quiz-battle/pkg/coins/shop"
+	"quiz-battle/pkg/config"
 	"quiz-battle/pkg/keys"
 	"quiz-battle/pkg/lifecycle"
 	"quiz-battle/pkg/log"
@@ -1843,23 +1843,17 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	cfg := config.MustCommon(ctx)
+
 	// Redis
-	redisAddr := os.Getenv("REDIS_ADDR")
-	if redisAddr == "" {
-		redisAddr = "localhost:6379"
-	}
-	rdb := redis.NewClient(&redis.Options{Addr: redisAddr})
+	rdb := redis.NewClient(&redis.Options{Addr: cfg.RedisAddr})
 	if err := rdb.Ping(ctx).Err(); err != nil {
 		log.Fatal(ctx, "redis connect failed", "err", err)
 	}
 	log.FromContext(ctx).Info("connected to Redis")
 
 	// RabbitMQ
-	rabbitURL := os.Getenv("RABBITMQ_URL")
-	if rabbitURL == "" {
-		rabbitURL = "amqp://guest:guest@localhost:5672/"
-	}
-	conn, err := amqp.Dial(rabbitURL)
+	conn, err := amqp.Dial(cfg.RabbitMQURL)
 	if err != nil {
 		log.Fatal(ctx, "rabbitmq connect failed", "err", err)
 	}
@@ -1875,11 +1869,7 @@ func main() {
 	log.FromContext(ctx).Info("connected to RabbitMQ")
 
 	// MongoDB
-	mongoURI := os.Getenv("MONGO_URI")
-	if mongoURI == "" {
-		mongoURI = "mongodb://localhost:27017/quizbattle"
-	}
-	mongoClient, err := mongo.Connect(options.Client().ApplyURI(mongoURI).SetBSONOptions(&options.BSONOptions{
+	mongoClient, err := mongo.Connect(options.Client().ApplyURI(cfg.MongoURI).SetBSONOptions(&options.BSONOptions{
 		ObjectIDAsHexString: true,
 	}))
 	if err != nil {
@@ -1887,10 +1877,7 @@ func main() {
 	}
 	log.FromContext(ctx).Info("connected to MongoDB")
 
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		jwtSecret = "quiz-battle-dev-secret"
-	}
+	jwtSecret := config.MustRequired(ctx, "JWT_SECRET")
 
 	mongoDB := mongoClient.Database(coins.DefaultDBName)
 	ledger := coins.NewLedger(mongoClient, coins.DefaultDBName)

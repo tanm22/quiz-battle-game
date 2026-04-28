@@ -27,6 +27,7 @@ import (
 
 	"quiz-battle/pkg/auth"
 	"quiz-battle/pkg/coins"
+	"quiz-battle/pkg/config"
 	"quiz-battle/pkg/email"
 	"quiz-battle/pkg/keys"
 	"quiz-battle/pkg/lifecycle"
@@ -48,7 +49,12 @@ type authServer struct {
 	rdb       *redis.Client
 	amqpConn  *amqp.Connection
 	jwtSecret string
-	mailer    *email.Sender
+	// googleClientID is the OAuth audience for Google ID tokens. Loaded
+	// once at startup via config.MustRequired so an empty value can't
+	// reach idtoken.Validate (which would otherwise skip the audience
+	// check and accept tokens issued to any Google OAuth client).
+	googleClientID string
+	mailer         *email.Sender
 }
 
 func (s *authServer) users() *mongo.Collection {
@@ -518,10 +524,10 @@ func sanitizeText(s string) string {
 // ---------------------------------------------------------------------------
 
 func (s *authServer) GoogleSignIn(ctx context.Context, req *pb.GoogleSignInRequest) (*pb.GoogleSignInResponse, error) {
-	googleClientID := os.Getenv("GOOGLE_CLIENT_ID")
-
-	// Verify Google ID token
-	payload, err := idtoken.Validate(ctx, req.IdToken, googleClientID)
+	// Verify Google ID token. s.googleClientID is guaranteed non-empty
+	// (MustRequired in main()); passing it to Validate enforces audience
+	// pinning so only tokens minted for our OAuth client are accepted.
+	payload, err := idtoken.Validate(ctx, req.IdToken, s.googleClientID)
 	if err != nil {
 		return nil, status.Errorf(codes.Unauthenticated, "invalid Google ID token: %v", err)
 	}
@@ -1012,11 +1018,8 @@ func main() {
 	defer cancel()
 
 	// MongoDB
-	mongoURI := os.Getenv("MONGO_URI")
-	if mongoURI == "" {
-		mongoURI = "mongodb://localhost:27017/quizbattle"
-	}
-	mongoClient, err := mongo.Connect(options.Client().ApplyURI(mongoURI).SetBSONOptions(&options.BSONOptions{
+	cfg := config.MustCommon(ctx)
+	mongoClient, err := mongo.Connect(options.Client().ApplyURI(cfg.MongoURI).SetBSONOptions(&options.BSONOptions{
 		ObjectIDAsHexString: true,
 	}))
 	if err != nil {
@@ -1036,22 +1039,14 @@ func main() {
 	log.FromContext(ctx).Info("connected to MongoDB")
 
 	// Redis
-	redisAddr := os.Getenv("REDIS_ADDR")
-	if redisAddr == "" {
-		redisAddr = "localhost:6379"
-	}
-	rdb := redis.NewClient(&redis.Options{Addr: redisAddr})
+	rdb := redis.NewClient(&redis.Options{Addr: cfg.RedisAddr})
 	if err := rdb.Ping(ctx).Err(); err != nil {
 		log.Fatal(ctx, "redis connect failed", "err", err)
 	}
 	log.FromContext(ctx).Info("connected to Redis")
 
 	// RabbitMQ (Phase 2: for publishing notification events)
-	rabbitURL := os.Getenv("RABBITMQ_URL")
-	if rabbitURL == "" {
-		rabbitURL = "amqp://guest:guest@localhost:5672/"
-	}
-	amqpConn, err := amqp.Dial(rabbitURL)
+	amqpConn, err := amqp.Dial(cfg.RabbitMQURL)
 	if err != nil {
 		log.Fatal(ctx, "rabbitmq connect failed", "err", err)
 	}
@@ -1064,11 +1059,17 @@ func main() {
 	setupCh.Close()
 	log.FromContext(ctx).Info("connected to RabbitMQ")
 
-	// JWT + Resend
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		jwtSecret = "quiz-battle-dev-secret"
-	}
+	// JWT + Resend. JWTSecret is now required (no dev fallback) — see
+	// pkg/config. RESEND_API_KEY stays optional because emails work in
+	// stub mode for dev (DEV_MODE=true logs the OTP) and the Resend
+	// path is not load-bearing for booting.
+	jwtSecret := config.MustRequired(ctx, "JWT_SECRET")
+
+	// GOOGLE_CLIENT_ID is required: idtoken.Validate skips the audience
+	// check when given an empty string, which would let any Google ID
+	// token forge a session via GoogleSignIn. Failing fast at startup
+	// matches the JWT_SECRET pattern above.
+	googleClientID := config.MustRequired(ctx, "GOOGLE_CLIENT_ID")
 
 	resendKey := os.Getenv("RESEND_API_KEY")
 	resendFrom := os.Getenv("RESEND_FROM")
@@ -1080,12 +1081,13 @@ func main() {
 	}
 
 	srv := &authServer{
-		mongoDB:   db,
-		ledger:    coins.NewLedger(mongoClient, coins.DefaultDBName),
-		rdb:       rdb,
-		amqpConn:  amqpConn,
-		jwtSecret: jwtSecret,
-		mailer:    email.NewSender(resendKey, resendFrom),
+		mongoDB:        db,
+		ledger:         coins.NewLedger(mongoClient, coins.DefaultDBName),
+		rdb:            rdb,
+		amqpConn:       amqpConn,
+		jwtSecret:      jwtSecret,
+		googleClientID: googleClientID,
+		mailer:         email.NewSender(resendKey, resendFrom),
 	}
 
 	// Phase 2: Start notification cron goroutines
