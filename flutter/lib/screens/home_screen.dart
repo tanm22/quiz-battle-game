@@ -11,6 +11,7 @@ import '../theme/app_theme.dart';
 import '../widgets/animated_counter.dart';
 import '../widgets/animated_toast.dart';
 import '../widgets/coin_balance_chip.dart';
+import '../widgets/empty_state.dart';
 import '../widgets/local_avatar.dart';
 import '../widgets/section_header.dart';
 import '../widgets/streak_calendar.dart';
@@ -485,69 +486,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildLeaderboardHeader() {
-    return Row(
-      children: [
-        const Icon(Icons.leaderboard, color: AppColors.gold, size: 20),
-        const SizedBox(width: 8),
-        const Text('Top Players', style: TextStyle(color: AppColors.text, fontSize: 16, fontWeight: FontWeight.bold)),
-        const Spacer(),
-        GestureDetector(
-          onTap: () => setState(() => _currentTab = 1),
-          child: Text('See all', style: TextStyle(color: AppColors.accent.withAlpha(200), fontSize: 13, fontWeight: FontWeight.w600)),
-        ),
-      ],
-    );
-  }
-
   /// Standard-sized shimmer block used for home/leaderboard card skeletons.
   Widget _skeletonTile({required double height, EdgeInsets? margin}) {
     return SkeletonBlock(
       height: height,
       borderRadius: AppRadius.card,
       margin: margin ?? EdgeInsets.zero,
-    );
-  }
-
-  /// Illustrated empty state for when the leaderboard has no entries.
-  /// Shared by the home preview and the full leaderboard tab.
-  Widget _buildLeaderboardEmpty() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: AppColors.goldBg,
-            border: Border.all(color: AppColors.gold.withAlpha(60)),
-          ),
-          child: const Icon(Icons.emoji_events, size: 40, color: AppColors.gold),
-        ),
-        const SizedBox(height: 14),
-        const Text(
-          'No scores yet',
-          style: TextStyle(color: AppColors.text, fontSize: 16, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          'Play your first match to claim the top spot.',
-          style: TextStyle(color: AppColors.textMuted, fontSize: 13),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 14),
-        ElevatedButton.icon(
-          onPressed: () => ref.read(gameStateProvider.notifier).navigateToMatchmaking(),
-          icon: const Icon(Icons.bolt, size: 18),
-          label: const Text('Start battle'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-            shape: const RoundedRectangleBorder(borderRadius: AppRadius.button),
-          ),
-        ),
-      ],
     );
   }
 
@@ -563,19 +507,53 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Column(
       children: [
+        // Big header with gold trophy + title — entrance animated.
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
           child: Row(
             children: [
-              const Icon(Icons.leaderboard, color: AppColors.gold, size: 28),
-              const SizedBox(width: 10),
-              const Text('Leaderboard', style: TextStyle(color: AppColors.text, fontSize: 22, fontWeight: FontWeight.bold)),
+              Container(
+                width: 44,
+                height: 44,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.gold.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color: AppColors.gold.withValues(alpha: 0.3)),
+                ),
+                child: const Icon(Icons.emoji_events_rounded,
+                    color: AppColors.gold, size: 24),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Leaderboard',
+                      style: TextStyle(
+                        color: AppColors.text,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      'Top players, ranked by score',
+                      style: TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
-        ),
+        ).animate().fadeIn(duration: 300.ms),
         // Time filter chips
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
           child: Row(
             children: [
               _filterChip('Daily', 'daily'),
@@ -585,37 +563,47 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               _filterChip('All Time', 'alltime'),
             ],
           ),
-        ),
+        ).animate().fadeIn(delay: 100.ms, duration: 300.ms),
         if (_lbLoading)
           Expanded(
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               children: [
                 for (int i = 0; i < 8; i++)
-                  _skeletonTile(height: 52, margin: const EdgeInsets.only(bottom: 8)),
+                  _skeletonTile(height: 56, margin: const EdgeInsets.only(bottom: 10)),
               ],
             ),
           ),
         if (!_lbLoading && _lbEntries != null && _lbEntries!.isNotEmpty)
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
+            child: ListView.separated(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+              itemCount: _lbEntries!.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 8),
+              itemBuilder: (_, i) => Container(
                 decoration: appCardDecoration(),
-                child: ListView.builder(
-                  padding: EdgeInsets.zero,
-                  itemCount: _lbEntries!.length,
-                  itemBuilder: (_, i) => _leaderboardRow(_lbEntries![i], showBorder: i < _lbEntries!.length - 1),
-                ),
-              ),
+                child: _leaderboardRow(_lbEntries![i], showBorder: false),
+              )
+                  .animate()
+                  .fadeIn(
+                    delay: Duration(milliseconds: 30 * (i % 8)),
+                    duration: 250.ms,
+                  )
+                  .slideY(
+                    begin: 0.05,
+                    end: 0,
+                    curve: Curves.easeOutCubic,
+                  ),
             ),
           ),
         if (!_lbLoading && (_lbEntries == null || _lbEntries!.isEmpty))
-          Expanded(
-            child: Center(child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: _buildLeaderboardEmpty(),
-            )),
+          const Expanded(
+            child: EmptyState(
+              icon: Icons.emoji_events_rounded,
+              iconColor: AppColors.gold,
+              title: 'No scores yet',
+              body: "Be the first to claim the top spot — play a match and your name will appear here.",
+            ),
           ),
         // Upsell for free users
         if ((_homeData?.profile.plan ?? 'free') != 'premium' && !_lbLoading && _lbEntries != null)
@@ -648,19 +636,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Widget _filterChip(String label, String value) {
     final selected = _lbFilter == value;
-    return GestureDetector(
-      onTap: () => _loadLeaderboard(value),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.accentBg : AppColors.cardTint,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: selected ? AppColors.accent : AppColors.border),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _loadLeaderboard(value),
+        borderRadius: BorderRadius.circular(999),
+        splashColor: AppColors.primary.withValues(alpha: 0.15),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: selected
+                ? AppColors.primary.withValues(alpha: 0.15)
+                : AppColors.surface,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: selected
+                  ? AppColors.primary.withValues(alpha: 0.5)
+                  : AppColors.border,
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected ? AppColors.primary : AppColors.textMuted,
+              fontSize: 13,
+              fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+            ),
+          ),
         ),
-        child: Text(label, style: TextStyle(
-          color: selected ? AppColors.accent : AppColors.textMuted,
-          fontSize: 13, fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-        )),
       ),
     );
   }
