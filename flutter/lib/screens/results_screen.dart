@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/game_state.dart';
 import '../theme/app_theme.dart';
@@ -112,12 +113,12 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen>
                     color: opponentLeft ? AppColors.primary : isWinner ? AppColors.gold : AppColors.textMuted,
                     letterSpacing: 2,
                   ),
-                ),
+                ).animate().fadeIn(delay: 300.ms, duration: 400.ms).slideY(begin: 0.2, end: 0, curve: Curves.easeOutBack),
                 const SizedBox(height: 6),
                 Text(
                   opponentLeft ? 'You win by default!' : 'Winner: $winnerName',
                   style: const TextStyle(color: AppColors.textMuted, fontSize: 15),
-                ),
+                ).animate().fadeIn(delay: 400.ms, duration: 400.ms),
 
                 const SizedBox(height: 32),
 
@@ -134,7 +135,10 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen>
                         _StatRow('Correct', '${myResult.answersCorrect}', AppColors.success),
                       ],
                     ),
-                  ),
+                  )
+                      .animate()
+                      .fadeIn(delay: 500.ms, duration: 400.ms)
+                      .slideY(begin: 0.1, end: 0, curve: Curves.easeOutCubic),
 
                 const SizedBox(height: 20),
 
@@ -216,7 +220,7 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen>
                   ),
                 ),
 
-                // Play Again
+                // Play Again — primary CTA
                 SizedBox(
                   width: double.infinity,
                   height: 56,
@@ -224,12 +228,25 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen>
                     decoration: BoxDecoration(
                       gradient: AppGradients.primary,
                       borderRadius: AppRadius.hero,
-                      boxShadow: [BoxShadow(color: AppColors.primary.withAlpha(80), blurRadius: 20, offset: const Offset(0, 6))],
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.4),
+                          blurRadius: 20,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
                     ),
                     child: ElevatedButton.icon(
                       onPressed: () => ref.read(gameStateProvider.notifier).playAgain(),
-                      icon: const Icon(Icons.replay),
-                      label: const Text('PLAY AGAIN', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, letterSpacing: 1)),
+                      icon: const Icon(Icons.replay_rounded),
+                      label: const Text(
+                        'PLAY AGAIN',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.transparent,
                         shadowColor: Colors.transparent,
@@ -238,7 +255,21 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen>
                       ),
                     ),
                   ),
-                ),
+                ).animate().fadeIn(delay: 700.ms, duration: 400.ms),
+                const SizedBox(height: 8),
+                // Back to home — secondary
+                TextButton(
+                  onPressed: () =>
+                      ref.read(gameStateProvider.notifier).navigateToHome(),
+                  child: const Text(
+                    'Back to home',
+                    style: TextStyle(
+                      color: AppColors.textMuted,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ).animate().fadeIn(delay: 800.ms, duration: 400.ms),
               ],
             ),
           ),
