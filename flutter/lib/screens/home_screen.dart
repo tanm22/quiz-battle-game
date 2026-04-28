@@ -19,6 +19,7 @@ import '../widgets/streak_calendar.dart';
 import '../widgets/streak_freeze_chip.dart';
 import '../proto/quiz.pbgrpc.dart';
 import 'coin_ledger_screen.dart';
+import 'friends_screen.dart';
 import 'shop/equip_screen.dart';
 import 'shop/shop_screen.dart';
 import 'profile_analytics_screen.dart';
@@ -28,6 +29,7 @@ import 'profile/edit_profile_screen.dart';
 import 'link_email_screen.dart';
 import 'tournament_screen.dart';
 import 'referral_screen.dart';
+import '../providers/friends_state.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -840,21 +842,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             iconColor: AppColors.success,
           ),
           const SizedBox(height: 8),
-          _profileTileGroup([
-            _ProfileTile(
-              icon: Icons.share_rounded,
-              label: 'Invite Friends',
-              color: AppColors.success,
-              onTap: () => _showShareDialog(gameState),
-            ),
-            _ProfileTile(
-              icon: Icons.card_giftcard_rounded,
-              label: 'Your Referrals',
-              color: AppColors.gold,
-              onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const ReferralScreen())),
-            ),
-          ]),
+          Consumer(
+            builder: (ctx, ref, _) {
+              // Watch the pending-requests count for the Friends tile
+              // badge. Updates live as `friend.request_received` FCM
+              // notifications invalidate `friendRequestsProvider`.
+              final pendingCount = ref.watch(friendRequestsCountProvider);
+              return _profileTileGroup([
+                _ProfileTile(
+                  icon: Icons.group_rounded,
+                  label: 'Friends',
+                  color: AppColors.primary,
+                  trailingBadge: pendingCount > 0 ? '$pendingCount' : null,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const FriendsScreen()),
+                  ),
+                ),
+                _ProfileTile(
+                  icon: Icons.share_rounded,
+                  label: 'Invite Friends',
+                  color: AppColors.success,
+                  onTap: () => _showShareDialog(gameState),
+                ),
+                _ProfileTile(
+                  icon: Icons.card_giftcard_rounded,
+                  label: 'Your Referrals',
+                  color: AppColors.gold,
+                  onTap: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const ReferralScreen())),
+                ),
+              ]);
+            },
+          ),
           const SizedBox(height: 32),
 
           // ── Logout + Delete (low-emphasis) ────────────────────
