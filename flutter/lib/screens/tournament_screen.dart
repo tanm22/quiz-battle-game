@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:grpc/grpc.dart';
 import '../services/quiz_service.dart';
 import '../proto/quiz.pbgrpc.dart';
 import '../theme/app_theme.dart';
+import '../widgets/empty_state.dart';
 import 'payment_screen.dart';
 
 class TournamentScreen extends StatefulWidget {
@@ -92,49 +94,43 @@ class _TournamentScreenState extends State<TournamentScreen> {
         title: const Text('Tournaments'),
         elevation: 0,
       ),
-      body: ScaffoldGradientBackground(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-            : _error != null
-                ? Center(child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 48, height: 48,
-                        decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.roseBg),
-                        child: const Icon(Icons.error_outline, color: AppColors.danger, size: 24),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+          : _error != null
+              ? EmptyState(
+                  icon: Icons.cloud_off_rounded,
+                  iconColor: AppColors.danger,
+                  title: "Couldn't load tournaments",
+                  body: _error,
+                  actionLabel: 'Retry',
+                  onActionTap: _load,
+                )
+              : _tournaments == null || _tournaments!.isEmpty
+                  ? const EmptyState(
+                      icon: Icons.emoji_events_rounded,
+                      iconColor: AppColors.gold,
+                      title: 'No tournaments right now',
+                      body: 'New tournaments drop weekly. Check back soon — premium players also get exclusive event access.',
+                    )
+                  : RefreshIndicator(
+                      onRefresh: _load,
+                      color: AppColors.primary,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+                        itemCount: _tournaments!.length,
+                        itemBuilder: (_, i) => _tournamentCard(_tournaments![i])
+                            .animate()
+                            .fadeIn(
+                              delay: Duration(milliseconds: 50 * (i % 6)),
+                              duration: 300.ms,
+                            )
+                            .slideY(
+                              begin: 0.1,
+                              end: 0,
+                              curve: Curves.easeOutCubic,
+                            ),
                       ),
-                      const SizedBox(height: 12),
-                      Text(_error!, style: const TextStyle(color: AppColors.textMuted), textAlign: TextAlign.center),
-                      const SizedBox(height: 8),
-                      TextButton(onPressed: _load, child: const Text('Retry', style: TextStyle(color: AppColors.primary))),
-                    ],
-                  ))
-                : _tournaments == null || _tournaments!.isEmpty
-                    ? Center(child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 64, height: 64,
-                            decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.goldBg),
-                            child: const Icon(Icons.emoji_events, color: AppColors.gold, size: 32),
-                          ),
-                          const SizedBox(height: 12),
-                          const Text('No tournaments right now', style: TextStyle(color: AppColors.textMuted, fontSize: 16)),
-                          const SizedBox(height: 4),
-                          const Text('Check back soon!', style: TextStyle(color: AppColors.textDim, fontSize: 13)),
-                        ],
-                      ))
-                    : RefreshIndicator(
-                        onRefresh: _load,
-                        color: AppColors.primary,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.all(20),
-                          itemCount: _tournaments!.length,
-                          itemBuilder: (_, i) => _tournamentCard(_tournaments![i]),
-                        ),
-                      ),
-      ),
+                    ),
     );
   }
 

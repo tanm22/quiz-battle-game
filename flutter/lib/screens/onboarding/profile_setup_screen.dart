@@ -4,6 +4,7 @@ import 'package:grpc/grpc.dart';
 import '../../providers/game_state.dart';
 import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/google_style_avatar.dart';
 import '../../widgets/local_avatar.dart';
 
 class ProfileSetupScreen extends ConsumerStatefulWidget {
@@ -235,20 +236,15 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   }
 
   /// Builds the i-th avatar tile. The Google-photo slot (index 0 when
-  /// signed in via Google) uses Image.network with a LocalAvatar fallback
-  /// so a failed photo load still renders something sensible. Preset
-  /// slots are pure-Dart LocalAvatar — no network involved.
+  /// signed in via Google) is rendered by [GoogleStyleAvatar] — shows
+  /// the photo when it loads, falls back to a deterministic
+  /// colored-initial circle (Gmail / Calendar style) when the photo
+  /// can't load. Preset slots are pure-Dart [LocalAvatar].
   Widget _renderAvatar(int i) {
     if (_hasGooglePhoto && i == 0) {
-      return ClipOval(
-        child: Image.network(
-          _googlePhotoUrl!,
-          fit: BoxFit.cover,
-          errorBuilder: (_, _, _) => const LocalAvatar(
-            glyph: '👤',
-            background: AppColors.accent,
-          ),
-        ),
+      return GoogleStyleAvatar(
+        name: _displayNameCtl.text.isNotEmpty ? _displayNameCtl.text : 'Player',
+        imageUrl: _googlePhotoUrl,
       );
     }
     final preset = kPresetAvatars[i - (_hasGooglePhoto ? 1 : 0)];

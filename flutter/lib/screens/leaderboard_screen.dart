@@ -125,11 +125,15 @@ class _EmptyLeaderboard extends StatelessWidget {
 }
 
 class _LeaderboardRow extends StatelessWidget {
-  // Podium background tints for top 3
+  // Podium background tints for top 3 — dark-tone tokens so the
+  // near-white username text + medal-colored score render with proper
+  // contrast on each row. The pre-redesign version used #F1F5F9
+  // (near-white) for 2nd and #FFF7ED (cream) for 3rd, which made
+  // the foreground text effectively invisible against them.
   static const _podiumBg = [
-    AppColors.goldBg,           // 1st – gold tint
-    Color(0xFFF1F5F9),          // 2nd – light grey
-    Color(0xFFFFF7ED),          // 3rd – warm tint
+    AppColors.goldBg,    // 1st – faint gold
+    AppColors.silverBg,  // 2nd – faint silver
+    AppColors.bronzeBg,  // 3rd – faint bronze
   ];
 
   static const _medalColors = [

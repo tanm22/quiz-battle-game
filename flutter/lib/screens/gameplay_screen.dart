@@ -539,32 +539,35 @@ class _QuestionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(left: 8, top: 10, bottom: 4),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.accent.withAlpha(30)),
-        boxShadow: [
-          BoxShadow(color: AppColors.accent.withAlpha(12), blurRadius: 24, offset: const Offset(0, 8)),
+        border: Border.all(color: AppColors.border),
+        boxShadow: const [
+          // Subtle dark shadow per the reference's cleaner question
+          // card styling — no purple accent halo, just depth.
+          BoxShadow(color: Color(0x4D000000), blurRadius: 20, offset: Offset(0, 8)),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Question text
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-            decoration: BoxDecoration(
-              color: AppColors.accentBg,
-              borderRadius: BorderRadius.circular(14),
-            ),
+          // Question text — left-aligned heading style on a transparent
+          // surface mirroring the reference's `_buildQuestionCard`.
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
             child: Text(
               question.text,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.text, fontSize: 17, fontWeight: FontWeight.w600, height: 1.35),
+              style: const TextStyle(
+                color: AppColors.text,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                height: 1.45,
+              ),
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           // Options
           ...List.generate(question.options.length, (i) {
             return Padding(

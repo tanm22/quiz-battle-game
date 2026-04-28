@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../proto/quiz.pb.dart';
 import '../providers/coins_state.dart';
 import '../theme/app_theme.dart';
+import '../widgets/empty_state.dart';
 
 /// Lifetime coin-ledger history. The screen owns its own pagination
 /// state — first page loads in [initState], subsequent pages load when
@@ -121,103 +123,183 @@ class _CoinLedgerScreenState extends ConsumerState<CoinLedgerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.bg,
+      appBar: AppBar(
+        title: const Text('Coin History'),
+        centerTitle: false,
+      ),
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
     if (_rows.isEmpty && _loading) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Coin History')),
-        body: const Center(child: CircularProgressIndicator()),
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.primary),
       );
     }
     if (_rows.isEmpty && _error != null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Coin History')),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.error_outline, size: 32, color: AppColors.danger),
-                const SizedBox(height: 8),
-                Text(_error!,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: AppColors.textMuted)),
-                const SizedBox(height: 12),
-                ElevatedButton(onPressed: _loadMore, child: const Text('Retry')),
-              ],
-            ),
-          ),
-        ),
+      return EmptyState(
+        icon: Icons.cloud_off_rounded,
+        iconColor: AppColors.danger,
+        title: "Couldn't load history",
+        body: _error,
+        actionLabel: 'Retry',
+        onActionTap: _loadMore,
       );
     }
     if (_rows.isEmpty) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Coin History')),
-        body: const Center(
-          child: Text('No coin activity yet — earn some by playing matches.',
-              style: TextStyle(color: AppColors.textMuted)),
-        ),
+      return const EmptyState(
+        icon: Icons.savings_rounded,
+        iconColor: AppColors.gold,
+        title: 'No coin activity yet',
+        body: 'Play your first match to start earning coins. Daily streaks and tournament wins boost your balance fast.',
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Coin History'),
-        backgroundColor: AppColors.bg,
-        foregroundColor: AppColors.text,
-      ),
-      body: ListView.separated(
-        controller: _scroll,
-        padding: const EdgeInsets.all(12),
-        itemCount: _rows.length + (_exhausted ? 0 : 1),
-        separatorBuilder: (_, _) => const Divider(height: 1, color: AppColors.border),
-        itemBuilder: (context, i) {
-          if (i >= _rows.length) {
-            // Footer spinner / retry while another page is in flight
-            // OR after a page-load error.
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Center(
-                child: _error != null
-                    ? TextButton(onPressed: _loadMore, child: const Text('Retry'))
-                    : const CircularProgressIndicator(strokeWidth: 2),
-              ),
+    return ListView.separated(
+      controller: _scroll,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      itemCount: _rows.length + (_exhausted ? 0 : 1),
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
+      itemBuilder: (context, i) {
+        if (i >= _rows.length) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Center(
+              child: _error != null
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _error!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              color: AppColors.danger, fontSize: 13),
+                        ),
+                        const SizedBox(height: 8),
+                        ElevatedButton.icon(
+                          onPressed: _loadMore,
+                          icon: const Icon(Icons.refresh_rounded, size: 16),
+                          label: const Text('Retry'),
+                        ),
+                      ],
+                    )
+                  : const CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.primary,
+                    ),
+            ),
+          );
+        }
+        final row = _rows[i];
+        return _LedgerRow(
+          reason: _humanize(row.reason),
+          delta: row.delta.toInt(),
+          balanceAfter: row.balanceAfter.toInt(),
+          when: _formatDate(row.createdAtUnixMs.toInt()),
+        )
+            .animate()
+            .fadeIn(
+              delay: Duration(milliseconds: 30 * (i % 8)),
+              duration: 250.ms,
+            )
+            .slideY(
+              begin: 0.05,
+              end: 0,
+              curve: Curves.easeOutCubic,
             );
-          }
-          final row = _rows[i];
-          final positive = row.delta >= 0;
-          return ListTile(
-            dense: true,
-            leading: Icon(
-              positive ? Icons.add_circle_outline : Icons.remove_circle_outline,
-              color: positive ? AppColors.success : AppColors.danger,
+      },
+    );
+  }
+}
+
+/// One ledger row — a card with a tinted-circle icon (green for
+/// positive delta / red for negative), humanized reason headline,
+/// timestamp, signed delta, and post-balance footnote.
+class _LedgerRow extends StatelessWidget {
+  final String reason;
+  final int delta;
+  final int balanceAfter;
+  final String when;
+
+  const _LedgerRow({
+    required this.reason,
+    required this.delta,
+    required this.balanceAfter,
+    required this.when,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final positive = delta >= 0;
+    final tint = positive ? AppColors.success : AppColors.danger;
+    final icon = positive
+        ? Icons.arrow_upward_rounded
+        : Icons.arrow_downward_rounded;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: appCardDecoration(),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: tint.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+              border: Border.all(color: tint.withValues(alpha: 0.3)),
             ),
-            title: Text(
-              _humanize(row.reason),
-              style: const TextStyle(color: AppColors.text, fontWeight: FontWeight.w700),
-            ),
-            subtitle: Text(
-              _formatDate(row.createdAtUnixMs.toInt()),
-              style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
-            ),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
+            child: Icon(icon, color: tint, size: 18),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${positive ? '+' : ''}${row.delta.toInt()}',
-                  style: TextStyle(
-                    color: positive ? AppColors.success : AppColors.danger,
-                    fontWeight: FontWeight.w800,
+                  reason,
+                  style: const TextStyle(
+                    color: AppColors.text,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
+                const SizedBox(height: 2),
                 Text(
-                  'bal ${row.balanceAfter.toInt()}',
-                  style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                  when,
+                  style: const TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 11,
+                  ),
                 ),
               ],
             ),
-          );
-        },
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${positive ? '+' : ''}$delta',
+                style: TextStyle(
+                  color: tint,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Text(
+                'bal $balanceAfter',
+                style: const TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../proto/quiz.pb.dart';
 import '../services/quiz_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/empty_state.dart';
 
 class MatchHistoryScreen extends StatefulWidget {
   final String currentUserId;
@@ -60,41 +62,41 @@ class _MatchHistoryScreenState extends State<MatchHistoryScreen> {
                 child: _loading
                     ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
                     : _error != null
-                        ? Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.error_outline, color: AppColors.danger, size: 48),
-                                const SizedBox(height: 12),
-                                Text(_error!, style: const TextStyle(color: AppColors.textMuted), textAlign: TextAlign.center),
-                                const SizedBox(height: 16),
-                                TextButton(onPressed: _loadHistory, child: const Text('Retry')),
-                              ],
-                            ),
+                        ? EmptyState(
+                            icon: Icons.cloud_off_rounded,
+                            iconColor: AppColors.danger,
+                            title: "Couldn't load matches",
+                            body: _error,
+                            actionLabel: 'Retry',
+                            onActionTap: _loadHistory,
                           )
                         : _matches.isEmpty
-                            ? Center(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.sports_esports, color: AppColors.textDim.withAlpha(100), size: 64),
-                                    const SizedBox(height: 16),
-                                    const Text('No matches yet', style: TextStyle(color: AppColors.textMuted, fontSize: 18)),
-                                    const SizedBox(height: 8),
-                                    const Text('Play a match to see your history here!', style: TextStyle(color: AppColors.textDim, fontSize: 14)),
-                                  ],
-                                ),
+                            ? const EmptyState(
+                                icon: Icons.sports_esports_rounded,
+                                iconColor: AppColors.accent,
+                                title: 'No matches yet',
+                                body: 'Play your first quiz battle and your match history will populate here.',
                               )
                             : RefreshIndicator(
                                 onRefresh: _loadHistory,
                                 color: AppColors.primary,
                                 child: ListView.builder(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
                                   itemCount: _matches.length,
                                   itemBuilder: (context, index) => _MatchCard(
                                     match: _matches[index],
                                     currentUserId: widget.currentUserId,
-                                  ),
+                                  )
+                                      .animate()
+                                      .fadeIn(
+                                        delay: Duration(milliseconds: 30 * (index % 8)),
+                                        duration: 250.ms,
+                                      )
+                                      .slideY(
+                                        begin: 0.05,
+                                        end: 0,
+                                        curve: Curves.easeOutCubic,
+                                      ),
                                 ),
                               ),
               ),
