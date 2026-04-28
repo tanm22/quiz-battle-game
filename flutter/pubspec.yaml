@@ -51,6 +51,12 @@ dependencies:
   # §4.5 analytics screen — line chart for the 30-day rating series.
   # Pure-Dart, no platform-specific code, ~150 KB to the bundle.
   fl_chart: ^0.69.0
+  # UI redesign — chainable .animate().fadeIn().slideY() for screen
+  # entrance / item-stagger animations adopted from the design ref.
+  flutter_animate: ^4.5.0
+  # UI redesign — Material motion transitions (shared-axis, fade-through)
+  # for navigation effects between screens.
+  animations: ^2.0.11
 
 dev_dependencies:
   flutter_test:

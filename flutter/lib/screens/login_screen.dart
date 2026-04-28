@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:grpc/grpc.dart';
 import '../providers/game_state.dart';
@@ -9,6 +10,14 @@ import '../services/quiz_service.dart';
 import '../theme/app_theme.dart';
 import 'email_code_screen.dart';
 
+/// LoginScreen — UX styled after the MANAS-exe/QUIZ_BATTLE_SYSTEM
+/// reference: a coral hero badge, "Quiz Battle" headline + tagline,
+/// Google-sign-in as the prominent primary CTA, and the credential
+/// flow collapsed behind a `Use email / password` toggle. The tabbed
+/// Login/Register form, the unique-username live check, the
+/// email-or-username login dispatcher, the email-code flow, the
+/// referral code, the forgot-password jump, and Quick Play (guest)
+/// are all preserved — only the visual layout and motion changed.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -34,6 +43,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   Timer? _usernameDebounce;
 
   bool _isLoading = false;
+  bool _showCredentialForm = false;
+  String? _error;
 
   @override
   void initState() {
@@ -69,7 +80,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     final username = _regUsernameController.text.trim();
     _usernameDebounce?.cancel();
     if (username.length < 3) {
-      setState(() { _usernameAvailable = null; _checkingUsername = false; });
+      setState(() {
+        _usernameAvailable = null;
+        _checkingUsername = false;
+      });
       return;
     }
     setState(() => _checkingUsername = true);
@@ -77,30 +91,42 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       try {
         final available = await AuthService().checkUsername(username);
         if (mounted && _regUsernameController.text.trim() == username) {
-          setState(() { _usernameAvailable = available; _checkingUsername = false; });
+          setState(() {
+            _usernameAvailable = available;
+            _checkingUsername = false;
+          });
         }
       } catch (_) {
-        if (mounted) setState(() { _usernameAvailable = null; _checkingUsername = false; });
+        if (mounted) {
+          setState(() {
+            _usernameAvailable = null;
+            _checkingUsername = false;
+          });
+        }
       }
     });
   }
 
-  void _showError(String message) {
+  /// Surface an inline error in the form (animated shake) instead of a
+  /// snackbar — matches the reference's affordance and keeps the user's
+  /// eye on the actual offending input.
+  void _setError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: AppColors.danger, behavior: SnackBarBehavior.floating),
-    );
+    setState(() => _error = message);
   }
 
   void _navigateToMatchmaking(AuthService auth) {
     QuizService().setAuthToken(auth.token!);
     final notifier = ref.read(gameStateProvider.notifier);
     notifier.setAuth(
-      auth.userId!, auth.token!, auth.rating,
-      email: auth.email, isGuest: auth.isGuest,
+      auth.userId!,
+      auth.token!,
+      auth.rating,
+      email: auth.email,
+      isGuest: auth.isGuest,
     );
-    // Fire-and-forget: register FCM token so push notifications reach this user.
-    // Handler is internally idempotent and never throws.
+    // Fire-and-forget: register FCM token so push notifications reach
+    // this user. The handler is internally idempotent and never throws.
     unawaited(FcmService.instance.registerForUser());
   }
 
@@ -115,8 +141,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       QuizService().setAuthToken(auth.token!);
       final notifier = ref.read(gameStateProvider.notifier);
       notifier.setAuth(
-        auth.userId!, auth.token!, auth.rating,
-        email: auth.email, isGuest: auth.isGuest,
+        auth.userId!,
+        auth.token!,
+        auth.rating,
+        email: auth.email,
+        isGuest: auth.isGuest,
       );
       // Intentionally NOT calling FcmService.registerForUser() —
       // permission ask is deferred to the prime screen so the OS
@@ -128,21 +157,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   }
 
   Future<void> _googleSignIn() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
     try {
       final auth = AuthService();
       await auth.signInWithGoogle();
       _navigateAfterSignup(auth);
     } on GrpcError catch (e) {
-      _showError(e.message ?? 'Google sign-in failed');
+      _setError(e.message ?? 'Google sign-in failed');
     } catch (e) {
       final msg = e.toString();
       if (msg.contains('cancelled')) return;
       // ApiException 12500 / 12501 = Google Play Services missing or misconfigured
-      if (msg.contains('12500') || msg.contains('12501') || msg.contains('ApiException')) {
-        _showError('Google Play Services not available. Use credentials or Quick Play instead.');
+      if (msg.contains('12500') ||
+          msg.contains('12501') ||
+          msg.contains('ApiException')) {
+        _setError('Google Play Services not available. Use credentials or Quick Play instead.');
       } else {
-        _showError(msg);
+        _setError(msg);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -150,15 +184,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   }
 
   Future<void> _guestLogin() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
     try {
       final auth = AuthService();
       await auth.guestLogin();
       _navigateToMatchmaking(auth);
     } on GrpcError catch (e) {
-      _showError(e.message ?? 'Guest login failed');
+      _setError(e.message ?? 'Guest login failed');
     } catch (e) {
-      _showError(e.toString());
+      _setError(e.toString());
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -166,8 +203,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   Future<void> _submitLogin() async {
     final identity = _loginIdentityController.text.trim();
-    if (identity.isEmpty) { _showError('Enter a username or email'); return; }
+    if (identity.isEmpty) {
+      _setError('Enter a username or email');
+      return;
+    }
     final isEmail = identity.contains('@');
+
+    setState(() => _error = null);
 
     if (isEmail) {
       setState(() => _isLoading = true);
@@ -178,24 +220,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         setState(() => _isLoading = false);
         _openEmailCodeScreen(identity, 'login');
       } on GrpcError catch (e) {
-        _showError(e.message ?? 'Failed to send login code');
+        _setError(e.message ?? 'Failed to send login code');
         if (mounted) setState(() => _isLoading = false);
       } catch (e) {
-        _showError(e.toString());
+        _setError(e.toString());
         if (mounted) setState(() => _isLoading = false);
       }
     } else {
       final password = _loginPasswordController.text;
-      if (password.isEmpty) { _showError('Password required'); return; }
+      if (password.isEmpty) {
+        _setError('Password required');
+        return;
+      }
       setState(() => _isLoading = true);
       try {
         final auth = AuthService();
         await auth.login(identity, password);
         _navigateToMatchmaking(auth);
       } on GrpcError catch (e) {
-        _showError(e.message ?? 'Login failed');
+        _setError(e.message ?? 'Login failed');
       } catch (e) {
-        _showError(e.toString());
+        _setError(e.toString());
       } finally {
         if (mounted) setState(() => _isLoading = false);
       }
@@ -207,17 +252,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     final password = _regPasswordController.text;
     final email = _regEmailController.text.trim();
     final referral = _regReferralController.text.trim();
-    if (username.isEmpty || password.isEmpty) { _showError('Username and password required'); return; }
-    if (username.length < 3) { _showError('Username must be at least 3 characters'); return; }
-    setState(() => _isLoading = true);
+    if (username.isEmpty || password.isEmpty) {
+      _setError('Username and password required');
+      return;
+    }
+    if (username.length < 3) {
+      _setError('Username must be at least 3 characters');
+      return;
+    }
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
     try {
       final auth = AuthService();
-      await auth.register(username, password, email: email.isNotEmpty ? email : null, referralCode: referral.isNotEmpty ? referral : null);
+      await auth.register(
+        username,
+        password,
+        email: email.isNotEmpty ? email : null,
+        referralCode: referral.isNotEmpty ? referral : null,
+      );
       _navigateAfterSignup(auth);
     } on GrpcError catch (e) {
-      _showError(e.message ?? 'Registration failed');
+      _setError(e.message ?? 'Registration failed');
     } catch (e) {
-      _showError(e.toString());
+      _setError(e.toString());
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -225,18 +284,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   Future<void> _forgotPassword() async {
     final email = _loginIdentityController.text.trim();
-    if (email.isEmpty || !email.contains('@')) { _showError('Enter your email address above first'); return; }
-    setState(() => _isLoading = true);
+    if (email.isEmpty || !email.contains('@')) {
+      _setError('Enter your email address above first');
+      return;
+    }
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
     try {
       await AuthService().sendEmailCode(email, 'reset');
       if (!mounted) return;
       setState(() => _isLoading = false);
       _openEmailCodeScreen(email, 'reset');
     } on GrpcError catch (e) {
-      _showError(e.message ?? 'Failed to send reset code');
+      _setError(e.message ?? 'Failed to send reset code');
       if (mounted) setState(() => _isLoading = false);
     } catch (e) {
-      _showError(e.toString());
+      _setError(e.toString());
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -251,12 +316,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             if (token != null && userId != null) {
               final auth = AuthService();
               QuizService().setAuthToken(auth.token!);
-              // VerifyEmailCodeResponse carries only verified/token/userId.
-              // The local _onboardingCompleted defaults to false on a fresh
-              // device, so we explicitly fetch the profile to know whether
-              // to route to onboarding or home — same contract as register
-              // / Google sign-in. Network failure falls through to cached
-              // defaults; that's the same risk every other flow accepts.
               await auth.refreshProfile();
             }
             if (!mounted) return;
@@ -270,7 +329,224 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     );
   }
 
-  InputDecoration _inputDecoration(String label, IconData icon, {Widget? suffix}) {
+  // ──────────────────────────────────────────────────────────────────
+  // Sub-widgets
+  // ──────────────────────────────────────────────────────────────────
+
+  /// Coral logo badge — circle with a faint coral fill and a 2px coral
+  /// border, bolt icon centered. Animates on mount: fade + elastic
+  /// scale matching the reference.
+  Widget _buildLogo() {
+    return Container(
+      width: 90,
+      height: 90,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: AppColors.primary.withValues(alpha: 0.15),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.4), width: 2),
+      ),
+      child: const Icon(Icons.bolt_rounded, color: AppColors.primary, size: 44),
+    )
+        .animate()
+        .fadeIn(duration: 500.ms)
+        .scale(
+          begin: const Offset(0.7, 0.7),
+          end: const Offset(1, 1),
+          duration: 500.ms,
+          curve: Curves.elasticOut,
+        );
+  }
+
+  Widget _buildHeadline() {
+    return Column(
+      children: [
+        const Text(
+          'Quiz Battle',
+          style: TextStyle(
+            color: AppColors.text,
+            fontSize: 32,
+            fontWeight: FontWeight.w800,
+          ),
+        ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
+        const SizedBox(height: 6),
+        Text(
+          'Challenge friends. Climb the ranks.',
+          style: TextStyle(
+            color: AppColors.text.withValues(alpha: 0.45),
+            fontSize: 14,
+          ),
+        ).animate().fadeIn(delay: 350.ms, duration: 400.ms),
+      ],
+    );
+  }
+
+  /// Primary action — large white Google button with the official "G"
+  /// glyph. Above the fold, full width, fade-in delay 450ms.
+  Widget _buildGoogleButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: _isLoading ? null : _googleSignIn,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF1F1F1F),
+          disabledBackgroundColor: Colors.white.withValues(alpha: 0.6),
+          padding: const EdgeInsets.symmetric(vertical: 15),
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+          ),
+        ),
+        child: _isLoading
+            ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  color: Color(0xFF1F1F1F),
+                  strokeWidth: 2.5,
+                ),
+              )
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const _GoogleLogo(),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Continue with Google',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1F1F1F),
+                    ),
+                  ),
+                ],
+              ),
+      ),
+    ).animate().fadeIn(delay: 450.ms, duration: 400.ms);
+  }
+
+  /// Secondary action — Quick Play (guest). Lighter weight than
+  /// Google so it reads as the alt path, not a competing CTA.
+  Widget _buildQuickPlayButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: TextButton.icon(
+        onPressed: _isLoading ? null : _guestLogin,
+        icon: const Icon(Icons.flash_on_rounded, color: AppColors.textMuted),
+        label: const Text(
+          'Quick Play (no account)',
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textMuted,
+          ),
+        ),
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+      ),
+    ).animate().fadeIn(delay: 500.ms, duration: 400.ms);
+  }
+
+  Widget _buildDivider() {
+    return Row(
+      children: [
+        Expanded(
+          child: Divider(color: AppColors.text.withValues(alpha: 0.12)),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text(
+            'or',
+            style: TextStyle(
+              color: AppColors.text.withValues(alpha: 0.35),
+              fontSize: 13,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Divider(color: AppColors.text.withValues(alpha: 0.12)),
+        ),
+      ],
+    ).animate().fadeIn(delay: 550.ms, duration: 400.ms);
+  }
+
+  /// Tap-to-expand toggle that reveals the credential form below.
+  Widget _buildCredentialToggle() {
+    return GestureDetector(
+      onTap: () => setState(() {
+        _showCredentialForm = !_showCredentialForm;
+        _error = null;
+      }),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            'Use email / password',
+            style: TextStyle(
+              color: AppColors.text.withValues(alpha: 0.5),
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Icon(
+            _showCredentialForm
+                ? Icons.keyboard_arrow_up_rounded
+                : Icons.keyboard_arrow_down_rounded,
+            color: AppColors.textMuted,
+            size: 18,
+          ),
+        ],
+      ),
+    ).animate().fadeIn(delay: 600.ms, duration: 400.ms);
+  }
+
+  Widget _buildErrorBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.danger.withValues(alpha: 0.12),
+        borderRadius: AppRadius.button,
+        border: Border.all(color: AppColors.danger.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline_rounded,
+              color: AppColors.danger, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              _error ?? '',
+              style: const TextStyle(color: AppColors.danger, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 200.ms).shakeX(hz: 3, amount: 4);
+  }
+
+  Widget _buildTermsNote() {
+    return Text(
+      'By continuing, you agree to our Terms and Privacy Policy.',
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        color: AppColors.text.withValues(alpha: 0.3),
+        fontSize: 11,
+        height: 1.4,
+      ),
+    ).animate().fadeIn(delay: 700.ms, duration: 400.ms);
+  }
+
+  // ── Credential form (collapsed by default) ─────────────────────────
+
+  InputDecoration _inputDecoration(String label, IconData icon,
+      {Widget? suffix}) {
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(color: AppColors.textMuted),
@@ -284,9 +560,50 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: AppColors.accent, width: 2),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
       ),
     );
+  }
+
+  Widget _buildCredentialForm() {
+    return Column(
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.cardTint,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: TabBar(
+            controller: _tabController,
+            indicatorSize: TabBarIndicatorSize.tab,
+            indicator: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.5)),
+            ),
+            labelColor: AppColors.primary,
+            unselectedLabelColor: AppColors.textMuted,
+            dividerColor: Colors.transparent,
+            tabs: const [
+              Tab(text: 'Login'),
+              Tab(text: 'Register'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        ListenableBuilder(
+          listenable: _tabController,
+          builder: (context, _) {
+            return IndexedStack(
+              index: _tabController.index,
+              children: [_buildLoginTab(), _buildRegisterTab()],
+            );
+          },
+        ),
+      ],
+    ).animate().fadeIn(duration: 250.ms).slideY(begin: -0.05, end: 0);
   }
 
   Widget _buildLoginTab() {
@@ -298,29 +615,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         TextField(
           controller: _loginIdentityController,
           style: const TextStyle(color: AppColors.text),
-          decoration: _inputDecoration('Username or Email', Icons.person),
+          decoration: _inputDecoration('Username or Email', Icons.person_outline_rounded),
           onSubmitted: (_) => _showLoginPassword ? null : _submitLogin(),
         ),
         if (_showLoginPassword && !isEmail) ...[
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           TextField(
             controller: _loginPasswordController,
             obscureText: true,
             style: const TextStyle(color: AppColors.text),
-            decoration: _inputDecoration('Password', Icons.lock),
+            decoration: _inputDecoration('Password', Icons.lock_outline_rounded),
             onSubmitted: (_) => _submitLogin(),
           ),
         ],
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
         Align(
           alignment: Alignment.centerRight,
           child: TextButton(
             onPressed: _isLoading ? null : _forgotPassword,
-            child: const Text('Forgot password?', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+            child: const Text(
+              'Forgot password?',
+              style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+            ),
           ),
         ),
-        const SizedBox(height: 12),
-        _buildActionButton(
+        const SizedBox(height: 8),
+        _buildPrimaryActionButton(
           onPressed: _isLoading ? null : _submitLogin,
           label: isEmail ? 'Send Login Code' : 'Login',
         ),
@@ -333,7 +653,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     if (_checkingUsername) {
       usernameSuffix = const Padding(
         padding: EdgeInsets.all(12),
-        child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.textMuted)),
+        child: SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: AppColors.textMuted,
+          ),
+        ),
       );
     } else if (_usernameAvailable == true) {
       usernameSuffix = const Icon(Icons.check_circle, color: AppColors.success);
@@ -347,39 +674,44 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         TextField(
           controller: _regUsernameController,
           style: const TextStyle(color: AppColors.text),
-          decoration: _inputDecoration('Username', Icons.person, suffix: usernameSuffix),
+          decoration: _inputDecoration('Username', Icons.person_outline_rounded,
+              suffix: usernameSuffix),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         TextField(
           controller: _regPasswordController,
           obscureText: true,
           style: const TextStyle(color: AppColors.text),
-          decoration: _inputDecoration('Password', Icons.lock),
+          decoration: _inputDecoration('Password', Icons.lock_outline_rounded),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         TextField(
           controller: _regEmailController,
           style: const TextStyle(color: AppColors.text),
-          decoration: _inputDecoration('Email (optional)', Icons.email),
+          decoration: _inputDecoration('Email (optional)', Icons.email_outlined),
           keyboardType: TextInputType.emailAddress,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         TextField(
           controller: _regReferralController,
           style: const TextStyle(color: AppColors.text),
-          decoration: _inputDecoration('Referral code (optional)', Icons.card_giftcard),
+          decoration: _inputDecoration(
+              'Referral code (optional)', Icons.card_giftcard_rounded),
           textCapitalization: TextCapitalization.characters,
         ),
-        const SizedBox(height: 20),
-        _buildActionButton(
+        const SizedBox(height: 16),
+        _buildPrimaryActionButton(
           onPressed: _isLoading ? null : _submitRegister,
-          label: 'Register',
+          label: 'Create account',
         ),
       ],
     );
   }
 
-  Widget _buildActionButton({VoidCallback? onPressed, required String label}) {
+  Widget _buildPrimaryActionButton({
+    VoidCallback? onPressed,
+    required String label,
+  }) {
     return SizedBox(
       width: double.infinity,
       height: 52,
@@ -387,7 +719,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         decoration: BoxDecoration(
           gradient: AppGradients.primary,
           borderRadius: BorderRadius.circular(14),
-          boxShadow: [BoxShadow(color: AppColors.primary.withAlpha(60), blurRadius: 12, offset: const Offset(0, 4))],
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.35),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            )
+          ],
         ),
         child: ElevatedButton(
           onPressed: onPressed,
@@ -395,148 +733,93 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             backgroundColor: Colors.transparent,
             shadowColor: Colors.transparent,
             foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14)),
           ),
           child: _isLoading
-              ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2.5, color: Colors.white),
+                )
+              : Text(label,
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold)),
         ),
       ),
     );
   }
 
+  // ──────────────────────────────────────────────────────────────────
+  // Build
+  // ──────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: ScaffoldGradientBackground(
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Logo
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppColors.accentBg,
-                      boxShadow: [BoxShadow(color: AppColors.accent.withAlpha(40), blurRadius: 30)],
-                    ),
-                    child: const Icon(Icons.bolt, size: 48, color: AppColors.accent),
-                  ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'QUIZ BATTLE',
-                    style: TextStyle(fontSize: 34, fontWeight: FontWeight.w900, color: AppColors.accent, letterSpacing: 2),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Challenge your mind',
-                    style: TextStyle(fontSize: 14, color: AppColors.textMuted, letterSpacing: 1),
-                  ),
-                  const SizedBox(height: 36),
-
-                  // Google Sign-In -- primary auth
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: Container(
-                      decoration: appCardDecoration(),
-                      child: ElevatedButton.icon(
-                        onPressed: _isLoading ? null : _googleSignIn,
-                        icon: Container(
-                          width: 24, height: 24,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Center(
-                            child: Text('G', style: TextStyle(
-                              color: Color(0xFF4285F4),
-                              fontWeight: FontWeight.w700,
-                              fontSize: 16,
-                              height: 1,
-                            )),
-                          ),
-                        ),
-                        label: const Text('Sign in with Google', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.transparent,
-                          shadowColor: Colors.transparent,
-                          foregroundColor: AppColors.text,
-                          shape: RoundedRectangleBorder(borderRadius: AppRadius.card),
-                          elevation: 0,
-                        ),
-                      ),
-                    ),
-                  ),
-
+      backgroundColor: AppColors.bg,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildLogo(),
+                const SizedBox(height: 20),
+                _buildHeadline(),
+                const SizedBox(height: 40),
+                _buildGoogleButton(),
+                const SizedBox(height: 12),
+                _buildQuickPlayButton(),
+                const SizedBox(height: 24),
+                _buildDivider(),
+                const SizedBox(height: 20),
+                _buildCredentialToggle(),
+                if (_showCredentialForm) ...[
                   const SizedBox(height: 16),
-
-                  // Guest login
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: TextButton.icon(
-                      onPressed: _isLoading ? null : _guestLogin,
-                      icon: const Icon(Icons.flash_on, color: AppColors.textMuted),
-                      label: const Text('Quick Play', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textMuted)),
-                      style: TextButton.styleFrom(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 28),
-                  Row(
-                    children: [
-                      const Expanded(child: Divider(color: AppColors.border)),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text('or use credentials', style: TextStyle(color: AppColors.textDim)),
-                      ),
-                      const Expanded(child: Divider(color: AppColors.border)),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Tab bar
-                  Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.cardTint,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: TabBar(
-                      controller: _tabController,
-                      indicatorSize: TabBarIndicatorSize.tab,
-                      indicator: BoxDecoration(
-                        color: AppColors.accentBg,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppColors.accent.withAlpha(60)),
-                      ),
-                      labelColor: AppColors.accent,
-                      unselectedLabelColor: AppColors.textMuted,
-                      dividerColor: Colors.transparent,
-                      tabs: const [Tab(text: 'Login'), Tab(text: 'Register')],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  ListenableBuilder(
-                    listenable: _tabController,
-                    builder: (context, _) {
-                      return IndexedStack(
-                        index: _tabController.index,
-                        children: [_buildLoginTab(), _buildRegisterTab()],
-                      );
-                    },
-                  ),
+                  _buildCredentialForm(),
                 ],
-              ),
+                if (_error != null) ...[
+                  const SizedBox(height: 12),
+                  _buildErrorBanner(),
+                ],
+                const SizedBox(height: 40),
+                _buildTermsNote(),
+              ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Inline "G" Google glyph — a 24×24 white tile with a colored G.
+/// Avoids depending on a network asset and matches the reference's
+/// approach of drawing the logo locally.
+class _GoogleLogo extends StatelessWidget {
+  const _GoogleLogo();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 24,
+      height: 24,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: const Center(
+        child: Text(
+          'G',
+          style: TextStyle(
+            color: Color(0xFF4285F4),
+            fontWeight: FontWeight.w700,
+            fontSize: 16,
+            height: 1,
           ),
         ),
       ),

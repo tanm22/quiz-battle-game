@@ -60,15 +60,162 @@ class QuizBattleApp extends StatelessWidget {
       title: 'Quiz Battle',
       navigatorKey: rootNavigatorKey,
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: AppColors.accent,
-          brightness: Brightness.light,
-        ),
-        scaffoldBackgroundColor: AppColors.bg,
-        fontFamily: 'Roboto',
-      ),
+      theme: _buildDarkTheme(),
       home: const AppShell(),
+    );
+  }
+
+  /// Dark Material3 theme aligned with the reference UI's
+  /// (MANAS-exe/QUIZ_BATTLE_SYSTEM) tokens — coral primary, dark-navy
+  /// surfaces, gold secondary. Every screen-level color reads through
+  /// the AppColors tokens so this builder only needs to wire the
+  /// ColorScheme + global widget theming (cards, buttons, dividers,
+  /// inputs) to match.
+  ThemeData _buildDarkTheme() {
+    const scheme = ColorScheme(
+      brightness: Brightness.dark,
+      primary: AppColors.primary,
+      onPrimary: Colors.white,
+      secondary: AppColors.gold,
+      onSecondary: Color(0xFF1A1632),
+      tertiary: AppColors.accent,
+      onTertiary: Colors.white,
+      error: AppColors.danger,
+      onError: Colors.white,
+      surface: AppColors.surface,
+      onSurface: AppColors.text,
+      surfaceContainerHighest: AppColors.cardTint,
+      outline: AppColors.border,
+      outlineVariant: AppColors.borderBright,
+    );
+
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      colorScheme: scheme,
+      scaffoldBackgroundColor: AppColors.bg,
+      fontFamily: 'Roboto',
+      // Type ramp matching the reference's TextTheme weights/sizes —
+      // bolder displays for hero copy, slightly chunkier titles.
+      textTheme: const TextTheme(
+        displayLarge:
+            TextStyle(fontSize: 32, fontWeight: FontWeight.w700, color: AppColors.text),
+        displayMedium:
+            TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: AppColors.text),
+        titleLarge:
+            TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.text),
+        titleMedium:
+            TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.text),
+        bodyLarge:
+            TextStyle(fontSize: 16, fontWeight: FontWeight.w400, color: AppColors.text),
+        bodyMedium:
+            TextStyle(fontSize: 14, fontWeight: FontWeight.w400, color: AppColors.textSecondary),
+        labelSmall:
+            TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textMuted),
+      ),
+      cardTheme: const CardThemeData(
+        color: AppColors.surface,
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.card),
+        margin: EdgeInsets.zero,
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: AppColors.surface,
+          disabledForegroundColor: AppColors.textMuted,
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+          shape: const RoundedRectangleBorder(borderRadius: AppRadius.button),
+          textStyle:
+              const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          elevation: 0,
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.primary,
+          textStyle:
+              const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.text,
+          side: const BorderSide(color: AppColors.borderBright),
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
+          shape: const RoundedRectangleBorder(borderRadius: AppRadius.button),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: AppColors.surface,
+        hintStyle: const TextStyle(color: AppColors.textMuted),
+        labelStyle: const TextStyle(color: AppColors.textSecondary),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: AppRadius.button,
+          borderSide: const BorderSide(color: AppColors.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: AppRadius.button,
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: AppRadius.button,
+          borderSide: const BorderSide(color: AppColors.danger),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: AppRadius.button,
+          borderSide: const BorderSide(color: AppColors.danger, width: 1.5),
+        ),
+      ),
+      dividerTheme: const DividerThemeData(
+        color: AppColors.border,
+        thickness: 1,
+        space: 1,
+      ),
+      iconTheme: const IconThemeData(color: AppColors.textSecondary),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: AppColors.bg,
+        foregroundColor: AppColors.text,
+        elevation: 0,
+        centerTitle: false,
+        titleTextStyle:
+            TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.text),
+      ),
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: AppColors.bgNav,
+        selectedItemColor: AppColors.primary,
+        unselectedItemColor: AppColors.textMuted,
+        elevation: 0,
+        type: BottomNavigationBarType.fixed,
+      ),
+      progressIndicatorTheme: const ProgressIndicatorThemeData(
+        color: AppColors.primary,
+      ),
+      snackBarTheme: const SnackBarThemeData(
+        backgroundColor: AppColors.surface,
+        contentTextStyle: TextStyle(color: AppColors.text),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.button),
+      ),
+      dialogTheme: const DialogThemeData(
+        backgroundColor: AppColors.bgTop,
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.card),
+        titleTextStyle:
+            TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.text),
+        contentTextStyle:
+            TextStyle(fontSize: 14, fontWeight: FontWeight.w400, color: AppColors.textSecondary),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: AppColors.bgTop,
+        modalBackgroundColor: AppColors.bgTop,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+      ),
     );
   }
 }
