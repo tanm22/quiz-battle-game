@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:grpc/grpc.dart';
 import 'package:share_plus/share_plus.dart';
@@ -208,21 +209,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          // Title
-          ShaderMask(
-            shaderCallback: (bounds) => const LinearGradient(
-              colors: [AppColors.primary, AppColors.gold],
-            ).createShader(bounds),
-            child: const Text(
-              'QUIZ BATTLE',
-              style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 2),
-              textAlign: TextAlign.center,
-            ),
-          ),
+          // Personalised top bar (greeting + coin capsule + settings).
+          // Mirrors the reference's "Good morning, Name" pattern instead
+          // of the prior gradient-shader brand title — friendlier
+          // session-start framing.
+          _buildTopBar(auth, gameState).animate().fadeIn(duration: 400.ms),
           const SizedBox(height: 20),
 
           // Profile card
-          _buildProfileCard(auth, gameState),
+          _buildProfileCard(auth, gameState)
+              .animate()
+              .fadeIn(delay: 100.ms, duration: 400.ms)
+              .slideY(begin: 0.05, end: 0, curve: Curves.easeOutCubic),
           const SizedBox(height: 16),
 
           // Guest email-link prompt
@@ -240,15 +238,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 const SizedBox(width: 12),
                 Expanded(child: _buildQuotaCard()),
               ],
-            ),
+            )
+                .animate()
+                .fadeIn(delay: 200.ms, duration: 400.ms)
+                .slideY(begin: 0.1, end: 0, curve: Curves.easeOutBack),
             const SizedBox(height: 16),
-            _buildStatsRow(),
+            _buildStatsRow().animate().fadeIn(delay: 300.ms, duration: 400.ms),
             const SizedBox(height: 24),
             // Day-0 nudge: only fires when the user has never played a match.
             // Once they have at least one match the existing stats card and
             // history surfaces are informative enough — no need for a CTA.
             if ((_homeData?.profile.matchesPlayed ?? 0) == 0) ...[
-              _buildDayZeroCard(),
+              _buildDayZeroCard().animate().fadeIn(delay: 350.ms, duration: 400.ms),
               const SizedBox(height: 24),
             ],
           ] else if (_loading && _error == null) ...[
@@ -293,41 +294,66 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
 
-          // Play button — disabled when quota exhausted
+          // Play button — disabled (and CTA flips) when daily quota is exhausted.
+          // Coral gradient pill matching the reference's primary action style;
+          // soft shadow grounds it against the dark scaffold.
           SizedBox(
             width: double.infinity,
-            height: 56,
+            height: 60,
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: quotaExhausted
-                    ? LinearGradient(colors: [Colors.grey.shade400, Colors.grey.shade300])
-                    : const LinearGradient(colors: [Color(0xFFF97316), Color(0xFFEA580C)]),
-                borderRadius: BorderRadius.circular(16),
+                    ? const LinearGradient(
+                        colors: [Color(0xFF2A2A45), Color(0xFF20203A)],
+                      )
+                    : AppGradients.primary,
+                borderRadius: BorderRadius.circular(18),
                 boxShadow: quotaExhausted
                     ? []
-                    : [BoxShadow(color: AppColors.primary.withAlpha(80), blurRadius: 20, offset: const Offset(0, 6))],
+                    : [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.4),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
               ),
               child: ElevatedButton.icon(
                 onPressed: quotaExhausted
                     ? () => _openPaymentScreen()
-                    : () => ref.read(gameStateProvider.notifier).navigateToMatchmaking(),
-                icon: Icon(quotaExhausted ? Icons.lock : Icons.bolt, size: 26),
+                    : () => ref
+                        .read(gameStateProvider.notifier)
+                        .navigateToMatchmaking(),
+                icon: Icon(
+                  quotaExhausted
+                      ? Icons.lock_rounded
+                      : Icons.bolt_rounded,
+                  size: 26,
+                ),
                 label: Text(
                   quotaExhausted ? 'UPGRADE TO PLAY' : 'START BATTLE',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 1),
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.2,
+                  ),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.transparent,
                   shadowColor: Colors.transparent,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18)),
                 ),
               ),
             ),
-          ),
+          )
+              .animate()
+              .fadeIn(delay: 400.ms, duration: 400.ms)
+              .scale(begin: const Offset(0.95, 0.95), end: const Offset(1, 1)),
           const SizedBox(height: 16),
 
-          // Action row: History, Tournaments, Premium, Invite
+          // Action row: History, Tournaments, Premium
           Row(
             children: [
               Expanded(child: _actionButton('📜', 'History', () {
@@ -346,18 +372,98 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 _openPaymentScreen();
               })),
             ],
-          ),
+          ).animate().fadeIn(delay: 500.ms, duration: 400.ms),
           const SizedBox(height: 16),
 
           // Premium upsell card (free users only)
           if (!isPremium && _homeData != null) ...[
-            _buildUpsellCard(),
+            _buildUpsellCard()
+                .animate()
+                .fadeIn(delay: 600.ms, duration: 400.ms)
+                .slideY(begin: 0.1, end: 0),
             const SizedBox(height: 16),
           ],
 
           const SizedBox(height: 24),
         ],
       ),
+    );
+  }
+
+  /// Personalised top bar shown above the profile card on the Home tab.
+  /// Greets the user by first-name, surfaces the coin balance as a
+  /// tappable gold pill, and exposes a settings/profile gear that
+  /// jumps to the Profile tab. Mirrors the reference's `_TopBar`.
+  Widget _buildTopBar(AuthService auth, GameState gameState) {
+    final profile = _homeData?.profile;
+    final username = profile?.username.isNotEmpty == true
+        ? profile!.username
+        : (auth.username ?? 'Player');
+    final firstName = username.split(' ').first;
+    final hour = DateTime.now().hour;
+    final greeting = hour < 12
+        ? 'Good morning'
+        : hour < 17
+            ? 'Good afternoon'
+            : 'Good evening';
+
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                greeting,
+                style: TextStyle(
+                  color: AppColors.text.withValues(alpha: 0.5),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w400,
+                  fontStyle: FontStyle.italic,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                firstName,
+                style: const TextStyle(
+                  color: AppColors.text,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Coin capsule — gold pill, tappable to open the lifetime ledger.
+        if (profile != null)
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            child: CoinBalanceChip(
+              initialBalance: profile.coins.toInt(),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CoinLedgerScreen()),
+              ),
+            ),
+          ),
+        // Settings gear → Profile tab.
+        IconButton(
+          tooltip: 'Profile',
+          onPressed: () => setState(() => _currentTab = 3),
+          icon: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: const Icon(Icons.settings_rounded,
+                color: AppColors.textSecondary, size: 20),
+          ),
+        ),
+      ],
     );
   }
 
@@ -884,36 +990,92 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ? presetFromAvatarUrl(profile!.avatarUrl)
         : null;
 
+    final losses = profile != null
+        ? (profile.matchesPlayed - profile.wins).toInt()
+        : 0;
+    final rating = profile?.rating ?? gameState.rating;
+
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: appCardDecoration(),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.surface, Color(0xFF22223C)],
+        ),
+        borderRadius: AppRadius.card,
+        border: Border.all(color: AppColors.border),
+        boxShadow: const [
+          BoxShadow(color: Color(0x40000000), blurRadius: 12, offset: Offset(0, 4)),
+        ],
+      ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          // Avatar with a coral→gold conic ring — strong personalisation
+          // anchor matching the reference's profile-card avatar.
           Container(
             padding: const EdgeInsets.all(3),
             decoration: const BoxDecoration(
               shape: BoxShape.circle,
-              gradient: LinearGradient(colors: [AppColors.primarySoft, AppColors.gold]),
+              gradient: LinearGradient(
+                colors: [AppColors.primary, AppColors.gold],
+              ),
             ),
             child: preset != null
-                ? LocalAvatar(glyph: preset.glyph, background: preset.color, size: 48)
+                ? LocalAvatar(
+                    glyph: preset.glyph,
+                    background: preset.color,
+                    size: 56,
+                  )
                 : CircleAvatar(
-                    radius: 24,
+                    radius: 28,
                     backgroundColor: AppColors.surface,
                     child: profile?.avatarUrl.isNotEmpty == true
-                        ? ClipOval(child: Image.network(profile!.avatarUrl, width: 48, height: 48, fit: BoxFit.cover,
-                            errorBuilder: (_, e, s) => Text(initial, style: const TextStyle(color: AppColors.accent, fontSize: 22, fontWeight: FontWeight.bold))))
-                        : Text(initial, style: const TextStyle(color: AppColors.accent, fontSize: 22, fontWeight: FontWeight.bold)),
+                        ? ClipOval(
+                            child: Image.network(
+                              profile!.avatarUrl,
+                              width: 56,
+                              height: 56,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, e, s) => Text(
+                                initial,
+                                style: const TextStyle(
+                                  color: AppColors.primary,
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          )
+                        : Text(
+                            initial,
+                            style: const TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
                   ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Flexible(child: Text(name, style: const TextStyle(color: AppColors.text, fontSize: 17, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
+                    Flexible(
+                      child: Text(
+                        name,
+                        style: const TextStyle(
+                          color: AppColors.text,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                     if (gameState.isGuest) ...[
                       const SizedBox(width: 8),
                       _badge('Guest', AppColors.secondary),
@@ -924,35 +1086,63 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ],
                   ],
                 ),
-                const SizedBox(height: 4),
-                Row(
+                const SizedBox(height: 8),
+                // Rating + W/L record chip cluster.
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    const Icon(Icons.star, size: 14, color: AppColors.gold),
-                    const SizedBox(width: 3),
-                    Text('${profile?.rating ?? gameState.rating}', style: const TextStyle(color: AppColors.goldDeep, fontSize: 13, fontWeight: FontWeight.w600)),
-                    if (profile != null) ...[
-                      const SizedBox(width: 12),
-                      Text('${profile.wins}W/${profile.matchesPlayed - profile.wins}L',
-                        style: const TextStyle(color: AppColors.textMuted, fontSize: 13, fontWeight: FontWeight.w600)),
-                      const SizedBox(width: 12),
-                      // Seed from profile.coins so the cached value
-                      // renders instantly without a redundant
-                      // GetCoinBalance round-trip — the home payload
-                      // already has it. The provider is still watched,
-                      // so any later invalidation (e.g. after a
-                      // purchase) refreshes the chip. Tapping the chip
-                      // opens the lifetime ledger history.
-                      CoinBalanceChip(
-                        initialBalance: profile.coins.toInt(),
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const CoinLedgerScreen()),
-                        ),
+                    _recordPill(
+                      icon: Icons.star_rounded,
+                      iconColor: AppColors.gold,
+                      label: '$rating',
+                      tint: AppColors.goldBg,
+                    ),
+                    if (profile != null)
+                      _recordPill(
+                        icon: Icons.emoji_events_rounded,
+                        iconColor: AppColors.primary,
+                        label: '${profile.wins}W / ${losses}L',
+                        tint: AppColors.orangeBg,
                       ),
-                    ],
                   ],
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Compact pill rendering an icon + value, used by the profile card's
+  /// rating and record indicators. Tinted bg + border keeps it visually
+  /// distinct without competing with the main accent.
+  Widget _recordPill({
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required Color tint,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: tint,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: iconColor.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: iconColor),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: iconColor,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
