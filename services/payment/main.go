@@ -32,6 +32,7 @@ import (
 	"quiz-battle/pkg/lifecycle"
 	"quiz-battle/pkg/log"
 	"quiz-battle/pkg/metrics"
+	"quiz-battle/pkg/ratelimit"
 	pb "quiz-battle/proto"
 )
 
@@ -49,6 +50,11 @@ type paymentServer struct {
 	razorpaySecret string
 	webhookSecret  string
 	metrics        *metrics.Metrics // nil in tests; non-nil in main()
+	// §4.7 PR-B1: limit on CreateOrder to soak up retry storms (a flaky
+	// payment dialog or a misbehaving client can fire many CreateOrder
+	// calls per minute). 10/min is generous for legitimate retry-after-
+	// failure UX while bounding the Razorpay API call rate.
+	orderLimiter *ratelimit.Limiter
 }
 
 // users returns the users collection on the configured DB. Mirrors the
@@ -80,6 +86,15 @@ func (s *paymentServer) CreateOrder(ctx context.Context, req *pb.CreateOrderRequ
 	userID, err := auth.UserIDFromContext(ctx)
 	if err != nil {
 		return nil, status.Error(codes.Unauthenticated, "not authenticated")
+	}
+
+	// §4.7 PR-B1: rate-limit CreateOrder per user. Each call hits the
+	// Razorpay Orders API and writes a payments row, so a runaway
+	// client can both burn upstream API quota and bloat Mongo. 10/min
+	// matches typical retry-after-network-blip UX without forcing real
+	// users into the wall.
+	if !s.orderLimiter.AllowWithLog(ctx, userID) {
+		return nil, status.Error(codes.ResourceExhausted, "too many order attempts; try again in a minute")
 	}
 
 	if req.PlanDuration != "monthly" && req.PlanDuration != "yearly" {
@@ -742,13 +757,14 @@ func main() {
 	const dbName = "quizbattle"
 	jwtSecret := config.MustRequired(ctx, "JWT_SECRET")
 	srv := &paymentServer{
-		rdb:         rdb,
-		amqpConn:    conn,
-		amqpCh:      amqpCh,
-		mongoClient: mongoClient,
-		mongoDB:     mongoClient.Database(dbName),
-		dbName:      dbName,
-		jwtSecret:   jwtSecret,
+		rdb:          rdb,
+		amqpConn:     conn,
+		amqpCh:       amqpCh,
+		mongoClient:  mongoClient,
+		mongoDB:      mongoClient.Database(dbName),
+		dbName:       dbName,
+		jwtSecret:    jwtSecret,
+		orderLimiter: ratelimit.New(rdb, "create_order", 10, time.Minute),
 		// Razorpay vars stay optional via os.Getenv — payment boots in
 		// stub mode without them so local dev works without Razorpay
 		// credentials. Webhook handler returns 503 in stub mode.

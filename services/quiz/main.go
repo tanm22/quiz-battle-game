@@ -28,6 +28,7 @@ import (
 	"quiz-battle/pkg/log"
 	"quiz-battle/pkg/metrics"
 	"quiz-battle/pkg/models"
+	"quiz-battle/pkg/ratelimit"
 	pb "quiz-battle/proto"
 )
 
@@ -68,6 +69,13 @@ type quizServer struct {
 	roomDeadlines sync.Map         // roomId -> int64 (current round deadline_unix)
 	roomQuestions sync.Map         // roomId -> []Question
 	metrics       *metrics.Metrics // nil in tests; non-nil in main()
+	// §4.7 PR-B1: per-user gate on SubmitAnswer to soak up flooded
+	// clients (a misbehaving Flutter build firing answer events in a
+	// loop, or a script trying to game scoring). 60/min per user is
+	// well above the realistic ceiling of one answer per round at ~10
+	// rounds per match — the cap kicks in at obvious abuse, not
+	// legitimate play.
+	answerLimiter *ratelimit.Limiter
 }
 
 // publish sends a message to the topic exchange with mutex protection.
@@ -986,6 +994,15 @@ func (s *quizServer) SubmitAnswer(ctx context.Context, req *pb.SubmitAnswerReque
 		return nil, status.Error(codes.Unauthenticated, "not authenticated")
 	}
 
+	// §4.7 PR-B1: anti-flood gate. Subject is userID — per-user, not
+	// per-room — so a script that opens many rooms can't multiply its
+	// answer rate by spawning more matches. The downstream
+	// answer.submitted event publish is cheap individually, but a
+	// torrent of them swamps the answer-processing-queue and Redis.
+	if !s.answerLimiter.AllowWithLog(ctx, userID) {
+		return nil, status.Error(codes.ResourceExhausted, "too many answer submissions; slow down")
+	}
+
 	// Publish answer.submitted event to RabbitMQ — do not wait for scoring
 	eventPayload, err := json.Marshal(map[string]interface{}{
 		"roomId":          req.RoomId,
@@ -1781,11 +1798,12 @@ func main() {
 
 	// gRPC server
 	srv := &quizServer{
-		rdb:       rdb,
-		amqpConn:  conn,
-		amqpCh:    amqpCh,
-		mongoDB:   mongoClient.Database("quizbattle"),
-		jwtSecret: jwtSecret,
+		rdb:           rdb,
+		amqpConn:      conn,
+		amqpCh:        amqpCh,
+		mongoDB:       mongoClient.Database("quizbattle"),
+		jwtSecret:     jwtSecret,
+		answerLimiter: ratelimit.New(rdb, "submit_answer", 60, time.Minute),
 	}
 
 	// Start RabbitMQ consumers + tournament workers
