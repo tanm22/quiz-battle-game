@@ -49,7 +49,12 @@ type authServer struct {
 	rdb       *redis.Client
 	amqpConn  *amqp.Connection
 	jwtSecret string
-	mailer    *email.Sender
+	// googleClientID is the OAuth audience for Google ID tokens. Loaded
+	// once at startup via config.MustRequired so an empty value can't
+	// reach idtoken.Validate (which would otherwise skip the audience
+	// check and accept tokens issued to any Google OAuth client).
+	googleClientID string
+	mailer         *email.Sender
 }
 
 func (s *authServer) users() *mongo.Collection {
@@ -519,10 +524,10 @@ func sanitizeText(s string) string {
 // ---------------------------------------------------------------------------
 
 func (s *authServer) GoogleSignIn(ctx context.Context, req *pb.GoogleSignInRequest) (*pb.GoogleSignInResponse, error) {
-	googleClientID := os.Getenv("GOOGLE_CLIENT_ID")
-
-	// Verify Google ID token
-	payload, err := idtoken.Validate(ctx, req.IdToken, googleClientID)
+	// Verify Google ID token. s.googleClientID is guaranteed non-empty
+	// (MustRequired in main()); passing it to Validate enforces audience
+	// pinning so only tokens minted for our OAuth client are accepted.
+	payload, err := idtoken.Validate(ctx, req.IdToken, s.googleClientID)
 	if err != nil {
 		return nil, status.Errorf(codes.Unauthenticated, "invalid Google ID token: %v", err)
 	}
@@ -1060,6 +1065,12 @@ func main() {
 	// path is not load-bearing for booting.
 	jwtSecret := config.MustRequired(ctx, "JWT_SECRET")
 
+	// GOOGLE_CLIENT_ID is required: idtoken.Validate skips the audience
+	// check when given an empty string, which would let any Google ID
+	// token forge a session via GoogleSignIn. Failing fast at startup
+	// matches the JWT_SECRET pattern above.
+	googleClientID := config.MustRequired(ctx, "GOOGLE_CLIENT_ID")
+
 	resendKey := os.Getenv("RESEND_API_KEY")
 	resendFrom := os.Getenv("RESEND_FROM")
 	if resendFrom == "" {
@@ -1070,12 +1081,13 @@ func main() {
 	}
 
 	srv := &authServer{
-		mongoDB:   db,
-		ledger:    coins.NewLedger(mongoClient, coins.DefaultDBName),
-		rdb:       rdb,
-		amqpConn:  amqpConn,
-		jwtSecret: jwtSecret,
-		mailer:    email.NewSender(resendKey, resendFrom),
+		mongoDB:        db,
+		ledger:         coins.NewLedger(mongoClient, coins.DefaultDBName),
+		rdb:            rdb,
+		amqpConn:       amqpConn,
+		jwtSecret:      jwtSecret,
+		googleClientID: googleClientID,
+		mailer:         email.NewSender(resendKey, resendFrom),
 	}
 
 	// Phase 2: Start notification cron goroutines

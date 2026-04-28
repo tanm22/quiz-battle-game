@@ -96,6 +96,35 @@ func TestLoadCommon_WhitespaceOnlyTreatedAsEmpty(t *testing.T) {
 	}
 }
 
+func TestLoadCommon_ValuesTrimmedOnStore(t *testing.T) {
+	// A manifest typo like MONGO_URI=" mongodb://host" passes the empty
+	// check (the trimmed value is non-empty) but the dial layer would
+	// then receive whitespace and emit a confusing connection error.
+	// Storing the trimmed value keeps the dial path clean.
+	envSnapshot(t, "MONGO_URI", "REDIS_ADDR", "RABBITMQ_URL", "LOG_LEVEL")
+	_ = setEnv("MONGO_URI", "  mongodb://m:1  ")
+	_ = setEnv("REDIS_ADDR", "\tr:6379\n")
+	_ = setEnv("RABBITMQ_URL", " amqp://q ")
+	_ = setEnv("LOG_LEVEL", "  debug  ")
+
+	c, err := LoadCommon()
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if c.MongoURI != "mongodb://m:1" {
+		t.Errorf("MongoURI not trimmed: %q", c.MongoURI)
+	}
+	if c.RedisAddr != "r:6379" {
+		t.Errorf("RedisAddr not trimmed: %q", c.RedisAddr)
+	}
+	if c.RabbitMQURL != "amqp://q" {
+		t.Errorf("RabbitMQURL not trimmed: %q", c.RabbitMQURL)
+	}
+	if c.LogLevel != "debug" {
+		t.Errorf("LogLevel not trimmed: %q", c.LogLevel)
+	}
+}
+
 func TestRequired_HappyAndMissing(t *testing.T) {
 	envSnapshot(t, "X_REQUIRED_TEST")
 	_ = setEnv("X_REQUIRED_TEST", "yes")

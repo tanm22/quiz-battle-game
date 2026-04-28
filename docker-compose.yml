@@ -80,7 +80,7 @@ services:
       - REDIS_ADDR=redis:6379
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
       - MONGO_URI=mongodb://mongo:27017/quizbattle?replicaSet=rs0
-      - JWT_SECRET=change-me-in-production
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set (export it or add to .env) — see README env-vars table}
 
   quiz:
     build: .
@@ -101,7 +101,7 @@ services:
       - REDIS_ADDR=redis:6379
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
       - MONGO_URI=mongodb://mongo:27017/quizbattle?replicaSet=rs0
-      - JWT_SECRET=change-me-in-production
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set (export it or add to .env) — see README env-vars table}
 
   scoring:
     build: .
@@ -122,7 +122,7 @@ services:
       - REDIS_ADDR=redis:6379
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
       - MONGO_URI=mongodb://mongo:27017/quizbattle?replicaSet=rs0
-      - JWT_SECRET=change-me-in-production
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set (export it or add to .env) — see README env-vars table}
 
   auth:
     build: .
@@ -143,7 +143,7 @@ services:
       - REDIS_ADDR=redis:6379
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
       - MONGO_URI=mongodb://mongo:27017/quizbattle?replicaSet=rs0
-      - JWT_SECRET=change-me-in-production
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set (export it or add to .env) — see README env-vars table}
       - RESEND_API_KEY=${RESEND_API_KEY:-}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
 
@@ -167,7 +167,7 @@ services:
       - REDIS_ADDR=redis:6379
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
       - MONGO_URI=mongodb://mongo:27017/quizbattle?replicaSet=rs0
-      - JWT_SECRET=change-me-in-production
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set (export it or add to .env) — see README env-vars table}
       - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-}
       - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-}
       - RAZORPAY_WEBHOOK_SECRET=${RAZORPAY_WEBHOOK_SECRET:-}

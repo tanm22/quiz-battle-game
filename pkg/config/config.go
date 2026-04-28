@@ -7,8 +7,8 @@
 //
 // Service-specific optional vars (RAZORPAY_*, FIREBASE_*, RESEND_*) are
 // NOT covered here; services read them directly with os.Getenv after
-// Common() returns. The line is "is this var required for ANY service
-// to boot at all?" — if yes, list it here.
+// MustCommon() returns. The line is "is this var required for ANY
+// service to boot at all?" — if yes, list it here.
 package config
 
 import (
@@ -49,6 +49,10 @@ var requiredCommonKeys = []string{
 // LoadCommon reads + validates the cross-service required env vars.
 // Returns an error listing every missing or empty key — operator can
 // fix all of them in one pass instead of restarting per missing var.
+//
+// Values are TrimSpace'd before being returned so a manifest typo like
+// MONGO_URI=" mongodb://host" hits a clean startup abort instead of a
+// confusing dial error.
 func LoadCommon() (*Common, error) {
 	missing := make([]string, 0, len(requiredCommonKeys))
 	for _, k := range requiredCommonKeys {
@@ -60,10 +64,10 @@ func LoadCommon() (*Common, error) {
 		return nil, fmt.Errorf("required env vars missing or empty: %s", strings.Join(missing, ", "))
 	}
 	return &Common{
-		MongoURI:    os.Getenv("MONGO_URI"),
-		RedisAddr:   os.Getenv("REDIS_ADDR"),
-		RabbitMQURL: os.Getenv("RABBITMQ_URL"),
-		LogLevel:    os.Getenv("LOG_LEVEL"),
+		MongoURI:    strings.TrimSpace(os.Getenv("MONGO_URI")),
+		RedisAddr:   strings.TrimSpace(os.Getenv("REDIS_ADDR")),
+		RabbitMQURL: strings.TrimSpace(os.Getenv("RABBITMQ_URL")),
+		LogLevel:    strings.TrimSpace(os.Getenv("LOG_LEVEL")),
 	}, nil
 }
 
@@ -95,14 +99,14 @@ func Required(name string) (string, error) {
 func MustRequired(ctx context.Context, name string) string {
 	v, err := Required(name)
 	if err != nil {
-		log.Fatal(ctx, "required env var missing", "name", name)
+		log.Fatal(ctx, "required env var missing", "name", name, "err", err)
 	}
 	return v
 }
 
 // Optional returns the value of name when set, or fallback when not.
 // Used for "has a sensible default" knobs (LOG_LEVEL, NOTIF_DAILY_CAP).
-// Note: there is intentionally no analog for the four required vars
+// Note: there is intentionally no analog for the three required vars
 // in Common — providing one would re-create the insecure-default
 // pattern this package exists to remove.
 func Optional(name, fallback string) string {
