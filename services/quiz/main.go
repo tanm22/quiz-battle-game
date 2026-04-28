@@ -71,7 +71,7 @@ type quizServer struct {
 func (s *quizServer) publish(ctx context.Context, routingKey string, body []byte) error {
 	s.amqpMu.Lock()
 	defer s.amqpMu.Unlock()
-	return s.amqpCh.PublishWithContext(ctx, "sx", routingKey, false, false, amqp.Publishing{
+	return log.PublishWithContext(ctx, s.amqpCh, "sx", routingKey, false, false, amqp.Publishing{
 		ContentType: "application/json",
 		Body:        body,
 	})
@@ -209,28 +209,29 @@ func (s *quizServer) consumeMatchCreated(ctx context.Context) {
 			if !ok {
 				return
 			}
+			msgCtx := log.ContextFromDelivery(ctx, msg)
 
 			var event struct {
 				RoomID    string   `json:"roomId"`
 				PlayerIDs []string `json:"playerIds"`
 			}
 			if err := json.Unmarshal(msg.Body, &event); err != nil {
-				log.FromContext(ctx).Warn("bad payload", "err", err)
+				log.FromContext(msgCtx).Warn("bad payload", "err", err)
 				msg.Nack(false, false)
 				continue
 			}
 
-			log.FromContext(ctx).Info("match.created received", "room_id", event.RoomID, "player_ids", event.PlayerIDs)
+			log.FromContext(msgCtx).Info("match.created received", "room_id", event.RoomID, "player_ids", event.PlayerIDs)
 
 			// Determine allowed topics based on player plans.
 			// If any player is free, restrict to free topics for fairness.
 			var allowedTopics []string
 			allPremium := true
 			for _, pid := range event.PlayerIDs {
-				p, _ := keys.GetPlan(ctx, s.rdb, pid)
+				p, _ := keys.GetPlan(msgCtx, s.rdb, pid)
 				if p == "" {
 					var doc bson.M
-					if s.mongoDB.Collection("users").FindOne(ctx, bson.M{"_id": pid}).Decode(&doc) == nil {
+					if s.mongoDB.Collection("users").FindOne(msgCtx, bson.M{"_id": pid}).Decode(&doc) == nil {
 						if pl, ok := doc["plan"].(string); ok {
 							p = pl
 						}
@@ -246,9 +247,9 @@ func (s *quizServer) consumeMatchCreated(ctx context.Context) {
 			}
 
 			// Select questions and store in Redis
-			questions, err := s.selectQuestions(ctx, allowedTopics)
+			questions, err := s.selectQuestions(msgCtx, allowedTopics)
 			if err != nil {
-				log.FromContext(ctx).Error("selectQuestions failed", "err", err)
+				log.FromContext(msgCtx).Error("selectQuestions failed", "err", err)
 				msg.Nack(false, true) // requeue
 				continue
 			}
@@ -258,8 +259,8 @@ func (s *quizServer) consumeMatchCreated(ctx context.Context) {
 			for i, q := range questions {
 				questionIDs[i] = q.ID
 			}
-			if err := keys.SetQuestions(ctx, s.rdb, event.RoomID, questionIDs); err != nil {
-				log.FromContext(ctx).Error("store questions failed", "err", err)
+			if err := keys.SetQuestions(msgCtx, s.rdb, event.RoomID, questionIDs); err != nil {
+				log.FromContext(msgCtx).Error("store questions failed", "err", err)
 				msg.Nack(false, true)
 				continue
 			}
@@ -268,15 +269,17 @@ func (s *quizServer) consumeMatchCreated(ctx context.Context) {
 			s.storeRoomQuestions(event.RoomID, questions)
 
 			// Set round to 1 and start
-			keys.SetRoomRound(ctx, s.rdb, event.RoomID, 1)
+			keys.SetRoomRound(msgCtx, s.rdb, event.RoomID, 1)
 
 			msg.Ack(false)
 
-			// Start first round after a brief delay for clients to connect
-			go func(roomID string) {
+			// Start first round after a brief delay for clients to connect.
+			// Detach msgCtx so the goroutine carries the request_id but is
+			// not bound to the consumer's lifecycle (msg has been Acked).
+			go func(roomID string, parentCtx context.Context) {
 				time.Sleep(2 * time.Second)
-				s.startRound(ctx, roomID, 1)
-			}(event.RoomID)
+				s.startRound(parentCtx, roomID, 1)
+			}(event.RoomID, log.DetachContext(msgCtx))
 		}
 	}
 }
@@ -1584,20 +1587,21 @@ func (s *quizServer) consumeRoundCompleted(ctx context.Context) {
 			if !ok {
 				return
 			}
+			msgCtx := log.ContextFromDelivery(ctx, msg)
 
 			var event struct {
 				RoomID string `json:"roomId"`
 				Round  int    `json:"round"`
 			}
 			if err := json.Unmarshal(msg.Body, &event); err != nil {
-				log.FromContext(ctx).Warn("bad payload", "err", err)
+				log.FromContext(msgCtx).Warn("bad payload", "err", err)
 				msg.Nack(false, false)
 				continue
 			}
 
 			questions, ok := s.getRoomQuestions(event.RoomID)
 			if !ok {
-				log.FromContext(ctx).Info("unknown room; skipping", "room_id", event.RoomID)
+				log.FromContext(msgCtx).Info("unknown room; skipping", "room_id", event.RoomID)
 				msg.Ack(false)
 				continue
 			}
@@ -1605,14 +1609,15 @@ func (s *quizServer) consumeRoundCompleted(ctx context.Context) {
 			msg.Ack(false)
 
 			if event.Round < len(questions) {
-				// Advance to next round after a 2s pause
-				go func(roomID string, nextRound int) {
+				// Advance to next round after a 2s pause. Detach so the
+				// goroutine has its own lifecycle but keeps the rid.
+				go func(roomID string, nextRound int, parentCtx context.Context) {
 					time.Sleep(2 * time.Second)
-					s.startRound(ctx, roomID, nextRound)
-				}(event.RoomID, event.Round+1)
+					s.startRound(parentCtx, roomID, nextRound)
+				}(event.RoomID, event.Round+1, log.DetachContext(msgCtx))
 			} else {
 				// All rounds complete — finish match
-				s.finishMatch(ctx, event.RoomID, event.Round)
+				s.finishMatch(msgCtx, event.RoomID, event.Round)
 			}
 		}
 	}
@@ -1643,6 +1648,7 @@ func (s *quizServer) consumeLeaderboardUpdated(ctx context.Context) {
 			if !ok {
 				return
 			}
+			msgCtx := log.ContextFromDelivery(ctx, msg)
 
 			var event struct {
 				RoomID  string `json:"roomId"`
@@ -1652,7 +1658,7 @@ func (s *quizServer) consumeLeaderboardUpdated(ctx context.Context) {
 				} `json:"entries"`
 			}
 			if err := json.Unmarshal(msg.Body, &event); err != nil {
-				log.FromContext(ctx).Warn("bad payload", "err", err)
+				log.FromContext(msgCtx).Warn("bad payload", "err", err)
 				msg.Nack(false, false)
 				continue
 			}
@@ -1663,7 +1669,7 @@ func (s *quizServer) consumeLeaderboardUpdated(ctx context.Context) {
 				userID := fmt.Sprintf("%v", e.Member)
 				username := userID
 				entryPlan := "free"
-				if playerJSON, err := keys.GetPlayer(ctx, s.rdb, event.RoomID, userID); err == nil {
+				if playerJSON, err := keys.GetPlayer(msgCtx, s.rdb, event.RoomID, userID); err == nil {
 					var info struct {
 						Username string `json:"username"`
 						Plan     string `json:"plan"`
@@ -1697,7 +1703,7 @@ func (s *quizServer) consumeLeaderboardUpdated(ctx context.Context) {
 			}
 			s.broadcastToRoom(event.RoomID, gameEvent)
 
-			log.FromContext(ctx).Info("LeaderboardUpdate broadcast", "room_id", event.RoomID, "entries", len(entries))
+			log.FromContext(msgCtx).Info("LeaderboardUpdate broadcast", "room_id", event.RoomID, "entries", len(entries))
 			msg.Ack(false)
 		}
 	}
@@ -1784,8 +1790,14 @@ func main() {
 	go srv.weeklyTournamentCron(ctx)         // Phase 3 (4.2): spawn weekly free tournament
 
 	grpcServer := grpc.NewServer(
-		grpc.UnaryInterceptor(auth.UnaryInterceptor(jwtSecret, nil)),
-		grpc.StreamInterceptor(auth.StreamInterceptor(jwtSecret, nil)),
+		grpc.ChainUnaryInterceptor(
+			log.UnaryServerInterceptor(),
+			auth.UnaryInterceptor(jwtSecret, nil),
+		),
+		grpc.ChainStreamInterceptor(
+			log.StreamServerInterceptor(),
+			auth.StreamInterceptor(jwtSecret, nil),
+		),
 	)
 	pb.RegisterQuizServiceServer(grpcServer, srv)
 

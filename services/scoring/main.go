@@ -82,7 +82,7 @@ func (s *scoringServer) publish(ctx context.Context, routingKey string, body []b
 	if s.amqpCh == nil {
 		return nil
 	}
-	return s.amqpCh.PublishWithContext(ctx, "sx", routingKey, false, false, amqp.Publishing{
+	return log.PublishWithContext(ctx, s.amqpCh, "sx", routingKey, false, false, amqp.Publishing{
 		ContentType: "application/json",
 		Body:        body,
 	})
@@ -703,7 +703,7 @@ func (s *scoringServer) consumeAnswers(ctx context.Context) {
 			if !ok {
 				return
 			}
-			s.processAnswer(ctx, msg)
+			s.processAnswer(log.ContextFromDelivery(ctx, msg), msg)
 		}
 	}
 }
@@ -877,7 +877,7 @@ func (s *scoringServer) consumeMatchFinished(ctx context.Context) {
 			if !ok {
 				return
 			}
-			s.persistMatch(ctx, msg)
+			s.persistMatch(log.ContextFromDelivery(ctx, msg), msg)
 		}
 	}
 }
@@ -1393,11 +1393,12 @@ func (s *scoringServer) consumeAnalytics(ctx context.Context) {
 			if !ok {
 				return
 			}
+			msgCtx := log.ContextFromDelivery(ctx, msg)
 			// Stub: no real analytics yet (durable record lives in Mongo
 			// match_history). Debug-level so the body dump only appears
 			// when an operator opts in via LOG_LEVEL=debug — INFO would
 			// emit one body-carrying line per finished match in prod.
-			log.FromContext(ctx).Debug("match.finished event received", "consumer", "analytics", "body", string(msg.Body))
+			log.FromContext(msgCtx).Debug("match.finished event received", "consumer", "analytics", "body", string(msg.Body))
 			msg.Ack(false)
 		}
 	}
@@ -1427,13 +1428,14 @@ func (s *scoringServer) consumePaymentCaptured(ctx context.Context) {
 			if !ok {
 				return
 			}
+			msgCtx := log.ContextFromDelivery(ctx, msg)
 
 			var event struct {
 				UserID       string `json:"userId"`
 				PlanDuration string `json:"planDuration"`
 			}
 			if err := json.Unmarshal(msg.Body, &event); err != nil {
-				log.FromContext(ctx).Warn("bad payload", "consumer", "payment", "body", string(msg.Body), "err", err)
+				log.FromContext(msgCtx).Warn("bad payload", "consumer", "payment", "body", string(msg.Body), "err", err)
 				msg.Nack(false, false)
 				continue
 			}
@@ -1447,7 +1449,7 @@ func (s *scoringServer) consumePaymentCaptured(ctx context.Context) {
 			}
 			base := time.Now()
 			var existingUser bson.M
-			if err := s.mongoDB.Collection("users").FindOne(ctx, bson.M{"_id": event.UserID}).Decode(&existingUser); err == nil {
+			if err := s.mongoDB.Collection("users").FindOne(msgCtx, bson.M{"_id": event.UserID}).Decode(&existingUser); err == nil {
 				if t, ok := existingUser["planExpiresAt"].(time.Time); ok && t.After(base) {
 					base = t // don't lose remaining premium days on renewal
 				}
@@ -1458,7 +1460,7 @@ func (s *scoringServer) consumePaymentCaptured(ctx context.Context) {
 			// payment service's pre-warning worker will fire again against the
 			// new (extended) expiry date — otherwise a renewing user would
 			// never be reminded about the new expiry.
-			_, err := s.mongoDB.Collection("users").UpdateOne(ctx,
+			_, err := s.mongoDB.Collection("users").UpdateOne(msgCtx,
 				bson.M{"_id": event.UserID},
 				bson.M{
 					"$set":   bson.M{"plan": "premium", "planExpiresAt": expiresAt},
@@ -1466,22 +1468,22 @@ func (s *scoringServer) consumePaymentCaptured(ctx context.Context) {
 				},
 			)
 			if err != nil {
-				log.FromContext(ctx).Error("plan upgrade failed", "consumer", "payment", "user_id", event.UserID, "err", err)
+				log.FromContext(msgCtx).Error("plan upgrade failed", "consumer", "payment", "user_id", event.UserID, "err", err)
 				msg.Nack(false, true)
 				continue
 			}
 
 			// Invalidate Redis plan cache (ISSUE-07)
-			keys.DelPlan(ctx, s.rdb, event.UserID)
+			keys.DelPlan(msgCtx, s.rdb, event.UserID)
 
 			// Publish activation notification
 			notifJSON, _ := json.Marshal(map[string]interface{}{
 				"event":  "notif.premium.activated",
 				"userId": event.UserID,
 			})
-			s.publish(ctx, "notif.premium.activated", notifJSON)
+			s.publish(msgCtx, "notif.premium.activated", notifJSON)
 
-			log.FromContext(ctx).Info("user upgraded to premium", "consumer", "payment", "user_id", event.UserID, "expires_at", expiresAt.Format("2006-01-02"))
+			log.FromContext(msgCtx).Info("user upgraded to premium", "consumer", "payment", "user_id", event.UserID, "expires_at", expiresAt.Format("2006-01-02"))
 			msg.Ack(false)
 		}
 	}
@@ -1511,13 +1513,14 @@ func (s *scoringServer) consumeReferralEvents(ctx context.Context) {
 			if !ok {
 				return
 			}
-			if err := s.handleReferralEvent(ctx, msg.Body); err != nil {
+			msgCtx := log.ContextFromDelivery(ctx, msg)
+			if err := s.handleReferralEvent(msgCtx, msg.Body); err != nil {
 				if errors.Is(err, errBadReferralPayload) {
-					log.FromContext(ctx).Warn("bad payload dropping", "consumer", "referral", "body", string(msg.Body), "err", err)
+					log.FromContext(msgCtx).Warn("bad payload dropping", "consumer", "referral", "body", string(msg.Body), "err", err)
 					msg.Nack(false, false)
 					continue
 				}
-				log.FromContext(ctx).Error("referral event processing failed", "consumer", "referral", "body", string(msg.Body), "err", err)
+				log.FromContext(msgCtx).Error("referral event processing failed", "consumer", "referral", "body", string(msg.Body), "err", err)
 				// Transient error — requeue. With classic queues there is no
 				// auto-DLQ on a delivery-count threshold, so a persistent
 				// failure (Mongo unreachable, etc.) loops until the
@@ -1663,13 +1666,14 @@ func (s *scoringServer) consumeTournamentFinished(ctx context.Context) {
 			if !ok {
 				return
 			}
-			if err := s.handleTournamentFinished(ctx, msg.Body); err != nil {
+			msgCtx := log.ContextFromDelivery(ctx, msg)
+			if err := s.handleTournamentFinished(msgCtx, msg.Body); err != nil {
 				if errors.Is(err, errBadTournamentPayload) {
-					log.FromContext(ctx).Warn("bad payload dropping", "consumer", "tournament_finished", "body", string(msg.Body), "err", err)
+					log.FromContext(msgCtx).Warn("bad payload dropping", "consumer", "tournament_finished", "body", string(msg.Body), "err", err)
 					msg.Nack(false, false)
 					continue
 				}
-				log.FromContext(ctx).Error("tournament event processing failed", "consumer", "tournament_finished", "body", string(msg.Body), "err", err)
+				log.FromContext(msgCtx).Error("tournament event processing failed", "consumer", "tournament_finished", "body", string(msg.Body), "err", err)
 				// Transient — requeue. With classic queues there is no
 				// auto-DLQ on a delivery-count threshold, so a persistent
 				// failure (Mongo unreachable, etc.) loops until the
@@ -1868,8 +1872,14 @@ func main() {
 		"/quiz.ScoringService/CalculateScore",
 	}
 	grpcServer := grpc.NewServer(
-		grpc.UnaryInterceptor(auth.UnaryInterceptor(jwtSecret, skipMethods)),
-		grpc.StreamInterceptor(auth.StreamInterceptor(jwtSecret, skipMethods)),
+		grpc.ChainUnaryInterceptor(
+			log.UnaryServerInterceptor(),
+			auth.UnaryInterceptor(jwtSecret, skipMethods),
+		),
+		grpc.ChainStreamInterceptor(
+			log.StreamServerInterceptor(),
+			auth.StreamInterceptor(jwtSecret, skipMethods),
+		),
 	)
 	pb.RegisterScoringServiceServer(grpcServer, srv)
 
@@ -1889,6 +1899,8 @@ func main() {
 	// Create gRPC loopback client so the scoring worker calls CalculateScore via gRPC
 	selfConn, err := grpc.NewClient("localhost:50053",
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithChainUnaryInterceptor(log.UnaryClientInterceptor()),
+		grpc.WithChainStreamInterceptor(log.StreamClientInterceptor()),
 	)
 	if err != nil {
 		log.Fatal(ctx, "self-client create failed", "err", err)

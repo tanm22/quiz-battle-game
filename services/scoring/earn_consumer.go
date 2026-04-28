@@ -83,7 +83,8 @@ func (s *scoringServer) consumeCoinEarn(ctx context.Context) {
 			if !ok {
 				return
 			}
-			dispatchCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+			msgCtx := log.ContextFromDelivery(ctx, msg)
+			dispatchCtx, cancel := context.WithTimeout(msgCtx, 10*time.Second)
 			err := s.handleEarnEvent(dispatchCtx, msg.Body)
 			cancel()
 
@@ -91,11 +92,11 @@ func (s *scoringServer) consumeCoinEarn(ctx context.Context) {
 			case err == nil:
 				_ = msg.Ack(false)
 			case errors.Is(err, errBadEarnPayload):
-				log.FromContext(ctx).Warn("dead-letter bad payload",
+				log.FromContext(msgCtx).Warn("dead-letter bad payload",
 					"consumer", "earn", "body", string(msg.Body), "err", err)
 				_ = msg.Nack(false, false) // → coin-earn-dlq
 			default:
-				log.FromContext(ctx).Error("transient error; will requeue",
+				log.FromContext(msgCtx).Error("transient error; will requeue",
 					"consumer", "earn", "err", err)
 				_ = msg.Nack(false, true)
 			}

@@ -58,7 +58,7 @@ func (s *notificationService) consume(ctx context.Context, queue string) {
 			if !ok {
 				return
 			}
-			s.dispatchNotification(ctx, msg)
+			s.dispatchNotification(log.ContextFromDelivery(ctx, msg), msg)
 		}
 	}
 }

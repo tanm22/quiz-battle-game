@@ -190,7 +190,8 @@ func (s *matchmakingServer) publishMatchInvite(ctx context.Context, fromUserID, 
 			continue
 		}
 
-		if err := s.amqpCh.PublishWithContext(ctx,
+		if err := log.PublishWithContext(ctx,
+			s.amqpCh,
 			"sx",
 			"notif.match.invite",
 			false,
@@ -415,7 +416,8 @@ func (s *matchmakingServer) createRoom(ctx context.Context, players []redis.Z) {
 		return
 	}
 
-	err = s.amqpCh.PublishWithContext(ctx,
+	err = log.PublishWithContext(ctx,
+		s.amqpCh,
 		"sx",            // exchange
 		"match.created", // routing key
 		false,           // mandatory
@@ -551,8 +553,14 @@ func main() {
 	go srv.startPoller(ctx)
 
 	grpcServer := grpc.NewServer(
-		grpc.UnaryInterceptor(auth.UnaryInterceptor(jwtSecret, nil)),
-		grpc.StreamInterceptor(auth.StreamInterceptor(jwtSecret, nil)),
+		grpc.ChainUnaryInterceptor(
+			log.UnaryServerInterceptor(),
+			auth.UnaryInterceptor(jwtSecret, nil),
+		),
+		grpc.ChainStreamInterceptor(
+			log.StreamServerInterceptor(),
+			auth.StreamInterceptor(jwtSecret, nil),
+		),
 	)
 	pb.RegisterMatchmakingServiceServer(grpcServer, srv)
 

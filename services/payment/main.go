@@ -58,7 +58,7 @@ func (s *paymentServer) users() *mongo.Collection {
 func (s *paymentServer) publish(ctx context.Context, routingKey string, body []byte) error {
 	s.amqpMu.Lock()
 	defer s.amqpMu.Unlock()
-	return s.amqpCh.PublishWithContext(ctx, "sx", routingKey, false, false, amqp.Publishing{
+	return log.PublishWithContext(ctx, s.amqpCh, "sx", routingKey, false, false, amqp.Publishing{
 		ContentType: "application/json",
 		Body:        body,
 	})
@@ -766,8 +766,14 @@ func main() {
 
 	// gRPC server on :50055
 	grpcServer := grpc.NewServer(
-		grpc.UnaryInterceptor(auth.UnaryInterceptor(jwtSecret, nil)),
-		grpc.StreamInterceptor(auth.StreamInterceptor(jwtSecret, nil)),
+		grpc.ChainUnaryInterceptor(
+			log.UnaryServerInterceptor(),
+			auth.UnaryInterceptor(jwtSecret, nil),
+		),
+		grpc.ChainStreamInterceptor(
+			log.StreamServerInterceptor(),
+			auth.StreamInterceptor(jwtSecret, nil),
+		),
 	)
 	pb.RegisterPaymentServiceServer(grpcServer, srv)
 
