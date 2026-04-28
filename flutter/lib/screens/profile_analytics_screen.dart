@@ -1,10 +1,12 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../proto/quiz.pb.dart';
 import '../providers/analytics_state.dart';
 import '../theme/app_theme.dart';
+import '../widgets/empty_state.dart';
 
 /// §4.5 Deeper analytics screen. All numbers come from
 /// [userAnalyticsProvider] / [recapDataProvider] which delegate to the
@@ -39,19 +41,36 @@ class ProfileAnalyticsScreen extends ConsumerWidget {
           data: (data) => ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              _LifetimeHero(matches: data.lifetimeMatches, wins: data.lifetimeWins),
+              _LifetimeHero(matches: data.lifetimeMatches, wins: data.lifetimeWins)
+                  .animate()
+                  .fadeIn(duration: 300.ms)
+                  .slideY(begin: 0.05, end: 0, curve: Curves.easeOutCubic),
               const SizedBox(height: 16),
               if (!data.hasData)
                 const _EmptyStateCard()
+                    .animate()
+                    .fadeIn(delay: 100.ms, duration: 400.ms)
               else ...[
-                _RatingChartCard(points: data.ratingHistory),
+                _RatingChartCard(points: data.ratingHistory)
+                    .animate()
+                    .fadeIn(delay: 100.ms, duration: 300.ms)
+                    .slideY(begin: 0.05, end: 0),
                 const SizedBox(height: 16),
-                _TopicAccuracyCard(rows: data.topicAccuracy),
+                _TopicAccuracyCard(rows: data.topicAccuracy)
+                    .animate()
+                    .fadeIn(delay: 200.ms, duration: 300.ms)
+                    .slideY(begin: 0.05, end: 0),
                 const SizedBox(height: 16),
-                _PercentileCard(rt: data.responseTime),
+                _PercentileCard(rt: data.responseTime)
+                    .animate()
+                    .fadeIn(delay: 300.ms, duration: 300.ms)
+                    .slideY(begin: 0.05, end: 0),
                 const SizedBox(height: 16),
               ],
-              const _MonthlyRecapCard(),
+              const _MonthlyRecapCard()
+                  .animate()
+                  .fadeIn(delay: 400.ms, duration: 300.ms)
+                  .slideY(begin: 0.05, end: 0),
               const SizedBox(height: 32),
             ],
           ),
@@ -515,15 +534,43 @@ class _EmptyStateCard extends StatelessWidget {
     return _Card(
       child: Column(
         children: [
-          const Icon(Icons.insights_outlined, size: 36, color: AppColors.textMuted),
-          const SizedBox(height: 8),
-          const Text('Not enough data yet',
-              style: TextStyle(color: AppColors.text, fontSize: 16, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 4),
+          // Tinted-circle hero badge — same affordance as the
+          // EmptyState shared widget but inline so it stays inside
+          // the analytics panel's _Card frame for visual consistency
+          // with the other panels above and below it.
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.accent.withValues(alpha: 0.15),
+              border: Border.all(
+                  color: AppColors.accent.withValues(alpha: 0.3), width: 2),
+            ),
+            child: const Icon(
+              Icons.insights_rounded,
+              size: 32,
+              color: AppColors.accent,
+            ),
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'Not enough data yet',
+            style: TextStyle(
+              color: AppColors.text,
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 6),
           const Text(
             'Play a few matches and your per-topic accuracy, response time, and rating curve will show up here.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+            style: TextStyle(
+              color: AppColors.textMuted,
+              fontSize: 13,
+              height: 1.4,
+            ),
           ),
         ],
       ),
@@ -539,22 +586,13 @@ class _ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, size: 32, color: AppColors.danger),
-            const SizedBox(height: 8),
-            Text(message,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.textMuted)),
-            const SizedBox(height: 12),
-            ElevatedButton(onPressed: onRetry, child: const Text('Retry')),
-          ],
-        ),
-      ),
+    return EmptyState(
+      icon: Icons.cloud_off_rounded,
+      iconColor: AppColors.danger,
+      title: "Couldn't load analytics",
+      body: message,
+      actionLabel: 'Retry',
+      onActionTap: onRetry,
     );
   }
 }

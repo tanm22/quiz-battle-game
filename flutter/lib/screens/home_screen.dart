@@ -324,10 +324,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               child: ElevatedButton.icon(
                 onPressed: quotaExhausted
-                    ? () => _openPaymentScreen()
-                    : () => ref
-                        .read(gameStateProvider.notifier)
-                        .navigateToMatchmaking(),
+                    ? () {
+                        HapticFeedback.lightImpact();
+                        _openPaymentScreen();
+                      }
+                    : () {
+                        HapticFeedback.mediumImpact();
+                        ref
+                            .read(gameStateProvider.notifier)
+                            .navigateToMatchmaking();
+                      },
                 icon: Icon(
                   quotaExhausted
                       ? Icons.lock_rounded
