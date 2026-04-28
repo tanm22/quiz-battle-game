@@ -1,5 +1,6 @@
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:grpc/grpc.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../services/quiz_service.dart';
@@ -285,51 +286,148 @@ class _PaymentScreenState extends State<PaymentScreen> {
     final isPremium = _currentPlan == 'premium';
 
     return Scaffold(
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
-        backgroundColor: AppColors.bg,
-        foregroundColor: AppColors.text,
         title: const Text('Premium'),
         elevation: 0,
       ),
-      body: ScaffoldGradientBackground(
-        child: ListView(
-          padding: const EdgeInsets.all(24),
-          children: [
-            if (isPremium) ...[
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: AppColors.emeraldBg,
-                  borderRadius: AppRadius.hero,
-                  border: Border.all(color: AppColors.success.withAlpha(60)),
+      body: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          if (isPremium) ...[
+            // Active-premium hero card — gold gradient with glow,
+            // matching the reference's premium-active affordance.
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF2E2818), Color(0xFF1F1F36)],
                 ),
-                child: Column(
-                  children: [
-                    const Icon(Icons.workspace_premium, size: 48, color: AppColors.success),
-                    const SizedBox(height: 8),
-                    const Text('You are Premium!',
-                        style: TextStyle(color: AppColors.text, fontSize: 22, fontWeight: FontWeight.bold)),
-                    if (_expiresAt != null && _expiresAt! > Int64.ZERO)
-                      Text(
-                        'Expires: ${DateTime.fromMillisecondsSinceEpoch(_expiresAt!.toInt() * 1000).toString().split(' ')[0]}',
-                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                borderRadius: AppRadius.hero,
+                border: Border.all(
+                    color: AppColors.gold.withValues(alpha: 0.4), width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.gold.withValues(alpha: 0.18),
+                    blurRadius: 28,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    width: 80,
+                    height: 80,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: AppGradients.gold,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.gold.withValues(alpha: 0.5),
+                          blurRadius: 24,
+                          spreadRadius: 4,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.workspace_premium_rounded,
+                      size: 40,
+                      color: Colors.white,
+                    ),
+                  )
+                      .animate()
+                      .fadeIn(duration: 500.ms)
+                      .scale(
+                        begin: const Offset(0.7, 0.7),
+                        end: const Offset(1, 1),
+                        curve: Curves.elasticOut,
                       ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    "You're Premium",
+                    style: TextStyle(
+                      color: AppColors.text,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
+                  const SizedBox(height: 4),
+                  if (_expiresAt != null && _expiresAt! > Int64.ZERO)
+                    Text(
+                      'Renews on ${DateTime.fromMillisecondsSinceEpoch(_expiresAt!.toInt() * 1000).toString().split(' ')[0]}',
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                      ),
+                    ).animate().fadeIn(delay: 300.ms, duration: 400.ms),
+                ],
+              ),
+            ),
+          ] else ...[
+            // Upgrade-tier hero — gold-to-coral icon badge + headline.
+            Center(
+              child: Container(
+                width: 80,
+                height: 80,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: AppGradients.gold,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.gold.withValues(alpha: 0.4),
+                      blurRadius: 24,
+                      spreadRadius: 4,
+                    ),
                   ],
                 ),
+                child: const Icon(
+                  Icons.workspace_premium_rounded,
+                  size: 40,
+                  color: Colors.white,
+                ),
+              )
+                  .animate()
+                  .fadeIn(duration: 500.ms)
+                  .scale(
+                    begin: const Offset(0.7, 0.7),
+                    end: const Offset(1, 1),
+                    curve: Curves.elasticOut,
+                  ),
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              'Upgrade to Premium',
+              style: TextStyle(
+                color: AppColors.text,
+                fontSize: 26,
+                fontWeight: FontWeight.w800,
               ),
-            ] else ...[
-              const Text('Upgrade to Premium',
-                  style: TextStyle(color: AppColors.text, fontSize: 24, fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center),
-              const SizedBox(height: 24),
+              textAlign: TextAlign.center,
+            ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
+            const SizedBox(height: 6),
+            const Text(
+              'Unlock unlimited play, tournaments, and the full leaderboard.',
+              style: TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 14,
+                height: 1.4,
+              ),
+              textAlign: TextAlign.center,
+            ).animate().fadeIn(delay: 300.ms, duration: 400.ms),
+            const SizedBox(height: 24),
 
-              // Feature comparison
-              _featureRow(Icons.play_circle, 'Unlimited quizzes', 'Free: 1/day'),
-              _featureRow(Icons.emoji_events, 'Join tournaments', 'Free: view only'),
-              _featureRow(Icons.history, 'Full match history', 'Free: last 3'),
-              _featureRow(Icons.leaderboard, 'Full leaderboard', 'Free: top 3'),
+            // Feature comparison
+            _featureRow(Icons.play_circle_rounded, 'Unlimited quizzes', 'Free: 1/day'),
+            _featureRow(Icons.emoji_events_rounded, 'Join tournaments', 'Free: view only'),
+            _featureRow(Icons.history_rounded, 'Full match history', 'Free: last 3'),
+            _featureRow(Icons.leaderboard_rounded, 'Full leaderboard', 'Free: top 3'),
 
-              const SizedBox(height: 24),
+            const SizedBox(height: 24),
 
               // Plan selection
               Row(
@@ -371,12 +469,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 ),
               ),
             ],
-            // Payment history — shown regardless of current plan so users can
-            // see past renewals/failures. GetPaymentHistory caps at 20 records.
-            const SizedBox(height: 32),
-            _buildPaymentHistory(),
-          ],
-        ),
+          // Payment history — shown regardless of current plan so users can
+          // see past renewals/failures. GetPaymentHistory caps at 20 records.
+          const SizedBox(height: 32),
+          _buildPaymentHistory(),
+        ],
       ),
     );
   }
