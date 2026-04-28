@@ -8,9 +8,11 @@ import '../providers/game_state.dart';
 import '../services/auth_service.dart';
 import '../services/quiz_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/animated_counter.dart';
 import '../widgets/animated_toast.dart';
 import '../widgets/coin_balance_chip.dart';
 import '../widgets/local_avatar.dart';
+import '../widgets/section_header.dart';
 import '../widgets/streak_calendar.dart';
 import '../proto/quiz.pbgrpc.dart';
 import 'coin_ledger_screen.dart';
@@ -120,28 +122,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final auth = AuthService();
 
     return Scaffold(
-      body: ScaffoldGradientBackground(
-        child: SafeArea(
-          child: _buildTabContent(auth, gameState),
-        ),
+      backgroundColor: AppColors.bg,
+      body: SafeArea(
+        bottom: false,
+        child: _buildTabContent(auth, gameState),
       ),
-      bottomNavigationBar: BottomNavigationBar(
+      bottomNavigationBar: _SpeakXBottomNav(
         currentIndex: _currentTab,
         onTap: (index) => setState(() => _currentTab = index),
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: AppColors.bgNav,
-        selectedItemColor: AppColors.accent,
-        unselectedItemColor: AppColors.textDim,
-        showUnselectedLabels: true,
-        selectedFontSize: 12,
-        unselectedFontSize: 11,
-        elevation: 8,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.bolt_rounded), label: 'Play'),
-          BottomNavigationBarItem(icon: Icon(Icons.leaderboard_rounded), label: 'Leaderboard'),
-          BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Profile'),
-        ],
       ),
     );
   }
@@ -232,6 +220,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
           // Streak + Quota row — either loaded cards or skeletons while fetching.
           if (_homeData != null) ...[
+            const SectionHeader(
+              title: 'Today',
+              icon: Icons.today_rounded,
+              iconColor: AppColors.primary,
+            )
+                .animate()
+                .fadeIn(delay: 150.ms, duration: 300.ms),
+            const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(child: _buildStreakCard()),
@@ -242,7 +238,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 .animate()
                 .fadeIn(delay: 200.ms, duration: 400.ms)
                 .slideY(begin: 0.1, end: 0, curve: Curves.easeOutBack),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
+            const SectionHeader(
+              title: 'Your stats',
+              icon: Icons.insights_rounded,
+              iconColor: AppColors.accent,
+            )
+                .animate()
+                .fadeIn(delay: 250.ms, duration: 300.ms),
+            const SizedBox(height: 8),
             _buildStatsRow().animate().fadeIn(delay: 300.ms, duration: 400.ms),
             const SizedBox(height: 24),
             // Day-0 nudge: only fires when the user has never played a match.
@@ -353,6 +357,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               .scale(begin: const Offset(0.95, 0.95), end: const Offset(1, 1)),
           const SizedBox(height: 16),
 
+          const SectionHeader(
+            title: 'Quick actions',
+            icon: Icons.bolt_rounded,
+            iconColor: AppColors.gold,
+          )
+              .animate()
+              .fadeIn(delay: 480.ms, duration: 300.ms),
+          const SizedBox(height: 8),
           // Action row: History, Tournaments, Premium
           Row(
             children: [
@@ -658,11 +670,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          const Text('Profile', style: TextStyle(color: AppColors.text, fontSize: 22, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 20),
+          const Text(
+            'Profile',
+            style: TextStyle(
+              color: AppColors.text,
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 18),
 
           _buildProfileCard(auth, gameState),
-          const SizedBox(height: 24),
+          const SizedBox(height: 18),
 
           // Streak calendar (30-day history, derived from StreakInfo).
           if (_homeData != null && _homeData!.profile.streak.current > 0) ...[
@@ -674,99 +693,192 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 lastClaimedDate: _homeData!.profile.streak.lastClaimedDate,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
           ],
 
           // Guest email-link prompt
           if (gameState.isGuest) ...[
             _buildLinkEmailPrompt(),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
           ],
 
-          // Info rows
-          if (auth.email != null && auth.email!.isNotEmpty)
-            _profileInfoRow(Icons.email, 'Email', auth.email!),
-          const SizedBox(height: 16),
+          // ── Account section ─────────────────────────────────────
+          const SectionHeader(
+            title: 'Account',
+            icon: Icons.person_rounded,
+            iconColor: AppColors.accent,
+          ),
+          const SizedBox(height: 8),
+          if (auth.email != null && auth.email!.isNotEmpty) ...[
+            _profileInfoRow(Icons.email_rounded, 'Email', auth.email!),
+            const SizedBox(height: 8),
+          ],
+          _profileTileGroup([
+            _ProfileTile(
+              icon: Icons.edit_rounded,
+              label: 'Edit Profile',
+              color: AppColors.accent,
+              onTap: () async {
+                final profile = _homeData?.profile;
+                final saved = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => EditProfileScreen(
+                      displayName:
+                          profile?.displayName ?? auth.username ?? '',
+                      avatarUrl: profile?.avatarUrl ?? '',
+                      preferredTopics:
+                          profile?.preferredTopics.toList() ?? <String>[],
+                    ),
+                  ),
+                );
+                if (saved == true) {
+                  await _loadHomeData();
+                }
+              },
+            ),
+          ]),
+          const SizedBox(height: 18),
 
-          // Actions
-          _profileActionButton(Icons.edit, 'Edit Profile', () async {
-            final profile = _homeData?.profile;
-            final saved = await Navigator.push<bool>(
-              context,
-              MaterialPageRoute(
-                builder: (_) => EditProfileScreen(
-                  displayName: profile?.displayName ?? auth.username ?? '',
-                  avatarUrl: profile?.avatarUrl ?? '',
-                  preferredTopics: profile?.preferredTopics.toList() ?? <String>[],
+          // ── Game section ──────────────────────────────────────
+          const SectionHeader(
+            title: 'Game',
+            icon: Icons.bolt_rounded,
+            iconColor: AppColors.primary,
+          ),
+          const SizedBox(height: 8),
+          _profileTileGroup([
+            _ProfileTile(
+              icon: Icons.history_rounded,
+              label: 'Match History',
+              color: AppColors.secondary,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => MatchHistoryScreen(
+                      currentUserId: gameState.userId ?? ''),
                 ),
               ),
-            );
-            if (saved == true) {
-              // Pull fresh values from the server so the profile card,
-              // home avatar, and any other surfaces re-render with the
-              // user's edits without requiring an app restart.
-              await _loadHomeData();
-            }
-          }, color: AppColors.accent),
-          const SizedBox(height: 8),
-          _profileActionButton(Icons.history, 'Match History', () {
-            Navigator.push(context, MaterialPageRoute(
-              builder: (_) => MatchHistoryScreen(currentUserId: gameState.userId ?? ''),
-            ));
-          }),
-          const SizedBox(height: 8),
-          _profileActionButton(Icons.insights, 'Stats & Recap', () {
-            Navigator.push(context, MaterialPageRoute(
-              builder: (_) => const ProfileAnalyticsScreen(),
-            ));
-          }, color: AppColors.accent),
-          const SizedBox(height: 8),
-          _profileActionButton(Icons.storefront, 'Coin Shop', () {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const ShopScreen()));
-          }, color: AppColors.primary),
-          const SizedBox(height: 8),
-          _profileActionButton(Icons.checkroom, 'Equip Cosmetics', () {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const EquipScreen()));
-          }, color: AppColors.accent),
-          const SizedBox(height: 8),
-          _profileActionButton(Icons.workspace_premium, 'Premium', () {
-            _openPaymentScreen();
-          }, color: AppColors.gold),
-          const SizedBox(height: 8),
-          _profileActionButton(Icons.share, 'Invite Friends', () {
-            _showShareDialog(gameState);
-          }),
-          const SizedBox(height: 8),
-          _profileActionButton(Icons.card_giftcard, 'Your Referrals', () {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const ReferralScreen()));
-          }),
+            ),
+            _ProfileTile(
+              icon: Icons.insights_rounded,
+              label: 'Stats & Recap',
+              color: AppColors.accent,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const ProfileAnalyticsScreen()),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 18),
 
+          // ── Premium / Shop section ────────────────────────────
+          const SectionHeader(
+            title: 'Coins & Premium',
+            icon: Icons.workspace_premium_rounded,
+            iconColor: AppColors.gold,
+          ),
+          const SizedBox(height: 8),
+          _profileTileGroup([
+            _ProfileTile(
+              icon: Icons.storefront_rounded,
+              label: 'Coin Shop',
+              color: AppColors.primary,
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const ShopScreen())),
+            ),
+            _ProfileTile(
+              icon: Icons.checkroom_rounded,
+              label: 'Equip Cosmetics',
+              color: AppColors.accent,
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const EquipScreen())),
+            ),
+            _ProfileTile(
+              icon: Icons.workspace_premium_rounded,
+              label: 'Premium',
+              color: AppColors.gold,
+              trailingBadge: ((_homeData?.profile.plan ?? 'free') == 'premium')
+                  ? 'PRO'
+                  : null,
+              onTap: () => _openPaymentScreen(),
+            ),
+          ]),
+          const SizedBox(height: 18),
+
+          // ── Social section ────────────────────────────────────
+          const SectionHeader(
+            title: 'Social',
+            icon: Icons.group_rounded,
+            iconColor: AppColors.success,
+          ),
+          const SizedBox(height: 8),
+          _profileTileGroup([
+            _ProfileTile(
+              icon: Icons.share_rounded,
+              label: 'Invite Friends',
+              color: AppColors.success,
+              onTap: () => _showShareDialog(gameState),
+            ),
+            _ProfileTile(
+              icon: Icons.card_giftcard_rounded,
+              label: 'Your Referrals',
+              color: AppColors.gold,
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const ReferralScreen())),
+            ),
+          ]),
           const SizedBox(height: 32),
 
-          // Logout + Delete
+          // ── Logout + Delete (low-emphasis) ────────────────────
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               TextButton.icon(
                 onPressed: () async {
                   await auth.logout();
-                  if (context.mounted) ref.read(gameStateProvider.notifier).logout();
+                  if (context.mounted) {
+                    ref.read(gameStateProvider.notifier).logout();
+                  }
                 },
-                icon: const Icon(Icons.logout, size: 16),
+                icon: const Icon(Icons.logout_rounded, size: 16),
                 label: const Text('Logout'),
-                style: TextButton.styleFrom(foregroundColor: AppColors.textDim),
+                style: TextButton.styleFrom(foregroundColor: AppColors.textMuted),
               ),
               const SizedBox(width: 16),
               TextButton.icon(
                 onPressed: () => _confirmDeleteAccount(auth),
-                icon: const Icon(Icons.delete_forever, size: 16),
+                icon: const Icon(Icons.delete_forever_rounded, size: 16),
                 label: const Text('Delete Account'),
-                style: TextButton.styleFrom(foregroundColor: AppColors.danger.withAlpha(180)),
+                style: TextButton.styleFrom(
+                    foregroundColor:
+                        AppColors.danger.withValues(alpha: 0.7)),
               ),
             ],
           ),
         ],
       ),
+    );
+  }
+
+  /// Wraps a list of [_ProfileTile]s in a single rounded card with
+  /// inner dividers — the SpeakX "settings group" pattern.
+  Widget _profileTileGroup(List<_ProfileTile> tiles) {
+    final children = <Widget>[];
+    for (var i = 0; i < tiles.length; i++) {
+      children.add(tiles[i]);
+      if (i < tiles.length - 1) {
+        children.add(const Divider(
+          color: AppColors.border,
+          height: 1,
+          indent: 56,
+        ));
+      }
+    }
+    return Container(
+      decoration: appCardDecoration(),
+      child: Column(children: children),
     );
   }
 
@@ -791,40 +903,49 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _profileActionButton(IconData icon, String label, VoidCallback onTap, {Color? color}) {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton.icon(
-        onPressed: onTap,
-        icon: Icon(icon, size: 18),
-        label: Text(label),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: color ?? AppColors.textSecondary,
-          side: BorderSide(color: AppColors.border),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-          alignment: Alignment.centerLeft,
-        ),
-      ),
-    );
-  }
+  // _profileActionButton was removed — superseded by the grouped
+  // _ProfileTile pattern below, which folds tiles into a single
+  // rounded card with inner dividers (SpeakX "settings group" style).
 
   // ---------------------------------------------------------------------------
   // Shared widgets
   // ---------------------------------------------------------------------------
 
   Widget _actionButton(String emoji, String label, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: appCardDecoration(),
-        child: Column(
-          children: [
-            Text(emoji, style: const TextStyle(fontSize: 22)),
-            const SizedBox(height: 4),
-            Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w500)),
-          ],
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppRadius.card,
+        splashColor: AppColors.primary.withValues(alpha: 0.15),
+        highlightColor: AppColors.primary.withValues(alpha: 0.08),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
+          decoration: appCardDecoration(),
+          child: Column(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.cardTint,
+                  border: Border.all(color: AppColors.border),
+                ),
+                alignment: Alignment.center,
+                child: Text(emoji, style: const TextStyle(fontSize: 20)),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1221,9 +1342,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _Stat(Icons.today, '$matchesToday', 'Today', AppColors.accent, AppColors.accentBg),
-          _Stat(Icons.local_fire_department, '$winStreak', 'Win Streak', AppColors.primary, AppColors.orangeBg),
-          _Stat(Icons.track_changes, '${accuracy.toStringAsFixed(0)}%', 'Accuracy', AppColors.success, AppColors.emeraldBg),
+          _Stat(Icons.today_rounded, matchesToday, 'Today', AppColors.accent, AppColors.accentBg),
+          _Stat(Icons.local_fire_department_rounded, winStreak, 'Win Streak', AppColors.primary, AppColors.orangeBg),
+          _Stat(Icons.track_changes_rounded, accuracy.round(), 'Accuracy', AppColors.success, AppColors.emeraldBg, suffix: '%'),
         ],
       ),
     );
@@ -1391,30 +1512,143 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
+/// Single stat tile — circular tinted icon + animated numeric value
+/// + label. Uses [AnimatedCounter] so when [value] changes (e.g. on
+/// pull-to-refresh after a match) the number rolls up rather than
+/// snapping. The optional [suffix] keeps "%" attached for the
+/// accuracy variant.
 class _Stat extends StatelessWidget {
   final IconData icon;
-  final String value;
+  final num value;
   final String label;
   final Color color;
   final Color bgColor;
-  const _Stat(this.icon, this.value, this.label, this.color, this.bgColor);
+  final String suffix;
+  const _Stat(
+    this.icon,
+    this.value,
+    this.label,
+    this.color,
+    this.bgColor, {
+    this.suffix = '',
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.all(6),
+          width: 36,
+          height: 36,
+          alignment: Alignment.center,
           decoration: BoxDecoration(
             color: bgColor,
             shape: BoxShape.circle,
+            border: Border.all(color: color.withValues(alpha: 0.3)),
           ),
-          child: Icon(icon, size: 16, color: color),
+          child: Icon(icon, size: 18, color: color),
         ),
-        const SizedBox(height: 4),
-        Text(value, style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.bold)),
-        Text(label, style: const TextStyle(color: AppColors.textMuted, fontSize: 11)),
+        const SizedBox(height: 6),
+        AnimatedCounter(
+          value: value,
+          suffix: suffix,
+          style: TextStyle(
+            color: color,
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        Text(
+          label,
+          style: const TextStyle(
+            color: AppColors.textMuted,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ],
+    );
+  }
+}
+
+/// _ProfileTile — single row inside a [_profileTileGroup] card.
+/// Tinted-icon badge on the left, label + optional badge in the
+/// middle, chevron on the right. InkWell ripple gives the tactile
+/// "tap landed" feedback that bare GestureDetector lacks.
+class _ProfileTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  final String? trailingBadge;
+
+  const _ProfileTile({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+    this.trailingBadge,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        splashColor: color.withValues(alpha: 0.15),
+        highlightColor: color.withValues(alpha: 0.08),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    color: AppColors.text,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              if (trailingBadge != null) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.gold,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    trailingBadge!,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+              ],
+              const Icon(Icons.chevron_right_rounded,
+                  color: AppColors.textMuted, size: 20),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1498,6 +1732,125 @@ class _DailyRewardDialogState extends State<_DailyRewardDialog>
                 ),
                 child: const Text('Claim!', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SpeakX-style bottom navigation
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Custom over Material's BottomNavigationBar because we want:
+//  - A coral pill INDICATOR sliding under the active tab (SpeakX pattern)
+//  - Larger touch targets (56px vs Material's default ~52px)
+//  - Soft elevation rather than the default 8-elevation drop-shadow line
+//  - Animated scale on the active icon for tactile feedback
+
+class _SpeakXBottomNav extends StatelessWidget {
+  final int currentIndex;
+  final ValueChanged<int> onTap;
+  const _SpeakXBottomNav({required this.currentIndex, required this.onTap});
+
+  static const _items = <_NavSpec>[
+    _NavSpec(icon: Icons.home_rounded, label: 'Home'),
+    _NavSpec(icon: Icons.bolt_rounded, label: 'Play'),
+    _NavSpec(icon: Icons.leaderboard_rounded, label: 'Ranks'),
+    _NavSpec(icon: Icons.person_rounded, label: 'Profile'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.bgNav,
+        border: Border(top: BorderSide(color: AppColors.border)),
+        boxShadow: [
+          BoxShadow(color: Color(0x33000000), blurRadius: 16, offset: Offset(0, -4)),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(8, 8, 8, 8 + (bottomInset > 0 ? 0 : 4)),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: List.generate(_items.length, (i) {
+              final spec = _items[i];
+              final selected = i == currentIndex;
+              return Expanded(
+                child: _NavItem(
+                  spec: spec,
+                  selected: selected,
+                  onTap: () => onTap(i),
+                ),
+              );
+            }),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NavSpec {
+  final IconData icon;
+  final String label;
+  const _NavSpec({required this.icon, required this.label});
+}
+
+class _NavItem extends StatelessWidget {
+  final _NavSpec spec;
+  final bool selected;
+  final VoidCallback onTap;
+  const _NavItem({
+    required this.spec,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.primary.withValues(alpha: 0.12)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedScale(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutBack,
+              scale: selected ? 1.1 : 1.0,
+              child: Icon(
+                spec.icon,
+                color: selected ? AppColors.primary : AppColors.textMuted,
+                size: 24,
+              ),
+            ),
+            const SizedBox(height: 4),
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 220),
+              style: TextStyle(
+                color: selected ? AppColors.primary : AppColors.textMuted,
+                fontSize: 11,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+              ),
+              child: Text(spec.label),
             ),
           ],
         ),
