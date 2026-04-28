@@ -63,6 +63,8 @@ class AppColors {
   /// fight the foreground icon/text.
   static const accentBg = Color(0xFF2A2647);  // faint purple
   static const goldBg = Color(0xFF2E2818);    // faint gold
+  static const silverBg = Color(0xFF1F2228);  // faint silver — dark-tone
+  static const bronzeBg = Color(0xFF2A1F14);  // faint bronze — dark-tone
   static const cyanBg = Color(0xFF16252A);    // faint cyan
   static const emeraldBg = Color(0xFF15291F); // faint green
   static const roseBg = Color(0xFF2E1A1B);    // faint red

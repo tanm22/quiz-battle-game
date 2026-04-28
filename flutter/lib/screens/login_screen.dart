@@ -42,9 +42,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   bool _checkingUsername = false;
   Timer? _usernameDebounce;
 
-  bool _isLoading = false;
+  /// Tracks WHICH auth path is currently in flight, so:
+  ///   1. Only the button the user actually tapped renders a spinner
+  ///      (Google was previously sharing `_isLoading` with email
+  ///      Login/Register, which made tapping Login spin the Google
+  ///      button too — visually confusing and wrong).
+  ///   2. Every other button is still disabled while one path is in
+  ///      flight, preventing double-submit across actions (you can't
+  ///      meaningfully fire Google + Register concurrently).
+  _LoadingAction? _activeAction;
   bool _showCredentialForm = false;
   String? _error;
+
+  /// True when any auth action is in flight. All buttons disable when
+  /// this is true; only the matching button renders a spinner.
+  bool get _busy => _activeAction != null;
 
   @override
   void initState() {
@@ -156,11 +168,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     }
   }
 
-  Future<void> _googleSignIn() async {
+  /// Sets [_activeAction] and clears [_error] in one frame. Used by
+  /// every auth handler at start.
+  void _enter(_LoadingAction a) {
+    if (!mounted) return;
     setState(() {
-      _isLoading = true;
+      _activeAction = a;
       _error = null;
     });
+  }
+
+  /// Resets [_activeAction] back to null. Used in every auth handler's
+  /// `finally` block (and in the early-return success paths that need
+  /// to clear before navigating).
+  void _exit() {
+    if (!mounted) return;
+    setState(() => _activeAction = null);
+  }
+
+  Future<void> _googleSignIn() async {
+    _enter(_LoadingAction.google);
     try {
       final auth = AuthService();
       await auth.signInWithGoogle();
@@ -179,15 +206,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         _setError(msg);
       }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      _exit();
     }
   }
 
   Future<void> _guestLogin() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    _enter(_LoadingAction.guest);
     try {
       final auth = AuthService();
       await auth.guestLogin();
@@ -197,7 +221,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     } catch (e) {
       _setError(e.toString());
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      _exit();
     }
   }
 
@@ -209,22 +233,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     }
     final isEmail = identity.contains('@');
 
-    setState(() => _error = null);
-
     if (isEmail) {
-      setState(() => _isLoading = true);
+      _enter(_LoadingAction.login);
       try {
         final auth = AuthService();
         await auth.loginWithEmail(identity);
         if (!mounted) return;
-        setState(() => _isLoading = false);
+        _exit();
         _openEmailCodeScreen(identity, 'login');
       } on GrpcError catch (e) {
         _setError(e.message ?? 'Failed to send login code');
-        if (mounted) setState(() => _isLoading = false);
+        _exit();
       } catch (e) {
         _setError(e.toString());
-        if (mounted) setState(() => _isLoading = false);
+        _exit();
       }
     } else {
       final password = _loginPasswordController.text;
@@ -232,7 +254,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         _setError('Password required');
         return;
       }
-      setState(() => _isLoading = true);
+      _enter(_LoadingAction.login);
       try {
         final auth = AuthService();
         await auth.login(identity, password);
@@ -242,7 +264,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       } catch (e) {
         _setError(e.toString());
       } finally {
-        if (mounted) setState(() => _isLoading = false);
+        _exit();
       }
     }
   }
@@ -260,10 +282,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       _setError('Username must be at least 3 characters');
       return;
     }
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    _enter(_LoadingAction.register);
     try {
       final auth = AuthService();
       await auth.register(
@@ -278,7 +297,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     } catch (e) {
       _setError(e.toString());
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      _exit();
     }
   }
 
@@ -288,21 +307,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       _setError('Enter your email address above first');
       return;
     }
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    _enter(_LoadingAction.forgot);
     try {
       await AuthService().sendEmailCode(email, 'reset');
       if (!mounted) return;
-      setState(() => _isLoading = false);
+      _exit();
       _openEmailCodeScreen(email, 'reset');
     } on GrpcError catch (e) {
       _setError(e.message ?? 'Failed to send reset code');
-      if (mounted) setState(() => _isLoading = false);
+      _exit();
     } catch (e) {
       _setError(e.toString());
-      if (mounted) setState(() => _isLoading = false);
+      _exit();
     }
   }
 
@@ -383,10 +399,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   /// Primary action — large white Google button with the official "G"
   /// glyph. Above the fold, full width, fade-in delay 450ms.
   Widget _buildGoogleButton() {
+    final googleInFlight = _activeAction == _LoadingAction.google;
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
-        onPressed: _isLoading ? null : _googleSignIn,
+        onPressed: _busy ? null : _googleSignIn,
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.white,
           foregroundColor: const Color(0xFF1F1F1F),
@@ -398,7 +415,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
           ),
         ),
-        child: _isLoading
+        child: googleInFlight
             ? const SizedBox(
                 width: 22,
                 height: 22,
@@ -429,11 +446,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   /// Secondary action — Quick Play (guest). Lighter weight than
   /// Google so it reads as the alt path, not a competing CTA.
   Widget _buildQuickPlayButton() {
+    final guestInFlight = _activeAction == _LoadingAction.guest;
     return SizedBox(
       width: double.infinity,
       child: TextButton.icon(
-        onPressed: _isLoading ? null : _guestLogin,
-        icon: const Icon(Icons.flash_on_rounded, color: AppColors.textMuted),
+        onPressed: _busy ? null : _guestLogin,
+        icon: guestInFlight
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.textMuted,
+                ),
+              )
+            : const Icon(Icons.flash_on_rounded, color: AppColors.textMuted),
         label: const Text(
           'Quick Play (no account)',
           style: TextStyle(
@@ -632,17 +659,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         Align(
           alignment: Alignment.centerRight,
           child: TextButton(
-            onPressed: _isLoading ? null : _forgotPassword,
-            child: const Text(
-              'Forgot password?',
-              style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+            onPressed: _busy ? null : _forgotPassword,
+            child: Text(
+              _activeAction == _LoadingAction.forgot
+                  ? 'Sending…'
+                  : 'Forgot password?',
+              style: const TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 13,
+              ),
             ),
           ),
         ),
         const SizedBox(height: 8),
         _buildPrimaryActionButton(
-          onPressed: _isLoading ? null : _submitLogin,
+          onPressed: _busy ? null : _submitLogin,
           label: isEmail ? 'Send Login Code' : 'Login',
+          showSpinner: _activeAction == _LoadingAction.login,
         ),
       ],
     );
@@ -701,8 +734,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         ),
         const SizedBox(height: 16),
         _buildPrimaryActionButton(
-          onPressed: _isLoading ? null : _submitRegister,
+          onPressed: _busy ? null : _submitRegister,
           label: 'Create account',
+          showSpinner: _activeAction == _LoadingAction.register,
         ),
       ],
     );
@@ -711,6 +745,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   Widget _buildPrimaryActionButton({
     VoidCallback? onPressed,
     required String label,
+    required bool showSpinner,
   }) {
     return SizedBox(
       width: double.infinity,
@@ -736,7 +771,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14)),
           ),
-          child: _isLoading
+          child: showSpinner
               ? const SizedBox(
                   width: 22,
                   height: 22,
@@ -826,3 +861,8 @@ class _GoogleLogo extends StatelessWidget {
     );
   }
 }
+
+/// Auth path enum used by [_LoginScreenState._activeAction] to gate
+/// per-button spinners while preserving global "any action in flight
+/// → all buttons disabled" semantics.
+enum _LoadingAction { google, guest, login, register, forgot }

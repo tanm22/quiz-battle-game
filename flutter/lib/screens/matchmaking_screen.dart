@@ -53,11 +53,19 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen>
   }
 
   void _startSearch() {
+    // Start the radar/spin animations BEFORE the userId-null guard so
+    // the visual is alive even on the rare path where matchmaking
+    // opens before auth has propagated. The animations are visual
+    // only — they don't depend on userId. If userId really is null
+    // (e.g. during a logout race) the user still sees the radar
+    // pulse rather than a frozen screen, and the joinMatchmaking
+    // call is correctly skipped.
+    if (!_pulseController.isAnimating) _pulseController.repeat();
+    if (!_spinController.isAnimating) _spinController.repeat();
+
     final gameState = ref.read(gameStateProvider);
     final userId = gameState.userId;
     if (userId == null) return;
-    if (!_pulseController.isAnimating) _pulseController.repeat();
-    if (!_spinController.isAnimating) _spinController.repeat();
     ref
         .read(gameStateProvider.notifier)
         .joinMatchmaking(userId, gameState.rating);

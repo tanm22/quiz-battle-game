@@ -67,6 +67,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _loadHomeData() async {
+    // Upfront mounted guard: callers may invoke this after a
+    // Navigator.push completes, by which point this screen could have
+    // been disposed (e.g. logout fired during the push). Without the
+    // guard, the synchronous setState below crashes with "setState
+    // called after dispose."
+    if (!mounted) return;
     setState(() { _loading = true; _error = null; });
     try {
       final resp = await QuizService().scoring.getHomeScreenData(
@@ -310,7 +316,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               decoration: BoxDecoration(
                 gradient: quotaExhausted
                     ? const LinearGradient(
-                        colors: [Color(0xFF2A2A45), Color(0xFF20203A)],
+                        // Muted dark surface gradient via tokens —
+                        // signals "disabled" without competing with
+                        // the live coral gradient on the active path.
+                        colors: [AppColors.border, AppColors.cardTint],
                       )
                     : AppGradients.primary,
                 borderRadius: BorderRadius.circular(18),
@@ -743,7 +752,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                   ),
                 );
-                if (saved == true) {
+                // Mounted guard mirrors the pattern in
+                // _openPaymentScreen (line 56): the screen could have
+                // been disposed during the EditProfile push (logout
+                // race). _loadHomeData itself also guards, but
+                // checking here keeps the await chain explicit.
+                if (saved == true && context.mounted) {
                   await _loadHomeData();
                 }
               },

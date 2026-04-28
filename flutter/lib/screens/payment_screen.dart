@@ -300,10 +300,13 @@ class _PaymentScreenState extends State<PaymentScreen> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
+                // Faint-gold → lifted-surface gradient via tokens.
+                // The next dark-palette tweak picks this up
+                // automatically — raw hex would silently drift.
                 gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [Color(0xFF2E2818), Color(0xFF1F1F36)],
+                  colors: [AppColors.goldBg, AppColors.bgTop],
                 ),
                 borderRadius: AppRadius.hero,
                 border: Border.all(
