@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:grpc/grpc.dart';
 import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/google_style_avatar.dart';
 import '../../widgets/local_avatar.dart';
 
 /// Lets an existing (already-onboarded) user change their display name,
@@ -322,20 +323,19 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   }
 
   /// Renders the i-th avatar tile. The custom slot (index 0 when the
-  /// user has a non-preset URL like a Google photo) uses Image.network
-  /// with a LocalAvatar fallback so a failed photo load still renders
-  /// something. Preset slots are pure-Dart LocalAvatar — no network.
+  /// user has a non-preset URL like a Google photo) is rendered by
+  /// [GoogleStyleAvatar] — shows the photo when it loads, falls back
+  /// to a deterministic colored-initial circle (using the user's
+  /// display name) when there's no network or the URL fails to
+  /// resolve. Preset slots are pure-Dart [LocalAvatar] — no network.
   Widget _renderAvatar(int i) {
     if (_hasCustomAvatar && i == 0) {
-      return ClipOval(
-        child: Image.network(
-          _customAvatarUrl!,
-          fit: BoxFit.cover,
-          errorBuilder: (_, _, _) => const LocalAvatar(
-            glyph: '👤',
-            background: AppColors.accent,
-          ),
-        ),
+      return GoogleStyleAvatar(
+        name: _displayNameCtl.text.isNotEmpty
+            ? _displayNameCtl.text
+            : widget.displayName,
+        imageUrl: _customAvatarUrl,
+        size: 64,
       );
     }
     final preset = kPresetAvatars[i - (_hasCustomAvatar ? 1 : 0)];

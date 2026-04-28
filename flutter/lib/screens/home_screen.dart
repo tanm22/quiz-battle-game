@@ -12,6 +12,7 @@ import '../widgets/animated_counter.dart';
 import '../widgets/animated_toast.dart';
 import '../widgets/coin_balance_chip.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/google_style_avatar.dart';
 import '../widgets/local_avatar.dart';
 import '../widgets/section_header.dart';
 import '../widgets/streak_calendar.dart';
@@ -1113,7 +1114,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ? profile!.displayName
         : (profile?.username.isNotEmpty == true ? profile!.username : (auth.username ?? ''));
     final plan = profile?.plan ?? 'free';
-    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
     // Resolve to a local emoji preset when the saved URL matches one
     // of the onboarding presets — gives consistent visuals across the
     // setup picker and the home card without depending on network.
@@ -1153,40 +1153,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 colors: [AppColors.primary, AppColors.gold],
               ),
             ),
+            // Three render paths, in priority order:
+            //   1. Onboarding-preset emoji glyph → LocalAvatar
+            //   2. Network photo (Google sign-in, future bucket
+            //      uploads) — GoogleStyleAvatar shows the photo when
+            //      it loads, and an initial-on-color fallback while
+            //      it loads or if it errors out.
+            //   3. No URL at all → GoogleStyleAvatar's deterministic
+            //      colored-initial circle. Looks intentional — same
+            //      affordance Gmail / Calendar / GitHub use for
+            //      photo-less users.
             child: preset != null
                 ? LocalAvatar(
                     glyph: preset.glyph,
                     background: preset.color,
                     size: 56,
                   )
-                : CircleAvatar(
-                    radius: 28,
-                    backgroundColor: AppColors.surface,
-                    child: profile?.avatarUrl.isNotEmpty == true
-                        ? ClipOval(
-                            child: Image.network(
-                              profile!.avatarUrl,
-                              width: 56,
-                              height: 56,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, e, s) => Text(
-                                initial,
-                                style: const TextStyle(
-                                  color: AppColors.primary,
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ),
-                          )
-                        : Text(
-                            initial,
-                            style: const TextStyle(
-                              color: AppColors.primary,
-                              fontSize: 24,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
+                : GoogleStyleAvatar(
+                    name: name,
+                    imageUrl: profile?.avatarUrl,
+                    size: 56,
                   ),
           ),
           const SizedBox(width: 16),
