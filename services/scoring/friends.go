@@ -17,6 +17,7 @@ import (
 	"quiz-battle/pkg/keys"
 	"quiz-battle/pkg/log"
 	"quiz-battle/pkg/models"
+	"quiz-battle/pkg/validate"
 	pb "quiz-battle/proto"
 )
 
@@ -70,6 +71,22 @@ func (s *scoringServer) SendFriendRequest(ctx context.Context, req *pb.SendFrien
 	if (req.TargetUsername == "" && req.TargetReferralCode == "") ||
 		(req.TargetUsername != "" && req.TargetReferralCode != "") {
 		return &pb.SendFriendRequestResponse{ErrorCode: "INVALID_ARGUMENT"}, nil
+	}
+	// §4.7 PR-B2: validate the user-supplied identifier matches the
+	// expected shape before hitting Mongo. Rejects "alice@bob",
+	// "../../etc/passwd", SQLi-style inputs at the parse step.
+	if req.TargetUsername != "" {
+		if err := validate.Username(req.TargetUsername); err != nil {
+			return &pb.SendFriendRequestResponse{ErrorCode: "INVALID_ARGUMENT"}, nil
+		}
+	}
+	if req.TargetReferralCode != "" {
+		// Referral codes are short alphanumeric tokens (~6 chars, generated
+		// in scoring/main.go's referral path). Bound the length to dodge
+		// pathological inputs that would still index-scan.
+		if err := validate.MaxLen(req.TargetReferralCode, 32); err != nil {
+			return &pb.SendFriendRequestResponse{ErrorCode: "INVALID_ARGUMENT"}, nil
+		}
 	}
 
 	// Look up the target user. The two paths are mutually exclusive so
@@ -423,6 +440,14 @@ func (s *scoringServer) ChallengeFriend(ctx context.Context, req *pb.ChallengeFr
 	}
 	if req.FriendUserId == "" {
 		return nil, status.Error(codes.InvalidArgument, "friendUserId required")
+	}
+	// §4.7 PR-B2: bound the user-supplied id length so a forged value
+	// like "../../etc/passwd" (40 bytes) or a 1MB SQLi payload doesn't
+	// reach Mongo. UUIDs are 36 chars; seeded test ids (`user_alice`)
+	// are short. 128 is a generous fence above both — anything longer
+	// is almost certainly an attack.
+	if err := validate.MaxLen(req.FriendUserId, 128); err != nil {
+		return nil, status.Error(codes.InvalidArgument, "friendUserId is too long")
 	}
 	if req.FriendUserId == fromID {
 		return &pb.ChallengeFriendResponse{ErrorCode: "NOT_FRIENDS"}, nil

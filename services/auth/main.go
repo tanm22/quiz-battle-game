@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"net"
 	"os"
-	"regexp"
 	"strings"
 	"time"
 
@@ -35,12 +34,8 @@ import (
 	"quiz-battle/pkg/metrics"
 	"quiz-battle/pkg/models"
 	"quiz-battle/pkg/ratelimit"
+	"quiz-battle/pkg/validate"
 	pb "quiz-battle/proto"
-)
-
-var (
-	usernameRegex = regexp.MustCompile(`^[a-zA-Z0-9_]{3,20}$`)
-	emailRegex    = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
 )
 
 type authServer struct {
@@ -71,14 +66,16 @@ func (s *authServer) users() *mongo.Collection {
 // ---------------------------------------------------------------------------
 
 func (s *authServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.AuthResponse, error) {
-	if !usernameRegex.MatchString(req.Username) {
-		return nil, status.Error(codes.InvalidArgument, "username must be 3-20 alphanumeric or underscore characters")
+	if err := validate.Username(req.Username); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	if len(req.Password) < 6 {
-		return nil, status.Error(codes.InvalidArgument, "password must be at least 6 characters")
+	if err := validate.Password(req.Password); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	if req.Email != "" && !emailRegex.MatchString(req.Email) {
-		return nil, status.Error(codes.InvalidArgument, "invalid email format")
+	if req.Email != "" {
+		if err := validate.Email(req.Email); err != nil {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
 	}
 
 	var existing bson.M
@@ -267,8 +264,8 @@ func (s *authServer) GuestLogin(ctx context.Context, _ *pb.GuestLoginRequest) (*
 // ---------------------------------------------------------------------------
 
 func (s *authServer) SendEmailCode(ctx context.Context, req *pb.SendEmailCodeRequest) (*pb.SendEmailCodeResponse, error) {
-	if !emailRegex.MatchString(req.Email) {
-		return nil, status.Error(codes.InvalidArgument, "invalid email format")
+	if err := validate.Email(req.Email); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 	purpose := req.Purpose
 	if purpose != "login" && purpose != "reset" && purpose != "link" {
@@ -374,8 +371,8 @@ func (s *authServer) LinkEmail(ctx context.Context, req *pb.LinkEmailRequest) (*
 		return nil, status.Error(codes.Unauthenticated, "not authenticated")
 	}
 
-	if !emailRegex.MatchString(req.Email) {
-		return nil, status.Error(codes.InvalidArgument, "invalid email format")
+	if err := validate.Email(req.Email); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	// Verify the code
@@ -407,11 +404,11 @@ func (s *authServer) LinkEmail(ctx context.Context, req *pb.LinkEmailRequest) (*
 // ---------------------------------------------------------------------------
 
 func (s *authServer) ResetPassword(ctx context.Context, req *pb.ResetPasswordRequest) (*pb.ResetPasswordResponse, error) {
-	if !emailRegex.MatchString(req.Email) {
-		return nil, status.Error(codes.InvalidArgument, "invalid email format")
+	if err := validate.Email(req.Email); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	if len(req.NewPassword) < 6 {
-		return nil, status.Error(codes.InvalidArgument, "password must be at least 6 characters")
+	if err := validate.Password(req.NewPassword); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	// Verify the code
