@@ -152,6 +152,7 @@ message PlayerResult {
   int32  answers_correct       = 5;
   double avg_response_time_ms  = 6;
   string plan                  = 7; // "free" or "premium"
+  int64  coins_awarded         = 8; // §4.3: 100 for rank 1, 0 otherwise. Server-authoritative.
 }
 
 message PlayerJoined {

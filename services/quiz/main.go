@@ -543,7 +543,7 @@ func (s *quizServer) finishMatch(ctx context.Context, roomID string, totalRounds
 	}
 
 	var winner string
-	playerResults := make([]*pb.PlayerResult, 0, len(allPlayers))
+	ranked := make([]rankedPlayer, 0, len(allPlayers))
 	scored := make(map[string]bool, len(entries))
 
 	// First pass: leaderboard-ranked players (by score desc).
@@ -554,14 +554,14 @@ func (s *quizServer) finishMatch(ctx context.Context, roomID string, totalRounds
 			winner = userID
 		}
 		username, pPlan := resolveInfo(userID)
-		playerResults = append(playerResults, &pb.PlayerResult{
-			UserId:            userID,
-			Username:          username,
-			FinalScore:        e.Score,
-			Rank:              int32(i + 1),
-			AnswersCorrect:    tallyCorrect(userID),
-			AvgResponseTimeMs: tallyAvgMs(userID),
-			Plan:              pPlan,
+		ranked = append(ranked, rankedPlayer{
+			UserID:         userID,
+			Username:       username,
+			FinalScore:     e.Score,
+			Rank:           int32(i + 1),
+			AnswersCorrect: tallyCorrect(userID),
+			AvgRespMs:      tallyAvgMs(userID),
+			Plan:           pPlan,
 		})
 	}
 
@@ -573,17 +573,19 @@ func (s *quizServer) finishMatch(ctx context.Context, roomID string, totalRounds
 			continue
 		}
 		username, pPlan := resolveInfo(userID)
-		playerResults = append(playerResults, &pb.PlayerResult{
-			UserId:            userID,
-			Username:          username,
-			FinalScore:        0,
-			Rank:              nextRank,
-			AnswersCorrect:    tallyCorrect(userID),
-			AvgResponseTimeMs: tallyAvgMs(userID),
-			Plan:              pPlan,
+		ranked = append(ranked, rankedPlayer{
+			UserID:         userID,
+			Username:       username,
+			FinalScore:     0,
+			Rank:           nextRank,
+			AnswersCorrect: tallyCorrect(userID),
+			AvgRespMs:      tallyAvgMs(userID),
+			Plan:           pPlan,
 		})
 		nextRank++
 	}
+
+	playerResults := buildPlayerResults(ranked)
 
 	// Broadcast MatchEnd GameEvent
 	seq := s.getSeqCounter(roomID).Add(1)
@@ -640,6 +642,45 @@ func (s *quizServer) finishMatch(ctx context.Context, roomID string, totalRounds
 	s.roomQuestions.Delete(roomID)
 	s.seqCounters.Delete(roomID)
 	s.roomTimers.Delete(roomID)
+}
+
+// rankedPlayer is the per-player snapshot the finalizer builds before
+// emitting MatchEnd. Keeping it as a plain struct (rather than building
+// pb.PlayerResult inline) lets buildPlayerResults stay a pure function we
+// can unit-test without spinning up Redis/Mongo/RabbitMQ.
+type rankedPlayer struct {
+	UserID         string
+	Username       string
+	FinalScore     float64
+	Rank           int32
+	AnswersCorrect int32
+	AvgRespMs      float64
+	Plan           string
+}
+
+// buildPlayerResults transforms ranked players into pb.PlayerResult slices,
+// populating CoinsAwarded so the client can show "+100 coins" without
+// guessing. Server-authoritative per §4.3 — the number here is what the
+// match-win event payload carries.
+func buildPlayerResults(ranked []rankedPlayer) []*pb.PlayerResult {
+	out := make([]*pb.PlayerResult, 0, len(ranked))
+	for _, p := range ranked {
+		var awarded int64
+		if p.Rank == 1 {
+			awarded = matchWinCoinReward
+		}
+		out = append(out, &pb.PlayerResult{
+			UserId:            p.UserID,
+			Username:          p.Username,
+			FinalScore:        p.FinalScore,
+			Rank:              p.Rank,
+			AnswersCorrect:    p.AnswersCorrect,
+			AvgResponseTimeMs: p.AvgRespMs,
+			Plan:              p.Plan,
+			CoinsAwarded:      awarded,
+		})
+	}
+	return out
 }
 
 // connectedPlayersInRoom returns the number of active game streams for a room.

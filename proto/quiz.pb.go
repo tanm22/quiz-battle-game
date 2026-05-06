@@ -1193,7 +1193,8 @@ type PlayerResult struct {
 	Rank              int32                  `protobuf:"varint,4,opt,name=rank,proto3" json:"rank,omitempty"`
 	AnswersCorrect    int32                  `protobuf:"varint,5,opt,name=answers_correct,json=answersCorrect,proto3" json:"answers_correct,omitempty"`
 	AvgResponseTimeMs float64                `protobuf:"fixed64,6,opt,name=avg_response_time_ms,json=avgResponseTimeMs,proto3" json:"avg_response_time_ms,omitempty"`
-	Plan              string                 `protobuf:"bytes,7,opt,name=plan,proto3" json:"plan,omitempty"` // "free" or "premium"
+	Plan              string                 `protobuf:"bytes,7,opt,name=plan,proto3" json:"plan,omitempty"`                                      // "free" or "premium"
+	CoinsAwarded      int64                  `protobuf:"varint,8,opt,name=coins_awarded,json=coinsAwarded,proto3" json:"coins_awarded,omitempty"` // §4.3: 100 for rank 1, 0 otherwise. Server-authoritative.
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -1275,6 +1276,13 @@ func (x *PlayerResult) GetPlan() string {
 		return x.Plan
 	}
 	return ""
+}
+
+func (x *PlayerResult) GetCoinsAwarded() int64 {
+	if x != nil {
+		return x.CoinsAwarded
+	}
+	return 0
 }
 
 type PlayerJoined struct {
@@ -7422,7 +7430,7 @@ const file_proto_quiz_proto_rawDesc = "" +
 	"\x06winner\x18\x02 \x01(\tR\x06winner\x12,\n" +
 	"\aplayers\x18\x03 \x03(\v2\x12.quiz.PlayerResultR\aplayers\x12\x16\n" +
 	"\x06rounds\x18\x04 \x01(\x05R\x06rounds\x12\x1a\n" +
-	"\bduration\x18\x05 \x01(\x03R\bduration\"\xe6\x01\n" +
+	"\bduration\x18\x05 \x01(\x03R\bduration\"\x8b\x02\n" +
 	"\fPlayerResult\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1a\n" +
 	"\busername\x18\x02 \x01(\tR\busername\x12\x1f\n" +
@@ -7431,7 +7439,8 @@ const file_proto_quiz_proto_rawDesc = "" +
 	"\x04rank\x18\x04 \x01(\x05R\x04rank\x12'\n" +
 	"\x0fanswers_correct\x18\x05 \x01(\x05R\x0eanswersCorrect\x12/\n" +
 	"\x14avg_response_time_ms\x18\x06 \x01(\x01R\x11avgResponseTimeMs\x12\x12\n" +
-	"\x04plan\x18\a \x01(\tR\x04plan\"W\n" +
+	"\x04plan\x18\a \x01(\tR\x04plan\x12#\n" +
+	"\rcoins_awarded\x18\b \x01(\x03R\fcoinsAwarded\"W\n" +
 	"\fPlayerJoined\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1a\n" +
 	"\busername\x18\x02 \x01(\tR\busername\x12\x12\n" +

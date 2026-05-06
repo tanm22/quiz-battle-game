@@ -1423,6 +1423,7 @@ class PlayerResult extends $pb.GeneratedMessage {
     $core.int? answersCorrect,
     $core.double? avgResponseTimeMs,
     $core.String? plan,
+    $fixnum.Int64? coinsAwarded,
   }) {
     final result = create();
     if (userId != null) result.userId = userId;
@@ -1432,6 +1433,7 @@ class PlayerResult extends $pb.GeneratedMessage {
     if (answersCorrect != null) result.answersCorrect = answersCorrect;
     if (avgResponseTimeMs != null) result.avgResponseTimeMs = avgResponseTimeMs;
     if (plan != null) result.plan = plan;
+    if (coinsAwarded != null) result.coinsAwarded = coinsAwarded;
     return result;
   }
 
@@ -1455,6 +1457,7 @@ class PlayerResult extends $pb.GeneratedMessage {
     ..aI(5, _omitFieldNames ? '' : 'answersCorrect')
     ..aD(6, _omitFieldNames ? '' : 'avgResponseTimeMs')
     ..aOS(7, _omitFieldNames ? '' : 'plan')
+    ..aInt64(8, _omitFieldNames ? '' : 'coinsAwarded')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1538,6 +1541,15 @@ class PlayerResult extends $pb.GeneratedMessage {
   $core.bool hasPlan() => $_has(6);
   @$pb.TagNumber(7)
   void clearPlan() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $fixnum.Int64 get coinsAwarded => $_getI64(7);
+  @$pb.TagNumber(8)
+  set coinsAwarded($fixnum.Int64 value) => $_setInt64(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasCoinsAwarded() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearCoinsAwarded() => $_clearField(8);
 }
 
 class PlayerJoined extends $pb.GeneratedMessage {
