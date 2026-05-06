@@ -12,6 +12,7 @@ import (
 	"quiz-battle/pkg/auth"
 	"quiz-battle/pkg/coins"
 	"quiz-battle/pkg/coins/shop"
+	"quiz-battle/pkg/validate"
 	pb "quiz-battle/proto"
 )
 
@@ -105,6 +106,12 @@ func (s *scoringServer) PurchaseShopItem(ctx context.Context, req *pb.PurchaseSh
 	}
 	if req.ItemId == "" || req.IdempotencyKey == "" {
 		return nil, status.Error(codes.InvalidArgument, "itemId and idempotencyKey required")
+	}
+	if err := validate.MaxLen(req.ItemId, 64); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "item_id: %v", err)
+	}
+	if err := validate.MaxLen(req.IdempotencyKey, 128); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "idempotency_key: %v", err)
 	}
 	res, err := s.purchase.Buy(ctx, uid, req.ItemId, req.IdempotencyKey)
 	if err != nil {

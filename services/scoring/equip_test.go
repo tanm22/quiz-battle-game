@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -36,6 +37,16 @@ func TestEquipCosmetic_RejectsEmptyItem(t *testing.T) {
 	seedScoringUser(t, c, db, "alice", 0)
 	if _, err := srv.EquipCosmetic(authedCtx("alice"), &pb.EquipCosmeticRequest{ItemId: ""}); status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("got %v, want InvalidArgument", err)
+	}
+}
+
+func TestEquipCosmetic_RejectsOversizeItemId(t *testing.T) {
+	srv, c, db := scoringTestEnv(t)
+	seedScoringUser(t, c, db, "alice", 0)
+	_, err := srv.EquipCosmetic(authedCtx("alice"),
+		&pb.EquipCosmeticRequest{ItemId: strings.Repeat("x", 200)})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("err code = %v, want InvalidArgument", status.Code(err))
 	}
 }
 

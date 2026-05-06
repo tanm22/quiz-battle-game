@@ -12,6 +12,7 @@ import (
 
 	"quiz-battle/pkg/auth"
 	"quiz-battle/pkg/coins/shop"
+	"quiz-battle/pkg/validate"
 	pb "quiz-battle/proto"
 )
 
@@ -32,6 +33,9 @@ func (s *scoringServer) EquipCosmetic(ctx context.Context, req *pb.EquipCosmetic
 	}
 	if req.ItemId == "" {
 		return nil, status.Error(codes.InvalidArgument, "itemId required")
+	}
+	if err := validate.MaxLen(req.ItemId, 64); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "item_id: %v", err)
 	}
 
 	item, err := shop.GetItem(ctx, s.mongoDB, req.ItemId)

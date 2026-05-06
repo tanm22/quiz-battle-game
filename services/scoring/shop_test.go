@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -202,6 +203,32 @@ func TestPurchaseShopItem_RejectsEmptyArgs(t *testing.T) {
 	_, err := srv.PurchaseShopItem(authedCtx("alice"), &pb.PurchaseShopItemRequest{ItemId: "", IdempotencyKey: ""})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("got %v, want InvalidArgument", err)
+	}
+}
+
+func TestPurchaseShopItem_RejectsOversizeItemId(t *testing.T) {
+	srv, db := shopTestEnv(t)
+	seedScoringUser(t, srv.mongoClient, db, "alice", 1000)
+	_, err := srv.PurchaseShopItem(authedCtx("alice"),
+		&pb.PurchaseShopItemRequest{
+			ItemId:         strings.Repeat("x", 200),
+			IdempotencyKey: "k-1",
+		})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("err code = %v, want InvalidArgument", status.Code(err))
+	}
+}
+
+func TestPurchaseShopItem_RejectsOversizeIdempotencyKey(t *testing.T) {
+	srv, db := shopTestEnv(t)
+	seedScoringUser(t, srv.mongoClient, db, "alice", 1000)
+	_, err := srv.PurchaseShopItem(authedCtx("alice"),
+		&pb.PurchaseShopItemRequest{
+			ItemId:         "frame.gold",
+			IdempotencyKey: strings.Repeat("k", 300),
+		})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("err code = %v, want InvalidArgument", status.Code(err))
 	}
 }
 

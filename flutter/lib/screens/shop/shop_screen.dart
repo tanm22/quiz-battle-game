@@ -22,9 +22,8 @@ const Map<String, List<String>> _categories = {
 /// Premium). Each tab grids out the catalog items whose `kind` is in
 /// the tab's list. Tapping a card pushes [ShopItemDetail].
 ///
-/// PR 6 ships read-only — the Buy button on [ShopItemDetail] opens a
-/// "coming next" placeholder dialog. PR 7 replaces it with the real
-/// purchase modal.
+/// The Buy button on [ShopItemDetail] opens [PurchaseConfirmModal]
+/// directly — there is no placeholder path.
 class ShopScreen extends ConsumerWidget {
   const ShopScreen({super.key});
 
