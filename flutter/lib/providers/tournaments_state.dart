@@ -31,9 +31,20 @@ final tournamentDetailProvider =
 /// anymore — leaving the detail screen tears it down with no leak.
 final tournamentLeaderboardProvider =
     FutureProvider.family<List<TournamentStandingEntry>, String>((ref, id) async {
+  // Skip the tick if the previous RPC hasn't completed yet — otherwise
+  // a slow window (network blip, backend stall > 10 s) cascades redundant
+  // in-flight RPCs that never serve a result. Riverpod auto-disposes the
+  // provider on screen pop, which fires onDispose → cancels the timer
+  // before this closure is ever stale.
+  var inFlight = true;
   final timer = Timer.periodic(const Duration(seconds: 10), (_) {
+    if (inFlight) return;
     ref.invalidateSelf();
   });
   ref.onDispose(timer.cancel);
-  return ref.watch(tournamentsServiceProvider).leaderboard(id);
+  try {
+    return await ref.watch(tournamentsServiceProvider).leaderboard(id);
+  } finally {
+    inFlight = false;
+  }
 });

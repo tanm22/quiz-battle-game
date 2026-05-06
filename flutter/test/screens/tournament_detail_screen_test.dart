@@ -46,8 +46,10 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    // Tournament name appears in the AppBar title.
-    expect(find.text('Weekend Warriors'), findsWidgets);
+    // Tournament name appears in the AppBar title (single render site —
+    // findsOneWidget guards against a future regression where the same
+    // string accidentally appears in multiple widgets).
+    expect(find.text('Weekend Warriors'), findsOneWidget);
     // Prize description is rendered on the Rules tab.
     expect(find.textContaining('500/300/100'), findsOneWidget);
   });

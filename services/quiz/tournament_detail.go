@@ -42,8 +42,8 @@ func (s *quizServer) GetTournament(ctx context.Context, req *pb.GetTournamentReq
 	var doc struct {
 		ID               string    `bson:"_id"`
 		Name             string    `bson:"name"`
-		StartTime        time.Time `bson:"startTime,omitempty"`
-		EndTime          time.Time `bson:"endTime,omitempty"`
+		StartTime        time.Time `bson:"startTime"`
+		EndTime          time.Time `bson:"endTime"`
 		EntryDeadline    time.Time `bson:"entryDeadline,omitempty"`
 		Status           string    `bson:"status"`
 		RequiredPlan     string    `bson:"requiredPlan"`
