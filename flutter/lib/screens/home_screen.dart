@@ -16,6 +16,7 @@ import '../widgets/google_style_avatar.dart';
 import '../widgets/local_avatar.dart';
 import '../widgets/section_header.dart';
 import '../widgets/streak_calendar.dart';
+import '../widgets/streak_freeze_chip.dart';
 import '../proto/quiz.pbgrpc.dart';
 import 'coin_ledger_screen.dart';
 import 'shop/equip_screen.dart';
@@ -1305,7 +1306,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         children: [
           const Icon(Icons.local_fire_department, color: AppColors.primary, size: 28),
           const SizedBox(height: 4),
-          Text('${streak?.current ?? 0}', style: const TextStyle(color: AppColors.text, fontSize: 22, fontWeight: FontWeight.w900)),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text('${streak?.current ?? 0}', style: const TextStyle(color: AppColors.text, fontSize: 22, fontWeight: FontWeight.w900)),
+              const SizedBox(width: 8),
+              const StreakFreezeChip(),
+            ],
+          ),
           const Text('day streak', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
         ],
       ),
