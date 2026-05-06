@@ -73,7 +73,20 @@ type scoringServer struct {
 	// a tighter limiter would block legitimate retries on transient
 	// errors. Nil-safe via the limiter's nil check.
 	referralLimiter *ratelimit.Limiter
+	// §4.7: anti-abuse limiter on PurchaseShopItem. Idempotency keys
+	// already debounce same-key spam, but a fresh-key purchase loop
+	// is unbounded without this guard. Nil-safe at the pkg/ratelimit
+	// level — shopTestEnv-built servers leave this as the zero value
+	// and the limiter passes through unchanged.
+	purchaseLimiter *ratelimit.Limiter
 }
+
+// purchaseRateLimit caps shop-purchase calls per user per minute. Set
+// liberally — a legitimate user spamming a single SKU is debounced by
+// idempotency keys, but a fresh-key purchase loop is unbounded without
+// this guard. 30/min is generous for any normal user; an attacker hits
+// the wall fast.
+const purchaseRateLimit = 30
 
 // publish sends a message to the topic exchange with mutex protection.
 // In tests, two seams short-circuit the broker hop:
@@ -1906,6 +1919,7 @@ func main() {
 		purchase:        shop.NewPurchase(mongoClient, mongoDB, ledger),
 		jwtSecret:       jwtSecret,
 		referralLimiter: ratelimit.New(rdb, "referral_apply", 3, 10*time.Minute),
+		purchaseLimiter: ratelimit.New(rdb, "purchase_shop_item", purchaseRateLimit, time.Minute),
 	}
 
 	// gRPC server — CalculateScore is called internally by the scoring worker

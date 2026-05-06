@@ -23,8 +23,8 @@ import '../theme/app_theme.dart';
 ///    refetch (e.g. via [invalidateCoinState] after a purchase) updates
 ///    the chip without manual wiring.
 ///
-/// The optional [onTap] makes the chip tappable; PR 7 wires it to push
-/// the ledger screen.
+/// The optional [onTap] makes the chip tappable. Common usage: navigate
+/// to the coin-ledger screen.
 class CoinBalanceChip extends ConsumerWidget {
   const CoinBalanceChip({super.key, this.onTap, this.initialBalance});
 

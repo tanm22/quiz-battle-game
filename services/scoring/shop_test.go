@@ -2,8 +2,13 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -11,6 +16,7 @@ import (
 	"quiz-battle/pkg/auth"
 	"quiz-battle/pkg/coins"
 	"quiz-battle/pkg/coins/shop"
+	"quiz-battle/pkg/ratelimit"
 	pb "quiz-battle/proto"
 )
 
@@ -200,6 +206,81 @@ func TestPurchaseShopItem_RejectsEmptyArgs(t *testing.T) {
 	}
 }
 
+func TestPurchaseShopItem_RejectsOversizeItemId(t *testing.T) {
+	srv, db := shopTestEnv(t)
+	seedScoringUser(t, srv.mongoClient, db, "alice", 1000)
+	_, err := srv.PurchaseShopItem(authedCtx("alice"),
+		&pb.PurchaseShopItemRequest{
+			ItemId:         strings.Repeat("x", 200),
+			IdempotencyKey: "k-1",
+		})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("err code = %v, want InvalidArgument", status.Code(err))
+	}
+}
+
+func TestPurchaseShopItem_RejectsOversizeIdempotencyKey(t *testing.T) {
+	srv, db := shopTestEnv(t)
+	seedScoringUser(t, srv.mongoClient, db, "alice", 1000)
+	_, err := srv.PurchaseShopItem(authedCtx("alice"),
+		&pb.PurchaseShopItemRequest{
+			ItemId:         "frame.gold",
+			IdempotencyKey: strings.Repeat("k", 300),
+		})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("err code = %v, want InvalidArgument", status.Code(err))
+	}
+}
+
 // Compile-time assert: shop handlers must keep the coin reasons importable
 // so reviewers can grep from this test file to the canonical constants.
 var _ = coins.ReasonShopPurchase
+
+func TestPurchaseShopItem_RateLimitedAfterBurst(t *testing.T) {
+	// Mirror pkg/ratelimit/limiter_test.go::testRedis so this test
+	// self-skips on machines without Redis. DB 13 is reserved for
+	// scoring-side rate-limit tests (separate from DB 14 in
+	// pkg/ratelimit) so a parallel run doesn't trample co-tenant keys.
+	addr := os.Getenv("REDIS_ADDR")
+	if addr == "" {
+		addr = "localhost:6379"
+	}
+	rdb := redis.NewClient(&redis.Options{Addr: addr, DB: 13})
+	if err := rdb.Ping(context.Background()).Err(); err != nil {
+		t.Skipf("redis ping: %v", err)
+	}
+	if err := rdb.FlushDB(context.Background()).Err(); err != nil {
+		t.Fatalf("flushdb: %v", err)
+	}
+	t.Cleanup(func() { _ = rdb.Close() })
+
+	srv, db := shopTestEnv(t)
+	seedScoringUser(t, srv.mongoClient, db, "alice", 100000)
+	srv.purchaseLimiter = ratelimit.New(rdb, "purchase_shop_item", 3, time.Minute)
+
+	// Use frame.gold with distinct idempotency keys: each key is a fresh
+	// refId so the ledger debits each call. AddCosmetic returns
+	// ErrAlreadyOwned on the 2nd+ purchase, but applyEffect silently
+	// ignores it — coins debit, transaction commits, the rate-limit
+	// path is exercised cleanly.
+	for i := 0; i < 3; i++ {
+		_, err := srv.PurchaseShopItem(authedCtx("alice"),
+			&pb.PurchaseShopItemRequest{
+				ItemId:         "frame.gold",
+				IdempotencyKey: fmt.Sprintf("k-%d", i),
+			})
+		if err != nil {
+			t.Fatalf("purchase %d: unexpected err: %v", i, err)
+		}
+	}
+
+	// 4th request in the window should be rejected with ResourceExhausted.
+	_, err := srv.PurchaseShopItem(authedCtx("alice"),
+		&pb.PurchaseShopItemRequest{
+			ItemId:         "frame.gold",
+			IdempotencyKey: "k-overlimit",
+		})
+	if status.Code(err) != codes.ResourceExhausted {
+		t.Errorf("over-limit purchase err code = %v, want ResourceExhausted", status.Code(err))
+	}
+}

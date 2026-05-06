@@ -12,6 +12,7 @@ import (
 	"quiz-battle/pkg/auth"
 	"quiz-battle/pkg/coins"
 	"quiz-battle/pkg/coins/shop"
+	"quiz-battle/pkg/validate"
 	pb "quiz-battle/proto"
 )
 
@@ -92,8 +93,25 @@ func (s *scoringServer) PurchaseShopItem(ctx context.Context, req *pb.PurchaseSh
 	if err != nil {
 		return nil, status.Error(codes.Unauthenticated, "not authenticated")
 	}
+	// §4.7 hardening: cap shop-purchase calls per user per minute. Same
+	// pattern as referralLimiter — fail-open on Redis errors (matches
+	// AllowWithLog behavior), per-subject (userId) so one user's burst
+	// doesn't starve others. Idempotency keys debounce same-key spam,
+	// but a fresh-key purchase loop is unbounded without this. The
+	// limiter is nil-safe at the package level (pkg/ratelimit.Allow
+	// returns true on nil receiver) so shopTestEnv-built servers without
+	// a wired limiter pass through unchanged.
+	if !s.purchaseLimiter.AllowWithLog(ctx, uid) {
+		return nil, status.Error(codes.ResourceExhausted, "too many purchases; slow down")
+	}
 	if req.ItemId == "" || req.IdempotencyKey == "" {
 		return nil, status.Error(codes.InvalidArgument, "itemId and idempotencyKey required")
+	}
+	if err := validate.MaxLen(req.ItemId, 64); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "item_id: %v", err)
+	}
+	if err := validate.MaxLen(req.IdempotencyKey, 128); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "idempotency_key: %v", err)
 	}
 	res, err := s.purchase.Buy(ctx, uid, req.ItemId, req.IdempotencyKey)
 	if err != nil {
