@@ -408,6 +408,7 @@ const PlayerResult$json = {
       '10': 'avgResponseTimeMs'
     },
     {'1': 'plan', '3': 7, '4': 1, '5': 9, '10': 'plan'},
+    {'1': 'coins_awarded', '3': 8, '4': 1, '5': 3, '10': 'coinsAwarded'},
   ],
 };
 
@@ -417,7 +418,7 @@ final $typed_data.Uint8List playerResultDescriptor = $convert.base64Decode(
     'gJUgh1c2VybmFtZRIfCgtmaW5hbF9zY29yZRgDIAEoAVIKZmluYWxTY29yZRISCgRyYW5rGAQg'
     'ASgFUgRyYW5rEicKD2Fuc3dlcnNfY29ycmVjdBgFIAEoBVIOYW5zd2Vyc0NvcnJlY3QSLwoUYX'
     'ZnX3Jlc3BvbnNlX3RpbWVfbXMYBiABKAFSEWF2Z1Jlc3BvbnNlVGltZU1zEhIKBHBsYW4YByAB'
-    'KAlSBHBsYW4=');
+    'KAlSBHBsYW4SIwoNY29pbnNfYXdhcmRlZBgIIAEoA1IMY29pbnNBd2FyZGVk');
 
 @$core.Deprecated('Use playerJoinedDescriptor instead')
 const PlayerJoined$json = {
