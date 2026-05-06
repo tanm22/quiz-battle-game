@@ -6,6 +6,7 @@ import '../proto/quiz.pbgrpc.dart';
 import '../theme/app_theme.dart';
 import '../widgets/empty_state.dart';
 import 'payment_screen.dart';
+import 'tournament_detail_screen.dart';
 
 class TournamentScreen extends StatefulWidget {
   final String currentPlan;
@@ -145,9 +146,15 @@ class _TournamentScreenState extends State<TournamentScreen> {
         ? 'Ends ${_formatTime(end)}'
         : 'Starts ${_formatTime(start)}';
 
+    // §4.2 PR 1: tap routes to the detail screen for non-completed
+    // tournaments. Completed tournaments (PR 2 will swap this for the
+    // results screen) currently no-op on tap; the Join button below
+    // is unaffected — InkWell delegates the gesture to the button when
+    // pressed inside it.
+    final canOpenDetail = t.status != 'completed';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: AppRadius.card,
@@ -159,7 +166,23 @@ class _TournamentScreenState extends State<TournamentScreen> {
           BoxShadow(color: Color(0x14000000), blurRadius: 1),
         ],
       ),
-      child: Column(
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: AppRadius.card,
+        child: InkWell(
+          borderRadius: AppRadius.card,
+          onTap: canOpenDetail
+              ? () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          TournamentDetailScreen(tournamentId: t.id),
+                    ),
+                  )
+              : null,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -255,8 +278,11 @@ class _TournamentScreenState extends State<TournamentScreen> {
               ),
             ),
           ),
-        ],
+            ],
+          ),
+        ),
       ),
+    ),
     );
   }
 

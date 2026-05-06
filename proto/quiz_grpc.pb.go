@@ -201,11 +201,13 @@ var MatchmakingService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	QuizService_GetRoomQuestions_FullMethodName  = "/quiz.QuizService/GetRoomQuestions"
-	QuizService_SubmitAnswer_FullMethodName      = "/quiz.QuizService/SubmitAnswer"
-	QuizService_StreamGameEvents_FullMethodName  = "/quiz.QuizService/StreamGameEvents"
-	QuizService_GetTournamentList_FullMethodName = "/quiz.QuizService/GetTournamentList"
-	QuizService_JoinTournament_FullMethodName    = "/quiz.QuizService/JoinTournament"
+	QuizService_GetRoomQuestions_FullMethodName         = "/quiz.QuizService/GetRoomQuestions"
+	QuizService_SubmitAnswer_FullMethodName             = "/quiz.QuizService/SubmitAnswer"
+	QuizService_StreamGameEvents_FullMethodName         = "/quiz.QuizService/StreamGameEvents"
+	QuizService_GetTournamentList_FullMethodName        = "/quiz.QuizService/GetTournamentList"
+	QuizService_JoinTournament_FullMethodName           = "/quiz.QuizService/JoinTournament"
+	QuizService_GetTournament_FullMethodName            = "/quiz.QuizService/GetTournament"
+	QuizService_GetTournamentLeaderboard_FullMethodName = "/quiz.QuizService/GetTournamentLeaderboard"
 )
 
 // QuizServiceClient is the client API for QuizService service.
@@ -218,6 +220,10 @@ type QuizServiceClient interface {
 	// Phase 2
 	GetTournamentList(ctx context.Context, in *GetTournamentListRequest, opts ...grpc.CallOption) (*GetTournamentListResponse, error)
 	JoinTournament(ctx context.Context, in *JoinTournamentRequest, opts ...grpc.CallOption) (*JoinTournamentResponse, error)
+	// §4.2 PR 1: detail screen + live leaderboard. Both gate on auth +
+	// validate.MaxLen(64) on the id; the leaderboard is capped server-side.
+	GetTournament(ctx context.Context, in *GetTournamentRequest, opts ...grpc.CallOption) (*GetTournamentResponse, error)
+	GetTournamentLeaderboard(ctx context.Context, in *GetTournamentLeaderboardRequest, opts ...grpc.CallOption) (*GetTournamentLeaderboardResponse, error)
 }
 
 type quizServiceClient struct {
@@ -287,6 +293,26 @@ func (c *quizServiceClient) JoinTournament(ctx context.Context, in *JoinTourname
 	return out, nil
 }
 
+func (c *quizServiceClient) GetTournament(ctx context.Context, in *GetTournamentRequest, opts ...grpc.CallOption) (*GetTournamentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetTournamentResponse)
+	err := c.cc.Invoke(ctx, QuizService_GetTournament_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *quizServiceClient) GetTournamentLeaderboard(ctx context.Context, in *GetTournamentLeaderboardRequest, opts ...grpc.CallOption) (*GetTournamentLeaderboardResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetTournamentLeaderboardResponse)
+	err := c.cc.Invoke(ctx, QuizService_GetTournamentLeaderboard_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // QuizServiceServer is the server API for QuizService service.
 // All implementations must embed UnimplementedQuizServiceServer
 // for forward compatibility.
@@ -297,6 +323,10 @@ type QuizServiceServer interface {
 	// Phase 2
 	GetTournamentList(context.Context, *GetTournamentListRequest) (*GetTournamentListResponse, error)
 	JoinTournament(context.Context, *JoinTournamentRequest) (*JoinTournamentResponse, error)
+	// §4.2 PR 1: detail screen + live leaderboard. Both gate on auth +
+	// validate.MaxLen(64) on the id; the leaderboard is capped server-side.
+	GetTournament(context.Context, *GetTournamentRequest) (*GetTournamentResponse, error)
+	GetTournamentLeaderboard(context.Context, *GetTournamentLeaderboardRequest) (*GetTournamentLeaderboardResponse, error)
 	mustEmbedUnimplementedQuizServiceServer()
 }
 
@@ -321,6 +351,12 @@ func (UnimplementedQuizServiceServer) GetTournamentList(context.Context, *GetTou
 }
 func (UnimplementedQuizServiceServer) JoinTournament(context.Context, *JoinTournamentRequest) (*JoinTournamentResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method JoinTournament not implemented")
+}
+func (UnimplementedQuizServiceServer) GetTournament(context.Context, *GetTournamentRequest) (*GetTournamentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetTournament not implemented")
+}
+func (UnimplementedQuizServiceServer) GetTournamentLeaderboard(context.Context, *GetTournamentLeaderboardRequest) (*GetTournamentLeaderboardResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetTournamentLeaderboard not implemented")
 }
 func (UnimplementedQuizServiceServer) mustEmbedUnimplementedQuizServiceServer() {}
 func (UnimplementedQuizServiceServer) testEmbeddedByValue()                     {}
@@ -426,6 +462,42 @@ func _QuizService_JoinTournament_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _QuizService_GetTournament_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTournamentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(QuizServiceServer).GetTournament(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: QuizService_GetTournament_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(QuizServiceServer).GetTournament(ctx, req.(*GetTournamentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _QuizService_GetTournamentLeaderboard_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTournamentLeaderboardRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(QuizServiceServer).GetTournamentLeaderboard(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: QuizService_GetTournamentLeaderboard_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(QuizServiceServer).GetTournamentLeaderboard(ctx, req.(*GetTournamentLeaderboardRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // QuizService_ServiceDesc is the grpc.ServiceDesc for QuizService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -448,6 +520,14 @@ var QuizService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "JoinTournament",
 			Handler:    _QuizService_JoinTournament_Handler,
+		},
+		{
+			MethodName: "GetTournament",
+			Handler:    _QuizService_GetTournament_Handler,
+		},
+		{
+			MethodName: "GetTournamentLeaderboard",
+			Handler:    _QuizService_GetTournamentLeaderboard_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

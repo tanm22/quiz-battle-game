@@ -1507,6 +1507,130 @@ final $typed_data.Uint8List joinTournamentResponseDescriptor =
     $convert.base64Decode(
         'ChZKb2luVG91cm5hbWVudFJlc3BvbnNlEhgKB3N1Y2Nlc3MYASABKAhSB3N1Y2Nlc3M=');
 
+@$core.Deprecated('Use tournamentDescriptor instead')
+const Tournament$json = {
+  '1': 'Tournament',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+    {'1': 'name', '3': 2, '4': 1, '5': 9, '10': 'name'},
+    {'1': 'start_time', '3': 3, '4': 1, '5': 3, '10': 'startTime'},
+    {'1': 'end_time', '3': 4, '4': 1, '5': 3, '10': 'endTime'},
+    {'1': 'entry_deadline', '3': 5, '4': 1, '5': 3, '10': 'entryDeadline'},
+    {'1': 'status', '3': 6, '4': 1, '5': 9, '10': 'status'},
+    {'1': 'required_plan', '3': 7, '4': 1, '5': 9, '10': 'requiredPlan'},
+    {
+      '1': 'prize_description',
+      '3': 8,
+      '4': 1,
+      '5': 9,
+      '10': 'prizeDescription'
+    },
+    {'1': 'prize_pool', '3': 9, '4': 3, '5': 3, '10': 'prizePool'},
+    {
+      '1': 'participant_count',
+      '3': 10,
+      '4': 1,
+      '5': 5,
+      '10': 'participantCount'
+    },
+  ],
+};
+
+/// Descriptor for `Tournament`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List tournamentDescriptor = $convert.base64Decode(
+    'CgpUb3VybmFtZW50Eg4KAmlkGAEgASgJUgJpZBISCgRuYW1lGAIgASgJUgRuYW1lEh0KCnN0YX'
+    'J0X3RpbWUYAyABKANSCXN0YXJ0VGltZRIZCghlbmRfdGltZRgEIAEoA1IHZW5kVGltZRIlCg5l'
+    'bnRyeV9kZWFkbGluZRgFIAEoA1INZW50cnlEZWFkbGluZRIWCgZzdGF0dXMYBiABKAlSBnN0YX'
+    'R1cxIjCg1yZXF1aXJlZF9wbGFuGAcgASgJUgxyZXF1aXJlZFBsYW4SKwoRcHJpemVfZGVzY3Jp'
+    'cHRpb24YCCABKAlSEHByaXplRGVzY3JpcHRpb24SHQoKcHJpemVfcG9vbBgJIAMoA1IJcHJpem'
+    'VQb29sEisKEXBhcnRpY2lwYW50X2NvdW50GAogASgFUhBwYXJ0aWNpcGFudENvdW50');
+
+@$core.Deprecated('Use getTournamentRequestDescriptor instead')
+const GetTournamentRequest$json = {
+  '1': 'GetTournamentRequest',
+  '2': [
+    {'1': 'tournament_id', '3': 1, '4': 1, '5': 9, '10': 'tournamentId'},
+  ],
+};
+
+/// Descriptor for `GetTournamentRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getTournamentRequestDescriptor = $convert.base64Decode(
+    'ChRHZXRUb3VybmFtZW50UmVxdWVzdBIjCg10b3VybmFtZW50X2lkGAEgASgJUgx0b3VybmFtZW'
+    '50SWQ=');
+
+@$core.Deprecated('Use getTournamentResponseDescriptor instead')
+const GetTournamentResponse$json = {
+  '1': 'GetTournamentResponse',
+  '2': [
+    {
+      '1': 'tournament',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.quiz.Tournament',
+      '10': 'tournament'
+    },
+  ],
+};
+
+/// Descriptor for `GetTournamentResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getTournamentResponseDescriptor = $convert.base64Decode(
+    'ChVHZXRUb3VybmFtZW50UmVzcG9uc2USMAoKdG91cm5hbWVudBgBIAEoCzIQLnF1aXouVG91cm'
+    '5hbWVudFIKdG91cm5hbWVudA==');
+
+@$core.Deprecated('Use tournamentStandingEntryDescriptor instead')
+const TournamentStandingEntry$json = {
+  '1': 'TournamentStandingEntry',
+  '2': [
+    {'1': 'user_id', '3': 1, '4': 1, '5': 9, '10': 'userId'},
+    {'1': 'username', '3': 2, '4': 1, '5': 9, '10': 'username'},
+    {'1': 'score', '3': 3, '4': 1, '5': 3, '10': 'score'},
+    {'1': 'rank', '3': 4, '4': 1, '5': 5, '10': 'rank'},
+    {'1': 'plan', '3': 5, '4': 1, '5': 9, '10': 'plan'},
+  ],
+};
+
+/// Descriptor for `TournamentStandingEntry`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List tournamentStandingEntryDescriptor = $convert.base64Decode(
+    'ChdUb3VybmFtZW50U3RhbmRpbmdFbnRyeRIXCgd1c2VyX2lkGAEgASgJUgZ1c2VySWQSGgoIdX'
+    'Nlcm5hbWUYAiABKAlSCHVzZXJuYW1lEhQKBXNjb3JlGAMgASgDUgVzY29yZRISCgRyYW5rGAQg'
+    'ASgFUgRyYW5rEhIKBHBsYW4YBSABKAlSBHBsYW4=');
+
+@$core.Deprecated('Use getTournamentLeaderboardRequestDescriptor instead')
+const GetTournamentLeaderboardRequest$json = {
+  '1': 'GetTournamentLeaderboardRequest',
+  '2': [
+    {'1': 'tournament_id', '3': 1, '4': 1, '5': 9, '10': 'tournamentId'},
+  ],
+};
+
+/// Descriptor for `GetTournamentLeaderboardRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getTournamentLeaderboardRequestDescriptor =
+    $convert.base64Decode(
+        'Ch9HZXRUb3VybmFtZW50TGVhZGVyYm9hcmRSZXF1ZXN0EiMKDXRvdXJuYW1lbnRfaWQYASABKA'
+        'lSDHRvdXJuYW1lbnRJZA==');
+
+@$core.Deprecated('Use getTournamentLeaderboardResponseDescriptor instead')
+const GetTournamentLeaderboardResponse$json = {
+  '1': 'GetTournamentLeaderboardResponse',
+  '2': [
+    {
+      '1': 'entries',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.quiz.TournamentStandingEntry',
+      '10': 'entries'
+    },
+  ],
+};
+
+/// Descriptor for `GetTournamentLeaderboardResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getTournamentLeaderboardResponseDescriptor =
+    $convert.base64Decode(
+        'CiBHZXRUb3VybmFtZW50TGVhZGVyYm9hcmRSZXNwb25zZRI3CgdlbnRyaWVzGAEgAygLMh0ucX'
+        'Vpei5Ub3VybmFtZW50U3RhbmRpbmdFbnRyeVIHZW50cmllcw==');
+
 @$core.Deprecated('Use getGlobalLeaderboardRequestDescriptor instead')
 const GetGlobalLeaderboardRequest$json = {
   '1': 'GetGlobalLeaderboardRequest',

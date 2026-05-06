@@ -58,6 +58,10 @@ service QuizService {
   // Phase 2
   rpc GetTournamentList(GetTournamentListRequest) returns (GetTournamentListResponse);
   rpc JoinTournament(JoinTournamentRequest) returns (JoinTournamentResponse);
+  // §4.2 PR 1: detail screen + live leaderboard. Both gate on auth +
+  // validate.MaxLen(64) on the id; the leaderboard is capped server-side.
+  rpc GetTournament(GetTournamentRequest) returns (GetTournamentResponse);
+  rpc GetTournamentLeaderboard(GetTournamentLeaderboardRequest) returns (GetTournamentLeaderboardResponse);
 }
 
 message GetRoomQuestionsRequest {
@@ -644,6 +648,50 @@ message JoinTournamentRequest {
 
 message JoinTournamentResponse {
   bool success = 1;
+}
+
+// Tournament is the full document surfaced to the detail screen. All
+// time fields are unix milliseconds (server emits via .UnixMilli()) so
+// the Flutter client can pass them straight into
+// DateTime.fromMillisecondsSinceEpoch without unit conversion.
+message Tournament {
+  string id                  = 1;
+  string name                = 2;
+  int64  start_time          = 3;
+  int64  end_time            = 4;
+  int64  entry_deadline      = 5;
+  string status              = 6;  // "upcoming" | "active" | "completed"
+  string required_plan       = 7;
+  string prize_description   = 8;
+  repeated int64 prize_pool  = 9;  // index i = coin reward for rank i+1
+  int32  participant_count   = 10;
+}
+
+message GetTournamentRequest {
+  string tournament_id = 1;
+}
+
+message GetTournamentResponse {
+  Tournament tournament = 1;
+}
+
+// TournamentStandingEntry is one row in the live leaderboard. Rank is
+// 1-based and assigned server-side from the score-desc ordering, so the
+// client never has to re-sort.
+message TournamentStandingEntry {
+  string user_id  = 1;
+  string username = 2;
+  int64  score    = 3;
+  int32  rank     = 4;
+  string plan     = 5; // "free" or "premium"
+}
+
+message GetTournamentLeaderboardRequest {
+  string tournament_id = 1;
+}
+
+message GetTournamentLeaderboardResponse {
+  repeated TournamentStandingEntry entries = 1;
 }
 
 // ---------------------------------------------------------------------------

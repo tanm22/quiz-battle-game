@@ -6101,6 +6101,496 @@ class JoinTournamentResponse extends $pb.GeneratedMessage {
   void clearSuccess() => $_clearField(1);
 }
 
+/// Tournament is the full document surfaced to the detail screen. All
+/// time fields are unix milliseconds (server emits via .UnixMilli()) so
+/// the Flutter client can pass them straight into
+/// DateTime.fromMillisecondsSinceEpoch without unit conversion.
+class Tournament extends $pb.GeneratedMessage {
+  factory Tournament({
+    $core.String? id,
+    $core.String? name,
+    $fixnum.Int64? startTime,
+    $fixnum.Int64? endTime,
+    $fixnum.Int64? entryDeadline,
+    $core.String? status,
+    $core.String? requiredPlan,
+    $core.String? prizeDescription,
+    $core.Iterable<$fixnum.Int64>? prizePool,
+    $core.int? participantCount,
+  }) {
+    final result = create();
+    if (id != null) result.id = id;
+    if (name != null) result.name = name;
+    if (startTime != null) result.startTime = startTime;
+    if (endTime != null) result.endTime = endTime;
+    if (entryDeadline != null) result.entryDeadline = entryDeadline;
+    if (status != null) result.status = status;
+    if (requiredPlan != null) result.requiredPlan = requiredPlan;
+    if (prizeDescription != null) result.prizeDescription = prizeDescription;
+    if (prizePool != null) result.prizePool.addAll(prizePool);
+    if (participantCount != null) result.participantCount = participantCount;
+    return result;
+  }
+
+  Tournament._();
+
+  factory Tournament.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory Tournament.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Tournament',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aOS(2, _omitFieldNames ? '' : 'name')
+    ..aInt64(3, _omitFieldNames ? '' : 'startTime')
+    ..aInt64(4, _omitFieldNames ? '' : 'endTime')
+    ..aInt64(5, _omitFieldNames ? '' : 'entryDeadline')
+    ..aOS(6, _omitFieldNames ? '' : 'status')
+    ..aOS(7, _omitFieldNames ? '' : 'requiredPlan')
+    ..aOS(8, _omitFieldNames ? '' : 'prizeDescription')
+    ..p<$fixnum.Int64>(
+        9, _omitFieldNames ? '' : 'prizePool', $pb.PbFieldType.K6)
+    ..aI(10, _omitFieldNames ? '' : 'participantCount')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Tournament clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Tournament copyWith(void Function(Tournament) updates) =>
+      super.copyWith((message) => updates(message as Tournament)) as Tournament;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static Tournament create() => Tournament._();
+  @$core.override
+  Tournament createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static Tournament getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<Tournament>(create);
+  static Tournament? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get name => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set name($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearName() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get startTime => $_getI64(2);
+  @$pb.TagNumber(3)
+  set startTime($fixnum.Int64 value) => $_setInt64(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasStartTime() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearStartTime() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $fixnum.Int64 get endTime => $_getI64(3);
+  @$pb.TagNumber(4)
+  set endTime($fixnum.Int64 value) => $_setInt64(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasEndTime() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearEndTime() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $fixnum.Int64 get entryDeadline => $_getI64(4);
+  @$pb.TagNumber(5)
+  set entryDeadline($fixnum.Int64 value) => $_setInt64(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasEntryDeadline() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearEntryDeadline() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get status => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set status($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasStatus() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearStatus() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.String get requiredPlan => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set requiredPlan($core.String value) => $_setString(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasRequiredPlan() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearRequiredPlan() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.String get prizeDescription => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set prizeDescription($core.String value) => $_setString(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasPrizeDescription() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearPrizeDescription() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $pb.PbList<$fixnum.Int64> get prizePool => $_getList(8);
+
+  @$pb.TagNumber(10)
+  $core.int get participantCount => $_getIZ(9);
+  @$pb.TagNumber(10)
+  set participantCount($core.int value) => $_setSignedInt32(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasParticipantCount() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearParticipantCount() => $_clearField(10);
+}
+
+class GetTournamentRequest extends $pb.GeneratedMessage {
+  factory GetTournamentRequest({
+    $core.String? tournamentId,
+  }) {
+    final result = create();
+    if (tournamentId != null) result.tournamentId = tournamentId;
+    return result;
+  }
+
+  GetTournamentRequest._();
+
+  factory GetTournamentRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetTournamentRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetTournamentRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'tournamentId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetTournamentRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetTournamentRequest copyWith(void Function(GetTournamentRequest) updates) =>
+      super.copyWith((message) => updates(message as GetTournamentRequest))
+          as GetTournamentRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetTournamentRequest create() => GetTournamentRequest._();
+  @$core.override
+  GetTournamentRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetTournamentRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetTournamentRequest>(create);
+  static GetTournamentRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get tournamentId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set tournamentId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasTournamentId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearTournamentId() => $_clearField(1);
+}
+
+class GetTournamentResponse extends $pb.GeneratedMessage {
+  factory GetTournamentResponse({
+    Tournament? tournament,
+  }) {
+    final result = create();
+    if (tournament != null) result.tournament = tournament;
+    return result;
+  }
+
+  GetTournamentResponse._();
+
+  factory GetTournamentResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetTournamentResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetTournamentResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOM<Tournament>(1, _omitFieldNames ? '' : 'tournament',
+        subBuilder: Tournament.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetTournamentResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetTournamentResponse copyWith(
+          void Function(GetTournamentResponse) updates) =>
+      super.copyWith((message) => updates(message as GetTournamentResponse))
+          as GetTournamentResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetTournamentResponse create() => GetTournamentResponse._();
+  @$core.override
+  GetTournamentResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetTournamentResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetTournamentResponse>(create);
+  static GetTournamentResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  Tournament get tournament => $_getN(0);
+  @$pb.TagNumber(1)
+  set tournament(Tournament value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasTournament() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearTournament() => $_clearField(1);
+  @$pb.TagNumber(1)
+  Tournament ensureTournament() => $_ensure(0);
+}
+
+/// TournamentStandingEntry is one row in the live leaderboard. Rank is
+/// 1-based and assigned server-side from the score-desc ordering, so the
+/// client never has to re-sort.
+class TournamentStandingEntry extends $pb.GeneratedMessage {
+  factory TournamentStandingEntry({
+    $core.String? userId,
+    $core.String? username,
+    $fixnum.Int64? score,
+    $core.int? rank,
+    $core.String? plan,
+  }) {
+    final result = create();
+    if (userId != null) result.userId = userId;
+    if (username != null) result.username = username;
+    if (score != null) result.score = score;
+    if (rank != null) result.rank = rank;
+    if (plan != null) result.plan = plan;
+    return result;
+  }
+
+  TournamentStandingEntry._();
+
+  factory TournamentStandingEntry.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TournamentStandingEntry.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TournamentStandingEntry',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'userId')
+    ..aOS(2, _omitFieldNames ? '' : 'username')
+    ..aInt64(3, _omitFieldNames ? '' : 'score')
+    ..aI(4, _omitFieldNames ? '' : 'rank')
+    ..aOS(5, _omitFieldNames ? '' : 'plan')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TournamentStandingEntry clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TournamentStandingEntry copyWith(
+          void Function(TournamentStandingEntry) updates) =>
+      super.copyWith((message) => updates(message as TournamentStandingEntry))
+          as TournamentStandingEntry;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TournamentStandingEntry create() => TournamentStandingEntry._();
+  @$core.override
+  TournamentStandingEntry createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TournamentStandingEntry getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TournamentStandingEntry>(create);
+  static TournamentStandingEntry? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get userId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set userId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasUserId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearUserId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get username => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set username($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasUsername() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearUsername() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get score => $_getI64(2);
+  @$pb.TagNumber(3)
+  set score($fixnum.Int64 value) => $_setInt64(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasScore() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearScore() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get rank => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set rank($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasRank() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearRank() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get plan => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set plan($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasPlan() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearPlan() => $_clearField(5);
+}
+
+class GetTournamentLeaderboardRequest extends $pb.GeneratedMessage {
+  factory GetTournamentLeaderboardRequest({
+    $core.String? tournamentId,
+  }) {
+    final result = create();
+    if (tournamentId != null) result.tournamentId = tournamentId;
+    return result;
+  }
+
+  GetTournamentLeaderboardRequest._();
+
+  factory GetTournamentLeaderboardRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetTournamentLeaderboardRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetTournamentLeaderboardRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'tournamentId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetTournamentLeaderboardRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetTournamentLeaderboardRequest copyWith(
+          void Function(GetTournamentLeaderboardRequest) updates) =>
+      super.copyWith(
+              (message) => updates(message as GetTournamentLeaderboardRequest))
+          as GetTournamentLeaderboardRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetTournamentLeaderboardRequest create() =>
+      GetTournamentLeaderboardRequest._();
+  @$core.override
+  GetTournamentLeaderboardRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetTournamentLeaderboardRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetTournamentLeaderboardRequest>(
+          create);
+  static GetTournamentLeaderboardRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get tournamentId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set tournamentId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasTournamentId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearTournamentId() => $_clearField(1);
+}
+
+class GetTournamentLeaderboardResponse extends $pb.GeneratedMessage {
+  factory GetTournamentLeaderboardResponse({
+    $core.Iterable<TournamentStandingEntry>? entries,
+  }) {
+    final result = create();
+    if (entries != null) result.entries.addAll(entries);
+    return result;
+  }
+
+  GetTournamentLeaderboardResponse._();
+
+  factory GetTournamentLeaderboardResponse.fromBuffer(
+          $core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetTournamentLeaderboardResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetTournamentLeaderboardResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..pPM<TournamentStandingEntry>(1, _omitFieldNames ? '' : 'entries',
+        subBuilder: TournamentStandingEntry.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetTournamentLeaderboardResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetTournamentLeaderboardResponse copyWith(
+          void Function(GetTournamentLeaderboardResponse) updates) =>
+      super.copyWith(
+              (message) => updates(message as GetTournamentLeaderboardResponse))
+          as GetTournamentLeaderboardResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetTournamentLeaderboardResponse create() =>
+      GetTournamentLeaderboardResponse._();
+  @$core.override
+  GetTournamentLeaderboardResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetTournamentLeaderboardResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetTournamentLeaderboardResponse>(
+          create);
+  static GetTournamentLeaderboardResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<TournamentStandingEntry> get entries => $_getList(0);
+}
+
 class GetGlobalLeaderboardRequest extends $pb.GeneratedMessage {
   factory GetGlobalLeaderboardRequest({
     $core.String? timeFilter,
