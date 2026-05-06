@@ -96,9 +96,12 @@ func (s *scoringServer) PurchaseShopItem(ctx context.Context, req *pb.PurchaseSh
 	// pattern as referralLimiter — fail-open on Redis errors (matches
 	// AllowWithLog behavior), per-subject (userId) so one user's burst
 	// doesn't starve others. Idempotency keys debounce same-key spam,
-	// but a fresh-key purchase loop is unbounded without this.
-	if s.purchaseLimiter != nil && !s.purchaseLimiter.AllowWithLog(ctx, uid) {
-		return nil, status.Error(codes.ResourceExhausted, "too many purchases — slow down")
+	// but a fresh-key purchase loop is unbounded without this. The
+	// limiter is nil-safe at the package level (pkg/ratelimit.Allow
+	// returns true on nil receiver) so shopTestEnv-built servers without
+	// a wired limiter pass through unchanged.
+	if !s.purchaseLimiter.AllowWithLog(ctx, uid) {
+		return nil, status.Error(codes.ResourceExhausted, "too many purchases; slow down")
 	}
 	if req.ItemId == "" || req.IdempotencyKey == "" {
 		return nil, status.Error(codes.InvalidArgument, "itemId and idempotencyKey required")

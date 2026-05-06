@@ -75,9 +75,9 @@ type scoringServer struct {
 	referralLimiter *ratelimit.Limiter
 	// §4.7: anti-abuse limiter on PurchaseShopItem. Idempotency keys
 	// already debounce same-key spam, but a fresh-key purchase loop
-	// is unbounded without this guard. Nil-safe via the limiter's
-	// nil check (and the call-site nil-guard for shopTestEnv tests
-	// that never wire Redis).
+	// is unbounded without this guard. Nil-safe at the pkg/ratelimit
+	// level — shopTestEnv-built servers leave this as the zero value
+	// and the limiter passes through unchanged.
 	purchaseLimiter *ratelimit.Limiter
 }
 
