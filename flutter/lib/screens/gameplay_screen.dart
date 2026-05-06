@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../proto/quiz.pb.dart';
 import '../providers/game_state.dart';
 import '../theme/app_theme.dart';
+import '../widgets/reroll_button.dart';
 
 // ─── Lively option palette ───────────────────────────────────────────────────
 const _optionColors = [
@@ -177,21 +178,39 @@ class _GameplayScreenState extends ConsumerState<GameplayScreen>
                           timerController: r == currentRound ? _timerController : null,
                         ),
 
-                        // Current round: animated question card
-                        if (r == currentRound)
+                        // Current round: reroll pill (auto-hides at 0
+                        // charges) + animated question card.
+                        if (r == currentRound) ...[
                           FadeTransition(
                             opacity: _revealCurve,
                             child: SizeTransition(
                               sizeFactor: _revealCurve,
                               axisAlignment: -1,
-                              child: _QuestionCard(
-                                question: question,
-                                selectedIndex: gs.selectedIndex,
-                                correctIndex: gs.correctIndex,
-                                onTap: (i) => ref.read(gameStateProvider.notifier).toggleAnswer(i),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  if (gs.roomId != null)
+                                    Padding(
+                                      padding: const EdgeInsets.fromLTRB(8, 8, 0, 0),
+                                      child: Align(
+                                        alignment: Alignment.centerRight,
+                                        child: RerollButton(
+                                          roomId: gs.roomId!,
+                                          roundId: '${gs.round}',
+                                        ),
+                                      ),
+                                    ),
+                                  _QuestionCard(
+                                    question: question,
+                                    selectedIndex: gs.selectedIndex,
+                                    correctIndex: gs.correctIndex,
+                                    onTap: (i) => ref.read(gameStateProvider.notifier).toggleAnswer(i),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
+                        ],
                       ],
                     ],
                   ),
