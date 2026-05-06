@@ -133,6 +133,32 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen>
                         _StatRow('Final Score', '${myResult.finalScore.toInt()}', AppColors.gold),
                         _StatRow('Rank', '#${myResult.rank}', AppColors.secondary),
                         _StatRow('Correct', '${myResult.answersCorrect}', AppColors.success),
+                        if (myResult.coinsAwarded > 0) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: AppColors.orangeBg,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: AppColors.primary.withAlpha(60)),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.monetization_on, size: 18, color: AppColors.primary),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '+${myResult.coinsAwarded.toInt()} coins',
+                                  style: const TextStyle(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   )
