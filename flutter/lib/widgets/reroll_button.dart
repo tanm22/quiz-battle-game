@@ -28,13 +28,26 @@ class RerollButton extends ConsumerStatefulWidget {
 class _RerollButtonState extends ConsumerState<RerollButton> {
   bool _busy = false;
 
+  /// Domain error codes from `ConsumeRerollResponse.errorCode`. Codes not
+  /// in this map render with a generic fallback so a future server-side
+  /// code doesn't leak raw enum names to the user.
+  String _humanize(String code) {
+    switch (code) {
+      case 'NO_CHARGES':
+        return 'You don\'t have any reroll charges left. Buy more in the Coin Shop.';
+      default:
+        return 'Couldn\'t reroll: $code';
+    }
+  }
+
   Future<void> _confirm() async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Use a reroll?'),
         content: const Text(
-            'Spend one reroll charge to skip this question and get a new one. '
+            'Spend one reroll charge — your topic preference is recorded so '
+            'future questions skew away from this round. '
             'You can buy more in the Coin Shop.'),
         actions: [
           TextButton(
@@ -55,6 +68,9 @@ class _RerollButtonState extends ConsumerState<RerollButton> {
     if (ok != true || !mounted) return;
     setState(() => _busy = true);
     try {
+      // Server records the reroll for the per-match audit trail; the
+      // question-refetch / topic-rebias flow lands in a follow-up PR. Until
+      // then, we surface the consume but don't promise an immediate swap.
       final r = await ref.read(coinsServiceProvider).consumeReroll(
             roomId: widget.roomId,
             roundId: widget.roundId,
@@ -63,11 +79,14 @@ class _RerollButtonState extends ConsumerState<RerollButton> {
       if (r.success) {
         invalidateCoinState(ref);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Reroll used — fetching a new question…')),
+          const SnackBar(content: Text('Reroll recorded.')),
         );
       } else {
+        // Stale inventory cache is the most likely root cause of NO_CHARGES
+        // when the badge said N — refresh it so the next tap reflects truth.
+        invalidateCoinState(ref);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Couldn\'t reroll: ${r.errorCode}')),
+          SnackBar(content: Text(_humanize(r.errorCode))),
         );
       }
     } catch (_) {
