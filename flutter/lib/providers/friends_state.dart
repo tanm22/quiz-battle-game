@@ -17,14 +17,14 @@ final friendsServiceProvider = Provider<FriendsService>((ref) {
 ///   - pull-to-refresh on the Friends screen
 ///   - the FCM tap handler for `notif.friend.request_accepted`
 final friendsListProvider = FutureProvider<List<Friend>>((ref) async {
-  return ref.read(friendsServiceProvider).list();
+  return ref.watch(friendsServiceProvider).list();
 });
 
 /// Incoming pending friend requests (the badge on the home tile +
 /// the Requests tab pull from this). Outgoing requests aren't surfaced
 /// here in v1 — the SendFriendRequest response is enough for the sender.
 final friendRequestsProvider = FutureProvider<List<FriendRequest>>((ref) async {
-  return ref.read(friendsServiceProvider).incomingRequests();
+  return ref.watch(friendsServiceProvider).incomingRequests();
 });
 
 /// Convenience derived count for the home-tile badge — number of

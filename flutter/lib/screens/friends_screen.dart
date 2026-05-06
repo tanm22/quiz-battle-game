@@ -22,7 +22,13 @@ import 'add_friend_modal.dart';
 /// ChallengeFriend (per row). Heartbeat is fired separately by
 /// AppShell so presence stays fresh while the app is foregrounded.
 class FriendsScreen extends ConsumerStatefulWidget {
-  const FriendsScreen({super.key});
+  /// Tab to show when the screen opens. 0 = Friends list (default),
+  /// 1 = Incoming Requests. The `notif.friend.request_received` FCM
+  /// tap routes here with index 1 so the user lands on the new request
+  /// directly instead of having to swipe over.
+  const FriendsScreen({super.key, this.initialTabIndex = 0});
+
+  final int initialTabIndex;
 
   @override
   ConsumerState<FriendsScreen> createState() => _FriendsScreenState();
@@ -35,7 +41,11 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen>
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 2, vsync: this);
+    _tab = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.initialTabIndex,
+    );
   }
 
   @override

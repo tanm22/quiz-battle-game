@@ -294,8 +294,12 @@ class _AppShellState extends ConsumerState<AppShell>
     if (state.userId == null) return;
     // Fire-and-forget — heartbeat failures don't matter, the next
     // tick recovers naturally and the server's TTL keeps presence
-    // accurate.
-    unawaited(ref.read(friendsServiceProvider).heartbeat());
+    // accurate. catchError swallows the future's error so a network
+    // blip / expired JWT / gRPC unavailable doesn't surface as an
+    // "Unhandled Exception" in Dart's uncaught-error console.
+    unawaited(
+      ref.read(friendsServiceProvider).heartbeat().catchError((_) {}),
+    );
   }
 
   /// Route the user to the most relevant screen for the tapped notification.
@@ -329,10 +333,15 @@ class _AppShellState extends ConsumerState<AppShell>
         // Land the user on the Requests tab (Friends screen, second tab)
         // so the inbound request is the first thing they see. Invalidate
         // the providers so the new request shows up before navigation.
+        // initialTabIndex: 1 sends them straight to the Requests tab
+        // instead of the default Friends list (where the new request
+        // wouldn't be visible until they swipe over).
         ref.invalidate(friendRequestsProvider);
         notifier.navigateToHome();
         rootNavigatorKey.currentState?.push(
-          MaterialPageRoute(builder: (_) => const FriendsScreen()),
+          MaterialPageRoute(
+            builder: (_) => const FriendsScreen(initialTabIndex: 1),
+          ),
         );
       case 'notif.friend.request_accepted':
         // The original sender's friends list just gained a member —
@@ -421,6 +430,25 @@ class _AppShellState extends ConsumerState<AppShell>
     }
 
     final gameState = ref.watch(gameStateProvider);
+
+    // Start the presence heartbeat ticker the moment a user authenticates
+    // via a fresh login (login_screen calls setAuth which flips userId
+    // from null → non-null). Without this hook the ticker only runs on
+    // the session-restore path inside _tryRestoreSession, so a freshly
+    // logged-in user would appear "offline" to friends until the next
+    // app pause/resume cycle. _startPresenceTicker is idempotent (its
+    // first line is `if (_presenceTicker != null) return`) so this is
+    // safe even if the ticker is already running.
+    ref.listen<String?>(
+      gameStateProvider.select((gs) => gs.userId),
+      (prev, next) {
+        if ((prev == null || prev.isEmpty) &&
+            next != null &&
+            next.isNotEmpty) {
+          _startPresenceTicker();
+        }
+      },
+    );
 
     // Show error messages as SnackBar
     ref.listen(
