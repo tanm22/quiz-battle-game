@@ -41,14 +41,21 @@ class _RerollButtonState extends ConsumerState<RerollButton> {
   }
 
   Future<void> _confirm() async {
+    // Snapshot intent at click-time. If gs.round bumps while the dialog
+    // is open, widget.roundId is updated by the parent rebuild — but the
+    // user's intent was attached to the round they were looking at when
+    // they tapped. Use the snapshot for the RPC.
+    final intentRoom = widget.roomId;
+    final intentRound = widget.roundId;
+
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Use a reroll?'),
         content: const Text(
-            'Spend one reroll charge — your topic preference is recorded so '
-            'future questions skew away from this round. '
-            'You can buy more in the Coin Shop.'),
+            'Spend one reroll charge from your inventory. The on-screen '
+            'question stays this round; reroll-aware question selection '
+            'lands in a follow-up. You can buy more in the Coin Shop.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -68,12 +75,13 @@ class _RerollButtonState extends ConsumerState<RerollButton> {
     if (ok != true || !mounted) return;
     setState(() => _busy = true);
     try {
-      // Server records the reroll for the per-match audit trail; the
-      // question-refetch / topic-rebias flow lands in a follow-up PR. Until
-      // then, we surface the consume but don't promise an immediate swap.
+      // Server records the consume by decrementing rerollCharges; nothing
+      // else moves today (no topic skew, no audit row, no stream emission).
+      // Honest dialog copy reflects this. The reroll-aware question
+      // selection ships in a follow-up PR.
       final r = await ref.read(coinsServiceProvider).consumeReroll(
-            roomId: widget.roomId,
-            roundId: widget.roundId,
+            roomId: intentRoom,
+            roundId: intentRound,
           );
       if (!mounted) return;
       if (r.success) {
@@ -92,7 +100,7 @@ class _RerollButtonState extends ConsumerState<RerollButton> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Network error — try again')),
+        const SnackBar(content: Text('Network error. Try again.')),
       );
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -112,7 +120,7 @@ class _RerollButtonState extends ConsumerState<RerollButton> {
         onTap: _busy ? null : _confirm,
         borderRadius: BorderRadius.circular(999),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           decoration: BoxDecoration(
             border: Border.all(color: AppColors.primary.withAlpha(80)),
             borderRadius: BorderRadius.circular(999),
