@@ -184,6 +184,24 @@ class QuizServiceClient extends $grpc.Client {
     return $createUnaryCall(_$joinTournament, request, options: options);
   }
 
+  /// §4.2 PR 1: detail screen + live leaderboard. Both gate on auth +
+  /// validate.MaxLen(64) on the id; the leaderboard is capped server-side.
+  $grpc.ResponseFuture<$0.GetTournamentResponse> getTournament(
+    $0.GetTournamentRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$getTournament, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.GetTournamentLeaderboardResponse>
+      getTournamentLeaderboard(
+    $0.GetTournamentLeaderboardRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$getTournamentLeaderboard, request,
+        options: options);
+  }
+
   // method descriptors
 
   static final _$getRoomQuestions = $grpc.ClientMethod<
@@ -211,6 +229,17 @@ class QuizServiceClient extends $grpc.Client {
           '/quiz.QuizService/JoinTournament',
           ($0.JoinTournamentRequest value) => value.writeToBuffer(),
           $0.JoinTournamentResponse.fromBuffer);
+  static final _$getTournament =
+      $grpc.ClientMethod<$0.GetTournamentRequest, $0.GetTournamentResponse>(
+          '/quiz.QuizService/GetTournament',
+          ($0.GetTournamentRequest value) => value.writeToBuffer(),
+          $0.GetTournamentResponse.fromBuffer);
+  static final _$getTournamentLeaderboard = $grpc.ClientMethod<
+          $0.GetTournamentLeaderboardRequest,
+          $0.GetTournamentLeaderboardResponse>(
+      '/quiz.QuizService/GetTournamentLeaderboard',
+      ($0.GetTournamentLeaderboardRequest value) => value.writeToBuffer(),
+      $0.GetTournamentLeaderboardResponse.fromBuffer);
 }
 
 @$pb.GrpcServiceName('quiz.QuizService')
@@ -262,6 +291,24 @@ abstract class QuizServiceBase extends $grpc.Service {
         ($core.List<$core.int> value) =>
             $0.JoinTournamentRequest.fromBuffer(value),
         ($0.JoinTournamentResponse value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.GetTournamentRequest, $0.GetTournamentResponse>(
+            'GetTournament',
+            getTournament_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.GetTournamentRequest.fromBuffer(value),
+            ($0.GetTournamentResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.GetTournamentLeaderboardRequest,
+            $0.GetTournamentLeaderboardResponse>(
+        'GetTournamentLeaderboard',
+        getTournamentLeaderboard_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.GetTournamentLeaderboardRequest.fromBuffer(value),
+        ($0.GetTournamentLeaderboardResponse value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.GetRoomQuestionsResponse> getRoomQuestions_Pre(
@@ -307,6 +354,24 @@ abstract class QuizServiceBase extends $grpc.Service {
 
   $async.Future<$0.JoinTournamentResponse> joinTournament(
       $grpc.ServiceCall call, $0.JoinTournamentRequest request);
+
+  $async.Future<$0.GetTournamentResponse> getTournament_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.GetTournamentRequest> $request) async {
+    return getTournament($call, await $request);
+  }
+
+  $async.Future<$0.GetTournamentResponse> getTournament(
+      $grpc.ServiceCall call, $0.GetTournamentRequest request);
+
+  $async.Future<$0.GetTournamentLeaderboardResponse>
+      getTournamentLeaderboard_Pre($grpc.ServiceCall $call,
+          $async.Future<$0.GetTournamentLeaderboardRequest> $request) async {
+    return getTournamentLeaderboard($call, await $request);
+  }
+
+  $async.Future<$0.GetTournamentLeaderboardResponse> getTournamentLeaderboard(
+      $grpc.ServiceCall call, $0.GetTournamentLeaderboardRequest request);
 }
 
 @$pb.GrpcServiceName('quiz.ScoringService')
