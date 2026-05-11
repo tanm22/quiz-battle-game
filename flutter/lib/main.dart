@@ -352,11 +352,18 @@ class _AppShellState extends ConsumerState<AppShell>
           MaterialPageRoute(builder: (_) => const FriendsScreen()),
         );
       case 'notif.friend.challenge':
-        // The challenger has already created the room server-side; the
-        // recipient just needs to join the game flow. Drop them on the
-        // matchmaking screen which transitions to gameplay when the
-        // match.created event for this room arrives.
-        notifier.navigateToMatchmaking();
+        // The challenger has already created the room server-side with
+        // both players. Join it directly using the roomId from the FCM
+        // payload — entering the rating-based pool here would pair the
+        // recipient with a stranger instead of the challenger.
+        final roomId = data['roomId'] as String?;
+        if (roomId != null && roomId.isNotEmpty) {
+          notifier.joinChallengeRoom(roomId);
+        } else {
+          // Defensive: missing roomId means the upstream notif payload
+          // was malformed. Land on home rather than the wrong opponent.
+          notifier.navigateToHome();
+        }
       default:
         // Unknown event — best-effort fallback to home so the user isn't
         // stranded on a stale screen.
