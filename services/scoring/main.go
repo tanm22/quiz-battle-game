@@ -757,6 +757,13 @@ func (s *scoringServer) consumeAnswers(ctx context.Context) {
 	}
 	defer ch.Close()
 
+	// prefetch=16 — bounds in-flight scoring work so a Mongo blip can't
+	// silently grow the unacked set into a memory leak. Same ceiling as
+	// the earn consumer; both have Mongo as the tail-latency dep.
+	if err := ch.Qos(16, 0, false); err != nil {
+		log.Fatal(ctx, "qos failed", "consumer", "scoring", "err", err)
+	}
+
 	msgs, err := ch.Consume("answer-processing-queue", "", false, false, false, false, nil)
 	if err != nil {
 		log.Fatal(ctx, "consume failed", "consumer", "scoring", "queue", "answer-processing-queue", "err", err)
@@ -931,6 +938,10 @@ func (s *scoringServer) consumeMatchFinished(ctx context.Context) {
 		log.Fatal(ctx, "open channel failed", "consumer", "persistence", "err", err)
 	}
 	defer ch.Close()
+
+	if err := ch.Qos(16, 0, false); err != nil {
+		log.Fatal(ctx, "qos failed", "consumer", "persistence", "err", err)
+	}
 
 	msgs, err := ch.Consume("match-finished-queue", "", false, false, false, false, nil)
 	if err != nil {
@@ -1453,6 +1464,10 @@ func (s *scoringServer) consumeAnalytics(ctx context.Context) {
 	}
 	defer ch.Close()
 
+	if err := ch.Qos(16, 0, false); err != nil {
+		log.Fatal(ctx, "qos failed", "consumer", "analytics", "err", err)
+	}
+
 	msgs, err := ch.Consume("match-analytics-queue", "", false, false, false, false, nil)
 	if err != nil {
 		log.Fatal(ctx, "consume failed", "consumer", "analytics", "queue", "match-analytics-queue", "err", err)
@@ -1488,6 +1503,10 @@ func (s *scoringServer) consumePaymentCaptured(ctx context.Context) {
 		log.Fatal(ctx, "open channel failed", "consumer", "payment", "err", err)
 	}
 	defer ch.Close()
+
+	if err := ch.Qos(16, 0, false); err != nil {
+		log.Fatal(ctx, "qos failed", "consumer", "payment", "err", err)
+	}
 
 	msgs, err := ch.Consume("payment-success-queue", "", false, false, false, false, nil)
 	if err != nil {
@@ -1576,6 +1595,10 @@ func (s *scoringServer) consumeReferralEvents(ctx context.Context) {
 		log.Fatal(ctx, "open channel failed", "consumer", "referral", "err", err)
 	}
 	defer ch.Close()
+
+	if err := ch.Qos(16, 0, false); err != nil {
+		log.Fatal(ctx, "qos failed", "consumer", "referral", "err", err)
+	}
 
 	msgs, err := ch.Consume("referral-event-queue", "", false, false, false, false, nil)
 	if err != nil {
@@ -1732,6 +1755,10 @@ func (s *scoringServer) consumeTournamentFinished(ctx context.Context) {
 		log.Fatal(ctx, "open channel failed", "consumer", "tournament_finished", "err", err)
 	}
 	defer ch.Close()
+
+	if err := ch.Qos(16, 0, false); err != nil {
+		log.Fatal(ctx, "qos failed", "consumer", "tournament_finished", "err", err)
+	}
 
 	msgs, err := ch.Consume("tournament-finished-queue", "", false, false, false, false, nil)
 	if err != nil {

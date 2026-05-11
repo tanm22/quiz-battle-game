@@ -22,6 +22,7 @@ import (
 	"google.golang.org/api/idtoken"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 
 	"quiz-battle/pkg/auth"
@@ -55,6 +56,48 @@ type authServer struct {
 	// username — generous for legitimate typos, tight enough that a
 	// dictionary attack hits the wall after one second of trying.
 	loginLimiter *ratelimit.Limiter
+	// Register: per-username window. Legit retries are rare (DB error,
+	// network blip); a script claiming a name 4+ times in 15 minutes is
+	// almost certainly trying to race a typo'd account creation. Subject
+	// is the requested username — a user-IP gate would also catch
+	// coordinated abuse but conflates shared-NAT users.
+	registerLimiter *ratelimit.Limiter
+	// ResetPassword: per-email window. Legit users reset once and move
+	// on; multiple resets per email in a tight window is the OTP-bypass
+	// probe pattern.
+	resetLimiter *ratelimit.Limiter
+	// CheckUsername: per-username typeahead probe window. Real typing
+	// triggers a few calls per name while the user thinks; a scraper
+	// probing the whole dictionary hits the wall on the first second.
+	checkUsernameLimiter *ratelimit.Limiter
+	// Per-IP gate stacked on top of the per-subject limiters above.
+	// The per-subject limiters catch focused attacks (same name probed
+	// repeatedly, same email reset spammed); this one catches the
+	// enumeration vector the per-subject limiters MISS — an attacker
+	// who probes 10000 different usernames gets 10000 different
+	// subject buckets but one IP bucket. Shared across Register,
+	// ResetPassword, CheckUsername because the IP is the same actor;
+	// scoping it per-RPC would let an attacker cycle endpoints to
+	// bypass the cap.
+	preauthIPLimiter *ratelimit.Limiter
+}
+
+// preauthIP extracts the caller's host (IP without port) from the gRPC
+// peer info. Returns "" when peer info is unavailable (in tests, or
+// behind a proxy that didn't preserve it) — the ratelimit primitive
+// treats empty subjects as fail-open so a missing peer doesn't block
+// the request, only the per-IP gate is skipped.
+func preauthIP(ctx context.Context) string {
+	p, ok := peer.FromContext(ctx)
+	if !ok || p == nil || p.Addr == nil {
+		return ""
+	}
+	host, _, err := net.SplitHostPort(p.Addr.String())
+	if err != nil {
+		// IPv6 without port or some custom net.Addr — use the raw form.
+		return p.Addr.String()
+	}
+	return host
 }
 
 func (s *authServer) users() *mongo.Collection {
@@ -71,6 +114,17 @@ func (s *authServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb
 	}
 	if err := validate.Password(req.Password); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	// Anti-abuse gates. Per-IP gate first — it's the layer that bounds
+	// the enumeration vector (an attacker rotating usernames sees one
+	// IP bucket, not many username buckets). Then the per-username gate
+	// to stop targeted races on a single name.
+	if !s.preauthIPLimiter.AllowWithLog(ctx, preauthIP(ctx)) {
+		return nil, status.Error(codes.ResourceExhausted, "too many requests from this client; try again later")
+	}
+	if !s.registerLimiter.AllowWithLog(ctx, req.Username) {
+		return nil, status.Error(codes.ResourceExhausted, "too many registration attempts; try again later")
 	}
 	if req.Email != "" {
 		if err := validate.Email(req.Email); err != nil {
@@ -411,6 +465,17 @@ func (s *authServer) ResetPassword(ctx context.Context, req *pb.ResetPasswordReq
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
+	// Anti-abuse gates before we touch Redis for the OTP check. The IP
+	// gate bounds mass reset-email costs (an attacker rotating emails
+	// would otherwise burn through email-send budget); the per-email
+	// gate stops the OTP-guess pattern against a single account.
+	if !s.preauthIPLimiter.AllowWithLog(ctx, preauthIP(ctx)) {
+		return nil, status.Error(codes.ResourceExhausted, "too many requests from this client; try again later")
+	}
+	if !s.resetLimiter.AllowWithLog(ctx, req.Email) {
+		return nil, status.Error(codes.ResourceExhausted, "too many reset attempts; try again later")
+	}
+
 	// Verify the code
 	valid, err := keys.CheckEmailCode(ctx, s.rdb, req.Email, "reset", req.Code)
 	if err != nil || !valid {
@@ -440,6 +505,18 @@ func (s *authServer) ResetPassword(ctx context.Context, req *pb.ResetPasswordReq
 func (s *authServer) CheckUsername(ctx context.Context, req *pb.CheckUsernameRequest) (*pb.CheckUsernameResponse, error) {
 	if req.Username == "" {
 		return &pb.CheckUsernameResponse{Available: false}, nil
+	}
+
+	// Anti-enumeration: per-IP gate is the load-bearing one — a scraper
+	// sweeping the dictionary sees one IP bucket regardless of how many
+	// distinct names it probes. The per-username gate on top stops a
+	// single name from being hammered (e.g. a typeahead bug retrying
+	// the same string in a tight loop).
+	if !s.preauthIPLimiter.AllowWithLog(ctx, preauthIP(ctx)) {
+		return nil, status.Error(codes.ResourceExhausted, "too many requests from this client; try again later")
+	}
+	if !s.checkUsernameLimiter.AllowWithLog(ctx, req.Username) {
+		return nil, status.Error(codes.ResourceExhausted, "too many username checks; try again later")
 	}
 
 	var existing bson.M
@@ -1099,14 +1176,21 @@ func main() {
 	}
 
 	srv := &authServer{
-		mongoDB:        db,
-		ledger:         coins.NewLedger(mongoClient, coins.DefaultDBName),
-		rdb:            rdb,
-		amqpConn:       amqpConn,
-		jwtSecret:      jwtSecret,
-		googleClientID: googleClientID,
-		mailer:         email.NewSender(resendKey, resendFrom),
-		loginLimiter:   ratelimit.New(rdb, "login", 5, time.Minute),
+		mongoDB:              db,
+		ledger:               coins.NewLedger(mongoClient, coins.DefaultDBName),
+		rdb:                  rdb,
+		amqpConn:             amqpConn,
+		jwtSecret:            jwtSecret,
+		googleClientID:       googleClientID,
+		mailer:               email.NewSender(resendKey, resendFrom),
+		loginLimiter:         ratelimit.New(rdb, "login", 5, time.Minute),
+		registerLimiter:      ratelimit.New(rdb, "register", 3, 15*time.Minute),
+		resetLimiter:         ratelimit.New(rdb, "reset", 5, 15*time.Minute),
+		checkUsernameLimiter: ratelimit.New(rdb, "check_username", 30, time.Minute),
+		// 60/min is generous for a real client (typeahead during a sign-
+		// up flow rarely exceeds a few calls per second), and bounds the
+		// enumeration vector to roughly one probe per second per IP.
+		preauthIPLimiter: ratelimit.New(rdb, "preauth_ip", 60, time.Minute),
 	}
 
 	// Phase 2: Start notification cron goroutines

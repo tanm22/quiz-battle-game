@@ -71,8 +71,7 @@ func CategoryFromEvent(event string) string {
 	case "notif.referral.converted":
 		return CategoryReferral
 	case "notif.tournament.remind",
-		"notif.tournament.finished",
-		"notif.tournament.rank_changed":
+		"notif.tournament.finished":
 		return CategoryTournament
 	case "notif.premium.activated",
 		"notif.premium.expiry",
