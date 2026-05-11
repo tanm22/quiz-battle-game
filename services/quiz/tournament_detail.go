@@ -95,9 +95,17 @@ func (s *quizServer) GetTournamentLeaderboard(ctx context.Context, req *pb.GetTo
 		return nil, status.Errorf(codes.InvalidArgument, "tournament_id: %v", err)
 	}
 
+	// Sort by score desc; on ties, the player who reached that score
+	// first ranks higher. updatedAt is set by scoring's upsert in
+	// services/scoring/main.go:1689 on every standings write, so the
+	// secondary key is reliably present in production. Without it, two
+	// players with identical scores would receive arbitrary ranks N and
+	// N+1 on every poll — and ranks drive prize payouts.
 	cursor, err := s.mongoDB.Collection("tournament_standings").Find(ctx,
 		bson.M{"tournamentId": req.TournamentId},
-		options.Find().SetSort(bson.D{{Key: "score", Value: -1}}).SetLimit(leaderboardLimit))
+		options.Find().
+			SetSort(bson.D{{Key: "score", Value: -1}, {Key: "updatedAt", Value: 1}}).
+			SetLimit(leaderboardLimit))
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "find standings: %v", err)
 	}

@@ -28,10 +28,20 @@ class _TournamentDetailScreenState
   void initState() {
     super.initState();
     _tab = TabController(length: 2, vsync: this);
+    _tab.addListener(_onTabChanged);
+  }
+
+  void _onTabChanged() {
+    // Rebuild so the body switch below only mounts the active tab's
+    // widget. Without this, _LiveTab would persist across Rules<->Live
+    // toggles and its 10s leaderboard poll would keep firing while the
+    // user is on Rules. See PR 43 review Important #1.
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    _tab.removeListener(_onTabChanged);
     _tab.dispose();
     super.dispose();
   }
@@ -61,13 +71,14 @@ class _TournamentDetailScreenState
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tab,
-        children: [
-          _RulesTab(tournamentId: widget.tournamentId),
-          _LiveTab(tournamentId: widget.tournamentId),
-        ],
-      ),
+      // Render only the active tab. Switching away unmounts the prior
+      // tab's widget, which auto-disposes its Riverpod subscriptions —
+      // for _LiveTab that means the leaderboard poll's Timer.periodic
+      // is cancelled (via the onDispose hook on the provider) the moment
+      // the user navigates to Rules.
+      body: _tab.index == 1
+          ? _LiveTab(tournamentId: widget.tournamentId)
+          : _RulesTab(tournamentId: widget.tournamentId),
     );
   }
 }

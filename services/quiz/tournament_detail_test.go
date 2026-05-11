@@ -155,6 +155,19 @@ func TestGetTournament_RejectsEmptyID(t *testing.T) {
 	}
 }
 
+// TestGetTournament_RejectsTooLongID exercises validate.MaxLen(64). Without
+// it, the MaxLen call could be silently dropped and only the empty-id and
+// auth gates would remain in CI — leaving the per-call upper-bound guard
+// for the Mongo-backed dev path that doesn't run in CI today.
+func TestGetTournament_RejectsTooLongID(t *testing.T) {
+	srv := &quizServer{}
+	_, err := srv.GetTournament(authedCtx("alice"),
+		&pb.GetTournamentRequest{TournamentId: strings.Repeat("x", 65)})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("err code = %v, want InvalidArgument", status.Code(err))
+	}
+}
+
 func TestGetTournamentLeaderboard_ReturnsTopSortedByScore(t *testing.T) {
 	srv := newTestQuizServer(t)
 	tid := bson.NewObjectID().Hex()
@@ -210,6 +223,15 @@ func TestGetTournamentLeaderboard_RejectsEmptyID(t *testing.T) {
 	srv := &quizServer{}
 	_, err := srv.GetTournamentLeaderboard(authedCtx("alice"),
 		&pb.GetTournamentLeaderboardRequest{TournamentId: ""})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("err code = %v, want InvalidArgument", status.Code(err))
+	}
+}
+
+func TestGetTournamentLeaderboard_RejectsTooLongID(t *testing.T) {
+	srv := &quizServer{}
+	_, err := srv.GetTournamentLeaderboard(authedCtx("alice"),
+		&pb.GetTournamentLeaderboardRequest{TournamentId: strings.Repeat("x", 65)})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Errorf("err code = %v, want InvalidArgument", status.Code(err))
 	}
