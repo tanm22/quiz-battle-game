@@ -124,6 +124,15 @@ func GetPlayer(ctx context.Context, rdb *redis.Client, roomID, userID string) (s
 	return rdb.HGet(ctx, Players(roomID), userID).Result()
 }
 
+// IsPlayerInRoom reports whether userID is registered in roomID's player
+// hash. Callers use this to gate room-scoped RPCs (StreamGameEvents,
+// SubmitAnswer, GetRoomQuestions) so outsiders can't act on rooms they
+// were never added to. Returns (false, nil) when the user is absent;
+// any non-nil error should be treated as deny-by-default by the caller.
+func IsPlayerInRoom(ctx context.Context, rdb *redis.Client, roomID, userID string) (bool, error) {
+	return rdb.HExists(ctx, Players(roomID), userID).Result()
+}
+
 // GetAllPlayers retrieves all players in a room.
 func GetAllPlayers(ctx context.Context, rdb *redis.Client, roomID string) (map[string]string, error) {
 	return rdb.HGetAll(ctx, Players(roomID)).Result()
