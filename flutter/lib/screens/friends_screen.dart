@@ -247,11 +247,10 @@ class _FriendRowState extends ConsumerState<_FriendRow> {
             behavior: SnackBarBehavior.floating,
           ),
         );
-        // Route the challenger straight into the matchmaking-equivalent
-        // flow. The friend taps the FCM notification to enter the same
-        // room. The actual gameplay screen is entered by both sides
-        // when the room reaches `match.created`.
-        ref.read(gameStateProvider.notifier).navigateToMatchmaking();
+        // Skip the matchmaking pool — ChallengeFriend already created
+        // the room with both players. Jump straight to gameplay; the
+        // recipient lands on the same roomId via their FCM tap handler.
+        ref.read(gameStateProvider.notifier).joinChallengeRoom(r.roomId!);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

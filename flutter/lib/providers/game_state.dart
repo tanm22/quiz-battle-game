@@ -194,6 +194,22 @@ class GameStateNotifier extends Notifier<GameState> {
     _startGameStream();
   }
 
+  // Friend challenges (§4.4) skip the matchmaking pool: ChallengeFriend
+  // already created the room server-side with both players in
+  // room:{id}:players and published match.created. Both clients jump
+  // straight from "I have a roomId" to gameplay — no SubscribeToMatch.
+  void joinChallengeRoom(String roomId) {
+    _matchSub?.cancel();
+    state = state.copyWith(
+      roomId: roomId,
+      currentScreen: GameScreen.gameplay,
+      lastSequenceNumber: 0,
+      clearError: true,
+    );
+    _fetchTotalRounds(roomId);
+    _startGameStream();
+  }
+
   Future<void> _fetchTotalRounds(String roomId) async {
     try {
       final resp = await _service.getRoomQuestions(roomId);
