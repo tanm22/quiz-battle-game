@@ -14,6 +14,22 @@
       },
       "oauth_client": [
         {
+          "client_id": "337216630704-e2p4qp8g38lr5khc9u8gl8migjpfn372.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.quizbattle.quiz_battle",
+            "certificate_hash": "ecd230114aa967d9d69383945b2cf95d933f09bb"
+          }
+        },
+        {
+          "client_id": "337216630704-kh4iekdvmk41q31re86pq3rn2f5qg1kn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.quizbattle.quiz_battle",
+            "certificate_hash": "26f236f877f310995d39dc2ec22cea222b3e85bf"
+          }
+        },
+        {
           "client_id": "337216630704-qunefia37t1jbib9pcot9s264d7fs5im.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
