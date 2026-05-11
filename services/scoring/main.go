@@ -149,27 +149,40 @@ func (s *scoringServer) CalculateScore(ctx context.Context, req *pb.CalculateSco
 		return nil, fmt.Errorf("failed to check answer: %w", err)
 	}
 
-	// basePoints = 100 * (1 if correct, 0 if wrong)
-	var basePoints float64
-	if correct {
-		basePoints = 100
-	}
-
-	// speedMultiplier: <5000ms → 1.5, >13000ms → 0.8, else 1.0
-	speedMultiplier := 1.0
-	if req.AnswerTimeMs < 5000 {
-		speedMultiplier = 1.5
-	} else if req.AnswerTimeMs > 13000 {
-		speedMultiplier = 0.8
-	}
-
-	score := basePoints * speedMultiplier
+	_, speedMultiplier, score := computeRoundScore(correct, req.AnswerTimeMs)
 
 	return &pb.CalculateScoreResponse{
 		Score:           score,
 		Correct:         correct,
 		SpeedMultiplier: speedMultiplier,
 	}, nil
+}
+
+// computeRoundScore is the pure scoring math used by CalculateScore.
+// Extracted so the formula is unit-testable without a Mongo round-trip
+// for the isCorrect lookup. Implements the §47 spec verbatim:
+//
+//	basePoints      = 100 if correct, 0 otherwise
+//	speedMultiplier = 1.5  when answerTimeMs <  5000
+//	                  1.0  when 5000 <= answerTimeMs <= 13000
+//	                  0.8  when answerTimeMs > 13000
+//	score           = basePoints * speedMultiplier
+//
+// Boundaries are strict: exactly 5000ms is medium (not fast), exactly
+// 13000ms is medium (not slow). A wrong answer scores 0 regardless of
+// speed (the multiplier is still reported back for telemetry).
+func computeRoundScore(correct bool, answerTimeMs int64) (basePoints, speedMultiplier, score float64) {
+	if correct {
+		basePoints = 100
+	}
+	speedMultiplier = 1.0
+	if answerTimeMs < 5000 {
+		speedMultiplier = 1.5
+	} else if answerTimeMs > 13000 {
+		speedMultiplier = 0.8
+	}
+	score = basePoints * speedMultiplier
+	return
 }
 
 // isCorrect looks up the question for a given room+round and checks the answer.
