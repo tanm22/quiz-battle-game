@@ -808,10 +808,35 @@ func (s *quizServer) sendStateSnapshot(ctx context.Context, roomID string, strea
 // StreamGameEvents — server-streaming RPC (section 4.1)
 // ---------------------------------------------------------------------------
 
+// requireRoomMember rejects callers who aren't registered in roomID's
+// player hash. Without this gate, any authenticated user who learns or
+// guesses a roomID can stream another match's events, submit answers
+// into it, or fetch its question bank — see the room-scoping audit for
+// the threat model. Fails closed on Redis errors so a transient blip
+// can't open the door.
+func (s *quizServer) requireRoomMember(ctx context.Context, roomID, userID string) error {
+	ok, err := keys.IsPlayerInRoom(ctx, s.rdb, roomID, userID)
+	if err != nil {
+		log.FromContext(ctx).Warn("room membership check failed; denying",
+			"room_id", roomID, "user_id", userID, "err", err)
+		return status.Error(codes.Internal, "room membership check failed")
+	}
+	if !ok {
+		log.FromContext(ctx).Warn("non-member attempted room access",
+			"room_id", roomID, "user_id", userID)
+		return status.Error(codes.PermissionDenied, "not a member of this room")
+	}
+	return nil
+}
+
 func (s *quizServer) StreamGameEvents(req *pb.StreamGameEventsRequest, stream pb.QuizService_StreamGameEventsServer) error {
 	userID, err := auth.UserIDFromContext(stream.Context())
 	if err != nil {
 		return status.Error(codes.Unauthenticated, "not authenticated")
+	}
+
+	if err := s.requireRoomMember(stream.Context(), req.RoomId, userID); err != nil {
+		return err
 	}
 
 	streamKey := req.RoomId + ":" + userID
@@ -901,6 +926,14 @@ func (s *quizServer) StreamGameEvents(req *pb.StreamGameEventsRequest, stream pb
 // ---------------------------------------------------------------------------
 
 func (s *quizServer) GetRoomQuestions(ctx context.Context, req *pb.GetRoomQuestionsRequest) (*pb.GetRoomQuestionsResponse, error) {
+	userID, err := auth.UserIDFromContext(ctx)
+	if err != nil {
+		return nil, status.Error(codes.Unauthenticated, "not authenticated")
+	}
+	if err := s.requireRoomMember(ctx, req.RoomId, userID); err != nil {
+		return nil, err
+	}
+
 	questions, ok := s.getRoomQuestions(req.RoomId)
 	if !ok {
 		return &pb.GetRoomQuestionsResponse{}, nil
@@ -1071,6 +1104,15 @@ func (s *quizServer) SubmitAnswer(ctx context.Context, req *pb.SubmitAnswerReque
 	// torrent of them swamps the answer-processing-queue and Redis.
 	if !s.answerLimiter.AllowWithLog(ctx, userID) {
 		return nil, status.Error(codes.ResourceExhausted, "too many answer submissions; slow down")
+	}
+
+	// Room-scoping gate: reject answers from anyone not in this room's
+	// player hash. Without this, an authenticated user who learned a
+	// roomID could feed answers into someone else's match — the scoring
+	// service would publish leaderboard.updated with their score, and
+	// the legitimate players would see a third "ghost" entry.
+	if err := s.requireRoomMember(ctx, req.RoomId, userID); err != nil {
+		return nil, err
 	}
 
 	// Publish answer.submitted event to RabbitMQ — do not wait for scoring
