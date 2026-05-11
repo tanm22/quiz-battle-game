@@ -814,16 +814,20 @@ func (s *quizServer) sendStateSnapshot(ctx context.Context, roomID string, strea
 // into it, or fetch its question bank — see the room-scoping audit for
 // the threat model. Fails closed on Redis errors so a transient blip
 // can't open the door.
-func (s *quizServer) requireRoomMember(ctx context.Context, roomID, userID string) error {
+//
+// op identifies the calling RPC (stream / submit / questions) and is
+// emitted on every warn line so ops can grep / alert per-RPC instead
+// of having to disambiguate by message text alone.
+func (s *quizServer) requireRoomMember(ctx context.Context, roomID, userID, op string) error {
 	ok, err := keys.IsPlayerInRoom(ctx, s.rdb, roomID, userID)
 	if err != nil {
 		log.FromContext(ctx).Warn("room membership check failed; denying",
-			"room_id", roomID, "user_id", userID, "err", err)
+			"op", op, "room_id", roomID, "user_id", userID, "err", err)
 		return status.Error(codes.Internal, "room membership check failed")
 	}
 	if !ok {
 		log.FromContext(ctx).Warn("non-member attempted room access",
-			"room_id", roomID, "user_id", userID)
+			"op", op, "room_id", roomID, "user_id", userID)
 		return status.Error(codes.PermissionDenied, "not a member of this room")
 	}
 	return nil
@@ -835,7 +839,7 @@ func (s *quizServer) StreamGameEvents(req *pb.StreamGameEventsRequest, stream pb
 		return status.Error(codes.Unauthenticated, "not authenticated")
 	}
 
-	if err := s.requireRoomMember(stream.Context(), req.RoomId, userID); err != nil {
+	if err := s.requireRoomMember(stream.Context(), req.RoomId, userID, "stream"); err != nil {
 		return err
 	}
 
@@ -930,7 +934,7 @@ func (s *quizServer) GetRoomQuestions(ctx context.Context, req *pb.GetRoomQuesti
 	if err != nil {
 		return nil, status.Error(codes.Unauthenticated, "not authenticated")
 	}
-	if err := s.requireRoomMember(ctx, req.RoomId, userID); err != nil {
+	if err := s.requireRoomMember(ctx, req.RoomId, userID, "questions"); err != nil {
 		return nil, err
 	}
 
@@ -1111,7 +1115,7 @@ func (s *quizServer) SubmitAnswer(ctx context.Context, req *pb.SubmitAnswerReque
 	// roomID could feed answers into someone else's match — the scoring
 	// service would publish leaderboard.updated with their score, and
 	// the legitimate players would see a third "ghost" entry.
-	if err := s.requireRoomMember(ctx, req.RoomId, userID); err != nil {
+	if err := s.requireRoomMember(ctx, req.RoomId, userID, "submit"); err != nil {
 		return nil, err
 	}
 
