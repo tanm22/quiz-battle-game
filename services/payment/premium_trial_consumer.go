@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"strconv"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"quiz-battle/pkg/coins/shop"
+	"quiz-battle/pkg/log"
 )
 
 // premiumTrialDefaultDays is the fallback when an outbox row's payload is
@@ -72,7 +72,7 @@ func (s *paymentServer) drainPremiumTrialOutbox(ctx context.Context) {
 	db := s.mongoClient.Database(s.dbName)
 	rows, err := shop.DequeueDue(ctx, db, "premium_trial", 32)
 	if err != nil {
-		log.Printf("[payment] premium-trial outbox dequeue: %v", err)
+		log.FromContext(ctx).Error("premium-trial outbox dequeue failed", "err", err)
 		return
 	}
 	for _, r := range rows {
@@ -105,7 +105,7 @@ func (s *paymentServer) applyPremiumTrialRow(ctx context.Context, db *mongo.Data
 
 	session, err := s.mongoClient.StartSession()
 	if err != nil {
-		log.Printf("[payment] premium-trial: start session for row %s: %v", r.ID, err)
+		log.FromContext(ctx).Error("premium-trial start session failed", "row_id", r.ID, "err", err)
 		return
 	}
 	defer session.EndSession(ctx)
@@ -154,16 +154,20 @@ func (s *paymentServer) applyPremiumTrialRow(ctx context.Context, db *mongo.Data
 		return expiry, nil
 	})
 	if err != nil {
-		log.Printf("[payment] premium-trial: row %s txn aborted, will retry: %v", r.ID, err)
+		log.FromContext(ctx).Warn("premium-trial txn aborted; will retry", "row_id", r.ID, "err", err)
 		return
 	}
 
 	if _, gone := res.(userGoneSentinel); gone {
-		log.Printf("[payment] premium-trial: user %s gone, row %s marked processed", r.UserID, r.ID)
+		log.FromContext(ctx).Info("premium-trial user gone; row marked processed", "user_id", r.UserID, "row_id", r.ID)
 		return
 	}
-	log.Printf("[payment] premium-trial granted user=%s days=%d expiresAt=%s row=%s",
-		r.UserID, days, res.(time.Time).Format(time.RFC3339), r.ID)
+	log.FromContext(ctx).Info("premium-trial granted",
+		"user_id", r.UserID,
+		"days", days,
+		"expires_at", res.(time.Time).Format(time.RFC3339),
+		"row_id", r.ID,
+	)
 }
 
 // userGoneSentinel is the WithTransaction return value used when the

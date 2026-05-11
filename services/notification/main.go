@@ -50,6 +50,14 @@ func (s *notificationService) consume(ctx context.Context, queue string) {
 	}
 	defer ch.Close()
 
+	// prefetch=16 gives backpressure when FCM is slow without choking
+	// throughput on the happy path. Matches pkg/coins earn-consumer; bound
+	// here is identical because the notification dispatcher's hot dep
+	// (FCM HTTP send) has comparable tail latency to Mongo.
+	if err := ch.Qos(16, 0, false); err != nil {
+		log.Fatal(ctx, "qos failed", "queue", queue, "err", err)
+	}
+
 	msgs, err := ch.Consume(queue, "", false, false, false, false, nil)
 	if err != nil {
 		log.Fatal(ctx, "consume failed", "queue", queue, "err", err)
@@ -282,35 +290,6 @@ func buildMessage(event string, payload map[string]any) (string, string, map[str
 		}
 		return "🏁 Tournament finished",
 			fmt.Sprintf("%s wrapped up. You finished #%d — better luck next round!", tname, rank),
-			data
-
-	case "notif.tournament.rank_changed":
-		// Reserved for the live-leaderboard rank-shift event. The publisher
-		// (currently a TODO — would live in the scoring service after each
-		// standings update) sends tournamentName, oldRank, newRank. We
-		// render a non-spammy summary; the per-day cap and dedup live in
-		// the notification policy layer (problem-03 4.6, separate PR).
-		tname := strField(payload, "tournamentName")
-		oldRank := intField(payload, "oldRank")
-		newRank := intField(payload, "newRank")
-		if tname == "" {
-			tname = "Your tournament"
-		}
-		data["tournamentName"] = tname
-		data["oldRank"] = strconv.FormatInt(oldRank, 10)
-		data["newRank"] = strconv.FormatInt(newRank, 10)
-		if newRank > 0 && oldRank > 0 && newRank < oldRank {
-			return "📈 You moved up",
-				fmt.Sprintf("You're now #%d in %s (up from #%d). Keep going!", newRank, tname, oldRank),
-				data
-		}
-		if newRank > 0 && oldRank > 0 && newRank > oldRank {
-			return "📉 Rank update",
-				fmt.Sprintf("You dropped to #%d in %s — play another match to climb back.", newRank, tname),
-				data
-		}
-		return "🏟️ Tournament update",
-			fmt.Sprintf("Your standing in %s changed.", tname),
 			data
 
 	case "notif.match.invite":

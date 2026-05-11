@@ -17,7 +17,6 @@ func TestCategoryFromEvent_KnownAndUnknown(t *testing.T) {
 		"notif.referral.converted":       CategoryReferral,
 		"notif.tournament.remind":        CategoryTournament,
 		"notif.tournament.finished":      CategoryTournament,
-		"notif.tournament.rank_changed":  CategoryTournament,
 		"notif.premium.activated":        CategoryPremium,
 		"notif.premium.expired":          CategoryPremium,
 		"notif.premium.expiry":           CategoryPremium,

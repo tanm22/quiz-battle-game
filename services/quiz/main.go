@@ -221,6 +221,13 @@ func (s *quizServer) consumeMatchCreated(ctx context.Context) {
 		log.Fatal(ctx, "bind match-created-queue failed", "err", err)
 	}
 
+	// prefetch=16 — bounds in-flight match starts so a flush of stale
+	// match.created events can't queue more selectQuestions calls than
+	// Mongo can absorb. Matches the chosen ceiling on other consumers.
+	if err := ch.Qos(16, 0, false); err != nil {
+		log.Fatal(ctx, "qos failed", "queue", "match-created-queue", "err", err)
+	}
+
 	msgs, err := ch.Consume("match-created-queue", "", false, false, false, false, nil)
 	if err != nil {
 		log.Fatal(ctx, "consume failed", "queue", "match-created-queue", "err", err)
@@ -249,27 +256,75 @@ func (s *quizServer) consumeMatchCreated(ctx context.Context) {
 
 			log.FromContext(msgCtx).Info("match.created received", "room_id", event.RoomID, "player_ids", event.PlayerIDs)
 
-			// Determine allowed topics based on player plans.
-			// If any player is free, restrict to free topics for fairness.
+			// Determine allowed topics based on player plans and preferences.
+			// Tier gate: if any player is free, the union must stay within
+			// freeTopics (premium topics are paywalled — we can't expose them
+			// just because a premium player is also in the match).
+			// Personalization: intersect that tier-gated set with the union
+			// of every player's preferredTopics (the field §4 calls out as
+			// "used by the quiz engine for personalization"). Empty
+			// preferences = no personalization restriction for that player,
+			// so the union naturally collapses to the tier-gated set.
 			var allowedTopics []string
 			allPremium := true
+			preferredUnion := map[string]struct{}{}
+			anyPreference := false
 			for _, pid := range event.PlayerIDs {
-				p, _ := keys.GetPlan(msgCtx, s.rdb, pid)
-				if p == "" {
-					var doc bson.M
-					if s.mongoDB.Collection("users").FindOne(msgCtx, bson.M{"_id": pid}).Decode(&doc) == nil {
-						if pl, ok := doc["plan"].(string); ok {
-							p = pl
+				p := ""
+				var topics []string
+				var doc bson.M
+				if s.mongoDB.Collection("users").FindOne(msgCtx, bson.M{"_id": pid}).Decode(&doc) == nil {
+					if pl, ok := doc["plan"].(string); ok {
+						p = pl
+					}
+					if raw, ok := doc["preferredTopics"].(bson.A); ok {
+						for _, v := range raw {
+							if t, ok := v.(string); ok && t != "" {
+								topics = append(topics, t)
+							}
 						}
+					}
+				}
+				if p == "" {
+					if cached, _ := keys.GetPlan(msgCtx, s.rdb, pid); cached != "" {
+						p = cached
 					}
 				}
 				if p != "premium" {
 					allPremium = false
-					break
+				}
+				if len(topics) > 0 {
+					anyPreference = true
+					for _, t := range topics {
+						preferredUnion[t] = struct{}{}
+					}
 				}
 			}
 			if !allPremium {
-				allowedTopics = freeTopics
+				allowedTopics = append(allowedTopics, freeTopics...)
+			}
+			if anyPreference {
+				if allowedTopics == nil {
+					// All-premium match: intersection of "all topics" and
+					// the preference union is just the preference union.
+					for t := range preferredUnion {
+						allowedTopics = append(allowedTopics, t)
+					}
+				} else {
+					filtered := allowedTopics[:0:0]
+					for _, t := range allowedTopics {
+						if _, ok := preferredUnion[t]; ok {
+							filtered = append(filtered, t)
+						}
+					}
+					// Empty intersection — preferences and tier-gated set
+					// don't overlap. Fall back to the tier-gated set so the
+					// match still has something to ask, even if it's off-
+					// preference. Better than a zero-question round.
+					if len(filtered) > 0 {
+						allowedTopics = filtered
+					}
+				}
 			}
 
 			// Select questions and store in Redis
@@ -1727,6 +1782,10 @@ func (s *quizServer) consumeRoundCompleted(ctx context.Context) {
 	}
 	defer ch.Close()
 
+	if err := ch.Qos(16, 0, false); err != nil {
+		log.Fatal(ctx, "qos failed", "queue", "round-completed-queue", "err", err)
+	}
+
 	msgs, err := ch.Consume("round-completed-queue", "", false, false, false, false, nil)
 	if err != nil {
 		log.Fatal(ctx, "consume failed", "queue", "round-completed-queue", "err", err)
@@ -1790,6 +1849,10 @@ func (s *quizServer) consumeLeaderboardUpdated(ctx context.Context) {
 		log.Fatal(ctx, "open channel failed", "err", err)
 	}
 	defer ch.Close()
+
+	if err := ch.Qos(16, 0, false); err != nil {
+		log.Fatal(ctx, "qos failed", "queue", "leaderboard-broadcast-queue", "err", err)
+	}
 
 	msgs, err := ch.Consume("leaderboard-broadcast-queue", "", false, false, false, false, nil)
 	if err != nil {
