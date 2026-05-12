@@ -57,6 +57,10 @@ dependencies:
   # UI redesign — Material motion transitions (shared-axis, fade-through)
   # for navigation effects between screens.
   animations: ^2.0.11
+  # §4.7 PR-A1: secure storage (Keychain on iOS, EncryptedSharedPreferences
+  # on Android) for the refresh token. Held outside SharedPreferences so a
+  # device backup can't lift the long-lived session credential.
+  flutter_secure_storage: ^9.0.0
 
 dev_dependencies:
   flutter_test:
