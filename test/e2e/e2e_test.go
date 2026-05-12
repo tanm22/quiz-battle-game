@@ -97,6 +97,35 @@ func recvGameEvent(t *testing.T, stream pb.QuizService_StreamGameEventsClient, t
 	}
 }
 
+// recvFirstQuestion pulls events from the stream until a QuestionBroadcast
+// arrives, skipping past the PlayerJoined event(s) the server emits at
+// round-1 start when each player's stream subscribes. Without this skip
+// the round-1 read races against the join-notification fanout and
+// flakes with "expected QuestionBroadcast, got PlayerJoined".
+//
+// Any event type other than PlayerJoined or QuestionBroadcast is a hard
+// fail — the caller is asking specifically for the round's question
+// frame and seeing e.g. a RoundResult here would mean something earlier
+// in the flow is wrong.
+func recvFirstQuestion(t *testing.T, stream pb.QuizService_StreamGameEventsClient, timeout time.Duration) *pb.GameEvent {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			t.Fatalf("timeout (%v) waiting for QuestionBroadcast", timeout)
+		}
+		ev := recvGameEvent(t, stream, remaining)
+		if ev.GetQuestion() != nil {
+			return ev
+		}
+		if ev.GetPlayerJoined() != nil {
+			continue
+		}
+		t.Fatalf("expected QuestionBroadcast or PlayerJoined, got %T", ev.Event)
+	}
+}
+
 // recvMatchEvent reads the next MatchEvent with a timeout.
 func recvMatchEvent(t *testing.T, stream pb.MatchmakingService_SubscribeToMatchClient, timeout time.Duration) *pb.MatchEvent {
 	t.Helper()
@@ -312,27 +341,24 @@ func TestFullMatchE2E(t *testing.T) {
 	for round := 1; round <= totalRounds; round++ {
 		t.Logf("--- Round %d ---", round)
 
-		// Receive QuestionBroadcast on both streams
+		// Receive QuestionBroadcast on both streams. recvFirstQuestion
+		// skips over the PlayerJoined event the server emits at round-1
+		// stream-subscribe time; for round 2+ there's no PlayerJoined
+		// queued so it behaves like a plain recv.
 		var q1, q2 *pb.GameEvent
 		wg.Add(2)
 		go func() {
 			defer wg.Done()
-			q1 = recvGameEvent(t, gameStream1, eventTimeout)
+			q1 = recvFirstQuestion(t, gameStream1, eventTimeout)
 		}()
 		go func() {
 			defer wg.Done()
-			q2 = recvGameEvent(t, gameStream2, eventTimeout)
+			q2 = recvFirstQuestion(t, gameStream2, eventTimeout)
 		}()
 		wg.Wait()
 
 		qb1 := q1.GetQuestion()
 		qb2 := q2.GetQuestion()
-		if qb1 == nil {
-			t.Fatalf("round %d: player1 expected QuestionBroadcast, got %T", round, q1.Event)
-		}
-		if qb2 == nil {
-			t.Fatalf("round %d: player2 expected QuestionBroadcast, got %T", round, q2.Event)
-		}
 
 		// CHECKLIST 2: Identical deadline timestamp, absolute Unix time
 		if qb1.DeadlineUnix != qb2.DeadlineUnix {
@@ -603,12 +629,10 @@ func TestDisconnectReconnect(t *testing.T) {
 		t.Fatalf("stream player2: %v", err)
 	}
 
-	// Wait for round 1 QuestionBroadcast
-	q1 := recvGameEvent(t, gs1, eventTimeout)
-	recvGameEvent(t, gs2, eventTimeout)
-	if q1.GetQuestion() == nil {
-		t.Fatalf("expected QuestionBroadcast, got %T", q1.Event)
-	}
+	// Wait for round 1 QuestionBroadcast on both streams. Same race
+	// guard as TestFullMatchE2E — skip past the PlayerJoined fanout.
+	q1 := recvFirstQuestion(t, gs1, eventTimeout)
+	recvFirstQuestion(t, gs2, eventTimeout)
 	lastSeq := q1.SequenceNumber
 	t.Logf("Round 1 started, sequence_number=%d", lastSeq)
 
