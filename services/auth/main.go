@@ -508,6 +508,20 @@ func (s *authServer) ResetPassword(ctx context.Context, req *pb.ResetPasswordReq
 		return nil, status.Error(codes.NotFound, "no account with this email")
 	}
 
+	// §4.7 PR-A1: revoke every active refresh-token family for this user
+	// so any sessions established with the old password lose access at
+	// their next refresh. Best-effort; the password change is already
+	// persisted, so a transient revocation failure shouldn't fail the
+	// RPC — the existing access tokens still die at AccessTokenTTL.
+	var u struct {
+		ID string `bson:"_id"`
+	}
+	if err := s.users().FindOne(ctx, bson.M{"email": req.Email}).Decode(&u); err == nil {
+		if err := s.refresh.RevokeAllForUser(ctx, u.ID); err != nil {
+			log.FromContext(ctx).Warn("revoke refresh on reset failed", "user_id", u.ID, "err", err)
+		}
+	}
+
 	log.FromContext(ctx).Info("password reset", "email", log.RedactEmail(req.Email))
 	return &pb.ResetPasswordResponse{Success: true}, nil
 }
@@ -554,6 +568,14 @@ func (s *authServer) DeleteAccount(ctx context.Context, _ *pb.DeleteAccountReque
 	}
 	if result.DeletedCount == 0 {
 		return nil, status.Error(codes.NotFound, "user not found")
+	}
+
+	// §4.7 PR-A1: revoke every refresh-token family. RefreshToken would
+	// already fail because the user lookup is gone, but explicit
+	// revocation is defense-in-depth and keeps the refresh_tokens
+	// collection self-consistent against orphan rows.
+	if err := s.refresh.RevokeAllForUser(ctx, userID); err != nil {
+		log.FromContext(ctx).Warn("revoke refresh on delete failed", "user_id", userID, "err", err)
 	}
 
 	log.FromContext(ctx).Info("account deleted", "user_id", userID)
