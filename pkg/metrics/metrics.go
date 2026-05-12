@@ -25,6 +25,13 @@ type Metrics struct {
 	AMQPConsumesTotal   *prometheus.CounterVec
 	AMQPDispatchedTotal *prometheus.CounterVec
 	WebhookEventsTotal  *prometheus.CounterVec
+	// §4.3 outbox visibility: gauges scoped by kind (bounded — currently
+	// only "premium_trial"). The watcher in services/payment refreshes
+	// these every 30s so operators can graph queue depth and the oldest
+	// unprocessed row's age, and so an alert can fire when the consumer
+	// stops draining.
+	OutboxPendingTotal     *prometheus.GaugeVec
+	OutboxOldestAgeSeconds *prometheus.GaugeVec
 
 	registry *prometheus.Registry
 	service  string
@@ -88,6 +95,20 @@ func New(serviceName string) *Metrics {
 			},
 			[]string{"source", "outcome"},
 		),
+		OutboxPendingTotal: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "outbox_pending_total",
+				Help: "Current count of unprocessed rows in coin_effect_outbox, partitioned by kind. Refreshed by the payment-service outbox watcher.",
+			},
+			[]string{"kind"},
+		),
+		OutboxOldestAgeSeconds: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "outbox_oldest_age_seconds",
+				Help: "Age in seconds of the oldest unprocessed row in coin_effect_outbox, partitioned by kind. 0 when the queue is empty.",
+			},
+			[]string{"kind"},
+		),
 	}
 
 	wrapped.MustRegister(
@@ -97,6 +118,8 @@ func New(serviceName string) *Metrics {
 		m.AMQPConsumesTotal,
 		m.AMQPDispatchedTotal,
 		m.WebhookEventsTotal,
+		m.OutboxPendingTotal,
+		m.OutboxOldestAgeSeconds,
 	)
 	return m
 }

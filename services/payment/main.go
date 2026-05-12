@@ -787,6 +787,11 @@ func main() {
 	m := metrics.New("payment")
 	metricsSrv := m.Serve(ctx, ":2112")
 	srv.metrics = m
+	// §4.3 visibility: 30s-tick watcher that publishes outbox queue depth
+	// and oldest-row age gauges, plus a loud error log when the oldest
+	// unprocessed row exceeds 5 minutes. Spawned after srv.metrics is set
+	// so the first tick can publish; see docs/runbook-coins.md.
+	srv.startOutboxWatcher(ctx, "premium_trial")
 
 	grpcServer := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(

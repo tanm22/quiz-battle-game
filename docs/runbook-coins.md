@@ -71,6 +71,27 @@ Manual fix: do **not** edit the row directly. Instead, replay the consumer
 on it by removing `processedAt` (already null) and waiting a second — or
 restart the payment service.
 
+## Outbox watcher metrics
+
+The payment service runs a 30s-tick watcher over `coin_effect_outbox`
+that publishes two Prometheus gauges per kind:
+
+- `outbox_pending_total{kind="premium_trial"}` — count of rows with
+  `processedAt: null`. Healthy steady-state: 0 (consumer drains within
+  one 1s poll). A non-zero value lingering across two scrape intervals
+  means the consumer is behind or stuck.
+- `outbox_oldest_age_seconds{kind="premium_trial"}` — age of the oldest
+  unprocessed row, 0 when the queue is empty. This is the primary
+  stuck-consumer signal: under normal operation it should stay under
+  ~2s; sustained values above tens of seconds mean apply latency is
+  growing; values above 5 minutes mean the consumer goroutine is wedged.
+
+When `outbox_oldest_age_seconds` exceeds **300s (5 minutes)** for a
+given kind, the watcher emits a structured `outbox stuck` error log with
+the kind, pending count, and oldest age. That loud log is the floor;
+in production you'd add a Prometheus alert rule like
+`outbox_oldest_age_seconds > 600` `for: 5m` and page on it.
+
 ## Granting coins manually
 
 Direct `db.coin_ledger.insertOne(...)` is **wrong**. The ledger insert and
