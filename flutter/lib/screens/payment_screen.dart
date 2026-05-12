@@ -6,6 +6,7 @@ import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../services/quiz_service.dart';
 import '../proto/quiz.pbgrpc.dart';
 import '../theme/app_theme.dart';
+import '../utils/payment_errors.dart';
 
 class PaymentScreen extends StatefulWidget {
   const PaymentScreen({super.key});
@@ -226,27 +227,24 @@ class _PaymentScreenState extends State<PaymentScreen> {
     // User-initiated cancels are the only case we silently dismiss —
     // surfacing a "Payment failed" dialog when the user themselves
     // closed the sheet would feel like the app shouting at them.
-    // Network errors get the dialog so they can hit Try again.
+    // Every other failure goes through friendlyPaymentError, which
+    // maps the raw SDK payload to a (title, body) the user can act on
+    // — and then we show the dialog with a Try-again button.
     if (response.code == Razorpay.PAYMENT_CANCELLED) return;
 
+    // Keep the raw SDK payload in logcat for triage. We translate it to
+    // user-friendly text below, but bug reports need the underlying code +
+    // message to tell device-side failures (no DNS, wrong clock) from real
+    // Razorpay business errors (card declined, OTP failed).
+    debugPrint('razorpay error: code=${response.code} message=${response.message}');
+
     final order = _lastOrder;
+    final (title, body) = friendlyPaymentError(response);
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Payment failed'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(response.message ?? 'Unknown error',
-                style: const TextStyle(color: AppColors.text)),
-            if (response.code != null) ...[
-              const SizedBox(height: 8),
-              Text('Code: ${response.code}',
-                  style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
-            ],
-          ],
-        ),
+        title: Text(title),
+        content: Text(body, style: const TextStyle(color: AppColors.text)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
