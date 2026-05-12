@@ -219,6 +219,12 @@ func (s *scoringServer) isCorrect(ctx context.Context, roomID string, round, opt
 // ---------------------------------------------------------------------------
 
 func (s *scoringServer) GetLeaderboard(ctx context.Context, req *pb.GetLeaderboardRequest) (*pb.GetLeaderboardResponse, error) {
+	// §4.7 PR-A1: bound the room-id string so a malicious client can't
+	// pad it to a giant Redis key and blow the per-keylength memory
+	// budget on the server.
+	if err := validate.MaxLen(req.RoomId, 128); err != nil {
+		return nil, status.Error(codes.InvalidArgument, "room_id: too long")
+	}
 	entries, err := keys.GetLeaderboardEntries(ctx, s.rdb, req.RoomId)
 	if err != nil {
 		return nil, fmt.Errorf("leaderboard fetch failed: %w", err)
@@ -489,6 +495,13 @@ func (s *scoringServer) GetGlobalLeaderboard(ctx context.Context, req *pb.GetGlo
 	userID, err := auth.UserIDFromContext(ctx)
 	if err != nil {
 		return nil, status.Error(codes.Unauthenticated, "not authenticated")
+	}
+
+	// §4.7 PR-A1: reject unknown TimeFilter values at the edge rather
+	// than silently aliasing to a default the user didn't ask for.
+	// Empty string is valid (treated as alltime below).
+	if err := validate.TimeFilter(req.TimeFilter); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "time_filter: %v", err)
 	}
 
 	// Get user plan for result limiting
