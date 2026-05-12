@@ -74,6 +74,7 @@ class _Badge {
     this.legendary = false,
     this.comingSoon = false,
   });
+  String get displayCondition => comingSoon ? 'Coming soon' : unlockCondition;
 }
 
 // Tier name → pill color. Lifted from the design brief's tier mapping.
@@ -1096,7 +1097,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
             Text(
               unlocked
                   ? 'Unlocked'
-                  : (b.comingSoon ? 'Coming soon' : b.unlockCondition),
+                  : b.displayCondition,
               style: AppText.body.copyWith(
                 color: unlocked ? AppColors.success : AppColors.textMuted,
               ),
@@ -2139,7 +2140,7 @@ class _BadgeTile extends StatelessWidget {
               )
             else
               Text(
-                badge.comingSoon ? 'Coming soon' : badge.unlockCondition,
+                badge.displayCondition,
                 style: AppText.caption.copyWith(color: AppColors.textDim),
                 textAlign: TextAlign.center,
                 maxLines: 2,
