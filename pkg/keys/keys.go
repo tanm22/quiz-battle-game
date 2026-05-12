@@ -12,6 +12,14 @@ const (
 	RoomQuestions   = "room:%s:questions"
 	RoomLeaderboard = "room:%s:leaderboard"
 	RoomAnswers     = "room:%s:answers:%d"
+	// RoomAnswered is the Redis SET of userIDs that have submitted an
+	// answer for a specific round. quiz's SubmitAnswer SADDs the caller
+	// here, then compares SCARD against HLEN(RoomPlayers) to early-close
+	// the round once every player has answered (avoids the 15s idle wait
+	// when all submissions land early). SADD semantics dedupe naturally,
+	// so a future regression that lets a user double-submit can't
+	// inflate the count past the player roster.
+	RoomAnswered    = "room:%s:answered:%d"
 	RoomLock        = "room:lock:%s"
 	RoomRoundClosed = "room:%s:round:%d:closed"
 	EmailCode       = "emailcode:%s:%s" // email, purpose
@@ -79,6 +87,15 @@ func Leaderboard(roomID string) string {
 
 func Answers(roomID string, round int) string {
 	return fmt.Sprintf(RoomAnswers, roomID, round)
+}
+
+// Answered returns the Redis key for the SET of userIDs that have
+// submitted an answer for a specific round. Used by quiz's SubmitAnswer
+// to early-close the round once every player in the room has answered.
+// SADD semantics dedupe naturally — a future regression that lets a
+// user double-submit won't inflate the count past the room's player roster.
+func Answered(roomID string, round int) string {
+	return fmt.Sprintf(RoomAnswered, roomID, round)
 }
 
 func Lock(roomID string) string {

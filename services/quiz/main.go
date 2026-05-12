@@ -81,9 +81,16 @@ type quizServer struct {
 }
 
 // publish sends a message to the topic exchange with mutex protection.
+// A nil amqpCh is a silent no-op so tests that exercise paths that
+// would normally publish (e.g. the early-close branch in SubmitAnswer
+// invoking closeRound, which fires round.completed) don't need to
+// stand up RabbitMQ. Mirrors the pattern in services/scoring.
 func (s *quizServer) publish(ctx context.Context, routingKey string, body []byte) error {
 	s.amqpMu.Lock()
 	defer s.amqpMu.Unlock()
+	if s.amqpCh == nil {
+		return nil
+	}
 	err := log.PublishWithContext(ctx, s.amqpCh, "sx", routingKey, false, false, amqp.Publishing{
 		ContentType: "application/json",
 		Body:        body,
@@ -1247,7 +1254,78 @@ func (s *quizServer) SubmitAnswer(ctx context.Context, req *pb.SubmitAnswerReque
 	}
 
 	log.FromContext(ctx).Info("answer submitted", "user_id", userID, "room_id", req.RoomId, "round", req.Round, "option_index", req.OptionIndex)
+
+	// Early close: if every player in the room has now submitted an
+	// answer for this round, cancel the 15s deadline timer and close
+	// the round immediately so the next one starts within milliseconds
+	// instead of after the dead-air timeout. closeRound's SETNX guard
+	// (keys.TryCloseRound) makes the timer-vs-early race safe — at most
+	// one path actually broadcasts RoundResult.
+	//
+	// Best-effort by design: any Redis hiccup falls through to the
+	// timer-based close path, so a momentary Redis blip can't turn a
+	// successful answer submission into an error response.
+	s.maybeEarlyCloseRound(ctx, req.RoomId, int(req.Round), userID)
+
 	return &pb.SubmitAnswerResponse{Accepted: true}, nil
+}
+
+// maybeEarlyCloseRound records `userID` as having answered `round` in
+// `roomID` and, if the answered-set's cardinality has reached the room's
+// player count, cancels the deadline timer and invokes closeRound in a
+// goroutine so the RPC returns immediately. Pulled out of SubmitAnswer
+// so both the production call site and the unit tests can drive it
+// directly without a full RPC harness.
+//
+// Errors are logged at warn and swallowed: the deadline timer (see
+// startRound) still fires after 15s, so a Redis hiccup degrades to the
+// status quo rather than poisoning a successful SubmitAnswer.
+func (s *quizServer) maybeEarlyCloseRound(ctx context.Context, roomID string, round int, userID string) {
+	answeredKey := keys.Answered(roomID, round)
+	added, err := s.rdb.SAdd(ctx, answeredKey, userID).Result()
+	if err != nil {
+		log.FromContext(ctx).Warn("early-close SADD failed; falling back to timer",
+			"room_id", roomID, "round", round, "err", err)
+		return
+	}
+	// Refresh TTL when a new member is added so a long-running room's
+	// per-round keys don't accumulate past RoomTTL. Re-applying on every
+	// add is idempotent and cheap; matches keys.TrySetAnswer's pattern.
+	if added == 1 {
+		s.rdb.Expire(ctx, answeredKey, keys.RoomTTL)
+	}
+
+	answered, err := s.rdb.SCard(ctx, answeredKey).Result()
+	if err != nil {
+		log.FromContext(ctx).Warn("early-close SCARD failed; falling back to timer",
+			"room_id", roomID, "round", round, "err", err)
+		return
+	}
+	playerCount, err := s.rdb.HLen(ctx, keys.Players(roomID)).Result()
+	if err != nil {
+		log.FromContext(ctx).Warn("early-close HLEN failed; falling back to timer",
+			"room_id", roomID, "round", round, "err", err)
+		return
+	}
+	// playerCount==0 would be a misconfigured room (room hash missing
+	// or expired). Skip rather than close on the off chance an empty
+	// room ever calls SubmitAnswer past the membership gate.
+	if playerCount == 0 || answered < playerCount {
+		return
+	}
+
+	// All players have answered. Stop the deadline timer if it's still
+	// armed — Stop() returns false when the timer already fired (its
+	// goroutine may or may not have called closeRound yet), which is
+	// fine: closeRound's SETNX guard handles that race.
+	if v, ok := s.roomTimers.Load(roomID); ok {
+		v.(*time.Timer).Stop()
+	}
+
+	// Detach so the RPC returns immediately; the goroutine still carries
+	// the request_id for log correlation. Matches the startRound pattern
+	// where time.AfterFunc invokes closeRound asynchronously.
+	go s.closeRound(log.DetachContext(ctx), roomID, round)
 }
 
 // ---------------------------------------------------------------------------
