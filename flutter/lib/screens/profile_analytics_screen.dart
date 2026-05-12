@@ -157,6 +157,12 @@ class _RatingChartCard extends StatelessWidget {
     final padding = ((maxRating - minRating) * 0.15).ceil().clamp(20, 100);
     final yMin = (minRating - padding).toDouble();
     final yMax = (maxRating + padding).toDouble();
+    // Pin the label interval to four buckets across the padded range so the
+    // axis renders ~5 labels (one per gridline) regardless of how narrow the
+    // rating spread is. Without an explicit interval, fl_chart inherits one
+    // from its layout heuristic and can collapse 1181/1201/1221 onto the
+    // same K-abbreviated label.
+    final yInterval = ((yMax - yMin) / 4).clamp(20, 200);
 
     return _Card(
       child: Column(
@@ -184,15 +190,31 @@ class _RatingChartCard extends StatelessWidget {
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
-                  horizontalInterval: ((yMax - yMin) / 4).clamp(20, 200),
+                  horizontalInterval: yInterval.toDouble(),
                   getDrawingHorizontalLine: (_) => const FlLine(color: AppColors.border, strokeWidth: 1),
                 ),
-                titlesData: const FlTitlesData(
-                  topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                titlesData: FlTitlesData(
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                   leftTitles: AxisTitles(
-                    sideTitles: SideTitles(showTitles: true, reservedSize: 40),
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 44,
+                      interval: yInterval.toDouble(),
+                      // Plain integer label. fl_chart's default formatter
+                      // abbreviates 4-digit numbers ("1.2K"), which made
+                      // every gridline read identically when the rating
+                      // spread was narrow. Ratings are always 4 digits, so
+                      // raw int is both compact and unambiguous.
+                      getTitlesWidget: (value, meta) => Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: Text(
+                          value.toInt().toString(),
+                          style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 borderData: FlBorderData(show: false),

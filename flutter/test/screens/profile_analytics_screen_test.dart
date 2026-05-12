@@ -132,8 +132,12 @@ void main() {
 
     // Rating chart.
     expect(find.byType(LineChart), findsOneWidget);
-    // Latest rating shown next to the section header.
-    expect(find.text('1240'), findsOneWidget);
+    // Latest rating shown next to the section header. We use
+    // findsAtLeastNWidgets(1) because '1240' is also one of the Y-axis
+    // labels in the chart (the labels are plain integers, not the
+    // K-abbreviated form fl_chart defaults to) — that's a feature, not
+    // a duplicate to assert against.
+    expect(find.text('1240'), findsAtLeastNWidgets(1));
 
     // Topic list.
     expect(find.text('science'), findsAtLeastNWidgets(1)); // also in recap
