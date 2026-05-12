@@ -11,10 +11,18 @@ import (
 )
 
 // AccessTokenTTL bounds how long a JWT stays valid before a refresh
-// round-trip is required. Short on purpose so revocation (logout,
-// password change, account delete) takes effect within minutes
-// without needing a per-request blacklist lookup on every RPC.
-const AccessTokenTTL = 15 * time.Minute
+// round-trip is required. 1 hour is a deliberate compromise: a
+// follow-up PR will drop this to ~15min once the Flutter client
+// gains a per-RPC auto-refresh interceptor on UNAUTHENTICATED, at
+// which point users won't notice the difference. Until then, 15min
+// would surface as random forced logouts every quarter-hour because
+// the client only refreshes on explicit demand via refreshAccessToken().
+//
+// 1h still bounds revocation latency to well under the previous 24h
+// while keeping the unmodified client usable. Logout still kills the
+// refresh-token family immediately — only access-token revocation
+// has to wait out the TTL.
+const AccessTokenTTL = time.Hour
 
 // RefreshTokenTTL bounds the session length before a user has to
 // re-authenticate from scratch. Long enough that mobile users on

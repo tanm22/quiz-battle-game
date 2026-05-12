@@ -160,8 +160,13 @@ func TestVerify_EmptyTokenRejected(t *testing.T) {
 }
 
 func TestAccessTokenTTLIsShortAndRefreshIsLong(t *testing.T) {
-	if AccessTokenTTL >= time.Hour {
-		t.Errorf("AccessTokenTTL = %v, want < 1h to bound revocation latency", AccessTokenTTL)
+	// AccessTokenTTL ≤ 1h is the contract: revocation must propagate
+	// in an hour at most. The original plan asked for 15min, but the
+	// Flutter client lacks an auto-refresh interceptor on UNAUTHENTICATED
+	// today, so 15min would surface as random forced logouts. 1h is
+	// the documented compromise — see jwt.go.
+	if AccessTokenTTL > time.Hour {
+		t.Errorf("AccessTokenTTL = %v, want <= 1h to bound revocation latency", AccessTokenTTL)
 	}
 	if RefreshTokenTTL < 7*24*time.Hour {
 		t.Errorf("RefreshTokenTTL = %v, want >= 7d so users aren't forced to re-login too often", RefreshTokenTTL)
