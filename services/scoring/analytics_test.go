@@ -135,8 +135,8 @@ func TestGetUserAnalytics_TopicAccuracy_GroupsAndOrders(t *testing.T) {
 	if resp.TopicAccuracy[0].Total != 4 || resp.TopicAccuracy[0].Correct != 3 {
 		t.Errorf("science totals: %+v", resp.TopicAccuracy[0])
 	}
-	if want := 3.0 / 4.0; resp.TopicAccuracy[0].AccuracyPct != want {
-		t.Errorf("science accuracy_pct=%v, want %v", resp.TopicAccuracy[0].AccuracyPct, want)
+	if want := 3.0 / 4.0; resp.TopicAccuracy[0].AccuracyRatio != want {
+		t.Errorf("science accuracy_ratio=%v, want %v", resp.TopicAccuracy[0].AccuracyRatio, want)
 	}
 	if resp.TopicAccuracy[1].Topic != "history" {
 		t.Errorf("second topic = %q, want history", resp.TopicAccuracy[1].Topic)
@@ -147,19 +147,20 @@ func TestGetUserAnalytics_PercentilesGatedByMinSamples(t *testing.T) {
 	srv, c, db := scoringTestEnv(t)
 	seedScoringUser(t, c, db, "alice", 0)
 
-	// 4 answers — under the 5-sample floor, so percentiles must be zero
-	// even though we have data (the floor protects against
-	// statistically-meaningless values).
+	// 19 answers — one under the 20-sample floor, so percentiles must
+	// stay zero even though we have data. The floor protects against
+	// statistically-meaningless values (at the previous N=5 floor
+	// p90/p95/p99 all collapsed to the max).
 	when := time.Now().UTC()
-	for _, ms := range []int64{1000, 2000, 3000, 4000} {
-		seedAnswerLog(t, c, db, "alice", "science", true, ms, when)
+	for i := int64(1); i <= 19; i++ {
+		seedAnswerLog(t, c, db, "alice", "science", true, i*100, when)
 	}
 	resp, _ := srv.GetUserAnalytics(analyticsAuthedCtx("alice"), &pb.GetUserAnalyticsRequest{})
 	if resp.ResponseTime.P50Ms != 0 || resp.ResponseTime.P99Ms != 0 {
-		t.Errorf("percentiles must be zero below 5-sample floor: %+v", resp.ResponseTime)
+		t.Errorf("percentiles must be zero below the sample floor: %+v", resp.ResponseTime)
 	}
-	if resp.ResponseTime.SampleCount != 4 {
-		t.Errorf("sample_count = %d, want 4", resp.ResponseTime.SampleCount)
+	if resp.ResponseTime.SampleCount != 19 {
+		t.Errorf("sample_count = %d, want 19", resp.ResponseTime.SampleCount)
 	}
 }
 
@@ -168,20 +169,26 @@ func TestGetUserAnalytics_PercentilesAtAndAboveFloor(t *testing.T) {
 	seedScoringUser(t, c, db, "alice", 0)
 
 	when := time.Now().UTC()
-	// 10 evenly-spaced response times: 1000, 2000, …, 10000.
-	for i := int64(1); i <= 10; i++ {
-		seedAnswerLog(t, c, db, "alice", "science", true, i*1000, when)
+	// 20 evenly-spaced response times: 500, 1000, …, 10000 (ms). At the
+	// minimum-sample floor, nearest-rank gives distinct indices for
+	// p50/p90/p95/p99 — values[9], values[17], values[18], values[19]
+	// respectively (1000ms apart but small enough that pinning indices,
+	// not exact ms, keeps the test stable if the seed values change).
+	for i := int64(1); i <= 20; i++ {
+		seedAnswerLog(t, c, db, "alice", "science", true, i*500, when)
 	}
 
 	resp, _ := srv.GetUserAnalytics(analyticsAuthedCtx("alice"), &pb.GetUserAnalyticsRequest{})
 	rt := resp.ResponseTime
-	if rt.SampleCount != 10 {
-		t.Errorf("sample_count=%d, want 10", rt.SampleCount)
+	if rt.SampleCount != 20 {
+		t.Errorf("sample_count=%d, want 20", rt.SampleCount)
 	}
-	// Percentile is approximate (t-digest); just sanity-check the order
-	// rather than pinning exact values.
-	if !(rt.P50Ms > 0 && rt.P50Ms <= rt.P90Ms && rt.P90Ms <= rt.P95Ms && rt.P95Ms <= rt.P99Ms) {
-		t.Errorf("percentiles not non-decreasing: %+v", rt)
+	// Nearest-rank at N=20 picks distinct indices, so p50 < p90 < p95 < p99
+	// strictly. Catching a regression to <=-only would let percentile
+	// collapse (the bug the higher floor was supposed to prevent) sneak
+	// back in.
+	if !(rt.P50Ms > 0 && rt.P50Ms < rt.P90Ms && rt.P90Ms < rt.P95Ms && rt.P95Ms < rt.P99Ms) {
+		t.Errorf("percentiles must be strictly increasing at N=20: %+v", rt)
 	}
 }
 

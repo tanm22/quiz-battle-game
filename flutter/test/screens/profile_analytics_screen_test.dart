@@ -30,12 +30,12 @@ GetUserAnalyticsResponse _populatedAnalytics() {
       ..topic = 'science'
       ..total = 30
       ..correct = 24
-      ..accuracyPct = 24 / 30,
+      ..accuracyRatio = 24 / 30,
     TopicAccuracy()
       ..topic = 'history'
       ..total = 20
       ..correct = 8
-      ..accuracyPct = 8 / 20,
+      ..accuracyRatio = 8 / 20,
   ]);
   // Three days, oldest first.
   r.ratingHistory.addAll([

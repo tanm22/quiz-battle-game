@@ -7364,7 +7364,7 @@ type TopicAccuracy struct {
 	Topic         string                 `protobuf:"bytes,1,opt,name=topic,proto3" json:"topic,omitempty"`
 	Total         int32                  `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"` // total questions answered with this topic
 	Correct       int32                  `protobuf:"varint,3,opt,name=correct,proto3" json:"correct,omitempty"`
-	AccuracyPct   float64                `protobuf:"fixed64,4,opt,name=accuracy_pct,json=accuracyPct,proto3" json:"accuracy_pct,omitempty"` // 0..1; (correct / total) — server-side, no
+	AccuracyRatio float64                `protobuf:"fixed64,4,opt,name=accuracy_ratio,json=accuracyRatio,proto3" json:"accuracy_ratio,omitempty"` // 0..1; (correct / total) — server-side, no
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -7420,9 +7420,9 @@ func (x *TopicAccuracy) GetCorrect() int32 {
 	return 0
 }
 
-func (x *TopicAccuracy) GetAccuracyPct() float64 {
+func (x *TopicAccuracy) GetAccuracyRatio() float64 {
 	if x != nil {
-		return x.AccuracyPct
+		return x.AccuracyRatio
 	}
 	return 0
 }
@@ -8235,12 +8235,12 @@ const file_proto_quiz_proto_rawDesc = "" +
 	"\x0erating_history\x18\x03 \x03(\v2\x11.quiz.RatingPointR\rratingHistory\x12)\n" +
 	"\x10lifetime_matches\x18\x04 \x01(\x05R\x0flifetimeMatches\x12#\n" +
 	"\rlifetime_wins\x18\x05 \x01(\x05R\flifetimeWins\x12\x19\n" +
-	"\bhas_data\x18\x06 \x01(\bR\ahasData\"x\n" +
+	"\bhas_data\x18\x06 \x01(\bR\ahasData\"|\n" +
 	"\rTopicAccuracy\x12\x14\n" +
 	"\x05topic\x18\x01 \x01(\tR\x05topic\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\x05R\x05total\x12\x18\n" +
-	"\acorrect\x18\x03 \x01(\x05R\acorrect\x12!\n" +
-	"\faccuracy_pct\x18\x04 \x01(\x01R\vaccuracyPct\"\x98\x01\n" +
+	"\acorrect\x18\x03 \x01(\x05R\acorrect\x12%\n" +
+	"\x0eaccuracy_ratio\x18\x04 \x01(\x01R\raccuracyRatio\"\x98\x01\n" +
 	"\x17ResponseTimePercentiles\x12\x15\n" +
 	"\x06p50_ms\x18\x01 \x01(\x01R\x05p50Ms\x12\x15\n" +
 	"\x06p90_ms\x18\x02 \x01(\x01R\x05p90Ms\x12\x15\n" +

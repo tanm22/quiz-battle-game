@@ -2349,15 +2349,15 @@ const TopicAccuracy$json = {
     {'1': 'topic', '3': 1, '4': 1, '5': 9, '10': 'topic'},
     {'1': 'total', '3': 2, '4': 1, '5': 5, '10': 'total'},
     {'1': 'correct', '3': 3, '4': 1, '5': 5, '10': 'correct'},
-    {'1': 'accuracy_pct', '3': 4, '4': 1, '5': 1, '10': 'accuracyPct'},
+    {'1': 'accuracy_ratio', '3': 4, '4': 1, '5': 1, '10': 'accuracyRatio'},
   ],
 };
 
 /// Descriptor for `TopicAccuracy`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List topicAccuracyDescriptor = $convert.base64Decode(
     'Cg1Ub3BpY0FjY3VyYWN5EhQKBXRvcGljGAEgASgJUgV0b3BpYxIUCgV0b3RhbBgCIAEoBVIFdG'
-    '90YWwSGAoHY29ycmVjdBgDIAEoBVIHY29ycmVjdBIhCgxhY2N1cmFjeV9wY3QYBCABKAFSC2Fj'
-    'Y3VyYWN5UGN0');
+    '90YWwSGAoHY29ycmVjdBgDIAEoBVIHY29ycmVjdBIlCg5hY2N1cmFjeV9yYXRpbxgEIAEoAVIN'
+    'YWNjdXJhY3lSYXRpbw==');
 
 @$core.Deprecated('Use responseTimePercentilesDescriptor instead')
 const ResponseTimePercentiles$json = {

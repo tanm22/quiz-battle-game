@@ -976,12 +976,14 @@ message GetUserAnalyticsResponse {
 }
 
 message TopicAccuracy {
-  string topic        = 1;
-  int32  total        = 2; // total questions answered with this topic
-  int32  correct      = 3;
-  double accuracy_pct = 4; // 0..1; (correct / total) — server-side, no
-                           // client division so a topic with 0 answered
-                           // never produces NaN client-side.
+  string topic          = 1;
+  int32  total          = 2; // total questions answered with this topic
+  int32  correct        = 3;
+  double accuracy_ratio = 4; // 0..1; (correct / total) — server-side, no
+                             // client division so a topic with 0 answered
+                             // never produces NaN client-side. Name carries
+                             // the 0..1 range explicitly (was accuracy_pct;
+                             // value was always a ratio, not a percentage).
 }
 
 message ResponseTimePercentiles {
