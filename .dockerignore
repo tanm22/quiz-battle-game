@@ -1,0 +1,47 @@
+# Build is Go-only (see Dockerfile). Nothing below is needed in the
+# image, and pulling them in either bloats the build context (Flutter)
+# or risks baking dev secrets into the image (secrets/, .env).
+
+# Flutter — 1.3GB+ including .dart_tool/ and build/ once pub get/run has
+# been executed. None of it is referenced by the Go build stage.
+flutter/
+
+# Local Go binaries left over from `go build .` at the repo root.
+/auth
+/matchmaking
+/notification
+/payment
+/quiz
+/scoring
+
+# Test scaffolding and local-only outputs.
+test/
+*.test
+*.exe
+coverage.out
+
+# Docs / spec — only consumed by humans.
+docs/
+*.md
+*.pdf
+README*
+CLAUDE*
+production-readiness*
+2026-*.md
+problem-*.md
+
+# VCS + tooling state.
+.git/
+.github/
+.vscode/
+.idea/
+.dart_tool/
+.claude/
+
+# Runtime config — env files belong on the host, never in the image.
+.env
+.env.*
+secrets/
+
+# OS noise.
+.DS_Store

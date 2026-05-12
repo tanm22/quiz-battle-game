@@ -13,6 +13,7 @@ RUN CGO_ENABLED=0 go build -o /out/matchmaking    ./services/matchmaking && \
     CGO_ENABLED=0 go build -o /out/auth            ./services/auth && \
     CGO_ENABLED=0 go build -o /out/payment         ./services/payment && \
     CGO_ENABLED=0 go build -o /out/notification    ./services/notification && \
+    CGO_ENABLED=0 go build -o /out/admin           ./services/admin && \
     CGO_ENABLED=0 go build -o /out/seed            ./seed
 
 # Stage 2: Minimal runtime image
