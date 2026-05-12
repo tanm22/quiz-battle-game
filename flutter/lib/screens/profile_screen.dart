@@ -517,8 +517,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     final dailyStreak = streak?.current ?? 0;
     final bestStreak = streak?.longest ?? 0;
     final winStreak = profile?.winStreak ?? 0;
-    final email = profile?.email.isNotEmpty == true
-        ? profile!.email
+    final profileEmail = profile?.email ?? '';
+    final email = profileEmail.isNotEmpty
+        ? profileEmail
         : (widget.auth.email ?? '');
 
     return ListView(
