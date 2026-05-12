@@ -517,6 +517,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     final dailyStreak = streak?.current ?? 0;
     final bestStreak = streak?.longest ?? 0;
     final winStreak = profile?.winStreak ?? 0;
+    final email = profile?.email.isNotEmpty == true
+        ? profile!.email
+        : (widget.auth.email ?? '');
 
     return ListView(
       // AlwaysScrollableScrollPhysics so the parent RefreshIndicator
@@ -670,10 +673,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
         //    for the product so they live here at the bottom of
         //    the PROFIL tab) ─────────────────────────────────────
         _sectionHeader('Account'),
-        if ((widget.auth.email ?? '').isNotEmpty)
-          _infoRow(Icons.email_rounded, 'Email', widget.auth.email!),
-        if ((widget.auth.email ?? '').isNotEmpty)
-          const SizedBox(height: Spacing.sm),
+        if (email.isNotEmpty) _infoRow(Icons.email_rounded, 'Email', email),
+        if (email.isNotEmpty) const SizedBox(height: Spacing.sm),
         _tileGroup([
           _ManagementTile(
             icon: Icons.edit_rounded,
@@ -1848,12 +1849,13 @@ class _MatchGroup extends StatelessWidget {
     final rank = me?.rank ?? 0;
     final score = (me?.finalScore ?? 0).toInt();
     final correct = me?.answersCorrect ?? 0;
-    final total = match.rounds == 0 ? 10 : match.rounds;
+    final total = match.rounds;
+    final hasRounds = total > 0;
     // coinsAwarded is Int64 on the proto — convert to int.
     final coinsAwarded = me?.coinsAwarded.toInt() ?? 0;
     final avgMs = (me?.avgResponseTimeMs ?? 0).toDouble();
     final duration = match.duration.toInt();
-    final accuracy = total == 0 ? 0.0 : correct / total;
+    final accuracy = hasRounds ? correct / total : 0.0;
 
     // Result classification:
     //   • rank 1 == win
@@ -1897,7 +1899,9 @@ class _MatchGroup extends StatelessWidget {
     }
 
     Color accuracyFill;
-    if (accuracy >= 0.7) {
+    if (!hasRounds) {
+      accuracyFill = AppColors.textDim;
+    } else if (accuracy >= 0.7) {
       accuracyFill = AppColors.success;
     } else if (accuracy >= 0.3) {
       accuracyFill = AppColors.primary;
@@ -1994,7 +1998,7 @@ class _MatchGroup extends StatelessWidget {
               child: StatCell(
                 icon: Icons.check_circle,
                 iconColor: AppColors.success,
-                value: '$correct/$total',
+                value: hasRounds ? '$correct/$total' : '—',
                 label: 'Correct',
               ),
             ),
@@ -2021,7 +2025,7 @@ class _MatchGroup extends StatelessWidget {
                           .copyWith(color: AppColors.textMuted)),
                   const Spacer(),
                   Text(
-                    '${(accuracy * 100).round()}%',
+                    hasRounds ? '${(accuracy * 100).round()}%' : '—',
                     style: AppText.body.copyWith(
                       color: accuracyFill,
                       fontWeight: FontWeight.w700,
@@ -2060,7 +2064,7 @@ class _MatchGroup extends StatelessWidget {
               child: StatCell(
                 icon: Icons.help_outline,
                 iconColor: AppColors.primary,
-                value: total.toString(),
+                value: hasRounds ? total.toString() : '—',
                 label: 'Rounds',
               ),
             ),
