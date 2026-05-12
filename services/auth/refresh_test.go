@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc/codes"
@@ -11,6 +12,7 @@ import (
 
 	"quiz-battle/pkg/auth"
 	"quiz-battle/pkg/keys"
+	"quiz-battle/pkg/ratelimit"
 	pb "quiz-battle/proto"
 )
 
@@ -20,6 +22,20 @@ import (
 // uid (no username variations).
 func authedCtx(uid string) context.Context {
 	return auth.ContextWithClaims(context.Background(), &auth.Claims{UserID: uid, Username: uid})
+}
+
+// attachLimiters wires fresh limiters that target the same Redis the
+// tests run against, so a test asserting "the 6th call must fail with
+// ResourceExhausted" actually sees a real counter rather than a nil-
+// safe no-op limiter. Keep parameters in sync with the production
+// initialisation in main().
+func attachLimiters(_ *testing.T, srv *authServer) {
+	srv.loginLimiter = ratelimit.New(srv.rdb, "login", 5, time.Minute)
+	srv.registerLimiter = ratelimit.New(srv.rdb, "register", 3, 15*time.Minute)
+	srv.resetLimiter = ratelimit.New(srv.rdb, "reset", 5, 15*time.Minute)
+	srv.checkUsernameLimiter = ratelimit.New(srv.rdb, "check_username", 30, time.Minute)
+	srv.preauthIPLimiter = ratelimit.New(srv.rdb, "preauth_ip", 60, time.Minute)
+	srv.verifyEmailLimiter = ratelimit.New(srv.rdb, "verify_email", 5, time.Minute)
 }
 
 // plantResetOTP writes a reset-purpose OTP for the given email directly
@@ -165,6 +181,23 @@ func TestResetPassword_RevokesAllRefreshTokens(t *testing.T) {
 
 	if _, err := srv.RefreshToken(ctx, &pb.RefreshTokenRequest{RefreshToken: reg.RefreshToken}); status.Code(err) != codes.Unauthenticated {
 		t.Errorf("refresh token survived password reset: %v", err)
+	}
+}
+
+// §4.7 PR-A1: VerifyEmailCode is the OTP attack surface (known email
+// + 10^6 codes). Without a rate limit, an attacker spins to blanket-
+// probe inside the 10-minute code TTL. 5/min/email is the gate.
+func TestVerifyEmailCode_RateLimited(t *testing.T) {
+	srv := newTestAuthServer(t)
+	attachRedis(t, srv)
+	attachLimiters(t, srv)
+	ctx := context.Background()
+	for i := 0; i < 5; i++ {
+		_, _ = srv.VerifyEmailCode(ctx, &pb.VerifyEmailCodeRequest{Email: "burn@example.com", Code: "000000"})
+	}
+	_, err := srv.VerifyEmailCode(ctx, &pb.VerifyEmailCodeRequest{Email: "burn@example.com", Code: "000000"})
+	if status.Code(err) != codes.ResourceExhausted {
+		t.Errorf("6th attempt err=%v, want ResourceExhausted", err)
 	}
 }
 

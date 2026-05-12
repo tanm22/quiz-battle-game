@@ -85,6 +85,11 @@ type authServer struct {
 	// scoping it per-RPC would let an attacker cycle endpoints to
 	// bypass the cap.
 	preauthIPLimiter *ratelimit.Limiter
+	// §4.7 PR-A1: VerifyEmailCode OTP-brute-force gate. 5 attempts per
+	// minute per email — generous for legitimate retypes, tight enough
+	// that the 6-digit OTP (10^6 keyspace) can't be blanket-probed
+	// inside the 10-minute code TTL.
+	verifyEmailLimiter *ratelimit.Limiter
 }
 
 // preauthIP extracts the caller's host (IP without port) from the gRPC
@@ -379,6 +384,13 @@ func (s *authServer) SendEmailCode(ctx context.Context, req *pb.SendEmailCodeReq
 func (s *authServer) VerifyEmailCode(ctx context.Context, req *pb.VerifyEmailCodeRequest) (*pb.VerifyEmailCodeResponse, error) {
 	if req.Email == "" || req.Code == "" {
 		return nil, status.Error(codes.InvalidArgument, "email and code required")
+	}
+	// §4.7 PR-A1: OTP brute-force gate. The verify path is the actual
+	// attack target (a known email + 10^6 possible codes); without
+	// this an attacker could spin a tight loop for ~13 minutes and
+	// blanket-probe the keyspace.
+	if !s.verifyEmailLimiter.AllowWithLog(ctx, strings.ToLower(req.Email)) {
+		return nil, status.Error(codes.ResourceExhausted, "too many attempts; please wait")
 	}
 
 	// Try all purposes — the code storage is purpose-scoped
@@ -1362,6 +1374,9 @@ func main() {
 		// up flow rarely exceeds a few calls per second), and bounds the
 		// enumeration vector to roughly one probe per second per IP.
 		preauthIPLimiter: ratelimit.New(rdb, "preauth_ip", 60, time.Minute),
+		// §4.7 PR-A1: 5/min/email is the standard OTP-brute-force gate;
+		// matches what reset uses.
+		verifyEmailLimiter: ratelimit.New(rdb, "verify_email", 5, time.Minute),
 		// §4.7 PR-A1: refresh-token store. EnsureIndexes is called below.
 		refresh: auth.NewRefreshStore(db),
 	}
