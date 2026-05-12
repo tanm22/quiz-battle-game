@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -550,9 +551,21 @@ func (s *authServer) DeleteAccount(ctx context.Context, _ *pb.DeleteAccountReque
 // UpdateProfile — onboarding completion (display name, avatar, topics, flag)
 // ---------------------------------------------------------------------------
 
+// welcomeBonusCoins is the one-time coin grant credited when a user
+// completes onboarding. Recorded via the coin ledger with
+// reason=coins.ReasonWelcomeBonus and refID="welcome:"+userID for
+// idempotency under retries.
+const welcomeBonusCoins = 100
+
 // Accepts partial updates: empty string / empty slice leaves the field
 // untouched. The OnboardingCompleted bool is one-way: once true, the
 // handler also stamps OnboardingCompletedAt.
+//
+// §4.1: when onboardingCompleted transitions false→true, credit
+// welcomeBonusCoins via the standard ledger (refID "welcome:<userID>") BEFORE
+// flipping the flag. If Grant fails, we return Internal and leave the flag
+// false so a retry hits Grant again — Grant is idempotent on
+// (userId, refId, reason), so at most one credit ever lands per user.
 func (s *authServer) UpdateProfile(ctx context.Context, req *pb.UpdateProfileRequest) (*pb.UpdateProfileResponse, error) {
 	userID, err := auth.UserIDFromContext(ctx)
 	if err != nil {
@@ -584,6 +597,38 @@ func (s *authServer) UpdateProfile(ctx context.Context, req *pb.UpdateProfileReq
 		set["preferredTopics"] = req.PreferredTopics
 	}
 	if req.OnboardingCompleted {
+		// Detect the false→true transition with a projected read so we only
+		// fetch the one field we care about. If currently true the user
+		// already received their welcome bonus on a prior call — skip the
+		// grant entirely (Grant would no-op via its idempotency check, but
+		// the explicit branch avoids a redundant Mongo roundtrip and makes
+		// the intent obvious).
+		var existing struct {
+			OnboardingCompleted bool `bson:"onboardingCompleted"`
+		}
+		lookupErr := s.users().FindOne(ctx,
+			bson.M{"_id": userID},
+			options.FindOne().SetProjection(bson.M{"onboardingCompleted": 1}),
+		).Decode(&existing)
+		if errors.Is(lookupErr, mongo.ErrNoDocuments) {
+			return nil, status.Error(codes.NotFound, "user not found")
+		}
+		if lookupErr != nil {
+			return nil, status.Errorf(codes.Internal, "lookup onboarding state: %v", lookupErr)
+		}
+
+		if !existing.OnboardingCompleted {
+			// Grant FIRST, then UpdateOne. If Grant fails, the flag stays
+			// false so the client retry hits Grant again. Grant is
+			// idempotent on (userId, refId, reason), so retries never
+			// double-credit.
+			if _, gerr := s.ledger.Grant(ctx, userID, welcomeBonusCoins,
+				coins.ReasonWelcomeBonus, "welcome:"+userID, nil); gerr != nil {
+				log.FromContext(ctx).Error("welcome bonus grant failed", "user_id", userID, "err", gerr)
+				return nil, status.Errorf(codes.Internal, "grant welcome bonus: %v", gerr)
+			}
+		}
+
 		set["onboardingCompleted"] = true
 		set["onboardingCompletedAt"] = time.Now()
 	}
