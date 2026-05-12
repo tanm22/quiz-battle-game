@@ -89,12 +89,12 @@ func Answers(roomID string, round int) string {
 	return fmt.Sprintf(RoomAnswers, roomID, round)
 }
 
-// AnsweredSet returns the Redis key for the SET of userIDs that have
+// Answered returns the Redis key for the SET of userIDs that have
 // submitted an answer for a specific round. Used by quiz's SubmitAnswer
 // to early-close the round once every player in the room has answered.
 // SADD semantics dedupe naturally — a future regression that lets a
 // user double-submit won't inflate the count past the room's player roster.
-func AnsweredSet(roomID string, round int) string {
+func Answered(roomID string, round int) string {
 	return fmt.Sprintf(RoomAnswered, roomID, round)
 }
 

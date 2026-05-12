@@ -67,7 +67,7 @@ func TestMaybeEarlyCloseRound_AllPlayersAnswered(t *testing.T) {
 	// First player answers — set has 1 of 2 → no early close.
 	srv.maybeEarlyCloseRound(ctx, roomID, round, playerA)
 
-	n, err := rdb.SCard(ctx, keys.AnsweredSet(roomID, round)).Result()
+	n, err := rdb.SCard(ctx, keys.Answered(roomID, round)).Result()
 	if err != nil {
 		t.Fatalf("SCard after first answer: %v", err)
 	}
@@ -84,7 +84,7 @@ func TestMaybeEarlyCloseRound_AllPlayersAnswered(t *testing.T) {
 	// Second player answers — set fills, expect early close.
 	srv.maybeEarlyCloseRound(ctx, roomID, round, playerB)
 
-	n, err = rdb.SCard(ctx, keys.AnsweredSet(roomID, round)).Result()
+	n, err = rdb.SCard(ctx, keys.Answered(roomID, round)).Result()
 	if err != nil {
 		t.Fatalf("SCard after second answer: %v", err)
 	}
@@ -115,7 +115,7 @@ func TestMaybeEarlyCloseRound_PartialAnswerKeepsTimer(t *testing.T) {
 	ctx := context.Background()
 	srv.maybeEarlyCloseRound(ctx, roomID, round, playerA)
 
-	n, err := rdb.SCard(ctx, keys.AnsweredSet(roomID, round)).Result()
+	n, err := rdb.SCard(ctx, keys.Answered(roomID, round)).Result()
 	if err != nil {
 		t.Fatalf("SCard: %v", err)
 	}
@@ -150,7 +150,7 @@ func TestMaybeEarlyCloseRound_TTLRefreshOnNewAddition(t *testing.T) {
 	ctx := context.Background()
 	srv.maybeEarlyCloseRound(ctx, roomID, round, playerA)
 
-	ttl, err := rdb.TTL(ctx, keys.AnsweredSet(roomID, round)).Result()
+	ttl, err := rdb.TTL(ctx, keys.Answered(roomID, round)).Result()
 	if err != nil {
 		t.Fatalf("TTL: %v", err)
 	}

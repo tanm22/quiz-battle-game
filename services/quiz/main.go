@@ -1281,7 +1281,7 @@ func (s *quizServer) SubmitAnswer(ctx context.Context, req *pb.SubmitAnswerReque
 // startRound) still fires after 15s, so a Redis hiccup degrades to the
 // status quo rather than poisoning a successful SubmitAnswer.
 func (s *quizServer) maybeEarlyCloseRound(ctx context.Context, roomID string, round int, userID string) {
-	answeredKey := keys.AnsweredSet(roomID, round)
+	answeredKey := keys.Answered(roomID, round)
 	added, err := s.rdb.SAdd(ctx, answeredKey, userID).Result()
 	if err != nil {
 		log.FromContext(ctx).Warn("early-close SADD failed; falling back to timer",
