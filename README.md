@@ -385,9 +385,16 @@ protoc --go_out=. --go-grpc_out=. \
 protoc --dart_out=grpc:flutter/lib/proto proto/quiz.proto
 ```
 
+## Production Deployment
+
+Local development runs over plaintext docker-compose. For internet-facing
+deployments, see [docs/deployment-tls.md](docs/deployment-tls.md) for the
+reverse-proxy + TLS-termination expectation, certificate provisioning
+options, and the Razorpay-webhook hardening checklist.
+
 ## Known Limitations
 
-- **No TLS on gRPC:** Services communicate over plaintext gRPC. Production deployment would need TLS certificates or a service mesh.
+- **No TLS on gRPC:** Services communicate over plaintext gRPC. Production deployment terminates TLS at a reverse proxy — see [docs/deployment-tls.md](docs/deployment-tls.md).
 - **Single Redis instance:** No Redis Cluster or Sentinel. Acceptable for demo scale but not production HA.
 - **No horizontal scaling:** Each service runs as a single instance. The matchmaking poller and RabbitMQ consumers would need coordination (e.g., consumer groups, leader election) for multi-instance deployment.
 - **AMQP channel recovery:** If the RabbitMQ connection drops, services don't auto-reconnect the AMQP channel. A restart is required.
