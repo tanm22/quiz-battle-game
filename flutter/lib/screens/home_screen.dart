@@ -23,6 +23,7 @@ import 'friends_screen.dart';
 import 'shop/equip_screen.dart';
 import 'shop/shop_screen.dart';
 import 'profile_analytics_screen.dart';
+import 'profile_screen.dart';
 import 'match_history_screen.dart';
 import 'payment_screen.dart';
 import 'profile/edit_profile_screen.dart';
@@ -154,8 +155,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         WidgetsBinding.instance.addPostFrameCallback((_) => _handlePlayTab());
         return _buildHomeTab(auth, gs);
       case 2:
-        return _buildLeaderboardTab();
+        // Revamp: Friends promoted from sub-route to top-level tab.
+        return const FriendsScreen();
       case 3:
+        // Revamp: Shop promoted from sub-route to top-level tab.
+        return const ShopScreen();
+      case 4:
+        return _buildLeaderboardTab();
+      case 5:
         return _buildProfileTab(auth, gs);
       default:
         return _buildHomeTab(auth, gs);
@@ -480,9 +487,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ),
         // Settings gear → Profile tab.
+        // Index 5 after the May 2026 6-tab reshuffle (was 3 in the
+        // pre-revamp 4-tab nav). Carries the same semantic — "jump to
+        // the Profile tab" — only the integer changed.
         IconButton(
           tooltip: 'Profile',
-          onPressed: () => setState(() => _currentTab = 3),
+          onPressed: () => setState(() => _currentTab = 5),
           icon: Container(
             width: 40,
             height: 40,
@@ -687,6 +697,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   // ---------------------------------------------------------------------------
 
   Widget _buildProfileTab(AuthService auth, GameState gameState) {
+    // Revamp: the new ProfileScreen owns the entire hero + 5-tab
+    // layout (PROFIL / LAST M / BADGES / STREAK / REFERR) and brings
+    // along every management affordance the legacy implementation
+    // below used to render. Callbacks let the host stay in charge of
+    // state cleanup (logout / delete) and cross-tab navigation.
+    return ProfileScreen(
+      homeData: _homeData,
+      auth: auth,
+      onRefresh: _loadHomeData,
+      onSwitchToPlayTab: () => setState(() => _currentTab = 1),
+      onOpenPayment: _openPaymentScreen,
+      onShareInvite: () => _showShareDialog(gameState),
+      // Profile is hosted as a tab, not pushed as a route. Wire back
+      // to "switch the bottom-nav to Home" so the top-bar back arrow
+      // does the thing the user expects.
+      onBack: () => setState(() => _currentTab = 0),
+      onLogout: () async {
+        await auth.logout();
+        if (mounted) {
+          ref.read(gameStateProvider.notifier).logout();
+        }
+      },
+      onDeleteAccountRequested: () => _confirmDeleteAccount(auth),
+    );
+  }
+
+  // Legacy profile-tab builder retained (but unused) for one release
+  // cycle in case a hot-fix needs the old layout back. Remove after
+  // the revamp ships to all users.
+  // ignore: unused_element
+  Widget _legacyBuildProfileTab(AuthService auth, GameState gameState) {
     return RefreshIndicator(
       onRefresh: _loadHomeData,
       color: AppColors.primary,
@@ -1781,118 +1822,87 @@ class _DailyRewardDialogState extends State<_DailyRewardDialog>
 
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SpeakX-style bottom navigation
+// Revamp: 6-tab Material 3 NavigationBar
 // ═══════════════════════════════════════════════════════════════════════════
 //
-// Custom over Material's BottomNavigationBar because we want:
-//  - A coral pill INDICATOR sliding under the active tab (SpeakX pattern)
-//  - Larger touch targets (56px vs Material's default ~52px)
-//  - Soft elevation rather than the default 8-elevation drop-shadow line
-//  - Animated scale on the active icon for tactile feedback
+// Replaces the pre-revamp 4-tab `_SpeakXBottomNav` (Home/Play/Ranks/Profile).
+// The new lineup promotes Friends and Shop from sub-routes to top-level
+// destinations:
+//
+//   0 Home   1 Play   2 Friends   3 Shop   4 Leaderboard   5 Profile
+//
+// Friends gets a live Badge.count bound to friendRequestsCountProvider —
+// the icon shows a small numeric dot whenever there's at least one
+// pending incoming request.
+//
+// The widget keeps its old `_SpeakXBottomNav` name + `currentIndex` /
+// `onTap` constructor so the home-screen call-site at line ~141 is
+// unchanged. Inside it now renders a Material 3 NavigationBar, which
+// inherits styling from the new `navigationBarTheme` in app_theme.dart
+// (height 72, surface bg, coral indicator pill, always-show labels).
 
-class _SpeakXBottomNav extends StatelessWidget {
+class _SpeakXBottomNav extends ConsumerWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
   const _SpeakXBottomNav({required this.currentIndex, required this.onTap});
 
-  static const _items = <_NavSpec>[
-    _NavSpec(icon: Icons.home_rounded, label: 'Home'),
-    _NavSpec(icon: Icons.bolt_rounded, label: 'Play'),
-    _NavSpec(icon: Icons.leaderboard_rounded, label: 'Ranks'),
-    _NavSpec(icon: Icons.person_rounded, label: 'Profile'),
-  ];
-
   @override
-  Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.of(context).padding.bottom;
-    return Container(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final pendingFriendRequests = ref.watch(friendRequestsCountProvider);
+
+    Widget friendsIcon(IconData icon) {
+      if (pendingFriendRequests <= 0) return Icon(icon);
+      return Badge.count(
+        count: pendingFriendRequests,
+        backgroundColor: AppColors.danger,
+        textColor: AppColors.text,
+        child: Icon(icon),
+      );
+    }
+
+    return DecoratedBox(
       decoration: const BoxDecoration(
-        color: AppColors.bgNav,
-        border: Border(top: BorderSide(color: AppColors.border)),
-        boxShadow: [
-          BoxShadow(color: Color(0x33000000), blurRadius: 16, offset: Offset(0, -4)),
-        ],
+        color: AppColors.surface,
+        border: Border(top: BorderSide(color: AppColors.divider)),
       ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(8, 8, 8, 8 + (bottomInset > 0 ? 0 : 4)),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: List.generate(_items.length, (i) {
-              final spec = _items[i];
-              final selected = i == currentIndex;
-              return Expanded(
-                child: _NavItem(
-                  spec: spec,
-                  selected: selected,
-                  onTap: () => onTap(i),
-                ),
-              );
-            }),
+      child: NavigationBar(
+        selectedIndex: currentIndex,
+        onDestinationSelected: (i) {
+          HapticFeedback.selectionClick();
+          onTap(i);
+        },
+        destinations: [
+          const NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home_filled),
+            label: 'Home',
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NavSpec {
-  final IconData icon;
-  final String label;
-  const _NavSpec({required this.icon, required this.label});
-}
-
-class _NavItem extends StatelessWidget {
-  final _NavSpec spec;
-  final bool selected;
-  final VoidCallback onTap;
-  const _NavItem({
-    required this.spec,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
-        decoration: BoxDecoration(
-          color: selected
-              ? AppColors.primary.withValues(alpha: 0.12)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AnimatedScale(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOutBack,
-              scale: selected ? 1.1 : 1.0,
-              child: Icon(
-                spec.icon,
-                color: selected ? AppColors.primary : AppColors.textMuted,
-                size: 24,
-              ),
-            ),
-            const SizedBox(height: 4),
-            AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 220),
-              style: TextStyle(
-                color: selected ? AppColors.primary : AppColors.textMuted,
-                fontSize: 11,
-                fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-              ),
-              child: Text(spec.label),
-            ),
-          ],
-        ),
+          const NavigationDestination(
+            icon: Icon(Icons.play_circle_outline),
+            selectedIcon: Icon(Icons.play_circle_filled),
+            label: 'Play',
+          ),
+          NavigationDestination(
+            icon: friendsIcon(Icons.people_alt_outlined),
+            selectedIcon: friendsIcon(Icons.people_alt),
+            label: 'Friends',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.shopping_bag_outlined),
+            selectedIcon: Icon(Icons.shopping_bag),
+            label: 'Shop',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.leaderboard_outlined),
+            selectedIcon: Icon(Icons.leaderboard),
+            label: 'Ranks',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ],
       ),
     );
   }

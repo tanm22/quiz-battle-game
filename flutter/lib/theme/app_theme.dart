@@ -1,125 +1,282 @@
+// app_theme.dart — central theme hub.
+//
+// Tokens were split out (app_colors.dart, typography.dart, spacing.dart)
+// during the revamp, but every existing screen still imports this file
+// as `import '../theme/app_theme.dart';`. The export directives below
+// keep `AppColors`, `AppRadius`, `AppDurations`, `AppGradients`, and the
+// helper widgets (`ScaffoldGradientBackground`, `appCardDecoration`,
+// `SkeletonBlock`) reachable through a single import.
+//
+// The Material 3 `ThemeData` builder lives here too. `MaterialApp` in
+// main.dart consumes it via `theme: buildAppTheme()`.
+
 import 'package:flutter/material.dart';
 
-/// Dark-theme design tokens ported from the reference UI
-/// (MANAS-exe/QUIZ_BATTLE_SYSTEM/flutter-app/lib/theme/colors.dart).
-///
-/// Palette: near-black scaffold (#0D0D1A), dark-navy surfaces (#1A1A2E),
-/// coral primary (#C96442), gold accent (#FFB830), green success
-/// (#2ECC71), red danger (#E74C3C). Off-white text (#F4F4FC) and
-/// graduated muted/dim secondaries for hierarchy on dark surfaces.
-///
-/// The class names (AppColors, AppRadius, AppGradients, AppDurations)
-/// and every public field are unchanged from the previous light-theme
-/// version — only the values flip. Every existing screen compiles
-/// against the same identifiers and inherits the new look without code
-/// edits.
+import 'app_colors.dart';
+import 'spacing.dart';
+import 'typography.dart';
 
-class AppColors {
-  AppColors._();
+// Re-export tokens so `import 'theme/app_theme.dart'` is sufficient
+// for every existing call-site.
+export 'app_colors.dart';
+export 'spacing.dart';
+export 'typography.dart';
 
-  // -- Brand ----------------------------------------------------------------
-  /// Coral primary CTA. Matches reference's `appCoral` (#C96442).
-  static const primary = Color(0xFFC96442);
-  static const primarySoft = Color(0xFFD97757); // hover / pressed lift
-  /// Cyan-blue secondary; brighter than the light-theme cyan so it
-  /// reads on a near-black bg.
-  static const secondary = Color(0xFF4FC3F7);
-  /// Purple accent. Lifted from #6D59C4 → #9B7BD4 for dark-bg contrast.
-  static const accent = Color(0xFF9B7BD4);
-  static const accentLight = Color(0xFFB6A6E0);
-  static const gold = Color(0xFFFFB830);     // reference's appGold
-  static const goldDeep = Color(0xFFE59617);
+// ─────────────────────────────────────────────────────────────────────
+// ThemeData builder — Material 3, dark brightness, brand tokens
+// ─────────────────────────────────────────────────────────────────────
+//
+// Every override here exists to make built-in Material widgets render
+// in the revamp palette WITHOUT per-widget edits in screens. Anything
+// not overridden falls back to Material's default, which is fine for
+// dark theme because the colorScheme above seeds reasonable defaults.
 
-  // -- Background stack -----------------------------------------------------
-  static const bg = Color(0xFF0D0D1A);       // scaffold base — appBg
-  static const surface = Color(0xFF1A1A2E);  // cards / sheets — appSurface
-  static const cardTint = Color(0xFF20203A); // tinted card sub-fill
-  static const bgTop = Color(0xFF1F1F36);    // dialogs, modals (lifted)
-  static const bgNav = Color(0xFF16162A);    // bottom-nav surface
-  // Legacy aliases — older code referenced bgDeep / bgMid before the
-  // light-theme rewrite. Keep them resolving to bg so nothing breaks.
-  static const bgDeep = bg;
-  static const bgMid = bg;
-
-  // -- Borders & dividers ---------------------------------------------------
-  static const border = Color(0xFF2A2A45);
-  static const borderBright = Color(0xFF3D3D60); // focused / active border
-
-  // -- Text -----------------------------------------------------------------
-  /// Primary on-surface text. Off-white (not pure white) reduces glare
-  /// on AMOLED panels and matches the reference's body copy.
-  static const text = Color(0xFFF4F4FC);
-  static const textSecondary = Color(0xFFB5B5CC);
-  static const textMuted = Color(0xFF76768F);
-  static const textDim = Color(0xFF4A4A66);
-
-  // -- Semantic -------------------------------------------------------------
-  static const success = Color(0xFF2ECC71); // reference's appGreen
-  static const danger = Color(0xFFE74C3C);  // reference's appRed
-
-  // -- Tinted backgrounds (faint chip / pill fills on dark) -----------------
-  /// Each tinted bg is a 10–14% alpha-on-bg approximation of the hue —
-  /// strong enough to read as colored on near-black, dim enough not to
-  /// fight the foreground icon/text.
-  static const accentBg = Color(0xFF2A2647);  // faint purple
-  static const goldBg = Color(0xFF2E2818);    // faint gold
-  static const silverBg = Color(0xFF1F2228);  // faint silver — dark-tone
-  static const bronzeBg = Color(0xFF2A1F14);  // faint bronze — dark-tone
-  static const cyanBg = Color(0xFF16252A);    // faint cyan
-  static const emeraldBg = Color(0xFF15291F); // faint green
-  static const roseBg = Color(0xFF2E1A1B);    // faint red
-  static const orangeBg = Color(0xFF2E1F15);  // faint coral
-
-  // -- Medals (leaderboard) -------------------------------------------------
-  static const medalGold = gold;
-  static const medalSilver = Color(0xFFB0BEC5); // reference's appSilver
-  static const medalBronze = Color(0xFFCD7F32); // reference's appBronze
-}
-
-class AppRadius {
-  AppRadius._();
-  // Bumped to align with the reference's 14/16 radii. button +2, card +2.
-  static const BorderRadius button = BorderRadius.all(Radius.circular(14));
-  static const BorderRadius card = BorderRadius.all(Radius.circular(16));
-  static const BorderRadius hero = BorderRadius.all(Radius.circular(20));
-  static const BorderRadius pill = BorderRadius.all(Radius.circular(999));
-}
-
-class AppDurations {
-  AppDurations._();
-  // Stays as-is — these are timing tokens used across micro-interactions
-  // and don't depend on light/dark.
-  static const Duration quick = Duration(milliseconds: 150);
-  static const Duration medium = Duration(milliseconds: 300);
-  static const Duration slow = Duration(milliseconds: 500);
-}
-
-class AppGradients {
-  AppGradients._();
-
-  /// Subtle near-black → dark-navy vertical gradient for the scaffold.
-  /// Provides depth without distracting from foreground content.
-  static const LinearGradient scaffold = LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-    colors: [Color(0xFF0D0D1A), Color(0xFF15152A)],
+ThemeData buildAppTheme() {
+  final colorScheme = ColorScheme.dark(
+    primary: AppColors.primary,
+    onPrimary: AppColors.textOnPri,
+    secondary: AppColors.secondary,
+    surface: AppColors.surface,
+    onSurface: AppColors.text,
+    surfaceContainerHighest: AppColors.surfaceHi,
+    error: AppColors.danger,
+    onError: AppColors.text,
+    outline: AppColors.border,
+    outlineVariant: AppColors.divider,
   );
 
-  /// Coral CTA gradient. Lighter coral → primary coral, top-left to
-  /// bottom-right, for ElevatedButton fills and hero pill buttons.
-  static const LinearGradient primary = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [Color(0xFFD97757), Color(0xFFC96442)],
-  );
+  return ThemeData(
+    useMaterial3: true,
+    brightness: Brightness.dark,
+    colorScheme: colorScheme,
+    scaffoldBackgroundColor: AppColors.bg,
+    canvasColor: AppColors.bg,
+    dividerColor: AppColors.divider,
+    splashColor: AppColors.primaryTint,
+    highlightColor: AppColors.primaryTint,
 
-  /// Hot gold→coral gradient used for premium / tournament emphasis.
-  static const LinearGradient gold = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [Color(0xFFFFB830), Color(0xFFC96442)],
+    // System font stack — no Google Fonts dependency per the brief's
+    // constraint set. Letter-spacing + tabular figures land on the
+    // AppText scale, not the global font family.
+    fontFamily: null,
+
+    textTheme: const TextTheme(
+      displayLarge: AppText.display,
+      displayMedium: AppText.h1,
+      displaySmall: AppText.h2,
+      headlineLarge: AppText.h1,
+      headlineMedium: AppText.h2,
+      headlineSmall: AppText.h3,
+      titleLarge: AppText.h2,
+      titleMedium: AppText.h3,
+      titleSmall: AppText.bodyLg,
+      bodyLarge: AppText.bodyLg,
+      bodyMedium: AppText.body,
+      bodySmall: AppText.caption,
+      labelLarge: AppText.body,
+      labelMedium: AppText.caption,
+      labelSmall: AppText.micro,
+    ),
+
+    appBarTheme: const AppBarTheme(
+      backgroundColor: AppColors.bg,
+      foregroundColor: AppColors.text,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      centerTitle: false,
+      titleTextStyle: AppText.h2,
+      iconTheme: IconThemeData(color: AppColors.text, size: 24),
+    ),
+
+    cardTheme: const CardThemeData(
+      color: AppColors.surface,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(Radii.lg)),
+        side: BorderSide(color: AppColors.border),
+      ),
+    ),
+
+    // Material 3 NavigationBar (the new 6-tab bottom nav uses this).
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: AppColors.surface,
+      surfaceTintColor: Colors.transparent,
+      indicatorColor: AppColors.primaryTint,
+      height: 72,
+      elevation: 0,
+      labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+      iconTheme: WidgetStateProperty.resolveWith(
+        (states) => IconThemeData(
+          size: 24,
+          color: states.contains(WidgetState.selected)
+              ? AppColors.primary
+              : AppColors.textDim,
+        ),
+      ),
+      labelTextStyle: WidgetStateProperty.resolveWith(
+        (states) => AppText.caption.copyWith(
+          fontWeight: FontWeight.w600,
+          color: states.contains(WidgetState.selected)
+              ? AppColors.primary
+              : AppColors.textDim,
+        ),
+      ),
+    ),
+
+    // Kept for any screen still using the old BottomNavigationBar.
+    bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      backgroundColor: AppColors.surface,
+      selectedItemColor: AppColors.primary,
+      unselectedItemColor: AppColors.textDim,
+      type: BottomNavigationBarType.fixed,
+      elevation: 0,
+      showUnselectedLabels: true,
+    ),
+
+    chipTheme: ChipThemeData(
+      backgroundColor: AppColors.surfaceHi,
+      selectedColor: AppColors.primaryTint,
+      disabledColor: AppColors.surfaceHi,
+      labelStyle: AppText.caption.copyWith(color: AppColors.text),
+      secondaryLabelStyle: AppText.caption.copyWith(color: AppColors.primary),
+      side: const BorderSide(color: AppColors.border),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(Radii.pill)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.xs),
+    ),
+
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: AppColors.surfaceHi,
+      hintStyle: AppText.body.copyWith(color: AppColors.textDim),
+      labelStyle: AppText.body.copyWith(color: AppColors.textMuted),
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: Spacing.lg,
+        vertical: Spacing.md,
+      ),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(Radii.md),
+        borderSide: const BorderSide(color: AppColors.border),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(Radii.md),
+        borderSide: const BorderSide(color: AppColors.border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(Radii.md),
+        borderSide: const BorderSide(color: AppColors.primary, width: 2),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(Radii.md),
+        borderSide: const BorderSide(color: AppColors.danger),
+      ),
+    ),
+
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        backgroundColor: AppColors.primary,
+        foregroundColor: AppColors.textOnPri,
+        disabledBackgroundColor: AppColors.surfaceHi,
+        disabledForegroundColor: AppColors.textDim,
+        textStyle: AppText.h3,
+        padding: const EdgeInsets.symmetric(horizontal: Spacing.xl, vertical: Spacing.md),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(Radii.lg)),
+        ),
+      ),
+    ),
+
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppColors.primary,
+        textStyle: AppText.body.copyWith(fontWeight: FontWeight.w700),
+        side: const BorderSide(color: AppColors.primary, width: 1),
+        padding: const EdgeInsets.symmetric(horizontal: Spacing.lg, vertical: Spacing.sm),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(Radii.pill)),
+        ),
+      ),
+    ),
+
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        foregroundColor: AppColors.primary,
+        textStyle: AppText.body.copyWith(fontWeight: FontWeight.w700),
+      ),
+    ),
+
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.primary,
+        foregroundColor: AppColors.textOnPri,
+        elevation: 0,
+        shadowColor: AppColors.primaryGlow,
+        textStyle: AppText.h3,
+        padding: const EdgeInsets.symmetric(horizontal: Spacing.xl, vertical: Spacing.md),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(Radii.lg)),
+        ),
+      ),
+    ),
+
+    tabBarTheme: TabBarThemeData(
+      labelColor: AppColors.primary,
+      unselectedLabelColor: AppColors.textMuted,
+      labelStyle: AppText.body.copyWith(fontWeight: FontWeight.w800, fontSize: 14),
+      unselectedLabelStyle: AppText.body.copyWith(fontWeight: FontWeight.w600, fontSize: 14),
+      indicatorColor: AppColors.primary,
+      indicatorSize: TabBarIndicatorSize.label,
+      dividerColor: Colors.transparent,
+    ),
+
+    dividerTheme: const DividerThemeData(
+      color: AppColors.divider,
+      thickness: 1,
+      space: 1,
+    ),
+
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: AppColors.surfaceOv,
+      contentTextStyle: AppText.body,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.md)),
+    ),
+
+    dialogTheme: DialogThemeData(
+      backgroundColor: AppColors.surfaceOv,
+      surfaceTintColor: Colors.transparent,
+      titleTextStyle: AppText.h2,
+      contentTextStyle: AppText.body,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.lg)),
+    ),
+
+    bottomSheetTheme: const BottomSheetThemeData(
+      backgroundColor: AppColors.surface,
+      surfaceTintColor: Colors.transparent,
+      modalBackgroundColor: AppColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(Radii.xl)),
+      ),
+    ),
+
+    progressIndicatorTheme: const ProgressIndicatorThemeData(
+      color: AppColors.primary,
+      linearTrackColor: AppColors.surfaceHi,
+      circularTrackColor: AppColors.surfaceHi,
+    ),
+
+    iconTheme: const IconThemeData(color: AppColors.text, size: 24),
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────
+// Helper widgets — kept verbatim from the previous app_theme.dart so
+// the screens that already render `ScaffoldGradientBackground`,
+// `appCardDecoration`, `SkeletonBlock` keep working unchanged.
+// ─────────────────────────────────────────────────────────────────────
 
 class ScaffoldGradientBackground extends StatelessWidget {
   final Widget child;
@@ -134,22 +291,18 @@ class ScaffoldGradientBackground extends StatelessWidget {
   }
 }
 
-/// Card decoration matching the reference: dark-navy surface, subtle
-/// border one shade up, soft shadow tuned for dark backgrounds (alpha
-/// ~25–30% black, blur 8 — anything brighter creates a halo on AMOLED).
+/// Card decoration matching the revamp surface stack.
 BoxDecoration appCardDecoration({Color? borderColor}) => BoxDecoration(
-  color: AppColors.surface,
-  borderRadius: AppRadius.card,
-  border: Border.all(color: borderColor ?? AppColors.border),
-  boxShadow: const [
-    BoxShadow(color: Color(0x40000000), blurRadius: 8, offset: Offset(0, 2)),
-    BoxShadow(color: Color(0x1A000000), blurRadius: 1),
-  ],
-);
+      color: AppColors.surface,
+      borderRadius: AppRadius.card,
+      border: Border.all(color: borderColor ?? AppColors.border),
+      boxShadow: const [
+        BoxShadow(color: Color(0x40000000), blurRadius: 8, offset: Offset(0, 2)),
+        BoxShadow(color: Color(0x1A000000), blurRadius: 1),
+      ],
+    );
 
-/// Skeleton loader (shimmer) tuned for the dark palette — three
-/// stops between two dark-greys so the sweep is visible on near-black
-/// without flashing white.
+/// Skeleton loader — three-stop sweep tuned for dark backgrounds.
 class SkeletonBlock extends StatefulWidget {
   final double? width;
   final double height;
@@ -203,9 +356,9 @@ class _SkeletonBlockState extends State<SkeletonBlock>
               begin: Alignment(-1.0 + t * 2, 0),
               end: Alignment(1.0 + t * 2, 0),
               colors: const [
-                Color(0xFF1F1F36),
-                Color(0xFF2A2A45),
-                Color(0xFF1F1F36),
+                AppColors.surfaceHi,
+                AppColors.surfaceOv,
+                AppColors.surfaceHi,
               ],
               stops: const [0.35, 0.5, 0.65],
             ),

@@ -62,17 +62,16 @@ class QuizBattleApp extends StatelessWidget {
       title: 'Quiz Battle',
       navigatorKey: rootNavigatorKey,
       debugShowCheckedModeBanner: false,
-      theme: _buildDarkTheme(),
+      theme: buildAppTheme(),
       home: const AppShell(),
     );
   }
 
-  /// Dark Material3 theme aligned with the reference UI's
-  /// (MANAS-exe/QUIZ_BATTLE_SYSTEM) tokens — coral primary, dark-navy
-  /// surfaces, gold secondary. Every screen-level color reads through
-  /// the AppColors tokens so this builder only needs to wire the
-  /// ColorScheme + global widget theming (cards, buttons, dividers,
-  /// inputs) to match.
+  /// Legacy inline ThemeData builder. Kept (but unused) for one
+  /// release cycle in case a hot-fix needs the old palette back —
+  /// `theme: _buildDarkTheme()` reverts to pre-revamp colors.
+  /// Remove after the revamp ships to all users.
+  // ignore: unused_element
   ThemeData _buildDarkTheme() {
     const scheme = ColorScheme(
       brightness: Brightness.dark,

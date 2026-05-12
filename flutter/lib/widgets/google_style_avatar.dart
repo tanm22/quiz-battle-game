@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+
 /// GoogleStyleAvatar — drop-in replacement for the bare
 /// `Image.network` + `Text(initial)` pattern used across the app.
 ///
@@ -13,21 +15,29 @@ import 'package:flutter/material.dart';
 /// The fallback color is derived from a stable hash of [name], so a
 /// given user always sees the same color across sessions and screens
 /// — the same affordance Gmail / Google Calendar / GitHub / Slack all
-/// use for "no profile photo" users. This is the default that most
-/// production apps land on, because:
-///   1. It looks intentional (vs. a placeholder ?? glyph)
-///   2. The color makes users distinguishable in lists at a glance
-///   3. It works offline / on cold start before the photo CDN responds
-///   4. Latency-tolerant: shows immediately, swaps to photo when ready
+/// use for "no profile photo" users.
 ///
-/// Use this anywhere you would otherwise write `Image.network(url,
-/// errorBuilder: ...)` for a user avatar.
+/// Revamp additions:
+///   - [online]: paints a 25%-of-size success dot at bottom-right with a
+///     2px bg ring. Use on friends lists to show presence.
+///   - [borderColor] / [borderWidth]: explicit border configuration —
+///     supersedes the legacy [border] parameter when set.
+///   - [glow]: adds a soft `borderColor`-tinted shadow around the avatar.
+///     Used on hero avatars (matchmaking lobby, profile header).
+///
+/// The legacy [border] field is kept for callsites that already pass it.
+/// If both [border] and [borderColor] are provided, [borderColor] wins.
 class GoogleStyleAvatar extends StatelessWidget {
   final String name;
   final String? imageUrl;
   final double size;
   final BorderRadiusGeometry? borderRadius;
   final Border? border;
+  // Revamp props ↓
+  final bool online;
+  final Color? borderColor;
+  final double borderWidth;
+  final bool glow;
 
   const GoogleStyleAvatar({
     super.key,
@@ -36,13 +46,17 @@ class GoogleStyleAvatar extends StatelessWidget {
     this.size = 48,
     this.borderRadius,
     this.border,
+    this.online = false,
+    this.borderColor,
+    this.borderWidth = 2,
+    this.glow = false,
   });
 
-  /// Curated palette tuned for legibility on both the dark scaffold
-  /// (#0D0D1A) and the dark-navy surface (#1A1A2E). Each color is a
-  /// Material 200/300-tier shade — saturated enough to read as the
-  /// avatar identity, but not screaming-bright. White-on-color for
-  /// the initial gives ≥ 4.5:1 contrast on every entry.
+  /// Curated palette tuned for legibility on both the dark scaffold and
+  /// the dark-navy surfaces. Each color is a Material 200/300-tier
+  /// shade — saturated enough to read as the avatar identity, but not
+  /// screaming-bright. White-on-color for the initial gives ≥ 4.5:1
+  /// contrast on every entry.
   static const _palette = <Color>[
     Color(0xFFE57373), // soft red
     Color(0xFFF06292), // pink
@@ -60,9 +74,8 @@ class GoogleStyleAvatar extends StatelessWidget {
     Color(0xFF90A4AE), // blue grey
   ];
 
-  /// FNV-1a-style fast hash → palette index. Deterministic and
-  /// O(name.length); collisions across users are visually fine because
-  /// initial + color together still distinguish them in 99% of lists.
+  /// FNV-1a-style fast hash → palette index. Deterministic across
+  /// sessions and screens for a given name.
   Color _colorFor(String name) {
     if (name.isEmpty) return _palette[0];
     var hash = 0;
@@ -73,8 +86,7 @@ class GoogleStyleAvatar extends StatelessWidget {
   }
 
   /// First grapheme cluster, uppercased. Handles emoji / non-Latin
-  /// names cleanly (one user-perceived character, not one Dart code
-  /// unit which would split a surrogate pair). Empty → "?".
+  /// names cleanly. Empty → "?".
   String _initial(String name) {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return '?';
@@ -86,9 +98,13 @@ class GoogleStyleAvatar extends StatelessWidget {
     final bg = _colorFor(name);
     final letter = _initial(name);
     final fontSize = size * 0.42;
-    final shape = borderRadius == null
-        ? BoxShape.circle
-        : BoxShape.rectangle;
+    final shape =
+        borderRadius == null ? BoxShape.circle : BoxShape.rectangle;
+
+    // Resolve border: explicit borderColor wins over legacy `border`.
+    final effectiveBorder = borderColor != null
+        ? Border.all(color: borderColor!, width: borderWidth)
+        : border;
 
     Widget fallback() {
       return Container(
@@ -99,7 +115,7 @@ class GoogleStyleAvatar extends StatelessWidget {
           shape: shape,
           color: bg,
           borderRadius: borderRadius,
-          border: border,
+          border: effectiveBorder,
         ),
         child: Text(
           letter,
@@ -108,46 +124,94 @@ class GoogleStyleAvatar extends StatelessWidget {
             fontSize: fontSize,
             fontWeight: FontWeight.w700,
             letterSpacing: -0.5,
-            // Tighter line-height so taller letters (like 'Q', 'J')
-            // don't push the baseline off-center.
             height: 1.0,
           ),
         ),
       );
     }
 
+    // Build the base avatar (image or fallback).
+    Widget base;
     final url = imageUrl;
     if (url == null || url.isEmpty) {
-      return fallback();
+      base = fallback();
+    } else {
+      final clipper = borderRadius != null
+          ? ClipRRect(
+              borderRadius: borderRadius!,
+              child: _imageOrFallback(url, size, fallback),
+            )
+          : ClipOval(child: _imageOrFallback(url, size, fallback));
+      base = effectiveBorder != null
+          ? Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                shape: shape,
+                borderRadius: borderRadius,
+                border: effectiveBorder,
+              ),
+              child: clipper,
+            )
+          : clipper;
     }
 
-    final clipper = borderRadius != null
-        ? ClipRRect(
-            borderRadius: borderRadius!,
-            child: _imageOrFallback(url, size, fallback),
-          )
-        : ClipOval(child: _imageOrFallback(url, size, fallback));
-
-    if (border != null) {
-      return Container(
-        width: size,
-        height: size,
+    // Optional glow shadow — uses borderColor (falls back to a primary
+    // glow if no borderColor was supplied so the prop is still useful
+    // for hero avatars that don't have a colored ring).
+    if (glow) {
+      final glowColor = (borderColor ?? AppColors.primary).withValues(alpha: 0.4);
+      base = Container(
         decoration: BoxDecoration(
           shape: shape,
           borderRadius: borderRadius,
-          border: border,
+          boxShadow: [
+            BoxShadow(color: glowColor, blurRadius: 16, spreadRadius: 0),
+          ],
         ),
-        child: clipper,
+        child: base,
       );
     }
-    return clipper;
+
+    // Online dot overlay — 25% of avatar size at bottom-right with a
+    // 2px scaffold-bg ring so the dot reads on top of darker avatars
+    // without merging into the background.
+    if (online) {
+      final dotSize = size * 0.25;
+      base = SizedBox(
+        width: size,
+        height: size,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            base,
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: Container(
+                width: dotSize,
+                height: dotSize,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.success,
+                  border: Border.fromBorderSide(
+                    BorderSide(color: AppColors.bg, width: 2),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return base;
   }
 
   /// Image.network with a clean fallback path: while loading we show
-  /// the colored-initial fallback (so first paint is always
-  /// good-looking), and on error (404, no network, etc.) we keep it.
-  /// Once the image arrives it swaps in. Avoids the "broken image"
-  /// icon and the half-second of empty grey.
+  /// the colored-initial fallback, and on error we keep it. Once the
+  /// image arrives it swaps in. Avoids the "broken image" icon and
+  /// the half-second of empty grey.
   static Widget _imageOrFallback(
     String url,
     double size,
