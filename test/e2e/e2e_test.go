@@ -11,8 +11,8 @@ package e2e
 
 import (
 	"context"
-	"fmt"
 	"math/rand"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -45,7 +45,14 @@ const (
 // ---------------------------------------------------------------------------
 
 func uniqueID() string {
-	return fmt.Sprintf("e2e_%d_%d", time.Now().UnixMilli(), rand.Intn(100000))
+	// pkg/validate caps usernames at 20 chars and restricts to letters,
+	// digits, underscore. Decimal "e2e_<unixMillis>_<rand>" was 22+ chars
+	// and tripped the validator. Base36 of the timestamp is ~8 chars and
+	// of a 24-bit random int is ~5 chars; with the "e2e" prefix the
+	// total lands at ~16, well under the cap, and stays alphanumeric.
+	ts := strconv.FormatInt(time.Now().UnixMilli(), 36)
+	tail := strconv.FormatInt(int64(rand.Intn(1<<24)), 36)
+	return "e2e" + ts + tail
 }
 
 // registerUser creates a new user via the auth service and returns token + userId.
