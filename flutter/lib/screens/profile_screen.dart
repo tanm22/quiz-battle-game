@@ -183,14 +183,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     super.initState();
     _tab = TabController(length: 5, vsync: this);
     _tab.addListener(_onTabChanged);
+    _codeCtrl.addListener(_onCodeCtrlChanged);
   }
 
   @override
   void dispose() {
     _tab.removeListener(_onTabChanged);
     _tab.dispose();
+    _codeCtrl.removeListener(_onCodeCtrlChanged);
     _codeCtrl.dispose();
     super.dispose();
+  }
+
+  void _onCodeCtrlChanged() {
+    if (!mounted) return;
+    setState(() {
+      if (_applyError != null) _applyError = null;
+    });
   }
 
   void _onTabChanged() {
@@ -1344,36 +1353,58 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
           builder: (context, snap) {
             final invited = snap.data?.totalInvites ?? 0;
             final earned = snap.data?.coinsEarned ?? 0;
-            // Match the server cap (20) — see services/auth/main.go:872.
-            final slotsLeft = math.max(0, 20 - invited);
-            return Row(
+            final conversions = snap.data?.conversions ?? 0;
+            // Server caps at 20 CONVERTED referrals — see services/auth/main.go:1112-1118.
+            final slotsLeft = math.max(0, 20 - conversions);
+            final hasError = snap.hasError;
+            return Column(
               children: [
-                Expanded(
-                  child: StatCell(
-                    icon: Icons.person_add_alt_1,
-                    iconColor: AppColors.primary,
-                    value: invited.toString(),
-                    label: 'Friends Invited',
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: StatCell(
+                        icon: Icons.person_add_alt_1,
+                        iconColor: AppColors.primary,
+                        value: hasError ? '—' : invited.toString(),
+                        label: 'Friends Invited',
+                      ),
+                    ),
+                    const SizedBox(width: Spacing.md),
+                    Expanded(
+                      child: StatCell(
+                        icon: Icons.monetization_on,
+                        iconColor: AppColors.gold,
+                        value: hasError ? '—' : earned.toString(),
+                        label: 'Coins Earned',
+                      ),
+                    ),
+                    const SizedBox(width: Spacing.md),
+                    Expanded(
+                      child: StatCell(
+                        icon: Icons.people_alt_outlined,
+                        iconColor: AppColors.textMuted,
+                        value: hasError ? '—' : slotsLeft.toString(),
+                        label: 'Slots Left',
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: Spacing.md),
-                Expanded(
-                  child: StatCell(
-                    icon: Icons.monetization_on,
-                    iconColor: AppColors.gold,
-                    value: earned.toString(),
-                    label: 'Coins Earned',
+                if (hasError)
+                  Center(
+                    child: TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _referralFuture =
+                              QuizService().getReferralDashboard();
+                        });
+                      },
+                      child: Text(
+                        'Couldn\'t load — Retry',
+                        style: AppText.caption
+                            .copyWith(color: AppColors.textMuted),
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(width: Spacing.md),
-                Expanded(
-                  child: StatCell(
-                    icon: Icons.people_alt_outlined,
-                    iconColor: AppColors.textMuted,
-                    value: slotsLeft.toString(),
-                    label: 'Slots Left',
-                  ),
-                ),
               ],
             );
           },
@@ -1413,11 +1444,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                         ),
                         errorText: _applyError,
                       ),
-                      onChanged: (_) {
-                        if (_applyError != null) {
-                          setState(() => _applyError = null);
-                        }
-                      },
+                      onChanged: (_) {},
                     ),
                   ),
                   const SizedBox(width: Spacing.md),
@@ -2371,7 +2398,7 @@ class _HowItWorksCard extends StatelessWidget {
             icon: Icons.share,
             title: 'Share your code',
             description:
-                'Send your 6-letter code to a friend who doesn\'t have the app yet.',
+                'Send your 6-digit code to a friend who doesn\'t have the app yet.',
           ),
           Divider(
             color: AppColors.divider,
