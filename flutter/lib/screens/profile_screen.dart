@@ -64,6 +64,7 @@ class _Badge {
   final Color accent;
   final String unlockCondition;
   final bool legendary;
+  final bool comingSoon;
   const _Badge({
     required this.id,
     required this.name,
@@ -71,7 +72,9 @@ class _Badge {
     required this.accent,
     required this.unlockCondition,
     this.legendary = false,
+    this.comingSoon = false,
   });
+  String get displayCondition => comingSoon ? 'Coming soon' : unlockCondition;
 }
 
 // Tier name → pill color. Lifted from the design brief's tier mapping.
@@ -183,14 +186,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     super.initState();
     _tab = TabController(length: 5, vsync: this);
     _tab.addListener(_onTabChanged);
+    _codeCtrl.addListener(_onCodeCtrlChanged);
   }
 
   @override
   void dispose() {
     _tab.removeListener(_onTabChanged);
     _tab.dispose();
+    _codeCtrl.removeListener(_onCodeCtrlChanged);
     _codeCtrl.dispose();
     super.dispose();
+  }
+
+  // Rebuild on every keystroke so the Apply button's `onPressed`
+  // gate re-evaluates when text crosses the 6-char threshold.
+  void _onCodeCtrlChanged() {
+    if (!mounted) return;
+    setState(() => _applyError = null);
   }
 
   void _onTabChanged() {
@@ -251,7 +263,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
               onRefresh: _handleRefresh,
               child: _buildLastMatchesTab(),
             ),
-            _buildBadgesTab(profile),
+            RefreshIndicator(
+              color: AppColors.primary,
+              backgroundColor: AppColors.surface,
+              onRefresh: _handleRefresh,
+              child: _buildBadgesTab(profile),
+            ),
             RefreshIndicator(
               color: AppColors.primary,
               backgroundColor: AppColors.surface,
@@ -500,6 +517,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     final dailyStreak = streak?.current ?? 0;
     final bestStreak = streak?.longest ?? 0;
     final winStreak = profile?.winStreak ?? 0;
+    final profileEmail = profile?.email ?? '';
+    final email = profileEmail.isNotEmpty
+        ? profileEmail
+        : (widget.auth.email ?? '');
 
     return ListView(
       // AlwaysScrollableScrollPhysics so the parent RefreshIndicator
@@ -653,10 +674,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
         //    for the product so they live here at the bottom of
         //    the PROFIL tab) ─────────────────────────────────────
         _sectionHeader('Account'),
-        if ((widget.auth.email ?? '').isNotEmpty)
-          _infoRow(Icons.email_rounded, 'Email', widget.auth.email!),
-        if ((widget.auth.email ?? '').isNotEmpty)
-          const SizedBox(height: Spacing.sm),
+        if (email.isNotEmpty) _infoRow(Icons.email_rounded, 'Email', email),
+        if (email.isNotEmpty) const SizedBox(height: Spacing.sm),
         _tileGroup([
           _ManagementTile(
             icon: Icons.edit_rounded,
@@ -922,7 +941,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
         name: 'Quick Thinker',
         icon: Icons.bolt,
         accent: AppColors.gold,
-        unlockCondition: '<3s avg in a match'),
+        unlockCondition: '<3s avg in a match',
+        comingSoon: true),
     _Badge(
         id: 'unstoppable',
         name: 'Unstoppable',
@@ -953,25 +973,28 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
         name: 'Dedicated',
         icon: Icons.calendar_today,
         accent: AppColors.primary,
-        unlockCondition: '7-day login streak'),
+        unlockCondition: '7-day reward streak'),
     _Badge(
         id: 'comeback_king',
         name: 'Comeback King',
         icon: Icons.trending_up,
         accent: AppColors.success,
-        unlockCondition: 'Win after trailing by 100+'),
+        unlockCondition: 'Win after trailing by 100+',
+        comingSoon: true),
     _Badge(
         id: 'sharpshooter',
         name: 'Sharpshooter',
         icon: Icons.gps_fixed,
         accent: AppColors.primary,
-        unlockCondition: '100% accuracy in a match'),
+        unlockCondition: '100% accuracy in a match',
+        comingSoon: true),
     _Badge(
         id: 'tournament_victor',
         name: 'Tournament Victor',
         icon: Icons.emoji_events,
         accent: AppColors.gold,
-        unlockCondition: 'Win a tournament'),
+        unlockCondition: 'Win a tournament',
+        comingSoon: true),
   ];
 
   bool _isUnlocked(_Badge b, UserProfile? profile) {
@@ -1007,6 +1030,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
 
   Widget _buildBadgesTab(UserProfile? profile) {
     return GridView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(
         Spacing.xl,
         Spacing.lg,
@@ -1073,7 +1097,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
             Text(b.name, style: AppText.h2),
             const SizedBox(height: Spacing.xs),
             Text(
-              unlocked ? 'Unlocked' : b.unlockCondition,
+              unlocked
+                  ? 'Unlocked'
+                  : b.displayCondition,
               style: AppText.body.copyWith(
                 color: unlocked ? AppColors.success : AppColors.textMuted,
               ),
@@ -1266,15 +1292,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
           child: ListView(
             scrollDirection: Axis.horizontal,
             children: const [
-              _MilestoneCard(day: 3, reward: '+50 coins'),
+              _MilestoneCard(day: 3, reward: '+30 coins'),
               SizedBox(width: Spacing.md),
-              _MilestoneCard(day: 7, reward: '+200 coins + badge'),
+              _MilestoneCard(day: 5, reward: '+50 coins + 1 quiz'),
               SizedBox(width: Spacing.md),
-              _MilestoneCard(day: 14, reward: '+500 coins'),
+              _MilestoneCard(day: 7, reward: '+100 coins + badge'),
               SizedBox(width: Spacing.md),
-              _MilestoneCard(day: 21, reward: '+750 coins'),
+              _MilestoneCard(day: 14, reward: '+200 coins + badge'),
               SizedBox(width: Spacing.md),
-              _MilestoneCard(day: 30, reward: '+1000 coins + badge'),
+              _MilestoneCard(day: 30, reward: '+200 coins'),
             ],
           ),
         ),
@@ -1344,36 +1370,58 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
           builder: (context, snap) {
             final invited = snap.data?.totalInvites ?? 0;
             final earned = snap.data?.coinsEarned ?? 0;
-            // Match the server cap (20) — see services/auth/main.go:872.
-            final slotsLeft = math.max(0, 20 - invited);
-            return Row(
+            final conversions = snap.data?.conversions ?? 0;
+            // Server caps at 20 CONVERTED referrals — see services/auth/main.go:1112-1118.
+            final slotsLeft = math.max(0, 20 - conversions);
+            final hasError = snap.hasError;
+            return Column(
               children: [
-                Expanded(
-                  child: StatCell(
-                    icon: Icons.person_add_alt_1,
-                    iconColor: AppColors.primary,
-                    value: invited.toString(),
-                    label: 'Friends Invited',
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: StatCell(
+                        icon: Icons.person_add_alt_1,
+                        iconColor: AppColors.primary,
+                        value: hasError ? '—' : invited.toString(),
+                        label: 'Friends Invited',
+                      ),
+                    ),
+                    const SizedBox(width: Spacing.md),
+                    Expanded(
+                      child: StatCell(
+                        icon: Icons.monetization_on,
+                        iconColor: AppColors.gold,
+                        value: hasError ? '—' : earned.toString(),
+                        label: 'Coins Earned',
+                      ),
+                    ),
+                    const SizedBox(width: Spacing.md),
+                    Expanded(
+                      child: StatCell(
+                        icon: Icons.people_alt_outlined,
+                        iconColor: AppColors.textMuted,
+                        value: hasError ? '—' : slotsLeft.toString(),
+                        label: 'Slots Left',
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: Spacing.md),
-                Expanded(
-                  child: StatCell(
-                    icon: Icons.monetization_on,
-                    iconColor: AppColors.gold,
-                    value: earned.toString(),
-                    label: 'Coins Earned',
+                if (hasError)
+                  Center(
+                    child: TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _referralFuture =
+                              QuizService().getReferralDashboard();
+                        });
+                      },
+                      child: Text(
+                        'Couldn\'t load — Retry',
+                        style: AppText.caption
+                            .copyWith(color: AppColors.textMuted),
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(width: Spacing.md),
-                Expanded(
-                  child: StatCell(
-                    icon: Icons.people_alt_outlined,
-                    iconColor: AppColors.textMuted,
-                    value: slotsLeft.toString(),
-                    label: 'Slots Left',
-                  ),
-                ),
               ],
             );
           },
@@ -1413,11 +1461,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                         ),
                         errorText: _applyError,
                       ),
-                      onChanged: (_) {
-                        if (_applyError != null) {
-                          setState(() => _applyError = null);
-                        }
-                      },
                     ),
                   ),
                   const SizedBox(width: Spacing.md),
@@ -1677,7 +1720,8 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
       color: AppColors.bg,
       child: TabBar(
         controller: controller,
-        isScrollable: false,
+        isScrollable: true,
+        tabAlignment: TabAlignment.center,
         labelColor: AppColors.primary,
         unselectedLabelColor: AppColors.textMuted,
         labelStyle: AppText.caption.copyWith(
@@ -1693,11 +1737,11 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
         indicatorSize: TabBarIndicatorSize.label,
         dividerColor: Colors.transparent,
         tabs: const [
-          Tab(text: 'PROFIL'),
-          Tab(text: 'LAST M'),
-          Tab(text: 'BADGES'),
-          Tab(text: 'STREAK'),
-          Tab(text: 'REFERR'),
+          Tab(text: 'Profile'),
+          Tab(text: 'Matches'),
+          Tab(text: 'Badges'),
+          Tab(text: 'Streak'),
+          Tab(text: 'Referrals'),
         ],
       ),
     );
@@ -1806,12 +1850,13 @@ class _MatchGroup extends StatelessWidget {
     final rank = me?.rank ?? 0;
     final score = (me?.finalScore ?? 0).toInt();
     final correct = me?.answersCorrect ?? 0;
-    final total = match.rounds == 0 ? 10 : match.rounds;
+    final total = match.rounds;
+    final hasRounds = total > 0;
     // coinsAwarded is Int64 on the proto — convert to int.
     final coinsAwarded = me?.coinsAwarded.toInt() ?? 0;
     final avgMs = (me?.avgResponseTimeMs ?? 0).toDouble();
     final duration = match.duration.toInt();
-    final accuracy = total == 0 ? 0.0 : correct / total;
+    final accuracy = hasRounds ? correct / total : 0.0;
 
     // Result classification:
     //   • rank 1 == win
@@ -1855,7 +1900,9 @@ class _MatchGroup extends StatelessWidget {
     }
 
     Color accuracyFill;
-    if (accuracy >= 0.7) {
+    if (!hasRounds) {
+      accuracyFill = AppColors.textDim;
+    } else if (accuracy >= 0.7) {
       accuracyFill = AppColors.success;
     } else if (accuracy >= 0.3) {
       accuracyFill = AppColors.primary;
@@ -1952,7 +1999,7 @@ class _MatchGroup extends StatelessWidget {
               child: StatCell(
                 icon: Icons.check_circle,
                 iconColor: AppColors.success,
-                value: '$correct/$total',
+                value: hasRounds ? '$correct/$total' : '—',
                 label: 'Correct',
               ),
             ),
@@ -1979,7 +2026,7 @@ class _MatchGroup extends StatelessWidget {
                           .copyWith(color: AppColors.textMuted)),
                   const Spacer(),
                   Text(
-                    '${(accuracy * 100).round()}%',
+                    hasRounds ? '${(accuracy * 100).round()}%' : '—',
                     style: AppText.body.copyWith(
                       color: accuracyFill,
                       fontWeight: FontWeight.w700,
@@ -2018,7 +2065,7 @@ class _MatchGroup extends StatelessWidget {
               child: StatCell(
                 icon: Icons.help_outline,
                 iconColor: AppColors.primary,
-                value: total.toString(),
+                value: hasRounds ? total.toString() : '—',
                 label: 'Rounds',
               ),
             ),
@@ -2098,7 +2145,7 @@ class _BadgeTile extends StatelessWidget {
               )
             else
               Text(
-                badge.unlockCondition,
+                badge.displayCondition,
                 style: AppText.caption.copyWith(color: AppColors.textDim),
                 textAlign: TextAlign.center,
                 maxLines: 2,
@@ -2370,7 +2417,7 @@ class _HowItWorksCard extends StatelessWidget {
             icon: Icons.share,
             title: 'Share your code',
             description:
-                'Send your 6-letter code to a friend who doesn\'t have the app yet.',
+                'Send your 6-digit code to a friend who doesn\'t have the app yet.',
           ),
           Divider(
             color: AppColors.divider,
