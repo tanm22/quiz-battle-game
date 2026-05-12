@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math/rand"
@@ -195,6 +196,110 @@ func (s *quizServer) selectQuestions(ctx context.Context, allowedTopics []string
 }
 
 // ---------------------------------------------------------------------------
+// computeAllowedTopics — resolve the topic allow-list for a match.
+// ---------------------------------------------------------------------------
+
+// computeAllowedTopics returns the topic allow-list for a match given its
+// participants. Returns nil to mean "no filter" (all topics allowed).
+//
+// Algorithm:
+//  1. Plan ceiling: if any player is free, ceiling = freeTopics; if all
+//     players are premium, ceiling = nil (no plan filtering).
+//  2. Preference union: collect the union of every player's preferredTopics.
+//  3. Intersect: keep only union members that are within the ceiling.
+//  4. Fallback: if the resulting set is empty (e.g. nobody has prefs, or no
+//     pref overlaps the free-tier ceiling), fall back to the plan ceiling so
+//     un-onboarded users keep working.
+//
+// Plan is read from Redis first (keys.GetPlan fast-path), then Mongo.
+// preferredTopics is read from Mongo only — it is not cached. Both fields
+// come from the same user document with one FindOne per player.
+func (s *quizServer) computeAllowedTopics(ctx context.Context, playerIDs []string) ([]string, error) {
+	// Plan ceiling: nil = "no filter, all topics allowed". A set form keeps
+	// the intersection step O(1) per topic without re-allocating.
+	var ceiling map[string]struct{} // nil means no filter
+
+	// Preference union across all players.
+	prefUnion := make(map[string]struct{})
+
+	for _, pid := range playerIDs {
+		// Try Redis fast-path for plan first. Skip when rdb is nil so the
+		// helper is unit-testable without a Redis instance — Mongo lookup
+		// below covers the same field.
+		var plan string
+		if s.rdb != nil {
+			plan, _ = keys.GetPlan(ctx, s.rdb, pid)
+		}
+
+		// Always fetch the user doc — preferredTopics is not cached anywhere,
+		// so we'd hit Mongo regardless. Pull plan from the same doc on cache
+		// miss to avoid a second roundtrip.
+		var doc bson.M
+		err := s.mongoDB.Collection("users").FindOne(ctx, bson.M{"_id": pid}).Decode(&doc)
+		if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, fmt.Errorf("lookup user %s: %w", pid, err)
+		}
+
+		if err == nil {
+			if plan == "" {
+				if pl, ok := doc["plan"].(string); ok {
+					plan = pl
+				}
+			}
+			// preferredTopics is stored as a BSON array of strings.
+			if raw, ok := doc["preferredTopics"].(bson.A); ok {
+				for _, t := range raw {
+					if topic, ok := t.(string); ok && topic != "" {
+						prefUnion[topic] = struct{}{}
+					}
+				}
+			}
+		}
+
+		// Any non-premium player tightens the ceiling to freeTopics. We
+		// don't break early — we still need to gather everyone's prefs.
+		if plan != "premium" && ceiling == nil {
+			ceiling = make(map[string]struct{}, len(freeTopics))
+			for _, t := range freeTopics {
+				ceiling[t] = struct{}{}
+			}
+		}
+	}
+
+	// Intersect union with ceiling.
+	var filtered []string
+	if ceiling == nil {
+		// All premium: union is unrestricted.
+		filtered = make([]string, 0, len(prefUnion))
+		for t := range prefUnion {
+			filtered = append(filtered, t)
+		}
+	} else {
+		filtered = make([]string, 0, len(prefUnion))
+		for t := range prefUnion {
+			if _, ok := ceiling[t]; ok {
+				filtered = append(filtered, t)
+			}
+		}
+	}
+
+	// Fallback: nothing usable from preferences — return the plan ceiling so
+	// pre-onboarding users still get questions.
+	if len(filtered) == 0 {
+		if ceiling == nil {
+			return nil, nil // all topics
+		}
+		fallback := make([]string, 0, len(ceiling))
+		for t := range ceiling {
+			fallback = append(fallback, t)
+		}
+		return fallback, nil
+	}
+
+	return filtered, nil
+}
+
+// ---------------------------------------------------------------------------
 // 41. RabbitMQ consumer for match.created
 // ---------------------------------------------------------------------------
 
@@ -256,75 +361,15 @@ func (s *quizServer) consumeMatchCreated(ctx context.Context) {
 
 			log.FromContext(msgCtx).Info("match.created received", "room_id", event.RoomID, "player_ids", event.PlayerIDs)
 
-			// Determine allowed topics based on player plans and preferences.
-			// Tier gate: if any player is free, the union must stay within
-			// freeTopics (premium topics are paywalled — we can't expose them
-			// just because a premium player is also in the match).
-			// Personalization: intersect that tier-gated set with the union
-			// of every player's preferredTopics (the field §4 calls out as
-			// "used by the quiz engine for personalization"). Empty
-			// preferences = no personalization restriction for that player,
-			// so the union naturally collapses to the tier-gated set.
-			var allowedTopics []string
-			allPremium := true
-			preferredUnion := map[string]struct{}{}
-			anyPreference := false
-			for _, pid := range event.PlayerIDs {
-				p := ""
-				var topics []string
-				var doc bson.M
-				if s.mongoDB.Collection("users").FindOne(msgCtx, bson.M{"_id": pid}).Decode(&doc) == nil {
-					if pl, ok := doc["plan"].(string); ok {
-						p = pl
-					}
-					if raw, ok := doc["preferredTopics"].(bson.A); ok {
-						for _, v := range raw {
-							if t, ok := v.(string); ok && t != "" {
-								topics = append(topics, t)
-							}
-						}
-					}
-				}
-				if p == "" {
-					if cached, _ := keys.GetPlan(msgCtx, s.rdb, pid); cached != "" {
-						p = cached
-					}
-				}
-				if p != "premium" {
-					allPremium = false
-				}
-				if len(topics) > 0 {
-					anyPreference = true
-					for _, t := range topics {
-						preferredUnion[t] = struct{}{}
-					}
-				}
-			}
-			if !allPremium {
-				allowedTopics = append(allowedTopics, freeTopics...)
-			}
-			if anyPreference {
-				if allowedTopics == nil {
-					// All-premium match: intersection of "all topics" and
-					// the preference union is just the preference union.
-					for t := range preferredUnion {
-						allowedTopics = append(allowedTopics, t)
-					}
-				} else {
-					filtered := allowedTopics[:0:0]
-					for _, t := range allowedTopics {
-						if _, ok := preferredUnion[t]; ok {
-							filtered = append(filtered, t)
-						}
-					}
-					// Empty intersection — preferences and tier-gated set
-					// don't overlap. Fall back to the tier-gated set so the
-					// match still has something to ask, even if it's off-
-					// preference. Better than a zero-question round.
-					if len(filtered) > 0 {
-						allowedTopics = filtered
-					}
-				}
+			// Resolve allowed-topics list: plan ceiling intersected with the
+			// union of players' preferredTopics, with fallback to ceiling
+			// when nobody's preferences apply. See computeAllowedTopics.
+			allowedTopics, err := s.computeAllowedTopics(msgCtx, event.PlayerIDs)
+			if err != nil {
+				log.FromContext(msgCtx).Error("computeAllowedTopics failed", "err", err)
+				msg.Nack(false, true) // requeue — transient Mongo failure
+				s.recordConsume("match-created-queue", metrics.StatusNackRequeue)
+				continue
 			}
 
 			// Select questions and store in Redis

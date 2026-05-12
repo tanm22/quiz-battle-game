@@ -45,6 +45,7 @@ const (
 	ReasonShopPurchase     = "shop.purchase"
 	ReasonShopRefund       = "shop.refund"
 	ReasonAdminAdjustment  = "admin.adjustment"
+	ReasonWelcomeBonus     = "onboarding.welcome"
 )
 
 var validReasons = map[string]struct{}{
@@ -57,6 +58,7 @@ var validReasons = map[string]struct{}{
 	ReasonShopPurchase:     {},
 	ReasonShopRefund:       {},
 	ReasonAdminAdjustment:  {},
+	ReasonWelcomeBonus:     {},
 }
 
 // Ledger is the entry point for all balance reads and writes. Construct one
