@@ -112,5 +112,30 @@ void main() {
       expect(container.read(gameStateProvider).selectedIndex, 1);
       expect(notifier.submitCalls, 1);
     });
+
+    test('after a new round event, selectedIndex resets and a new tap is accepted',
+        () {
+      notifier.selectAnswer(1); // locks the round-1 answer to option 1
+      expect(container.read(gameStateProvider).selectedIndex, 1);
+      expect(notifier.submitCalls, 1);
+
+      // Simulate the QuestionBroadcast for round 2 — _processGameEvent
+      // does `copyWith(round: q.round, clearSelectedIndex: true, ...)`.
+      // Without the clear, the first-tap lock from round 1 would persist
+      // and the player could never answer again.
+      notifier.state = notifier.state.copyWith(
+        round: 2,
+        clearSelectedIndex: true,
+        clearCorrectIndex: true,
+      );
+
+      notifier.selectAnswer(3); // first tap of round 2
+
+      expect(container.read(gameStateProvider).selectedIndex, 3,
+          reason: 'new round must accept a fresh tap once selectedIndex is cleared');
+      expect(notifier.submitCalls, 2,
+          reason: 'round 2 tap should hit the server independently of round 1');
+      expect(notifier.submittedOptions, [1, 3]);
+    });
   });
 }
