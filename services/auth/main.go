@@ -629,6 +629,14 @@ func (s *authServer) UpdateProfile(ctx context.Context, req *pb.UpdateProfileReq
 		if len(req.PreferredTopics) > 10 {
 			return nil, status.Error(codes.InvalidArgument, "too many topics")
 		}
+		// §4.7 PR-A1: validate each item, not just the list length.
+		// An attacker who can pad the list with empty strings or 1MB
+		// blobs gets to write garbage into the user document otherwise.
+		for i, topic := range req.PreferredTopics {
+			if err := validate.Topic(topic); err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "preferred_topics[%d]: %v", i, err)
+			}
+		}
 		set["preferredTopics"] = req.PreferredTopics
 	}
 	if req.OnboardingCompleted {
