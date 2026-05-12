@@ -20,8 +20,8 @@ import (
 func TestNewRegistersAllCollectors(t *testing.T) {
 	m := New("test-svc")
 
-	// Counter / histogram vectors don't appear in Gather() output until
-	// at least one label combination has been observed — that's a
+	// Counter / histogram / gauge vectors don't appear in Gather() output
+	// until at least one label combination has been observed — that's a
 	// client_golang invariant, not a bug in registration. Touch each
 	// vector once with a sentinel label set so the family shows up.
 	m.RPCRequestsTotal.WithLabelValues("/probe", "OK").Inc()
@@ -30,6 +30,8 @@ func TestNewRegistersAllCollectors(t *testing.T) {
 	m.AMQPConsumesTotal.WithLabelValues("probe", StatusAck).Inc()
 	m.AMQPDispatchedTotal.WithLabelValues("probe").Inc()
 	m.WebhookEventsTotal.WithLabelValues("probe", OutcomeOK).Inc()
+	m.OutboxPendingTotal.WithLabelValues("test").Set(0)
+	m.OutboxOldestAgeSeconds.WithLabelValues("test").Set(0)
 
 	mfs, err := m.Registry().Gather()
 	if err != nil {
@@ -37,12 +39,14 @@ func TestNewRegistersAllCollectors(t *testing.T) {
 	}
 
 	want := map[string]bool{
-		"rpc_requests_total":    false,
-		"rpc_duration_seconds":  false,
-		"amqp_publishes_total":  false,
-		"amqp_consumes_total":   false,
-		"amqp_dispatched_total": false,
-		"webhook_events_total":  false,
+		"rpc_requests_total":        false,
+		"rpc_duration_seconds":      false,
+		"amqp_publishes_total":      false,
+		"amqp_consumes_total":       false,
+		"amqp_dispatched_total":     false,
+		"webhook_events_total":      false,
+		"outbox_pending_total":      false,
+		"outbox_oldest_age_seconds": false,
 	}
 	for _, mf := range mfs {
 		if _, ok := want[mf.GetName()]; ok {

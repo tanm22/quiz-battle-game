@@ -89,8 +89,11 @@ func (s *paymentServer) tickOutboxWatcher(ctx context.Context, kind string) {
 //
 // Both queries are scoped to a single kind so per-kind gauge updates
 // don't accidentally mix queue depths across unrelated consumers. The
-// {kind, processedAt} index in seed/main.go (added with the outbox
-// schema) makes both filters covered scans.
+// (processedAt, kind) compound index in seed/main.go is leveraged by
+// the equality filter (processedAt: nil is the leading field). The
+// createdAt sort in the oldest-row lookup is an in-memory pass over the
+// unprocessed rows — fine at current scale (the queue is normally empty
+// or small).
 //
 // Exposed as a method so the unit test can drive the watcher
 // deterministically — insert fixtures, call sampleOutbox, assert the
