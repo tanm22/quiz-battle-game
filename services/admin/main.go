@@ -76,9 +76,9 @@ type mongoCounts struct {
 }
 
 type rabbitQueue struct {
-	Name           string `json:"name"`
-	Messages       int64  `json:"messages"`
-	MessagesUnacked int64 `json:"messages_unacknowledged"`
+	Name            string `json:"name"`
+	Messages        int64  `json:"messages"`
+	MessagesUnacked int64  `json:"messages_unacknowledged"`
 }
 
 type adminServer struct {

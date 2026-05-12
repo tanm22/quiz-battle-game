@@ -67,16 +67,29 @@ jobs:
       - uses: actions/setup-go@v5
         with: { go-version: '1.25' }
 
+      - name: Write CI .env
+        # docker-compose.yml uses `${JWT_SECRET:?...}` (and similar) for
+        # services that require values at startup. Compose interpolates
+        # these on EVERY `docker compose` invocation — `up`, `ps`,
+        # `logs`, `down` — so a step-scoped env block isn't enough:
+        # subsequent steps would re-interpolate against an unset value
+        # and fail. Writing a real .env at the workspace root makes the
+        # values available to every compose call in this job.
+        # Placeholder values are fine: the e2e suite never exercises
+        # Google sign-in or Razorpay capture; pkg/config.MustRequired
+        # only refuses empty values.
+        run: |
+          cat > .env <<'EOF'
+          JWT_SECRET=ci-e2e-jwt-secret-not-for-prod
+          GOOGLE_CLIENT_ID=000000000000-placeholder.apps.googleusercontent.com
+          RAZORPAY_KEY_ID=rzp_test_placeholder
+          RAZORPAY_KEY_SECRET=placeholder
+          RAZORPAY_WEBHOOK_SECRET=placeholder
+          RESEND_API_KEY=
+          EOF
+
       - name: Boot docker-compose stack
         run: docker compose up -d --build
-        env:
-          # Required at startup by services that load config via
-          # config.MustRequired — pkg/config errors out on unset values
-          # with a clear "missing env" message, so we always provide a
-          # value, even a placeholder. Real keys aren't needed: the e2e
-          # suite never exercises Google sign-in or Razorpay capture.
-          JWT_SECRET: ci-e2e-jwt-secret-not-for-prod
-          GOOGLE_CLIENT_ID: 000000000000-placeholder.apps.googleusercontent.com
 
       - name: Wait for gRPC ports
         run: |

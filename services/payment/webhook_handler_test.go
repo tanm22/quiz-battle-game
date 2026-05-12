@@ -321,4 +321,3 @@ func TestHandleWebhook_WrongMethod(t *testing.T) {
 		}
 	}
 }
-
