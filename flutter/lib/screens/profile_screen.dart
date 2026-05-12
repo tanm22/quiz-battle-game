@@ -1677,7 +1677,8 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
       color: AppColors.bg,
       child: TabBar(
         controller: controller,
-        isScrollable: false,
+        isScrollable: true,
+        tabAlignment: TabAlignment.center,
         labelColor: AppColors.primary,
         unselectedLabelColor: AppColors.textMuted,
         labelStyle: AppText.caption.copyWith(
@@ -1693,11 +1694,11 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
         indicatorSize: TabBarIndicatorSize.label,
         dividerColor: Colors.transparent,
         tabs: const [
-          Tab(text: 'PROFIL'),
-          Tab(text: 'LAST M'),
-          Tab(text: 'BADGES'),
-          Tab(text: 'STREAK'),
-          Tab(text: 'REFERR'),
+          Tab(text: 'Profile'),
+          Tab(text: 'Matches'),
+          Tab(text: 'Badges'),
+          Tab(text: 'Streak'),
+          Tab(text: 'Referrals'),
         ],
       ),
     );
