@@ -47,6 +47,10 @@ type authServer struct {
 	rdb       *redis.Client
 	amqpConn  *amqp.Connection
 	jwtSecret string
+	// §4.7 PR-A1: refresh-token rotation. Every login path mints a
+	// paired access/refresh token; RefreshToken/Logout RPCs operate
+	// against this store.
+	refresh *auth.RefreshStore
 	// googleClientID is the OAuth audience for Google ID tokens. Loaded
 	// once at startup via config.MustRequired so an empty value can't
 	// reach idtoken.Validate (which would otherwise skip the audience
@@ -81,6 +85,11 @@ type authServer struct {
 	// scoping it per-RPC would let an attacker cycle endpoints to
 	// bypass the cap.
 	preauthIPLimiter *ratelimit.Limiter
+	// §4.7 PR-A1: VerifyEmailCode OTP-brute-force gate. 5 attempts per
+	// minute per email — generous for legitimate retypes, tight enough
+	// that the 6-digit OTP (10^6 keyspace) can't be blanket-probed
+	// inside the 10-minute code TTL.
+	verifyEmailLimiter *ratelimit.Limiter
 }
 
 // preauthIP extracts the caller's host (IP without port) from the gRPC
@@ -177,14 +186,15 @@ func (s *authServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb
 	// Process streak (first login = day 1)
 	streakInfo, reward, _ := s.processStreak(ctx, &user)
 
-	token, err := auth.GenerateToken(userID, req.Username, s.jwtSecret)
+	access, refresh, err := s.issueTokenPair(ctx, userID, req.Username)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "token error: %v", err)
 	}
 
 	log.FromContext(ctx).Info("registered user", "username", req.Username, "user_id", userID)
 	return &pb.AuthResponse{
-		UserId: userID, Username: req.Username, Token: token,
+		UserId: userID, Username: req.Username, Token: access,
+		RefreshToken: refresh, ExpiresIn: int64(auth.AccessTokenTTL.Seconds()),
 		Rating: 1200, MatchesPlayed: 0, Wins: 0, Email: req.Email, IsGuest: false,
 		Plan: "free", ReferralCode: refCode, Streak: streakInfo, Reward: reward,
 		StreakUpdated:       true,
@@ -230,7 +240,7 @@ func (s *authServer) Login(ctx context.Context, req *pb.LoginRequest) (*pb.AuthR
 		return nil, status.Error(codes.NotFound, "invalid username or password")
 	}
 
-	token, err := auth.GenerateToken(user.ID, user.Username, s.jwtSecret)
+	access, refresh, err := s.issueTokenPair(ctx, user.ID, user.Username)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "token error: %v", err)
 	}
@@ -240,7 +250,8 @@ func (s *authServer) Login(ctx context.Context, req *pb.LoginRequest) (*pb.AuthR
 
 	log.FromContext(ctx).Info("login", "username", user.Username, "user_id", user.ID)
 	return &pb.AuthResponse{
-		UserId: user.ID, Username: user.Username, Token: token,
+		UserId: user.ID, Username: user.Username, Token: access,
+		RefreshToken: refresh, ExpiresIn: int64(auth.AccessTokenTTL.Seconds()),
 		Rating: user.Rating, MatchesPlayed: user.MatchesPlayed, Wins: user.Wins,
 		Email: user.Email, IsGuest: user.IsGuest,
 		Plan: user.Plan, Coins: user.Coins, Streak: streakInfo,
@@ -301,14 +312,15 @@ func (s *authServer) GuestLogin(ctx context.Context, _ *pb.GuestLoginRequest) (*
 		return nil, status.Errorf(codes.Internal, "insert error: %v", err)
 	}
 
-	token, err := auth.GenerateToken(userID, username, s.jwtSecret)
+	access, refresh, err := s.issueTokenPair(ctx, userID, username)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "token error: %v", err)
 	}
 
 	log.FromContext(ctx).Info("guest login", "username", username, "user_id", userID)
 	return &pb.AuthResponse{
-		UserId: userID, Username: username, Token: token,
+		UserId: userID, Username: username, Token: access,
+		RefreshToken: refresh, ExpiresIn: int64(auth.AccessTokenTTL.Seconds()),
 		Rating: 1200, IsGuest: true, ReferralCode: refCode,
 		OnboardingCompleted: false,
 	}, nil
@@ -373,6 +385,13 @@ func (s *authServer) VerifyEmailCode(ctx context.Context, req *pb.VerifyEmailCod
 	if req.Email == "" || req.Code == "" {
 		return nil, status.Error(codes.InvalidArgument, "email and code required")
 	}
+	// §4.7 PR-A1: OTP brute-force gate. The verify path is the actual
+	// attack target (a known email + 10^6 possible codes); without
+	// this an attacker could spin a tight loop for ~13 minutes and
+	// blanket-probe the keyspace.
+	if !s.verifyEmailLimiter.AllowWithLog(ctx, strings.ToLower(req.Email)) {
+		return nil, status.Error(codes.ResourceExhausted, "too many attempts; please wait")
+	}
 
 	// Try all purposes — the code storage is purpose-scoped
 	for _, purpose := range []string{"login", "reset", "link"} {
@@ -387,12 +406,18 @@ func (s *authServer) VerifyEmailCode(ctx context.Context, req *pb.VerifyEmailCod
 				if err := s.users().FindOne(ctx, bson.M{"email": req.Email}).Decode(&user); err != nil {
 					return nil, status.Error(codes.NotFound, "user not found")
 				}
-				token, err := auth.GenerateToken(user.ID, user.Username, s.jwtSecret)
+				access, refresh, err := s.issueTokenPair(ctx, user.ID, user.Username)
 				if err != nil {
 					return nil, status.Errorf(codes.Internal, "token error: %v", err)
 				}
 				log.FromContext(ctx).Info("email login verified", "email", log.RedactEmail(req.Email))
-				return &pb.VerifyEmailCodeResponse{Verified: true, Token: token, UserId: user.ID}, nil
+				return &pb.VerifyEmailCodeResponse{
+					Verified:     true,
+					Token:        access,
+					UserId:       user.ID,
+					RefreshToken: refresh,
+					ExpiresIn:    int64(auth.AccessTokenTTL.Seconds()),
+				}, nil
 			}
 
 			// For reset/link: just confirm verification
@@ -495,6 +520,20 @@ func (s *authServer) ResetPassword(ctx context.Context, req *pb.ResetPasswordReq
 		return nil, status.Error(codes.NotFound, "no account with this email")
 	}
 
+	// §4.7 PR-A1: revoke every active refresh-token family for this user
+	// so any sessions established with the old password lose access at
+	// their next refresh. Best-effort; the password change is already
+	// persisted, so a transient revocation failure shouldn't fail the
+	// RPC — the existing access tokens still die at AccessTokenTTL.
+	var u struct {
+		ID string `bson:"_id"`
+	}
+	if err := s.users().FindOne(ctx, bson.M{"email": req.Email}).Decode(&u); err == nil {
+		if err := s.refresh.RevokeAllForUser(ctx, u.ID); err != nil {
+			log.FromContext(ctx).Warn("revoke refresh on reset failed", "user_id", u.ID, "err", err)
+		}
+	}
+
 	log.FromContext(ctx).Info("password reset", "email", log.RedactEmail(req.Email))
 	return &pb.ResetPasswordResponse{Success: true}, nil
 }
@@ -541,6 +580,14 @@ func (s *authServer) DeleteAccount(ctx context.Context, _ *pb.DeleteAccountReque
 	}
 	if result.DeletedCount == 0 {
 		return nil, status.Error(codes.NotFound, "user not found")
+	}
+
+	// §4.7 PR-A1: revoke every refresh-token family. RefreshToken would
+	// already fail because the user lookup is gone, but explicit
+	// revocation is defense-in-depth and keeps the refresh_tokens
+	// collection self-consistent against orphan rows.
+	if err := s.refresh.RevokeAllForUser(ctx, userID); err != nil {
+		log.FromContext(ctx).Warn("revoke refresh on delete failed", "user_id", userID, "err", err)
 	}
 
 	log.FromContext(ctx).Info("account deleted", "user_id", userID)
@@ -593,6 +640,14 @@ func (s *authServer) UpdateProfile(ctx context.Context, req *pb.UpdateProfileReq
 	if len(req.PreferredTopics) > 0 {
 		if len(req.PreferredTopics) > 10 {
 			return nil, status.Error(codes.InvalidArgument, "too many topics")
+		}
+		// §4.7 PR-A1: validate each item, not just the list length.
+		// An attacker who can pad the list with empty strings or 1MB
+		// blobs gets to write garbage into the user document otherwise.
+		for i, topic := range req.PreferredTopics {
+			if err := validate.Topic(topic); err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "preferred_topics[%d]: %v", i, err)
+			}
 		}
 		set["preferredTopics"] = req.PreferredTopics
 	}
@@ -733,14 +788,16 @@ func (s *authServer) GoogleSignIn(ctx context.Context, req *pb.GoogleSignInReque
 	// Process streak
 	streakInfo, reward, streakUpdated := s.processStreak(ctx, &user)
 
-	// Issue JWT
-	token, err := auth.GenerateToken(user.ID, user.Username, s.jwtSecret)
+	// Issue paired access + refresh tokens
+	access, refresh, err := s.issueTokenPair(ctx, user.ID, user.Username)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "token generation failed: %v", err)
 	}
 
 	return &pb.GoogleSignInResponse{
-		Token:         token,
+		Token:         access,
+		RefreshToken:  refresh,
+		ExpiresIn:     int64(auth.AccessTokenTTL.Seconds()),
 		IsNewUser:     isNewUser,
 		StreakUpdated: streakUpdated,
 		Reward:        reward,
@@ -944,6 +1001,69 @@ func (s *authServer) GetStreakInfo(ctx context.Context, _ *pb.GetStreakInfoReque
 }
 
 // ---------------------------------------------------------------------------
+// Refresh-token rotation (§4.7 PR-A1)
+// ---------------------------------------------------------------------------
+
+// RefreshToken validates the presented refresh token, rotates it
+// (mints a new refresh id in the same family, revokes the old),
+// and issues a fresh access JWT. Any validation failure collapses
+// to codes.Unauthenticated to deny attackers a discriminator.
+func (s *authServer) RefreshToken(ctx context.Context, req *pb.RefreshTokenRequest) (*pb.RefreshTokenResponse, error) {
+	if err := validate.MaxLen(req.RefreshToken, 128); err != nil {
+		return nil, status.Error(codes.InvalidArgument, "refresh_token: too long")
+	}
+	rec, err := s.refresh.Validate(ctx, req.RefreshToken)
+	if err != nil {
+		return nil, status.Error(codes.Unauthenticated, "refresh token invalid")
+	}
+	// Look up username for the access claim. If the user has been
+	// deleted in the meantime, fail closed.
+	var u struct {
+		Username string `bson:"username"`
+	}
+	if err := s.users().FindOne(ctx, bson.M{"_id": rec.UserID}).Decode(&u); err != nil {
+		return nil, status.Error(codes.Unauthenticated, "user not found")
+	}
+	newRefresh, err := s.refresh.Rotate(ctx, req.RefreshToken)
+	if err != nil {
+		return nil, status.Error(codes.Unauthenticated, "refresh token invalid")
+	}
+	access, _, err := auth.GenerateAccessToken(rec.UserID, u.Username, s.jwtSecret)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "sign access token: %v", err)
+	}
+	return &pb.RefreshTokenResponse{
+		AccessToken:  access,
+		RefreshToken: newRefresh,
+		ExpiresIn:    int64(auth.AccessTokenTTL.Seconds()),
+	}, nil
+}
+
+// Logout revokes the entire refresh-token family the presented token
+// belongs to — covering every device that shares the same login lineage.
+// Idempotent: presenting an unknown or already-revoked token still
+// returns success so a retry from a flaky network doesn't surface a
+// confusing error to the user mid-logout.
+func (s *authServer) Logout(ctx context.Context, req *pb.LogoutRequest) (*pb.LogoutResponse, error) {
+	if err := validate.MaxLen(req.RefreshToken, 128); err != nil {
+		return nil, status.Error(codes.InvalidArgument, "refresh_token: too long")
+	}
+	// We don't require the token to be currently valid — the goal
+	// of Logout is "make this dead." But we DO need the family id,
+	// so look up the doc directly.
+	var doc struct {
+		FamilyID string `bson:"familyId"`
+	}
+	if err := s.mongoDB.Collection("refresh_tokens").FindOne(ctx, bson.M{"_id": req.RefreshToken}).Decode(&doc); err != nil {
+		return &pb.LogoutResponse{Success: true}, nil // already gone — treat as success
+	}
+	if err := s.refresh.RevokeFamily(ctx, doc.FamilyID); err != nil {
+		return nil, status.Errorf(codes.Internal, "revoke: %v", err)
+	}
+	return &pb.LogoutResponse{Success: true}, nil
+}
+
+// ---------------------------------------------------------------------------
 // Referral helpers
 // ---------------------------------------------------------------------------
 
@@ -1021,6 +1141,24 @@ func generateCode() string {
 	rand.Read(b)
 	n := (int(b[0])<<16 | int(b[1])<<8 | int(b[2])) % 1000000
 	return fmt.Sprintf("%06d", n)
+}
+
+// issueTokenPair generates a fresh access JWT plus a refresh token
+// (persisted under a new family) for the given user. Every successful
+// login/registration calls this — never auth.GenerateAccessToken directly —
+// so the refresh-token store stays the single source of truth for which
+// (user, family) lineages exist.
+func (s *authServer) issueTokenPair(ctx context.Context, userID, username string) (access, refresh string, err error) {
+	access, _, err = auth.GenerateAccessToken(userID, username, s.jwtSecret)
+	if err != nil {
+		return "", "", err
+	}
+	famID, err := auth.GenerateRefreshTokenID()
+	if err != nil {
+		return "", "", err
+	}
+	refresh, err = s.refresh.Issue(ctx, userID, famID)
+	return access, refresh, err
 }
 
 // ---------------------------------------------------------------------------
@@ -1236,6 +1374,17 @@ func main() {
 		// up flow rarely exceeds a few calls per second), and bounds the
 		// enumeration vector to roughly one probe per second per IP.
 		preauthIPLimiter: ratelimit.New(rdb, "preauth_ip", 60, time.Minute),
+		// §4.7 PR-A1: 5/min/email is the standard OTP-brute-force gate;
+		// matches what reset uses.
+		verifyEmailLimiter: ratelimit.New(rdb, "verify_email", 5, time.Minute),
+		// §4.7 PR-A1: refresh-token store. EnsureIndexes is called below.
+		refresh: auth.NewRefreshStore(db),
+	}
+
+	if err := srv.refresh.EnsureIndexes(ctx); err != nil {
+		log.FromContext(ctx).Error("refresh store ensure indexes", "err", err)
+		// Non-fatal: existing indexes are fine and CreateMany is idempotent;
+		// a transient Mongo blip during boot shouldn't keep the service down.
 	}
 
 	// Phase 2: Start notification cron goroutines
@@ -1252,6 +1401,10 @@ func main() {
 		"/quiz.AuthService/LoginWithEmail",
 		"/quiz.AuthService/CheckUsername",
 		"/quiz.AuthService/GoogleSignIn",
+		// §4.7 PR-A1: refresh/logout carry a refresh token in the payload,
+		// not a JWT — they can't pass the JWT-checking interceptor.
+		"/quiz.AuthService/RefreshToken",
+		"/quiz.AuthService/Logout",
 	}
 
 	m := metrics.New("auth")

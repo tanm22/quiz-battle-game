@@ -32,6 +32,7 @@ import (
 	"quiz-battle/pkg/metrics"
 	"quiz-battle/pkg/models"
 	"quiz-battle/pkg/ratelimit"
+	"quiz-battle/pkg/validate"
 	pb "quiz-battle/proto"
 )
 
@@ -79,6 +80,12 @@ type scoringServer struct {
 	// level — shopTestEnv-built servers leave this as the zero value
 	// and the limiter passes through unchanged.
 	purchaseLimiter *ratelimit.Limiter
+	// §4.7 PR-A1: UpdateFCMToken spam gate. Legitimate clients update
+	// only on app install, OS-level reinstall, or after FCM rotates a
+	// token (rare). 10/hour/user is generous for those plus an
+	// occasional dev-tools push, and tight enough that a misbehaving
+	// client can't bloat the user's fcmTokens array with garbage.
+	fcmTokenLimiter *ratelimit.Limiter
 }
 
 // purchaseRateLimit caps shop-purchase calls per user per minute. Set
@@ -218,6 +225,12 @@ func (s *scoringServer) isCorrect(ctx context.Context, roomID string, round, opt
 // ---------------------------------------------------------------------------
 
 func (s *scoringServer) GetLeaderboard(ctx context.Context, req *pb.GetLeaderboardRequest) (*pb.GetLeaderboardResponse, error) {
+	// §4.7 PR-A1: bound the room-id string so a malicious client can't
+	// pad it to a giant Redis key and blow the per-keylength memory
+	// budget on the server.
+	if err := validate.MaxLen(req.RoomId, 128); err != nil {
+		return nil, status.Error(codes.InvalidArgument, "room_id: too long")
+	}
 	entries, err := keys.GetLeaderboardEntries(ctx, s.rdb, req.RoomId)
 	if err != nil {
 		return nil, fmt.Errorf("leaderboard fetch failed: %w", err)
@@ -490,6 +503,13 @@ func (s *scoringServer) GetGlobalLeaderboard(ctx context.Context, req *pb.GetGlo
 		return nil, status.Error(codes.Unauthenticated, "not authenticated")
 	}
 
+	// §4.7 PR-A1: reject unknown TimeFilter values at the edge rather
+	// than silently aliasing to a default the user didn't ask for.
+	// Empty string is valid (treated as alltime below).
+	if err := validate.TimeFilter(req.TimeFilter); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "time_filter: %v", err)
+	}
+
 	// Get user plan for result limiting
 	plan, _ := keys.GetPlan(ctx, s.rdb, userID)
 	if plan == "" {
@@ -634,6 +654,23 @@ func (s *scoringServer) UpdateFCMToken(ctx context.Context, req *pb.UpdateFCMTok
 		return nil, status.Error(codes.Unauthenticated, "not authenticated")
 	}
 
+	// §4.7 PR-A1: bound the token size + reject empty. Real FCM tokens
+	// are ~163 ASCII chars; 512 is generous. Without this, a malicious
+	// client could $addToSet a 1MB blob into the user document.
+	if req.Token == "" {
+		return nil, status.Error(codes.InvalidArgument, "token: required")
+	}
+	if err := validate.MaxLen(req.Token, 512); err != nil {
+		return nil, status.Error(codes.InvalidArgument, "token: too long")
+	}
+
+	// §4.7 PR-A1: token-churn rate limit. Real clients update once per
+	// install; 10/h is generous for dev reinstalls and an accidental
+	// retry loop without letting a misbehaving client bloat fcmTokens.
+	if !s.fcmTokenLimiter.AllowWithLog(ctx, userID) {
+		return nil, status.Error(codes.ResourceExhausted, "too many token updates; please wait")
+	}
+
 	_, err = s.mongoDB.Collection("users").UpdateOne(ctx,
 		bson.M{"_id": userID},
 		bson.M{"$addToSet": bson.M{"fcmTokens": req.Token}},
@@ -680,6 +717,14 @@ func (s *scoringServer) ApplyReferralCode(ctx context.Context, req *pb.ApplyRefe
 	userID, err := auth.UserIDFromContext(ctx)
 	if err != nil {
 		return nil, status.Error(codes.Unauthenticated, "not authenticated")
+	}
+
+	// §4.7 PR-A1: validate the code format before it reaches the Redis
+	// lookup. Stops "${jndi:...}"-style payloads and bounds the input
+	// size at the same time. Matches the issuance format scoring's
+	// mint logic produces.
+	if err := validate.ReferralCode(req.Code); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "code: %v", err)
 	}
 
 	// §4.7 PR-B1: anti-abuse gate. Stops a script from probing every
@@ -1960,6 +2005,10 @@ func main() {
 		jwtSecret:       jwtSecret,
 		referralLimiter: ratelimit.New(rdb, "referral_apply", 3, 10*time.Minute),
 		purchaseLimiter: ratelimit.New(rdb, "purchase_shop_item", purchaseRateLimit, time.Minute),
+		// §4.7 PR-A1: 10/hour caps the FCM-token churn vector. Real
+		// clients touch this RPC once per install; 10/h leaves room for
+		// dev-mode reinstalls and one accidental loop without blocking.
+		fcmTokenLimiter: ratelimit.New(rdb, "fcm_token", 10, time.Hour),
 	}
 
 	// gRPC server — CalculateScore is called internally by the scoring worker

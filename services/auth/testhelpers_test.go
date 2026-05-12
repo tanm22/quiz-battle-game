@@ -12,6 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
+	"quiz-battle/pkg/auth"
 	"quiz-battle/pkg/coins"
 )
 
@@ -65,11 +66,19 @@ func newTestAuthServer(t *testing.T) *authServer {
 		_ = client.Disconnect(context.Background())
 	})
 
-	return &authServer{
+	srv := &authServer{
 		mongoDB:   db,
 		ledger:    coins.NewLedger(client, dbName),
 		jwtSecret: "test-jwt-secret",
+		refresh:   auth.NewRefreshStore(db),
 	}
+	// §4.7 PR-A1: refresh-token tests need the indexes in place. Errors
+	// here are non-fatal in production (CreateMany is idempotent), but
+	// in tests we want the failure surfaced.
+	if err := srv.refresh.EnsureIndexes(ctx); err != nil {
+		t.Fatalf("refresh ensure indexes: %v", err)
+	}
+	return srv
 }
 
 // createTestUser inserts a minimal user document and returns its ID.

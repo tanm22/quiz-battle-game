@@ -158,3 +158,41 @@ func TestVerify_EmptyTokenRejected(t *testing.T) {
 		t.Fatal("err is typed nil")
 	}
 }
+
+func TestAccessTokenTTLIsShortAndRefreshIsLong(t *testing.T) {
+	// AccessTokenTTL ≤ 1h is the contract: revocation must propagate
+	// in an hour at most. The original plan asked for 15min, but the
+	// Flutter client lacks an auto-refresh interceptor on UNAUTHENTICATED
+	// today, so 15min would surface as random forced logouts. 1h is
+	// the documented compromise — see jwt.go.
+	if AccessTokenTTL > time.Hour {
+		t.Errorf("AccessTokenTTL = %v, want <= 1h to bound revocation latency", AccessTokenTTL)
+	}
+	if RefreshTokenTTL < 7*24*time.Hour {
+		t.Errorf("RefreshTokenTTL = %v, want >= 7d so users aren't forced to re-login too often", RefreshTokenTTL)
+	}
+}
+
+func TestGenerateAccessTokenIncludesJTI(t *testing.T) {
+	tok, jti, err := GenerateAccessToken("u-1", "alice", "secret")
+	if err != nil {
+		t.Fatalf("GenerateAccessToken: %v", err)
+	}
+	claims, err := VerifyToken(tok, "secret")
+	if err != nil {
+		t.Fatalf("VerifyToken: %v", err)
+	}
+	if claims.ID == "" || claims.ID != jti {
+		t.Errorf("jti=%q, want non-empty and match returned %q", claims.ID, jti)
+	}
+}
+
+func TestGenerateRefreshTokenIDReturnsHexString(t *testing.T) {
+	id, err := GenerateRefreshTokenID()
+	if err != nil {
+		t.Fatalf("GenerateRefreshTokenID: %v", err)
+	}
+	if len(id) < 32 {
+		t.Errorf("refresh id %q too short (got %d bytes)", id, len(id))
+	}
+}

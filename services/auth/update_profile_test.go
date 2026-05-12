@@ -58,3 +58,31 @@ func TestUpdateProfile_PersistsFields(t *testing.T) {
 		t.Errorf("preferredTopics: got %v", topics)
 	}
 }
+
+func TestUpdateProfile_RejectsInvalidTopicValue(t *testing.T) {
+	srv := newTestAuthServer(t)
+	uid := createTestUser(t, srv, "alice_invalid_topic")
+	ctx := auth.ContextWithClaims(context.Background(), &auth.Claims{UserID: uid, Username: "alice_invalid_topic"})
+	_, err := srv.UpdateProfile(ctx, &pb.UpdateProfileRequest{
+		PreferredTopics: []string{"history", "", "science"}, // empty in the middle
+	})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("err=%v, want InvalidArgument", err)
+	}
+}
+
+func TestUpdateProfile_RejectsTooLongTopic(t *testing.T) {
+	srv := newTestAuthServer(t)
+	uid := createTestUser(t, srv, "alice_long_topic")
+	ctx := auth.ContextWithClaims(context.Background(), &auth.Claims{UserID: uid, Username: "alice_long_topic"})
+	long := make([]byte, 65)
+	for i := range long {
+		long[i] = 'x'
+	}
+	_, err := srv.UpdateProfile(ctx, &pb.UpdateProfileRequest{
+		PreferredTopics: []string{"history", string(long)},
+	})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("err=%v, want InvalidArgument", err)
+	}
+}

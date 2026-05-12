@@ -1342,6 +1342,27 @@ class AuthServiceClient extends $grpc.Client {
     return $createUnaryCall(_$updateProfile, request, options: options);
   }
 
+  /// §4.7 PR-A1: refresh-token rotation. Client presents a refresh token
+  /// (single-use); server rotates it (mints a new refresh, revokes the
+  /// old in the same family) and issues a fresh access JWT. Replay of an
+  /// already-rotated token revokes the whole family — standard refresh-
+  /// reuse defense against a stolen token.
+  $grpc.ResponseFuture<$0.RefreshTokenResponse> refreshToken(
+    $0.RefreshTokenRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$refreshToken, request, options: options);
+  }
+
+  /// Revokes the family the presented refresh token belongs to. Covers
+  /// every device sharing the same login lineage. Idempotent.
+  $grpc.ResponseFuture<$0.LogoutResponse> logout(
+    $0.LogoutRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$logout, request, options: options);
+  }
+
   // method descriptors
 
   static final _$register =
@@ -1418,6 +1439,16 @@ class AuthServiceClient extends $grpc.Client {
           '/quiz.AuthService/UpdateProfile',
           ($0.UpdateProfileRequest value) => value.writeToBuffer(),
           $0.UpdateProfileResponse.fromBuffer);
+  static final _$refreshToken =
+      $grpc.ClientMethod<$0.RefreshTokenRequest, $0.RefreshTokenResponse>(
+          '/quiz.AuthService/RefreshToken',
+          ($0.RefreshTokenRequest value) => value.writeToBuffer(),
+          $0.RefreshTokenResponse.fromBuffer);
+  static final _$logout =
+      $grpc.ClientMethod<$0.LogoutRequest, $0.LogoutResponse>(
+          '/quiz.AuthService/Logout',
+          ($0.LogoutRequest value) => value.writeToBuffer(),
+          $0.LogoutResponse.fromBuffer);
 }
 
 @$pb.GrpcServiceName('quiz.AuthService')
@@ -1550,6 +1581,22 @@ abstract class AuthServiceBase extends $grpc.Service {
             ($core.List<$core.int> value) =>
                 $0.UpdateProfileRequest.fromBuffer(value),
             ($0.UpdateProfileResponse value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.RefreshTokenRequest, $0.RefreshTokenResponse>(
+            'RefreshToken',
+            refreshToken_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.RefreshTokenRequest.fromBuffer(value),
+            ($0.RefreshTokenResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.LogoutRequest, $0.LogoutResponse>(
+        'Logout',
+        logout_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.LogoutRequest.fromBuffer(value),
+        ($0.LogoutResponse value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.AuthResponse> register_Pre($grpc.ServiceCall $call,
@@ -1681,6 +1728,23 @@ abstract class AuthServiceBase extends $grpc.Service {
 
   $async.Future<$0.UpdateProfileResponse> updateProfile(
       $grpc.ServiceCall call, $0.UpdateProfileRequest request);
+
+  $async.Future<$0.RefreshTokenResponse> refreshToken_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.RefreshTokenRequest> $request) async {
+    return refreshToken($call, await $request);
+  }
+
+  $async.Future<$0.RefreshTokenResponse> refreshToken(
+      $grpc.ServiceCall call, $0.RefreshTokenRequest request);
+
+  $async.Future<$0.LogoutResponse> logout_Pre(
+      $grpc.ServiceCall $call, $async.Future<$0.LogoutRequest> $request) async {
+    return logout($call, await $request);
+  }
+
+  $async.Future<$0.LogoutResponse> logout(
+      $grpc.ServiceCall call, $0.LogoutRequest request);
 }
 
 @$pb.GrpcServiceName('quiz.PaymentService')

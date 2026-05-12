@@ -2,6 +2,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:grpc/grpc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../proto/quiz.pbgrpc.dart';
+import 'auth_storage.dart';
 import 'fcm_service.dart';
 
 /// Singleton auth service — handles registration, login, guest login,
@@ -108,6 +109,7 @@ class AuthService {
       req.referralCode = referralCode;
     }
     final resp = await _client.register(req, options: _opts());
+    await _persistTokensFromAuthResponse(resp);
     _token = resp.token;
     _userId = resp.userId;
     _username = resp.username;
@@ -127,6 +129,7 @@ class AuthService {
         ..password = password,
       options: _opts(),
     );
+    await _persistTokensFromAuthResponse(resp);
     _token = resp.token;
     _userId = resp.userId;
     _username = resp.username;
@@ -141,6 +144,7 @@ class AuthService {
 
   Future<void> guestLogin() async {
     final resp = await _client.guestLogin(GuestLoginRequest(), options: _opts());
+    await _persistTokensFromAuthResponse(resp);
     _token = resp.token;
     _userId = resp.userId;
     _username = resp.username;
@@ -177,6 +181,12 @@ class AuthService {
     }
 
     final resp = await _client.googleSignIn(req, options: _opts());
+    if (resp.refreshToken.isNotEmpty) {
+      await AuthStorage.instance.writeRefreshToken(resp.refreshToken);
+    }
+    if (resp.token.isNotEmpty && resp.expiresIn > 0) {
+      AuthStorage.instance.setAccessToken(resp.token, Duration(seconds: resp.expiresIn.toInt()));
+    }
     final profile = resp.userProfile;
     _token = resp.token;
     _userId = profile.userId;
@@ -213,6 +223,12 @@ class AuthService {
     );
     // If a token is returned (e.g. email login flow), store auth state
     if (resp.token.isNotEmpty) {
+      if (resp.refreshToken.isNotEmpty) {
+        await AuthStorage.instance.writeRefreshToken(resp.refreshToken);
+      }
+      if (resp.expiresIn > 0) {
+        AuthStorage.instance.setAccessToken(resp.token, Duration(seconds: resp.expiresIn.toInt()));
+      }
       _token = resp.token;
       _userId = resp.userId;
       _email = email;
@@ -367,7 +383,62 @@ class AuthService {
     'auth_preferred_topics',
   ];
 
+  // §4.7 PR-A1: shared persistence path for paired tokens issued by
+  // AuthResponse-returning RPCs (Register, Login, GuestLogin). Writes
+  // the refresh to secure storage and stashes the access in memory
+  // with its server-side TTL so the gRPC client can read it back
+  // without re-decoding the JWT.
+  Future<void> _persistTokensFromAuthResponse(AuthResponse resp) async {
+    if (resp.refreshToken.isNotEmpty) {
+      await AuthStorage.instance.writeRefreshToken(resp.refreshToken);
+    }
+    if (resp.token.isNotEmpty && resp.expiresIn > 0) {
+      AuthStorage.instance.setAccessToken(
+        resp.token,
+        Duration(seconds: resp.expiresIn.toInt()),
+      );
+    }
+  }
+
+  // §4.7 PR-A1: rotate the cached access token using the persisted
+  // refresh. Returns the new access token on success, null on any
+  // failure (caller should treat as "log in again").
+  Future<String?> refreshAccessToken() async {
+    final refresh = await AuthStorage.instance.readRefreshToken();
+    if (refresh == null) return null;
+    try {
+      final resp = await _client.refreshToken(
+        RefreshTokenRequest()..refreshToken = refresh,
+      );
+      AuthStorage.instance.setAccessToken(
+        resp.accessToken,
+        Duration(seconds: resp.expiresIn.toInt()),
+      );
+      await AuthStorage.instance.writeRefreshToken(resp.refreshToken);
+      _token = resp.accessToken;
+      return resp.accessToken;
+    } catch (_) {
+      await AuthStorage.instance.clearRefreshToken();
+      AuthStorage.instance.clearAccessToken();
+      return null;
+    }
+  }
+
   Future<void> logout() async {
+    // §4.7 PR-A1: best-effort server-side revocation of the entire
+    // refresh-token family. We don't await success — the local clear
+    // below is what makes "Logout" feel like Logout to the user. A
+    // dropped network or down server still results in a clean app
+    // state; the orphan family expires on its own TTL.
+    final refresh = await AuthStorage.instance.readRefreshToken();
+    if (refresh != null) {
+      try {
+        await _client.logout(LogoutRequest()..refreshToken = refresh);
+      } catch (_) { /* best-effort */ }
+    }
+    await AuthStorage.instance.clearRefreshToken();
+    AuthStorage.instance.clearAccessToken();
+
     try { await GoogleSignIn().signOut(); } catch (_) {}
     // Tear down FCM listeners + clear the singleton's _initialized flag so
     // a subsequent registerForUser (e.g. another user signing in during the

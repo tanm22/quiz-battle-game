@@ -517,6 +517,8 @@ const AuthResponse$json = {
       '5': 8,
       '10': 'onboardingCompleted'
     },
+    {'1': 'refresh_token', '3': 16, '4': 1, '5': 9, '10': 'refreshToken'},
+    {'1': 'expires_in', '3': 17, '4': 1, '5': 3, '10': 'expiresIn'},
   ],
 };
 
@@ -530,7 +532,8 @@ final $typed_data.Uint8List authResponseDescriptor = $convert.base64Decode(
     'gLMhAucXVpei5TdHJlYWtJbmZvUgZzdHJlYWsSIwoNcmVmZXJyYWxfY29kZRgMIAEoCVIMcmVm'
     'ZXJyYWxDb2RlEiUKDnN0cmVha191cGRhdGVkGA0gASgIUg1zdHJlYWtVcGRhdGVkEikKBnJld2'
     'FyZBgOIAEoCzIRLnF1aXouUmV3YXJkR3JhbnRSBnJld2FyZBIxChRvbmJvYXJkaW5nX2NvbXBs'
-    'ZXRlZBgPIAEoCFITb25ib2FyZGluZ0NvbXBsZXRlZA==');
+    'ZXRlZBgPIAEoCFITb25ib2FyZGluZ0NvbXBsZXRlZBIjCg1yZWZyZXNoX3Rva2VuGBAgASgJUg'
+    'xyZWZyZXNoVG9rZW4SHQoKZXhwaXJlc19pbhgRIAEoA1IJZXhwaXJlc0lu');
 
 @$core.Deprecated('Use getProfileRequestDescriptor instead')
 const GetProfileRequest$json = {
@@ -658,14 +661,17 @@ const VerifyEmailCodeResponse$json = {
     {'1': 'verified', '3': 1, '4': 1, '5': 8, '10': 'verified'},
     {'1': 'token', '3': 2, '4': 1, '5': 9, '10': 'token'},
     {'1': 'user_id', '3': 3, '4': 1, '5': 9, '10': 'userId'},
+    {'1': 'refresh_token', '3': 4, '4': 1, '5': 9, '10': 'refreshToken'},
+    {'1': 'expires_in', '3': 5, '4': 1, '5': 3, '10': 'expiresIn'},
   ],
 };
 
 /// Descriptor for `VerifyEmailCodeResponse`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List verifyEmailCodeResponseDescriptor =
-    $convert.base64Decode(
-        'ChdWZXJpZnlFbWFpbENvZGVSZXNwb25zZRIaCgh2ZXJpZmllZBgBIAEoCFIIdmVyaWZpZWQSFA'
-        'oFdG9rZW4YAiABKAlSBXRva2VuEhcKB3VzZXJfaWQYAyABKAlSBnVzZXJJZA==');
+final $typed_data.Uint8List verifyEmailCodeResponseDescriptor = $convert.base64Decode(
+    'ChdWZXJpZnlFbWFpbENvZGVSZXNwb25zZRIaCgh2ZXJpZmllZBgBIAEoCFIIdmVyaWZpZWQSFA'
+    'oFdG9rZW4YAiABKAlSBXRva2VuEhcKB3VzZXJfaWQYAyABKAlSBnVzZXJJZBIjCg1yZWZyZXNo'
+    'X3Rva2VuGAQgASgJUgxyZWZyZXNoVG9rZW4SHQoKZXhwaXJlc19pbhgFIAEoA1IJZXhwaXJlc0'
+    'lu');
 
 @$core.Deprecated('Use linkEmailRequestDescriptor instead')
 const LinkEmailRequest$json = {
@@ -1018,6 +1024,8 @@ const GoogleSignInResponse$json = {
       '6': '.quiz.RewardGrant',
       '10': 'reward'
     },
+    {'1': 'refresh_token', '3': 6, '4': 1, '5': 9, '10': 'refreshToken'},
+    {'1': 'expires_in', '3': 7, '4': 1, '5': 3, '10': 'expiresIn'},
   ],
 };
 
@@ -1026,7 +1034,9 @@ final $typed_data.Uint8List googleSignInResponseDescriptor = $convert.base64Deco
     'ChRHb29nbGVTaWduSW5SZXNwb25zZRIUCgV0b2tlbhgBIAEoCVIFdG9rZW4SNAoMdXNlcl9wcm'
     '9maWxlGAIgASgLMhEucXVpei5Vc2VyUHJvZmlsZVILdXNlclByb2ZpbGUSHgoLaXNfbmV3X3Vz'
     'ZXIYAyABKAhSCWlzTmV3VXNlchIlCg5zdHJlYWtfdXBkYXRlZBgEIAEoCFINc3RyZWFrVXBkYX'
-    'RlZBIpCgZyZXdhcmQYBSABKAsyES5xdWl6LlJld2FyZEdyYW50UgZyZXdhcmQ=');
+    'RlZBIpCgZyZXdhcmQYBSABKAsyES5xdWl6LlJld2FyZEdyYW50UgZyZXdhcmQSIwoNcmVmcmVz'
+    'aF90b2tlbhgGIAEoCVIMcmVmcmVzaFRva2VuEh0KCmV4cGlyZXNfaW4YByABKANSCWV4cGlyZX'
+    'NJbg==');
 
 @$core.Deprecated('Use userProfileDescriptor instead')
 const UserProfile$json = {
@@ -2434,3 +2444,56 @@ final $typed_data.Uint8List getMonthlyRecapResponseDescriptor = $convert.base64D
     'aW5zGAQgASgFUgR3aW5zEhkKCHdpbl9yYXRlGAUgASgBUgd3aW5SYXRlEiUKDmZhdm9yaXRlX3'
     'RvcGljGAYgASgJUg1mYXZvcml0ZVRvcGljEjYKF2xvbmdlc3Rfc3RyZWFrX2xpZmV0aW1lGAcg'
     'ASgFUhVsb25nZXN0U3RyZWFrTGlmZXRpbWUSGQoIaGFzX2RhdGEYCCABKAhSB2hhc0RhdGE=');
+
+@$core.Deprecated('Use refreshTokenRequestDescriptor instead')
+const RefreshTokenRequest$json = {
+  '1': 'RefreshTokenRequest',
+  '2': [
+    {'1': 'refresh_token', '3': 1, '4': 1, '5': 9, '10': 'refreshToken'},
+  ],
+};
+
+/// Descriptor for `RefreshTokenRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List refreshTokenRequestDescriptor = $convert.base64Decode(
+    'ChNSZWZyZXNoVG9rZW5SZXF1ZXN0EiMKDXJlZnJlc2hfdG9rZW4YASABKAlSDHJlZnJlc2hUb2'
+    'tlbg==');
+
+@$core.Deprecated('Use refreshTokenResponseDescriptor instead')
+const RefreshTokenResponse$json = {
+  '1': 'RefreshTokenResponse',
+  '2': [
+    {'1': 'access_token', '3': 1, '4': 1, '5': 9, '10': 'accessToken'},
+    {'1': 'refresh_token', '3': 2, '4': 1, '5': 9, '10': 'refreshToken'},
+    {'1': 'expires_in', '3': 3, '4': 1, '5': 3, '10': 'expiresIn'},
+  ],
+};
+
+/// Descriptor for `RefreshTokenResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List refreshTokenResponseDescriptor = $convert.base64Decode(
+    'ChRSZWZyZXNoVG9rZW5SZXNwb25zZRIhCgxhY2Nlc3NfdG9rZW4YASABKAlSC2FjY2Vzc1Rva2'
+    'VuEiMKDXJlZnJlc2hfdG9rZW4YAiABKAlSDHJlZnJlc2hUb2tlbhIdCgpleHBpcmVzX2luGAMg'
+    'ASgDUglleHBpcmVzSW4=');
+
+@$core.Deprecated('Use logoutRequestDescriptor instead')
+const LogoutRequest$json = {
+  '1': 'LogoutRequest',
+  '2': [
+    {'1': 'refresh_token', '3': 1, '4': 1, '5': 9, '10': 'refreshToken'},
+  ],
+};
+
+/// Descriptor for `LogoutRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List logoutRequestDescriptor = $convert.base64Decode(
+    'Cg1Mb2dvdXRSZXF1ZXN0EiMKDXJlZnJlc2hfdG9rZW4YASABKAlSDHJlZnJlc2hUb2tlbg==');
+
+@$core.Deprecated('Use logoutResponseDescriptor instead')
+const LogoutResponse$json = {
+  '1': 'LogoutResponse',
+  '2': [
+    {'1': 'success', '3': 1, '4': 1, '5': 8, '10': 'success'},
+  ],
+};
+
+/// Descriptor for `LogoutResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List logoutResponseDescriptor = $convert
+    .base64Decode('Cg5Mb2dvdXRSZXNwb25zZRIYCgdzdWNjZXNzGAEgASgIUgdzdWNjZXNz');
