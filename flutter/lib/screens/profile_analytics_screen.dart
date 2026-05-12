@@ -295,7 +295,9 @@ class _TopicRow extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Percentile card — p50/p90/p95/p99
+// Response-time card — single average tile (percentiles still in
+// proto for advanced UI / debug surfaces, but the profile screen
+// surfaces just the headline mean).
 // ---------------------------------------------------------------------------
 
 class _PercentileCard extends StatelessWidget {
@@ -305,7 +307,7 @@ class _PercentileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasEnough = rt.sampleCount >= 5;
+    final hasData = rt.sampleCount > 0;
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -320,19 +322,13 @@ class _PercentileCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          if (!hasEnough)
-            _MutedRow(
-                '${rt.sampleCount} answers logged — keep playing for more accurate stats (need 5+).')
+          if (!hasData)
+            const _MutedRow(
+                'No answers logged yet — play a match and your average will show up here.')
           else
             Row(
               children: [
-                Expanded(child: _pctTile('p50', rt.p50Ms)),
-                const SizedBox(width: 8),
-                Expanded(child: _pctTile('p90', rt.p90Ms)),
-                const SizedBox(width: 8),
-                Expanded(child: _pctTile('p95', rt.p95Ms)),
-                const SizedBox(width: 8),
-                Expanded(child: _pctTile('p99', rt.p99Ms)),
+                Expanded(child: _avgTile('Average', rt.avgMs)),
               ],
             ),
         ],
@@ -340,9 +336,9 @@ class _PercentileCard extends StatelessWidget {
     );
   }
 
-  Widget _pctTile(String label, double ms) {
+  Widget _avgTile(String label, double ms) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: 14),
       decoration: BoxDecoration(
         color: AppColors.cardTint,
         borderRadius: AppRadius.button,
@@ -350,10 +346,10 @@ class _PercentileCard extends StatelessWidget {
       child: Column(
         children: [
           Text(label, style: const TextStyle(color: AppColors.textMuted, fontSize: 11)),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text('${(ms / 1000).toStringAsFixed(1)}s',
               style: const TextStyle(
-                  color: AppColors.text, fontWeight: FontWeight.w800, fontSize: 16)),
+                  color: AppColors.text, fontWeight: FontWeight.w800, fontSize: 22)),
         ],
       ),
     );

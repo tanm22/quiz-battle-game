@@ -9466,6 +9466,7 @@ class ResponseTimePercentiles extends $pb.GeneratedMessage {
     $core.double? p95Ms,
     $core.double? p99Ms,
     $fixnum.Int64? sampleCount,
+    $core.double? avgMs,
   }) {
     final result = create();
     if (p50Ms != null) result.p50Ms = p50Ms;
@@ -9473,6 +9474,7 @@ class ResponseTimePercentiles extends $pb.GeneratedMessage {
     if (p95Ms != null) result.p95Ms = p95Ms;
     if (p99Ms != null) result.p99Ms = p99Ms;
     if (sampleCount != null) result.sampleCount = sampleCount;
+    if (avgMs != null) result.avgMs = avgMs;
     return result;
   }
 
@@ -9494,6 +9496,7 @@ class ResponseTimePercentiles extends $pb.GeneratedMessage {
     ..aD(3, _omitFieldNames ? '' : 'p95Ms')
     ..aD(4, _omitFieldNames ? '' : 'p99Ms')
     ..aInt64(5, _omitFieldNames ? '' : 'sampleCount')
+    ..aD(6, _omitFieldNames ? '' : 'avgMs')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -9518,8 +9521,9 @@ class ResponseTimePercentiles extends $pb.GeneratedMessage {
 
   /// Each value is the actual response time in ms (server-reported
   /// serverTimestamp - clientTimestamp at answer submit time, clamped
-  /// to [0, 15000] in scoring). Zero when n < 5 — the client should
-  /// treat zeros as "not enough data" rather than "answered instantly."
+  /// to [0, 15000] in scoring). Percentiles are zero when sample_count
+  /// is below analyticsMinPercentile (= 20) — the client should treat
+  /// zeros as "not enough data" rather than "answered instantly."
   @$pb.TagNumber(1)
   $core.double get p50Ms => $_getN(0);
   @$pb.TagNumber(1)
@@ -9566,6 +9570,20 @@ class ResponseTimePercentiles extends $pb.GeneratedMessage {
   $core.bool hasSampleCount() => $_has(4);
   @$pb.TagNumber(5)
   void clearSampleCount() => $_clearField(5);
+
+  /// Mean response time in ms across all logged answers. Always
+  /// populated when sample_count > 0 (no minimum-sample gate), since
+  /// the average is meaningful at N=1. The profile screen surfaces
+  /// this as the single response-time stat; the percentiles above
+  /// remain on the response for advanced UI / debug surfaces.
+  @$pb.TagNumber(6)
+  $core.double get avgMs => $_getN(5);
+  @$pb.TagNumber(6)
+  set avgMs($core.double value) => $_setDouble(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasAvgMs() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearAvgMs() => $_clearField(6);
 }
 
 class RatingPoint extends $pb.GeneratedMessage {

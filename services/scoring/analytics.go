@@ -63,17 +63,18 @@ func (s *scoringServer) GetUserAnalytics(ctx context.Context, _ *pb.GetUserAnaly
 	out.TopicAccuracy = topicAccuracy
 	out.HasData = totalAnswers > 0
 
-	// Response-time percentiles — only emit values once we have enough
-	// samples for the percentile to mean anything. Below the floor the
-	// client renders an empty-state copy ("N answers logged — keep
-	// playing").
-	if totalAnswers >= analyticsMinPercentile {
-		percentiles, err := s.aggregatePercentiles(ctx, userID)
+	// Response-time stats. The average is always populated when the user
+	// has answers (it's meaningful at N=1); percentile fields are gated
+	// inside aggregateResponseTimes by analyticsMinPercentile and stay
+	// zero below that floor so the client can render "not enough data"
+	// copy without divide-by-N-collapsed values bleeding into the UI.
+	if totalAnswers > 0 {
+		rt, err := s.aggregateResponseTimes(ctx, userID)
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "percentiles: %v", err)
+			return nil, status.Errorf(codes.Internal, "response time stats: %v", err)
 		}
-		percentiles.SampleCount = totalAnswers
-		out.ResponseTime = percentiles
+		rt.SampleCount = totalAnswers
+		out.ResponseTime = rt
 	} else {
 		out.ResponseTime.SampleCount = totalAnswers
 	}
@@ -226,15 +227,20 @@ func (s *scoringServer) aggregateTopicAccuracy(ctx context.Context, userID strin
 	return rows, grandTotal, nil
 }
 
-// aggregatePercentiles streams the user's responseTimeMs values
-// sorted-ascending and computes nearest-rank percentiles in Go.
+// aggregateResponseTimes streams the user's responseTimeMs values
+// sorted-ascending and computes the average + nearest-rank percentiles
+// in Go. The average is always populated when N > 0 (it's meaningful
+// at any sample size). Percentile fields are zero below
+// analyticsMinPercentile because at small N the nearest-rank formula
+// collapses p90/p95/p99 to the maximum value, which renders three
+// identical numbers in the UI.
 //
 // We deliberately avoid Mongo's `$percentile` accumulator — it was added
 // in 7.0 and the project's docker-compose pins `mongo:6`. With N ≤ a
 // few thousand answers per user the in-memory pass is trivial; if the
 // dataset ever grows past that we'd prefer a dedicated metrics store
 // over server-side approximation anyway.
-func (s *scoringServer) aggregatePercentiles(ctx context.Context, userID string) (*pb.ResponseTimePercentiles, error) {
+func (s *scoringServer) aggregateResponseTimes(ctx context.Context, userID string) (*pb.ResponseTimePercentiles, error) {
 	cursor, err := s.mongoDB.Collection("answer_log").Find(ctx,
 		bson.M{"userId": userID},
 		options.Find().
@@ -252,7 +258,7 @@ func (s *scoringServer) aggregatePercentiles(ctx context.Context, userID string)
 			ResponseTimeMs float64 `bson:"responseTimeMs"`
 		}
 		if err := cursor.Decode(&doc); err != nil {
-			log.FromContext(ctx).Warn("aggregatePercentiles decode error",
+			log.FromContext(ctx).Warn("aggregateResponseTimes decode error",
 				"component", "analytics", "user_id", userID, "err", err)
 			continue
 		}
@@ -265,9 +271,25 @@ func (s *scoringServer) aggregatePercentiles(ctx context.Context, userID string)
 		return &pb.ResponseTimePercentiles{}, nil
 	}
 
+	// Average — defined for any N>0, surfaced as the headline response-
+	// time stat on the profile screen.
+	var total float64
+	for _, v := range values {
+		total += v
+	}
+	result := &pb.ResponseTimePercentiles{
+		AvgMs: total / float64(len(values)),
+	}
+
 	// Nearest-rank percentile: index = ceil(N * p) - 1, clamped to
 	// [0, N-1]. For sorted-ascending arrays this gives the lowest
 	// value whose CDF is ≥ p, matching the textbook NIST definition.
+	// Only meaningful at N >= analyticsMinPercentile; below the floor
+	// we leave the percentile fields zero and let the client render
+	// "average only" copy.
+	if len(values) < analyticsMinPercentile {
+		return result, nil
+	}
 	pct := func(p float64) float64 {
 		n := float64(len(values))
 		idx := int(math.Ceil(n*p)) - 1
@@ -279,12 +301,11 @@ func (s *scoringServer) aggregatePercentiles(ctx context.Context, userID string)
 		}
 		return values[idx]
 	}
-	return &pb.ResponseTimePercentiles{
-		P50Ms: pct(0.50),
-		P90Ms: pct(0.90),
-		P95Ms: pct(0.95),
-		P99Ms: pct(0.99),
-	}, nil
+	result.P50Ms = pct(0.50)
+	result.P90Ms = pct(0.90)
+	result.P95Ms = pct(0.95)
+	result.P99Ms = pct(0.99)
+	return result, nil
 }
 
 // aggregateRatingHistory pulls the last `days` of rating snapshots for
@@ -352,22 +373,44 @@ func (s *scoringServer) aggregateRatingHistory(ctx context.Context, userID strin
 	return out, nil
 }
 
-// lifetimeMatchTotals reads matchesPlayed + wins straight off the user
-// document. These are maintained by persistMatch's $inc-per-match
-// (existing logic, unchanged).
+// lifetimeMatchTotals counts the caller's matches and wins straight off
+// the match_history collection — the same authoritative source the
+// History screen pages through. Previously this read from
+// users.matchesPlayed / users.wins, but persistMatch only increments
+// those counters via the leaderboard-entry loop, so any match the
+// player finished with score=0 (every round timed out, every answer
+// wrong) was silently dropped from the user counter even though the
+// match_history row was correctly written. That mismatch surfaced as
+// the Stats screen showing "2 Matches" while the History screen listed
+// 6. Aggregating from match_history keeps both screens in sync and
+// follows the same pattern as matchTotalsInWindow (which has always
+// been correct because it never read the stale counters).
 func (s *scoringServer) lifetimeMatchTotals(ctx context.Context, userID string) (matches, wins int32, err error) {
+	pipeline := mongo.Pipeline{
+		{{Key: "$match", Value: bson.M{"players.userId": userID}}},
+		{{Key: "$group", Value: bson.M{
+			"_id":     nil,
+			"matches": bson.M{"$sum": 1},
+			"wins":    bson.M{"$sum": bson.M{"$cond": []any{bson.M{"$eq": []any{"$winner", userID}}, 1, 0}}},
+		}}},
+	}
+	cursor, err := s.mongoDB.Collection("match_history").Aggregate(ctx, pipeline)
+	if err != nil {
+		return 0, 0, fmt.Errorf("aggregate: %w", err)
+	}
+	defer cursor.Close(ctx)
+	if !cursor.Next(ctx) {
+		// No match_history rows yet — fresh account.
+		return 0, 0, nil
+	}
 	var doc struct {
-		MatchesPlayed int32 `bson:"matchesPlayed"`
-		Wins          int32 `bson:"wins"`
+		Matches int32 `bson:"matches"`
+		Wins    int32 `bson:"wins"`
 	}
-	if err := s.mongoDB.Collection("users").
-		FindOne(ctx, bson.M{"_id": userID}).Decode(&doc); err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			return 0, 0, nil
-		}
-		return 0, 0, err
+	if err := cursor.Decode(&doc); err != nil {
+		return 0, 0, fmt.Errorf("decode: %w", err)
 	}
-	return doc.MatchesPlayed, doc.Wins, nil
+	return doc.Matches, doc.Wins, nil
 }
 
 func (s *scoringServer) lifetimeLongestStreak(ctx context.Context, userID string) (int32, error) {

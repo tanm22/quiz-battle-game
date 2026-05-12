@@ -1011,8 +1011,9 @@ message TopicAccuracy {
 message ResponseTimePercentiles {
   // Each value is the actual response time in ms (server-reported
   // serverTimestamp - clientTimestamp at answer submit time, clamped
-  // to [0, 15000] in scoring). Zero when n < 5 — the client should
-  // treat zeros as "not enough data" rather than "answered instantly."
+  // to [0, 15000] in scoring). Percentiles are zero when sample_count
+  // is below analyticsMinPercentile (= 20) — the client should treat
+  // zeros as "not enough data" rather than "answered instantly."
   double p50_ms = 1;
   double p90_ms = 2;
   double p95_ms = 3;
@@ -1020,6 +1021,12 @@ message ResponseTimePercentiles {
   // Sample count — surfaced so the client can render the empty-state
   // copy ("4 answers logged — keep playing for more accurate stats").
   int64  sample_count = 5;
+  // Mean response time in ms across all logged answers. Always
+  // populated when sample_count > 0 (no minimum-sample gate), since
+  // the average is meaningful at N=1. The profile screen surfaces
+  // this as the single response-time stat; the percentiles above
+  // remain on the response for advanced UI / debug surfaces.
+  double avg_ms = 6;
 }
 
 message RatingPoint {

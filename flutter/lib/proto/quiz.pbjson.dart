@@ -2378,6 +2378,7 @@ const ResponseTimePercentiles$json = {
     {'1': 'p95_ms', '3': 3, '4': 1, '5': 1, '10': 'p95Ms'},
     {'1': 'p99_ms', '3': 4, '4': 1, '5': 1, '10': 'p99Ms'},
     {'1': 'sample_count', '3': 5, '4': 1, '5': 3, '10': 'sampleCount'},
+    {'1': 'avg_ms', '3': 6, '4': 1, '5': 1, '10': 'avgMs'},
   ],
 };
 
@@ -2385,7 +2386,8 @@ const ResponseTimePercentiles$json = {
 final $typed_data.Uint8List responseTimePercentilesDescriptor = $convert.base64Decode(
     'ChdSZXNwb25zZVRpbWVQZXJjZW50aWxlcxIVCgZwNTBfbXMYASABKAFSBXA1ME1zEhUKBnA5MF'
     '9tcxgCIAEoAVIFcDkwTXMSFQoGcDk1X21zGAMgASgBUgVwOTVNcxIVCgZwOTlfbXMYBCABKAFS'
-    'BXA5OU1zEiEKDHNhbXBsZV9jb3VudBgFIAEoA1ILc2FtcGxlQ291bnQ=');
+    'BXA5OU1zEiEKDHNhbXBsZV9jb3VudBgFIAEoA1ILc2FtcGxlQ291bnQSFQoGYXZnX21zGAYgAS'
+    'gBUgVhdmdNcw==');
 
 @$core.Deprecated('Use ratingPointDescriptor instead')
 const RatingPoint$json = {

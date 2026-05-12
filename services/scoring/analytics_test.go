@@ -147,20 +147,23 @@ func TestGetUserAnalytics_PercentilesGatedByMinSamples(t *testing.T) {
 	srv, c, db := scoringTestEnv(t)
 	seedScoringUser(t, c, db, "alice", 0)
 
-	// 19 answers — one under the 20-sample floor, so percentiles must
-	// stay zero even though we have data. The floor protects against
-	// statistically-meaningless values (at the previous N=5 floor
-	// p90/p95/p99 all collapsed to the max).
+	// 19 answers — one under the 20-sample floor, so percentile fields
+	// must stay zero. The average is always populated when N > 0 since
+	// the mean is meaningful at any sample size.
 	when := time.Now().UTC()
 	for i := int64(1); i <= 19; i++ {
 		seedAnswerLog(t, c, db, "alice", "science", true, i*100, when)
 	}
 	resp, _ := srv.GetUserAnalytics(analyticsAuthedCtx("alice"), &pb.GetUserAnalyticsRequest{})
 	if resp.ResponseTime.P50Ms != 0 || resp.ResponseTime.P99Ms != 0 {
-		t.Errorf("percentiles must be zero below the sample floor: %+v", resp.ResponseTime)
+		t.Errorf("percentile fields must be zero below the sample floor: %+v", resp.ResponseTime)
 	}
 	if resp.ResponseTime.SampleCount != 19 {
 		t.Errorf("sample_count = %d, want 19", resp.ResponseTime.SampleCount)
+	}
+	// Mean of 100, 200, ..., 1900 = 1000ms exactly.
+	if resp.ResponseTime.AvgMs != 1000 {
+		t.Errorf("avg_ms = %v, want 1000 (mean of 100..1900)", resp.ResponseTime.AvgMs)
 	}
 }
 
@@ -189,6 +192,50 @@ func TestGetUserAnalytics_PercentilesAtAndAboveFloor(t *testing.T) {
 	// back in.
 	if !(rt.P50Ms > 0 && rt.P50Ms < rt.P90Ms && rt.P90Ms < rt.P95Ms && rt.P95Ms < rt.P99Ms) {
 		t.Errorf("percentiles must be strictly increasing at N=20: %+v", rt)
+	}
+	// Avg of 500, 1000, …, 10000 = 5250ms. Pinning the exact value
+	// guards against an accidental switch to median/mode if someone
+	// later refactors this code path.
+	if rt.AvgMs != 5250 {
+		t.Errorf("avg_ms = %v, want 5250 (mean of 500..10000 step 500)", rt.AvgMs)
+	}
+}
+
+// TestGetUserAnalytics_LifetimeMatchTotalsFromHistory pins the fix for
+// the "Stats says 2 matches, History shows 6" bug. lifetimeMatchTotals
+// must aggregate from match_history (the same source the History
+// screen pages through), not from users.matchesPlayed which is
+// undercounted when persistMatch's leaderboard-entry loop skips
+// score-zero participants.
+func TestGetUserAnalytics_LifetimeMatchTotalsFromHistory(t *testing.T) {
+	srv, c, db := scoringTestEnv(t)
+	// Seed user with deliberately-stale counter values — the analytics
+	// endpoint must IGNORE these and count from match_history.
+	seedScoringUser(t, c, db, "alice", 0)
+	_, _ = c.Database(db).Collection("users").UpdateOne(context.Background(),
+		bson.M{"_id": "alice"},
+		bson.M{"$set": bson.M{"matchesPlayed": int32(2), "wins": int32(1)}},
+	)
+	when := time.Now().UTC()
+	// Six match_history rows: alice wins one, the other five are
+	// score-zero participations (the case that breaks the stale
+	// counter).
+	seedMatchHistoryRow(t, c, db, "m1", "alice", []string{"alice", "bob"}, when)
+	seedMatchHistoryRow(t, c, db, "m2", "bob", []string{"alice", "bob"}, when)
+	seedMatchHistoryRow(t, c, db, "m3", "", []string{"alice", "bob"}, when) // no winner (both 0)
+	seedMatchHistoryRow(t, c, db, "m4", "", []string{"alice", "bob"}, when)
+	seedMatchHistoryRow(t, c, db, "m5", "", []string{"alice", "bob"}, when)
+	seedMatchHistoryRow(t, c, db, "m6", "", []string{"alice", "bob"}, when)
+
+	resp, err := srv.GetUserAnalytics(analyticsAuthedCtx("alice"), &pb.GetUserAnalyticsRequest{})
+	if err != nil {
+		t.Fatalf("GetUserAnalytics: %v", err)
+	}
+	if resp.LifetimeMatches != 6 {
+		t.Errorf("lifetime_matches = %d, want 6 (must reflect match_history, not the stale users.matchesPlayed=2)", resp.LifetimeMatches)
+	}
+	if resp.LifetimeWins != 1 {
+		t.Errorf("lifetime_wins = %d, want 1 (alice won m1 only)", resp.LifetimeWins)
 	}
 }
 

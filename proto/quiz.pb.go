@@ -7486,15 +7486,22 @@ type ResponseTimePercentiles struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Each value is the actual response time in ms (server-reported
 	// serverTimestamp - clientTimestamp at answer submit time, clamped
-	// to [0, 15000] in scoring). Zero when n < 5 — the client should
-	// treat zeros as "not enough data" rather than "answered instantly."
+	// to [0, 15000] in scoring). Percentiles are zero when sample_count
+	// is below analyticsMinPercentile (= 20) — the client should treat
+	// zeros as "not enough data" rather than "answered instantly."
 	P50Ms float64 `protobuf:"fixed64,1,opt,name=p50_ms,json=p50Ms,proto3" json:"p50_ms,omitempty"`
 	P90Ms float64 `protobuf:"fixed64,2,opt,name=p90_ms,json=p90Ms,proto3" json:"p90_ms,omitempty"`
 	P95Ms float64 `protobuf:"fixed64,3,opt,name=p95_ms,json=p95Ms,proto3" json:"p95_ms,omitempty"`
 	P99Ms float64 `protobuf:"fixed64,4,opt,name=p99_ms,json=p99Ms,proto3" json:"p99_ms,omitempty"`
 	// Sample count — surfaced so the client can render the empty-state
 	// copy ("4 answers logged — keep playing for more accurate stats").
-	SampleCount   int64 `protobuf:"varint,5,opt,name=sample_count,json=sampleCount,proto3" json:"sample_count,omitempty"`
+	SampleCount int64 `protobuf:"varint,5,opt,name=sample_count,json=sampleCount,proto3" json:"sample_count,omitempty"`
+	// Mean response time in ms across all logged answers. Always
+	// populated when sample_count > 0 (no minimum-sample gate), since
+	// the average is meaningful at N=1. The profile screen surfaces
+	// this as the single response-time stat; the percentiles above
+	// remain on the response for advanced UI / debug surfaces.
+	AvgMs         float64 `protobuf:"fixed64,6,opt,name=avg_ms,json=avgMs,proto3" json:"avg_ms,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -7560,6 +7567,13 @@ func (x *ResponseTimePercentiles) GetP99Ms() float64 {
 func (x *ResponseTimePercentiles) GetSampleCount() int64 {
 	if x != nil {
 		return x.SampleCount
+	}
+	return 0
+}
+
+func (x *ResponseTimePercentiles) GetAvgMs() float64 {
+	if x != nil {
+		return x.AvgMs
 	}
 	return 0
 }
@@ -8496,13 +8510,14 @@ const file_proto_quiz_proto_rawDesc = "" +
 	"\x05topic\x18\x01 \x01(\tR\x05topic\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\x05R\x05total\x12\x18\n" +
 	"\acorrect\x18\x03 \x01(\x05R\acorrect\x12%\n" +
-	"\x0eaccuracy_ratio\x18\x04 \x01(\x01R\raccuracyRatio\"\x98\x01\n" +
+	"\x0eaccuracy_ratio\x18\x04 \x01(\x01R\raccuracyRatio\"\xaf\x01\n" +
 	"\x17ResponseTimePercentiles\x12\x15\n" +
 	"\x06p50_ms\x18\x01 \x01(\x01R\x05p50Ms\x12\x15\n" +
 	"\x06p90_ms\x18\x02 \x01(\x01R\x05p90Ms\x12\x15\n" +
 	"\x06p95_ms\x18\x03 \x01(\x01R\x05p95Ms\x12\x15\n" +
 	"\x06p99_ms\x18\x04 \x01(\x01R\x05p99Ms\x12!\n" +
-	"\fsample_count\x18\x05 \x01(\x03R\vsampleCount\"@\n" +
+	"\fsample_count\x18\x05 \x01(\x03R\vsampleCount\x12\x15\n" +
+	"\x06avg_ms\x18\x06 \x01(\x01R\x05avgMs\"@\n" +
 	"\vRatingPoint\x12\x19\n" +
 	"\bunix_day\x18\x01 \x01(\x03R\aunixDay\x12\x16\n" +
 	"\x06rating\x18\x02 \x01(\x05R\x06rating\"B\n" +

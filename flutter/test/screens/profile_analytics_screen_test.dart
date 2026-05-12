@@ -21,6 +21,7 @@ GetUserAnalyticsResponse _populatedAnalytics() {
     ..lifetimeWins = 7
     ..responseTime = (ResponseTimePercentiles()
       ..sampleCount = Int64(50)
+      ..avgMs = 5000
       ..p50Ms = 3000
       ..p90Ms = 7000
       ..p95Ms = 9000
@@ -141,22 +142,31 @@ void main() {
     expect(find.text('80%'), findsOneWidget); // 24/30
     expect(find.text('40%'), findsOneWidget); // 8/20
 
-    // Percentile tiles, all four labels.
-    expect(find.text('p50'), findsOneWidget);
-    expect(find.text('p99'), findsOneWidget);
-    expect(find.text('3.0s'), findsOneWidget);
-    expect(find.text('12.0s'), findsOneWidget);
+    // Response-time card shows a single average tile (percentiles
+    // still in the proto for debug surfaces, but the profile screen
+    // surfaces only the headline mean).
+    expect(find.text('Average'), findsOneWidget);
+    expect(find.text('5.0s'), findsOneWidget); // 5000 ms / 1000
+    expect(find.text('p50'), findsNothing);
+    expect(find.text('p99'), findsNothing);
 
     // Monthly recap (populated).
     expect(find.text('Monthly recap'), findsOneWidget);
     expect(find.text('Favorite topic'), findsOneWidget);
   });
 
-  testWidgets('percentile card shows hint copy below the 5-sample floor', (tester) async {
+  testWidgets('response-time card shows the average tile at any N > 0', (tester) async {
+    // With the single-average UI, even a fresh user with 3 answers
+    // sees their mean response time. The percentile-sample floor still
+    // applies server-side to the p50/p90/p95/p99 fields, but the
+    // average is meaningful at N=1 so it renders unconditionally.
     await giveTallSurface(tester);
     final analytics = _populatedAnalytics()
       ..responseTime = (ResponseTimePercentiles()
         ..sampleCount = Int64(3)
+        ..avgMs = 2500
+        // Percentile fields stay zero — gated server-side below
+        // analyticsMinPercentile. The UI doesn't render them anyway.
         ..p50Ms = 0
         ..p90Ms = 0
         ..p95Ms = 0
@@ -168,9 +178,26 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    // The "keep playing" copy renders, no per-percentile tile.
-    expect(find.textContaining('keep playing'), findsOneWidget);
+    expect(find.text('Average'), findsOneWidget);
+    expect(find.text('2.5s'), findsOneWidget);
+    expect(find.textContaining('No answers logged'), findsNothing);
     expect(find.text('p50'), findsNothing);
+  });
+
+  testWidgets('response-time card shows empty-state when sample_count == 0',
+      (tester) async {
+    await giveTallSurface(tester);
+    final analytics = _populatedAnalytics()
+      ..responseTime = (ResponseTimePercentiles()..sampleCount = Int64(0));
+
+    await tester.pumpWidget(_wrap(
+      analytics: AsyncValue.data(analytics),
+      recap: AsyncValue.data(_emptyRecap()),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('No answers logged'), findsOneWidget);
+    expect(find.text('Average'), findsNothing);
   });
 
   testWidgets('topic accuracy renders zero topics with friendly empty hint',
