@@ -142,6 +142,17 @@ func (s *scoringServer) SendFriendRequest(ctx context.Context, req *pb.SendFrien
 			); err != nil {
 				return nil, status.Errorf(codes.Internal, "auto-accept: %v", err)
 			}
+			// Touch the auto-accepter's presence before notifying the
+			// original requester. Same rationale as RespondToFriendRequest's
+			// accept path: the sender's UI immediately refetches the
+			// friends list and reads presence; a missing key here would
+			// render the brand-new friend as Offline right after the
+			// friendship is committed. Best-effort.
+			if perr := keys.TouchPresence(ctx, s.rdb, fromID); perr != nil {
+				log.FromContext(ctx).Warn("touch presence on auto-accept failed",
+					"component", "friends", "user_id", fromID, "err", perr)
+			}
+
 			// Tell the original requester (Bob) that the request just flipped
 			// to accepted. Without this push he'd only learn via polling
 			// GetFriendsList. Best-effort: a publish failure doesn't fail
@@ -268,6 +279,19 @@ func (s *scoringServer) RespondToFriendRequest(ctx context.Context, req *pb.Resp
 	// is silent on purpose — surfacing rejections would create an
 	// uncomfortable UX without giving the rejector any control.
 	if newStatus == "accepted" {
+		// Touch the acceptor's presence BEFORE publishing the accepted
+		// event. The sender's FCM handler invalidates friendsListProvider
+		// on receipt, which triggers GetFriendsList → AreOnline; without
+		// this refresh, a stale-or-missing presence key would render the
+		// brand-new friend as Offline immediately after the friendship
+		// is committed (the act of accepting proves you're online).
+		// Best-effort: a failure here logs but doesn't fail the RPC,
+		// since the friendship is already accepted.
+		if perr := keys.TouchPresence(ctx, s.rdb, uid); perr != nil {
+			log.FromContext(ctx).Warn("touch presence on accept failed",
+				"component", "friends", "user_id", uid, "err", perr)
+		}
+
 		// Resolve the responder's username for the push body so the
 		// recipient sees "<friend> accepted your request" instead of an
 		// opaque user id. Best-effort lookup; a failure here doesn't

@@ -16,14 +16,24 @@ final friendsServiceProvider = Provider<FriendsService>((ref) {
 ///     SendFriendRequest auto-accept-reverse path
 ///   - pull-to-refresh on the Friends screen
 ///   - the FCM tap handler for `notif.friend.request_accepted`
-final friendsListProvider = FutureProvider<List<Friend>>((ref) async {
+///   - **autoDispose**: navigating away from the Friends screen disposes
+///     this provider, so the next entry to the screen always fetches a
+///     fresh list. Without autoDispose the cached value survives
+///     navigation and presence flags (online/offline) go stale.
+final friendsListProvider = FutureProvider.autoDispose<List<Friend>>((ref) async {
   return ref.watch(friendsServiceProvider).list();
 });
 
 /// Incoming pending friend requests (the badge on the home tile +
 /// the Requests tab pull from this). Outgoing requests aren't surfaced
 /// here in v1 — the SendFriendRequest response is enough for the sender.
-final friendRequestsProvider = FutureProvider<List<FriendRequest>>((ref) async {
+///
+/// **autoDispose**: same rationale as friendsListProvider — navigating
+/// away from the Requests tab should free the cache so a re-entry
+/// reflects requests that arrived while the screen was unmounted.
+/// Without this, a request that lands while the user is on the home
+/// screen wouldn't appear when they re-enter Friends → Requests.
+final friendRequestsProvider = FutureProvider.autoDispose<List<FriendRequest>>((ref) async {
   return ref.watch(friendsServiceProvider).incomingRequests();
 });
 
