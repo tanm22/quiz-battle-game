@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+
 import '../theme/app_theme.dart';
 
-/// EmptyState — the SpeakX-style "nothing here yet" affordance:
-/// a tinted-circle hero icon, a short headline (h3-weight), a softer
-/// body line, and an optional primary CTA. Animated entrance keeps
-/// it from feeling like a dead screen.
+/// EmptyState — the "nothing here yet" affordance: a tinted-circle hero
+/// icon, a short headline, a softer body line, and an optional primary
+/// CTA. Animated entrance keeps it from feeling like a dead screen.
 ///
-/// Used by every list / data screen (match history, coin ledger,
-/// referrals, leaderboard, analytics) so the empty surface reads as
-/// part of the same design language and the user always knows what
-/// to do next.
+/// Brief spec (revamp):
+///   - 80×80 tinted circle (was 96)
+///   - 32px icon (was 44)
+///   - Title in `h2` (22 / w700)
+///   - Body in `body` muted
+///   - CTA as a [FilledButton] inheriting the new theme's primary styling
+///
+/// Constructor surface is unchanged — every existing call-site keeps
+/// working.
 class EmptyState extends StatelessWidget {
   final IconData icon;
   final Color? iconColor;
@@ -28,7 +33,7 @@ class EmptyState extends StatelessWidget {
     this.body,
     this.actionLabel,
     this.onActionTap,
-    this.padding = const EdgeInsets.all(32),
+    this.padding = const EdgeInsets.all(Spacing.xxxl),
   });
 
   @override
@@ -41,17 +46,17 @@ class EmptyState extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 96,
-              height: 96,
+              width: 80,
+              height: 80,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: tint.withValues(alpha: 0.12),
                 border: Border.all(
                   color: tint.withValues(alpha: 0.3),
-                  width: 2,
+                  width: 1.5,
                 ),
               ),
-              child: Icon(icon, size: 44, color: tint),
+              child: Icon(icon, size: 32, color: tint),
             )
                 .animate()
                 .fadeIn(duration: 400.ms)
@@ -61,45 +66,29 @@ class EmptyState extends StatelessWidget {
                   curve: Curves.elasticOut,
                   duration: 600.ms,
                 ),
-            const SizedBox(height: 18),
+            const SizedBox(height: Spacing.lg),
             Text(
               title,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppColors.text,
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
-              ),
+              style: AppText.h2,
             ).animate().fadeIn(delay: 150.ms, duration: 400.ms),
             if (body != null) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: Spacing.sm),
               Text(
                 body!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: AppColors.textMuted,
-                  fontSize: 14,
-                  height: 1.4,
-                ),
+                style: AppText.body.copyWith(color: AppColors.textMuted),
               ).animate().fadeIn(delay: 250.ms, duration: 400.ms),
             ],
             if (actionLabel != null && onActionTap != null) ...[
-              const SizedBox(height: 20),
-              ElevatedButton(
+              const SizedBox(height: Spacing.xl),
+              FilledButton(
                 onPressed: onActionTap,
-                style: ElevatedButton.styleFrom(
+                style: FilledButton.styleFrom(
                   backgroundColor: tint,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 22, vertical: 12),
-                  shape: const RoundedRectangleBorder(
-                      borderRadius: AppRadius.button),
+                  foregroundColor: AppColors.textOnPri,
                 ),
-                child: Text(
-                  actionLabel!,
-                  style: const TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w700),
-                ),
+                child: Text(actionLabel!),
               ).animate().fadeIn(delay: 350.ms, duration: 400.ms),
             ],
           ],
