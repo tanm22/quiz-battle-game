@@ -1856,6 +1856,8 @@ class AuthResponse extends $pb.GeneratedMessage {
     $core.bool? streakUpdated,
     RewardGrant? reward,
     $core.bool? onboardingCompleted,
+    $core.String? refreshToken,
+    $fixnum.Int64? expiresIn,
   }) {
     final result = create();
     if (userId != null) result.userId = userId;
@@ -1874,6 +1876,8 @@ class AuthResponse extends $pb.GeneratedMessage {
     if (reward != null) result.reward = reward;
     if (onboardingCompleted != null)
       result.onboardingCompleted = onboardingCompleted;
+    if (refreshToken != null) result.refreshToken = refreshToken;
+    if (expiresIn != null) result.expiresIn = expiresIn;
     return result;
   }
 
@@ -1907,6 +1911,8 @@ class AuthResponse extends $pb.GeneratedMessage {
     ..aOM<RewardGrant>(14, _omitFieldNames ? '' : 'reward',
         subBuilder: RewardGrant.create)
     ..aOB(15, _omitFieldNames ? '' : 'onboardingCompleted')
+    ..aOS(16, _omitFieldNames ? '' : 'refreshToken')
+    ..aInt64(17, _omitFieldNames ? '' : 'expiresIn')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2066,6 +2072,27 @@ class AuthResponse extends $pb.GeneratedMessage {
   $core.bool hasOnboardingCompleted() => $_has(14);
   @$pb.TagNumber(15)
   void clearOnboardingCompleted() => $_clearField(15);
+
+  /// §4.7 PR-A1: refresh-token rotation. The client stores `refresh_token`
+  /// in secure storage and uses it to mint a fresh access token via
+  /// RefreshToken once `expires_in` seconds elapse.
+  @$pb.TagNumber(16)
+  $core.String get refreshToken => $_getSZ(15);
+  @$pb.TagNumber(16)
+  set refreshToken($core.String value) => $_setString(15, value);
+  @$pb.TagNumber(16)
+  $core.bool hasRefreshToken() => $_has(15);
+  @$pb.TagNumber(16)
+  void clearRefreshToken() => $_clearField(16);
+
+  @$pb.TagNumber(17)
+  $fixnum.Int64 get expiresIn => $_getI64(16);
+  @$pb.TagNumber(17)
+  set expiresIn($fixnum.Int64 value) => $_setInt64(16, value);
+  @$pb.TagNumber(17)
+  $core.bool hasExpiresIn() => $_has(16);
+  @$pb.TagNumber(17)
+  void clearExpiresIn() => $_clearField(17);
 }
 
 class GetProfileRequest extends $pb.GeneratedMessage {
@@ -2611,11 +2638,15 @@ class VerifyEmailCodeResponse extends $pb.GeneratedMessage {
     $core.bool? verified,
     $core.String? token,
     $core.String? userId,
+    $core.String? refreshToken,
+    $fixnum.Int64? expiresIn,
   }) {
     final result = create();
     if (verified != null) result.verified = verified;
     if (token != null) result.token = token;
     if (userId != null) result.userId = userId;
+    if (refreshToken != null) result.refreshToken = refreshToken;
+    if (expiresIn != null) result.expiresIn = expiresIn;
     return result;
   }
 
@@ -2635,6 +2666,8 @@ class VerifyEmailCodeResponse extends $pb.GeneratedMessage {
     ..aOB(1, _omitFieldNames ? '' : 'verified')
     ..aOS(2, _omitFieldNames ? '' : 'token')
     ..aOS(3, _omitFieldNames ? '' : 'userId')
+    ..aOS(4, _omitFieldNames ? '' : 'refreshToken')
+    ..aInt64(5, _omitFieldNames ? '' : 'expiresIn')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2683,6 +2716,27 @@ class VerifyEmailCodeResponse extends $pb.GeneratedMessage {
   $core.bool hasUserId() => $_has(2);
   @$pb.TagNumber(3)
   void clearUserId() => $_clearField(3);
+
+  /// §4.7 PR-A1: refresh-token rotation. Populated on login purpose
+  /// alongside `token` so the client can use the new refresh-rotation
+  /// flow.
+  @$pb.TagNumber(4)
+  $core.String get refreshToken => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set refreshToken($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasRefreshToken() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearRefreshToken() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $fixnum.Int64 get expiresIn => $_getI64(4);
+  @$pb.TagNumber(5)
+  set expiresIn($fixnum.Int64 value) => $_setInt64(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasExpiresIn() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearExpiresIn() => $_clearField(5);
 }
 
 class LinkEmailRequest extends $pb.GeneratedMessage {
@@ -4087,6 +4141,8 @@ class GoogleSignInResponse extends $pb.GeneratedMessage {
     $core.bool? isNewUser,
     $core.bool? streakUpdated,
     RewardGrant? reward,
+    $core.String? refreshToken,
+    $fixnum.Int64? expiresIn,
   }) {
     final result = create();
     if (token != null) result.token = token;
@@ -4094,6 +4150,8 @@ class GoogleSignInResponse extends $pb.GeneratedMessage {
     if (isNewUser != null) result.isNewUser = isNewUser;
     if (streakUpdated != null) result.streakUpdated = streakUpdated;
     if (reward != null) result.reward = reward;
+    if (refreshToken != null) result.refreshToken = refreshToken;
+    if (expiresIn != null) result.expiresIn = expiresIn;
     return result;
   }
 
@@ -4117,6 +4175,8 @@ class GoogleSignInResponse extends $pb.GeneratedMessage {
     ..aOB(4, _omitFieldNames ? '' : 'streakUpdated')
     ..aOM<RewardGrant>(5, _omitFieldNames ? '' : 'reward',
         subBuilder: RewardGrant.create)
+    ..aOS(6, _omitFieldNames ? '' : 'refreshToken')
+    ..aInt64(7, _omitFieldNames ? '' : 'expiresIn')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4186,6 +4246,25 @@ class GoogleSignInResponse extends $pb.GeneratedMessage {
   void clearReward() => $_clearField(5);
   @$pb.TagNumber(5)
   RewardGrant ensureReward() => $_ensure(4);
+
+  /// §4.7 PR-A1: refresh-token rotation.
+  @$pb.TagNumber(6)
+  $core.String get refreshToken => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set refreshToken($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasRefreshToken() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearRefreshToken() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $fixnum.Int64 get expiresIn => $_getI64(6);
+  @$pb.TagNumber(7)
+  set expiresIn($fixnum.Int64 value) => $_setInt64(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasExpiresIn() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearExpiresIn() => $_clearField(7);
 }
 
 class UserProfile extends $pb.GeneratedMessage {
@@ -9773,6 +9852,246 @@ class GetMonthlyRecapResponse extends $pb.GeneratedMessage {
   $core.bool hasHasData() => $_has(7);
   @$pb.TagNumber(8)
   void clearHasData() => $_clearField(8);
+}
+
+class RefreshTokenRequest extends $pb.GeneratedMessage {
+  factory RefreshTokenRequest({
+    $core.String? refreshToken,
+  }) {
+    final result = create();
+    if (refreshToken != null) result.refreshToken = refreshToken;
+    return result;
+  }
+
+  RefreshTokenRequest._();
+
+  factory RefreshTokenRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RefreshTokenRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RefreshTokenRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'refreshToken')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RefreshTokenRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RefreshTokenRequest copyWith(void Function(RefreshTokenRequest) updates) =>
+      super.copyWith((message) => updates(message as RefreshTokenRequest))
+          as RefreshTokenRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RefreshTokenRequest create() => RefreshTokenRequest._();
+  @$core.override
+  RefreshTokenRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RefreshTokenRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RefreshTokenRequest>(create);
+  static RefreshTokenRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get refreshToken => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set refreshToken($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRefreshToken() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRefreshToken() => $_clearField(1);
+}
+
+class RefreshTokenResponse extends $pb.GeneratedMessage {
+  factory RefreshTokenResponse({
+    $core.String? accessToken,
+    $core.String? refreshToken,
+    $fixnum.Int64? expiresIn,
+  }) {
+    final result = create();
+    if (accessToken != null) result.accessToken = accessToken;
+    if (refreshToken != null) result.refreshToken = refreshToken;
+    if (expiresIn != null) result.expiresIn = expiresIn;
+    return result;
+  }
+
+  RefreshTokenResponse._();
+
+  factory RefreshTokenResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RefreshTokenResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RefreshTokenResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'accessToken')
+    ..aOS(2, _omitFieldNames ? '' : 'refreshToken')
+    ..aInt64(3, _omitFieldNames ? '' : 'expiresIn')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RefreshTokenResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RefreshTokenResponse copyWith(void Function(RefreshTokenResponse) updates) =>
+      super.copyWith((message) => updates(message as RefreshTokenResponse))
+          as RefreshTokenResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RefreshTokenResponse create() => RefreshTokenResponse._();
+  @$core.override
+  RefreshTokenResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RefreshTokenResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RefreshTokenResponse>(create);
+  static RefreshTokenResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get accessToken => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set accessToken($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasAccessToken() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearAccessToken() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get refreshToken => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set refreshToken($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRefreshToken() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRefreshToken() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get expiresIn => $_getI64(2);
+  @$pb.TagNumber(3)
+  set expiresIn($fixnum.Int64 value) => $_setInt64(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasExpiresIn() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearExpiresIn() => $_clearField(3);
+}
+
+class LogoutRequest extends $pb.GeneratedMessage {
+  factory LogoutRequest({
+    $core.String? refreshToken,
+  }) {
+    final result = create();
+    if (refreshToken != null) result.refreshToken = refreshToken;
+    return result;
+  }
+
+  LogoutRequest._();
+
+  factory LogoutRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory LogoutRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'LogoutRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'refreshToken')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LogoutRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LogoutRequest copyWith(void Function(LogoutRequest) updates) =>
+      super.copyWith((message) => updates(message as LogoutRequest))
+          as LogoutRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static LogoutRequest create() => LogoutRequest._();
+  @$core.override
+  LogoutRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static LogoutRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<LogoutRequest>(create);
+  static LogoutRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get refreshToken => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set refreshToken($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRefreshToken() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRefreshToken() => $_clearField(1);
+}
+
+class LogoutResponse extends $pb.GeneratedMessage {
+  factory LogoutResponse({
+    $core.bool? success,
+  }) {
+    final result = create();
+    if (success != null) result.success = success;
+    return result;
+  }
+
+  LogoutResponse._();
+
+  factory LogoutResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory LogoutResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'LogoutResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'success')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LogoutResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LogoutResponse copyWith(void Function(LogoutResponse) updates) =>
+      super.copyWith((message) => updates(message as LogoutResponse))
+          as LogoutResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static LogoutResponse create() => LogoutResponse._();
+  @$core.override
+  LogoutResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static LogoutResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<LogoutResponse>(create);
+  static LogoutResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get success => $_getBF(0);
+  @$pb.TagNumber(1)
+  set success($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSuccess() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSuccess() => $_clearField(1);
 }
 
 const $core.bool _omitFieldNames =

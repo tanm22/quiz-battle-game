@@ -22,6 +22,12 @@ class AuthStorage {
   AuthStorage({FlutterSecureStorage? store})
       : _store = store ?? const FlutterSecureStorage();
 
+  // Shared instance so both AuthService and QuizService see the same
+  // access-token + refresh-token state. AuthService writes after a
+  // successful login; QuizService reads when constructing call options
+  // (a future refactor will make every RPC auto-refresh on 401).
+  static final AuthStorage instance = AuthStorage();
+
   Future<String?> readRefreshToken() => _store.read(key: _refreshKey);
 
   Future<void> writeRefreshToken(String value) =>
