@@ -140,8 +140,12 @@ class _TournamentScreenState extends State<TournamentScreen> {
     final isPremiumRequired = t.requiredPlan == 'premium';
     final canJoin = !isPremiumRequired || widget.currentPlan == 'premium';
 
-    final start = DateTime.fromMillisecondsSinceEpoch(t.startTime.toInt() * 1000);
-    final end = DateTime.fromMillisecondsSinceEpoch(t.endTime.toInt() * 1000);
+    // start_time / end_time are unix milliseconds — same wire contract as
+    // the detail endpoint (services/quiz/tournament_detail.go). Earlier the
+    // list endpoint emitted seconds and this widget compensated with * 1000;
+    // both now use ms so the multiplication is dropped.
+    final start = DateTime.fromMillisecondsSinceEpoch(t.startTime.toInt());
+    final end = DateTime.fromMillisecondsSinceEpoch(t.endTime.toInt());
     final timeLabel = isActive
         ? 'Ends ${_formatTime(end)}'
         : 'Starts ${_formatTime(start)}';
