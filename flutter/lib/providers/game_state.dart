@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:grpc/grpc.dart';
 import '../proto/quiz.pb.dart';
@@ -292,6 +293,16 @@ class GameStateNotifier extends Notifier<GameState> {
 
   int? _submittedRound; // track which round we already submitted for
 
+  /// First-tap-wins entry point used by the gameplay screen.
+  ///
+  /// The local [GameState.selectedIndex] must stay in lockstep with the
+  /// answer the server actually stored, because the round-result badge
+  /// (`Correct` / `Wrong`) is rendered by comparing `selectedIndex`
+  /// against the server-broadcast `correctIndex`. Only the *first* tap
+  /// in a round is forwarded to the server (gated by [_submittedRound]
+  /// in [toggleAnswer]); allowing the UI to flip `selectedIndex` on a
+  /// later tap therefore produced a UI that disagreed with the server's
+  /// record. We early-return here so the second tap is a no-op.
   void selectAnswer(int optionIndex) {
     if (state.selectedIndex != null) return;
     toggleAnswer(optionIndex);
@@ -312,17 +323,26 @@ class GameStateNotifier extends Notifier<GameState> {
     // Submit only once per round
     if (_submittedRound != state.round) {
       _submittedRound = state.round;
-      try {
-        _service.submitAnswer(
-          roomId: state.roomId!,
-          userId: state.userId!,
-          round: state.round,
-          optionIndex: optionIndex,
-          clientTimestamp: DateTime.now().millisecondsSinceEpoch,
-        );
-      } on GrpcError catch (e) {
-        state = state.copyWith(errorMessage: 'Failed to submit answer: ${e.message}');
-      }
+      submitAnswerToServer(optionIndex);
+    }
+  }
+
+  /// Hook around the actual gRPC submission so tests can subclass this
+  /// notifier and count invocations without standing up a real channel.
+  /// Production callers should go through [selectAnswer] / [toggleAnswer];
+  /// this is only public so a test double can override it.
+  @visibleForTesting
+  void submitAnswerToServer(int optionIndex) {
+    try {
+      _service.submitAnswer(
+        roomId: state.roomId!,
+        userId: state.userId!,
+        round: state.round,
+        optionIndex: optionIndex,
+        clientTimestamp: DateTime.now().millisecondsSinceEpoch,
+      );
+    } on GrpcError catch (e) {
+      state = state.copyWith(errorMessage: 'Failed to submit answer: ${e.message}');
     }
   }
 

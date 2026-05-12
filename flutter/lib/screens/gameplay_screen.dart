@@ -204,7 +204,17 @@ class _GameplayScreenState extends ConsumerState<GameplayScreen>
                                     question: question,
                                     selectedIndex: gs.selectedIndex,
                                     correctIndex: gs.correctIndex,
-                                    onTap: (i) => ref.read(gameStateProvider.notifier).toggleAnswer(i),
+                                    // First-tap-wins: only `selectAnswer`
+                                    // guards against re-tap drift between
+                                    // the UI's selectedIndex and the
+                                    // answer the server actually stored
+                                    // (the _submittedRound gate drops
+                                    // any resubmit). Using `toggleAnswer`
+                                    // here let the local state diverge
+                                    // from the server's recorded answer
+                                    // and produced false "Correct" badges
+                                    // — see fix in providers/game_state.
+                                    onTap: (i) => ref.read(gameStateProvider.notifier).selectAnswer(i),
                                   ),
                                 ],
                               ),
