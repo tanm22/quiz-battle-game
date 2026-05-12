@@ -113,9 +113,13 @@ class _CategoryGrid extends StatelessWidget {
     }
     return GridView.builder(
       padding: const EdgeInsets.all(16),
+      // mainAxisExtent bumped from 180 → 244 to make room for the
+      // new themed preview tile at the top of each card. Without it
+      // the description Expanded squashes to a single line and the
+      // card looks sparse.
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 220,
-        mainAxisExtent: 180,
+        mainAxisExtent: 244,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
       ),
@@ -201,6 +205,13 @@ class _ShopCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Themed preview tile — fills in for the missing
+              // product artwork. Each kind maps to a gradient + icon
+              // pair (see _previewFor) so cosmetic frames feel
+              // metallic, name colors feel like text, freeze items
+              // feel icy, etc.
+              _ProductPreview(item: item),
+              const SizedBox(height: 10),
               Row(
                 children: [
                   Expanded(
@@ -208,7 +219,7 @@ class _ShopCard extends StatelessWidget {
                       item.name,
                       style: const TextStyle(
                         color: AppColors.text,
-                        fontSize: 16,
+                        fontSize: 15,
                         fontWeight: FontWeight.w700,
                       ),
                       maxLines: 1,
@@ -222,13 +233,17 @@ class _ShopCard extends StatelessWidget {
                         size: 16, color: AppColors.textMuted),
                 ],
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Expanded(
                 child: Text(
                   item.description,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                    height: 1.3,
+                  ),
                 ),
               ),
               Row(
@@ -250,6 +265,201 @@ class _ShopCard extends StatelessWidget {
       ),
     );
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// _ProductPreview — themed gradient + icon stand-in for product art
+// ─────────────────────────────────────────────────────────────────────
+//
+// Why icon + gradient instead of a real asset:
+//   The codebase has a hard no-new-assets / no-new-packages constraint
+//   for this revamp, and the seed catalog has no preview images on the
+//   server side either. Per-id gradients keyed off the catalog (gold
+//   frame → metallic gold ramp, freeze → arctic blue ramp, etc.) read
+//   as intentional product art rather than a placeholder.
+//
+// Adding a real artwork pipeline later is a backend question (a new
+// `image_url` field on ShopItem, an S3 bucket, etc.) — this widget
+// stays as the fallback when image_url is empty.
+
+class _ProductPreview extends StatelessWidget {
+  const _ProductPreview({required this.item});
+
+  final ShopItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final spec = _previewFor(item);
+    return AspectRatio(
+      aspectRatio: 16 / 9,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Themed gradient backdrop.
+            DecoratedBox(decoration: BoxDecoration(gradient: spec.gradient)),
+            // Subtle radial bloom from the top-left for depth.
+            Positioned(
+              top: -10,
+              left: -10,
+              child: Container(
+                width: 80,
+                height: 80,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [Color(0x66FFFFFF), Color(0x00FFFFFF)],
+                    stops: [0, 0.7],
+                  ),
+                ),
+              ),
+            ),
+            // Centered icon.
+            Center(
+              child: Icon(
+                spec.icon,
+                size: 36,
+                color: Colors.white.withValues(alpha: 0.92),
+                shadows: const [
+                  Shadow(
+                    color: Color(0x55000000),
+                    blurRadius: 6,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static _PreviewSpec _previewFor(ShopItem item) {
+    // Per-id mapping for the seeded catalog. Falls back to a
+    // per-kind default for anything new the seed introduces later.
+    switch (item.id) {
+      case 'frame.gold':
+        return const _PreviewSpec(
+          Icons.crop_portrait_rounded,
+          LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFF5C842), Color(0xFFD88E0E)],
+          ),
+        );
+      case 'frame.neon':
+        return const _PreviewSpec(
+          Icons.auto_awesome,
+          LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF22D3EE), Color(0xFF3B82F6)],
+          ),
+        );
+      case 'name.crimson':
+        return const _PreviewSpec(
+          Icons.format_color_text_rounded,
+          LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFEF4444), Color(0xFFE85A3C)],
+          ),
+        );
+      case 'name.aurora':
+        return const _PreviewSpec(
+          Icons.gradient_rounded,
+          LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF9B7BD4),
+              Color(0xFF22D3EE),
+              Color(0xFFF5A524),
+            ],
+          ),
+        );
+      case 'streak_freeze.weekly':
+        return const _PreviewSpec(
+          Icons.ac_unit_rounded,
+          LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF22D3EE), Color(0xFF3B82F6)],
+          ),
+        );
+      case 'premium.trial.3d':
+        return const _PreviewSpec(
+          Icons.workspace_premium_rounded,
+          LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFF5A524), Color(0xFFE85A3C)],
+          ),
+        );
+      case 'reroll.topic':
+        return const _PreviewSpec(
+          Icons.shuffle_rounded,
+          LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFE85A3C), Color(0xFFCC4A2E)],
+          ),
+        );
+    }
+    // Fallback by kind for any future items.
+    switch (item.kind) {
+      case 'cosmetic.avatar_frame':
+        return const _PreviewSpec(
+          Icons.crop_portrait_rounded,
+          LinearGradient(
+            colors: [Color(0xFFF5A524), Color(0xFFE85A3C)],
+          ),
+        );
+      case 'cosmetic.name_color':
+        return const _PreviewSpec(
+          Icons.format_color_text_rounded,
+          LinearGradient(
+            colors: [Color(0xFF9B7BD4), Color(0xFFE85A3C)],
+          ),
+        );
+      case 'streak_freeze':
+        return const _PreviewSpec(
+          Icons.ac_unit_rounded,
+          LinearGradient(
+            colors: [Color(0xFF22D3EE), Color(0xFF3B82F6)],
+          ),
+        );
+      case 'premium_trial':
+        return const _PreviewSpec(
+          Icons.workspace_premium_rounded,
+          LinearGradient(
+            colors: [Color(0xFFF5A524), Color(0xFFD88E0E)],
+          ),
+        );
+      case 'reroll_topic':
+        return const _PreviewSpec(
+          Icons.shuffle_rounded,
+          LinearGradient(
+            colors: [Color(0xFFE85A3C), Color(0xFFCC4A2E)],
+          ),
+        );
+      default:
+        return const _PreviewSpec(
+          Icons.card_giftcard_rounded,
+          LinearGradient(
+            colors: [Color(0xFF1C1923), Color(0xFF15131B)],
+          ),
+        );
+    }
+  }
+}
+
+class _PreviewSpec {
+  final IconData icon;
+  final Gradient gradient;
+  const _PreviewSpec(this.icon, this.gradient);
 }
 
 class _StatusChip extends StatelessWidget {
