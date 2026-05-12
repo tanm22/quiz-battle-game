@@ -273,7 +273,7 @@ class _TopicRow extends StatelessWidget {
               Text('${row.correct}/${row.total}',
                   style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
               const SizedBox(width: 8),
-              Text('${(row.accuracyPct * 100).toStringAsFixed(0)}%',
+              Text('${(row.accuracyRatio * 100).toStringAsFixed(0)}%',
                   style: const TextStyle(
                       color: AppColors.primary, fontWeight: FontWeight.w800)),
             ],
@@ -282,7 +282,7 @@ class _TopicRow extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
-              value: row.accuracyPct.clamp(0.0, 1.0),
+              value: row.accuracyRatio.clamp(0.0, 1.0),
               minHeight: 6,
               backgroundColor: AppColors.border,
               valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),

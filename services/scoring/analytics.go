@@ -28,8 +28,13 @@ import (
 // recaps would mix in matches outside the requested month.
 
 const (
-	analyticsRatingDays      = 30 // rating-graph window length
-	analyticsMinPercentile   = 5  // need ≥5 answers before percentiles are meaningful
+	analyticsRatingDays = 30 // rating-graph window length (calendar days, including today)
+	// analyticsMinPercentile: at N=5 the nearest-rank formula gives
+	// p90==p95==p99==values[4] (all collapse to the max), so the user
+	// would see three identical "p99-ish" numbers and nothing useful.
+	// 20 is the smallest N at which p50/p90/p95/p99 all map to distinct
+	// indices (9, 17, 18, 19), so each percentile carries real signal.
+	analyticsMinPercentile   = 20
 	analyticsTopicLabelEmpty = "(unknown)"
 )
 
@@ -171,7 +176,11 @@ func (s *scoringServer) aggregateTopicAccuracy(ctx context.Context, userID strin
 			"total":   bson.M{"$sum": 1},
 			"correct": bson.M{"$sum": bson.M{"$cond": []any{"$correct", 1, 0}}},
 		}}},
-		{{Key: "$sort", Value: bson.D{{Key: "total", Value: -1}}}},
+		// Secondary sort on _id (topic name) so rows with equal totals
+		// render in the same order on every call — without it Mongo's
+		// sort is unstable on ties and the bar chart's rows would shuffle
+		// between refreshes.
+		{{Key: "$sort", Value: bson.D{{Key: "total", Value: -1}, {Key: "_id", Value: 1}}}},
 	}
 	cursor, err := s.mongoDB.Collection("answer_log").Aggregate(ctx, pipeline)
 	if err != nil {
@@ -204,10 +213,10 @@ func (s *scoringServer) aggregateTopicAccuracy(ctx context.Context, userID strin
 			pct = float64(doc.Correct) / float64(doc.Total)
 		}
 		rows = append(rows, &pb.TopicAccuracy{
-			Topic:       topic,
-			Total:       int32(doc.Total),
-			Correct:     int32(doc.Correct),
-			AccuracyPct: pct,
+			Topic:         topic,
+			Total:         int32(doc.Total),
+			Correct:       int32(doc.Correct),
+			AccuracyRatio: pct,
 		})
 		grandTotal += doc.Total
 	}
@@ -284,8 +293,15 @@ func (s *scoringServer) aggregatePercentiles(ctx context.Context, userID string)
 // users would expect "rating at end of day"). Days with no matches are
 // omitted — the chart can either hold the previous value or interpolate.
 func (s *scoringServer) aggregateRatingHistory(ctx context.Context, userID string, days int) ([]*pb.RatingPoint, error) {
+	// Cutoff is the START of (days-1) UTC days ago — so a 30-day window
+	// includes today + the previous 29 calendar days, giving up to 30
+	// daily buckets regardless of what time of day the call lands. The
+	// previous formulation (`now.AddDate(0, 0, -days)`) was a sliding
+	// time window that could yield 30 or 31 buckets depending on
+	// wall-clock-vs-bucket-edge timing.
 	now := time.Now().UTC()
-	cutoff := now.AddDate(0, 0, -days)
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	cutoff := today.AddDate(0, 0, -(days - 1))
 
 	cursor, err := s.mongoDB.Collection("rating_history").Find(ctx,
 		bson.M{
@@ -412,7 +428,11 @@ func (s *scoringServer) favoriteTopicInWindow(ctx context.Context, userID string
 			"createdAt": bson.M{"$gte": start, "$lt": end},
 		}}},
 		{{Key: "$group", Value: bson.M{"_id": "$topic", "n": bson.M{"$sum": 1}}}},
-		{{Key: "$sort", Value: bson.D{{Key: "n", Value: -1}}}},
+		// Secondary sort on _id (topic name, ascending) so a tie between
+		// two topics resolves deterministically — without it Mongo can
+		// return either topic on different calls, making the recap card
+		// flicker.
+		{{Key: "$sort", Value: bson.D{{Key: "n", Value: -1}, {Key: "_id", Value: 1}}}},
 		{{Key: "$limit", Value: 1}},
 	}
 	cursor, err := s.mongoDB.Collection("answer_log").Aggregate(ctx, pipeline)

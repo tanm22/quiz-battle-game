@@ -9295,13 +9295,13 @@ class TopicAccuracy extends $pb.GeneratedMessage {
     $core.String? topic,
     $core.int? total,
     $core.int? correct,
-    $core.double? accuracyPct,
+    $core.double? accuracyRatio,
   }) {
     final result = create();
     if (topic != null) result.topic = topic;
     if (total != null) result.total = total;
     if (correct != null) result.correct = correct;
-    if (accuracyPct != null) result.accuracyPct = accuracyPct;
+    if (accuracyRatio != null) result.accuracyRatio = accuracyRatio;
     return result;
   }
 
@@ -9321,7 +9321,7 @@ class TopicAccuracy extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'topic')
     ..aI(2, _omitFieldNames ? '' : 'total')
     ..aI(3, _omitFieldNames ? '' : 'correct')
-    ..aD(4, _omitFieldNames ? '' : 'accuracyPct')
+    ..aD(4, _omitFieldNames ? '' : 'accuracyRatio')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -9371,13 +9371,13 @@ class TopicAccuracy extends $pb.GeneratedMessage {
   void clearCorrect() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $core.double get accuracyPct => $_getN(3);
+  $core.double get accuracyRatio => $_getN(3);
   @$pb.TagNumber(4)
-  set accuracyPct($core.double value) => $_setDouble(3, value);
+  set accuracyRatio($core.double value) => $_setDouble(3, value);
   @$pb.TagNumber(4)
-  $core.bool hasAccuracyPct() => $_has(3);
+  $core.bool hasAccuracyRatio() => $_has(3);
   @$pb.TagNumber(4)
-  void clearAccuracyPct() => $_clearField(4);
+  void clearAccuracyRatio() => $_clearField(4);
 }
 
 class ResponseTimePercentiles extends $pb.GeneratedMessage {
