@@ -959,6 +959,69 @@ func (s *authServer) GetStreakInfo(ctx context.Context, _ *pb.GetStreakInfoReque
 }
 
 // ---------------------------------------------------------------------------
+// Refresh-token rotation (§4.7 PR-A1)
+// ---------------------------------------------------------------------------
+
+// RefreshToken validates the presented refresh token, rotates it
+// (mints a new refresh id in the same family, revokes the old),
+// and issues a fresh access JWT. Any validation failure collapses
+// to codes.Unauthenticated to deny attackers a discriminator.
+func (s *authServer) RefreshToken(ctx context.Context, req *pb.RefreshTokenRequest) (*pb.RefreshTokenResponse, error) {
+	if err := validate.MaxLen(req.RefreshToken, 128); err != nil {
+		return nil, status.Error(codes.InvalidArgument, "refresh_token: too long")
+	}
+	rec, err := s.refresh.Validate(ctx, req.RefreshToken)
+	if err != nil {
+		return nil, status.Error(codes.Unauthenticated, "refresh token invalid")
+	}
+	// Look up username for the access claim. If the user has been
+	// deleted in the meantime, fail closed.
+	var u struct {
+		Username string `bson:"username"`
+	}
+	if err := s.users().FindOne(ctx, bson.M{"_id": rec.UserID}).Decode(&u); err != nil {
+		return nil, status.Error(codes.Unauthenticated, "user not found")
+	}
+	newRefresh, err := s.refresh.Rotate(ctx, req.RefreshToken)
+	if err != nil {
+		return nil, status.Error(codes.Unauthenticated, "refresh token invalid")
+	}
+	access, _, err := auth.GenerateAccessToken(rec.UserID, u.Username, s.jwtSecret)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "sign access token: %v", err)
+	}
+	return &pb.RefreshTokenResponse{
+		AccessToken:  access,
+		RefreshToken: newRefresh,
+		ExpiresIn:    int64(auth.AccessTokenTTL.Seconds()),
+	}, nil
+}
+
+// Logout revokes the entire refresh-token family the presented token
+// belongs to — covering every device that shares the same login lineage.
+// Idempotent: presenting an unknown or already-revoked token still
+// returns success so a retry from a flaky network doesn't surface a
+// confusing error to the user mid-logout.
+func (s *authServer) Logout(ctx context.Context, req *pb.LogoutRequest) (*pb.LogoutResponse, error) {
+	if err := validate.MaxLen(req.RefreshToken, 128); err != nil {
+		return nil, status.Error(codes.InvalidArgument, "refresh_token: too long")
+	}
+	// We don't require the token to be currently valid — the goal
+	// of Logout is "make this dead." But we DO need the family id,
+	// so look up the doc directly.
+	var doc struct {
+		FamilyID string `bson:"familyId"`
+	}
+	if err := s.mongoDB.Collection("refresh_tokens").FindOne(ctx, bson.M{"_id": req.RefreshToken}).Decode(&doc); err != nil {
+		return &pb.LogoutResponse{Success: true}, nil // already gone — treat as success
+	}
+	if err := s.refresh.RevokeFamily(ctx, doc.FamilyID); err != nil {
+		return nil, status.Errorf(codes.Internal, "revoke: %v", err)
+	}
+	return &pb.LogoutResponse{Success: true}, nil
+}
+
+// ---------------------------------------------------------------------------
 // Referral helpers
 // ---------------------------------------------------------------------------
 
@@ -1293,6 +1356,10 @@ func main() {
 		"/quiz.AuthService/LoginWithEmail",
 		"/quiz.AuthService/CheckUsername",
 		"/quiz.AuthService/GoogleSignIn",
+		// §4.7 PR-A1: refresh/logout carry a refresh token in the payload,
+		// not a JWT — they can't pass the JWT-checking interceptor.
+		"/quiz.AuthService/RefreshToken",
+		"/quiz.AuthService/Logout",
 	}
 
 	m := metrics.New("auth")
