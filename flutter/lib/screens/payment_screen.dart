@@ -229,24 +229,19 @@ class _PaymentScreenState extends State<PaymentScreen> {
     // Network errors get the dialog so they can hit Try again.
     if (response.code == Razorpay.PAYMENT_CANCELLED) return;
 
+    // Keep the raw SDK payload in logcat for triage. We translate it to
+    // user-friendly text below, but bug reports need the underlying code +
+    // message to tell device-side failures (no DNS, wrong clock) from real
+    // Razorpay business errors (card declined, OTP failed).
+    debugPrint('razorpay error: code=${response.code} message=${response.message}');
+
     final order = _lastOrder;
+    final (title, body) = _friendlyPaymentError(response);
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Payment failed'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(response.message ?? 'Unknown error',
-                style: const TextStyle(color: AppColors.text)),
-            if (response.code != null) ...[
-              const SizedBox(height: 8),
-              Text('Code: ${response.code}',
-                  style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
-            ],
-          ],
-        ),
+        title: Text(title),
+        content: Text(body, style: const TextStyle(color: AppColors.text)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
@@ -269,6 +264,48 @@ class _PaymentScreenState extends State<PaymentScreen> {
         ],
       ),
     );
+  }
+
+  // Maps Razorpay SDK error codes to a (title, body) the user can act on.
+  // The raw `response.message` is fine for real business errors ("Card
+  // declined", "Insufficient funds") but useless for WebView-level failures
+  // — `net::ERR_NAME_NOT_RESOLVED` and friends just confuse non-engineers.
+  (String, String) _friendlyPaymentError(PaymentFailureResponse r) {
+    switch (r.code) {
+      case Razorpay.NETWORK_ERROR:
+        return (
+          'No internet connection',
+          "Couldn't reach the payment gateway. Check your network and try again.",
+        );
+      case Razorpay.TLS_ERROR:
+        return (
+          'Secure connection failed',
+          "Couldn't establish a secure connection. Check that your device's date and time are set correctly, then try again.",
+        );
+      case Razorpay.INVALID_OPTIONS:
+        return (
+          'Payment setup error',
+          'Something went wrong setting up this payment. Please go back and start the upgrade again.',
+        );
+      case Razorpay.INCOMPATIBLE_PLUGIN:
+        return (
+          'Update required',
+          "This version of the app can't process payments. Please update to the latest version.",
+        );
+      default:
+        final raw = r.message?.trim() ?? '';
+        // Chromium / WebView errors leak through as `net::ERR_*` — useless
+        // to a normal user, so swap for a generic retry prompt.
+        if (raw.isEmpty || raw.startsWith('net::')) {
+          return (
+            'Payment failed',
+            'The payment could not be completed. Please try again in a moment.',
+          );
+        }
+        // Real Razorpay business errors (card declined, insufficient
+        // funds, OTP failed) are human-readable — pass through.
+        return ('Payment failed', raw);
+    }
   }
 
   void _handleExternalWallet(ExternalWalletResponse response) {
