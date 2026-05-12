@@ -364,10 +364,17 @@ func main() {
 	log.FromContext(ctx).Info("shop fields backfilled", "count", shopBackfillRes.ModifiedCount)
 
 	// --- Seed tournaments ---
+	// Each tournament is inserted with a string _id (hex ObjectID). Without
+	// it, Mongo auto-assigns a binary primitive.ObjectID which then breaks
+	// the typed-struct decode (ID string) in GetTournamentList /
+	// GetTournament and confuses JoinTournament's string-keyed _id lookup.
+	// Existing dev databases keep their binary _ids — drop the tournaments
+	// collection and re-run seed to repair them.
 	tournamentsColl := db.Collection("tournaments")
 	now := time.Now()
 	tournaments := []bson.M{
 		{
+			"_id":              bson.NewObjectID().Hex(),
 			"name":             "Weekend Warriors",
 			"startTime":        now.Add(2 * 24 * time.Hour),
 			"endTime":          now.Add(3 * 24 * time.Hour),
@@ -382,6 +389,7 @@ func main() {
 			"createdAt":        now,
 		},
 		{
+			"_id":              bson.NewObjectID().Hex(),
 			"name":             "Open Challenge",
 			"startTime":        now.Add(5 * 24 * time.Hour),
 			"endTime":          now.Add(6 * 24 * time.Hour),
@@ -400,6 +408,7 @@ func main() {
 		// in via the scoring service's tournament_standings updater. Ends
 		// 6 hours from seed time so a normal dev session doesn't outlast it.
 		{
+			"_id":              bson.NewObjectID().Hex(),
 			"name":             "Live Dev Sprint",
 			"startTime":        now.Add(-1 * time.Minute),
 			"endTime":          now.Add(6 * time.Hour),
