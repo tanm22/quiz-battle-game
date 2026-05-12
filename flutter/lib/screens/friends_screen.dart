@@ -46,6 +46,18 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen>
       vsync: this,
       initialIndex: widget.initialTabIndex,
     );
+    // Force a fresh fetch on every screen entry. autoDispose alone
+    // isn't sufficient because the home-screen badge keeps
+    // friendRequestsProvider warm via friendRequestsCountProvider, so
+    // navigating Home → Friends would otherwise render the stale list
+    // cached from the badge's last read. Invalidate-on-mount guarantees
+    // both panels reflect server-current state (new requests that
+    // arrived, friend presence changes, accept/reject results).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.invalidate(friendsListProvider);
+      ref.invalidate(friendRequestsProvider);
+    });
   }
 
   @override
@@ -152,6 +164,23 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen>
 // Friends tab
 // ─────────────────────────────────────────────────────────────────────
 
+/// Wraps a non-scrollable child in a viewport-filling scrollable so the
+/// parent RefreshIndicator's pull-to-refresh gesture actually fires.
+/// Without this, the loading / error / empty states in either tab are
+/// centered Columns that swallow the drag — pull-to-refresh becomes a
+/// silent no-op exactly when the user most wants to refresh.
+Widget _pullToRefreshable(Widget child) {
+  return LayoutBuilder(
+    builder: (context, constraints) => SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: constraints.maxHeight),
+        child: child,
+      ),
+    ),
+  );
+}
+
 class _FriendsTab extends ConsumerWidget {
   final VoidCallback onAddTap;
   const _FriendsTab({required this.onAddTap});
@@ -161,27 +190,27 @@ class _FriendsTab extends ConsumerWidget {
     final friends = ref.watch(friendsListProvider);
 
     return friends.when(
-      loading: () => const Center(
+      loading: () => _pullToRefreshable(const Center(
         child: CircularProgressIndicator(color: AppColors.primary),
-      ),
-      error: (e, _) => EmptyState(
+      )),
+      error: (e, _) => _pullToRefreshable(EmptyState(
         icon: Icons.cloud_off_rounded,
         iconColor: AppColors.danger,
         title: "Couldn't load friends",
         body: e.toString(),
         actionLabel: 'Retry',
         onActionTap: () => ref.invalidate(friendsListProvider),
-      ),
+      )),
       data: (list) {
         if (list.isEmpty) {
-          return EmptyState(
+          return _pullToRefreshable(EmptyState(
             icon: Icons.group_add_rounded,
             iconColor: AppColors.primary,
             title: 'No friends yet',
             body: "Add a friend by their username or referral code, then challenge them to a head-to-head quiz.",
             actionLabel: 'Add your first friend',
             onActionTap: onAddTap,
-          );
+          ));
         }
         // Sort: online users first, then alphabetical by username.
         final sorted = [...list]..sort((a, b) {
@@ -412,25 +441,25 @@ class _RequestsTab extends ConsumerWidget {
     final requests = ref.watch(friendRequestsProvider);
 
     return requests.when(
-      loading: () => const Center(
+      loading: () => _pullToRefreshable(const Center(
         child: CircularProgressIndicator(color: AppColors.primary),
-      ),
-      error: (e, _) => EmptyState(
+      )),
+      error: (e, _) => _pullToRefreshable(EmptyState(
         icon: Icons.cloud_off_rounded,
         iconColor: AppColors.danger,
         title: "Couldn't load requests",
         body: e.toString(),
         actionLabel: 'Retry',
         onActionTap: () => ref.invalidate(friendRequestsProvider),
-      ),
+      )),
       data: (list) {
         if (list.isEmpty) {
-          return const EmptyState(
+          return _pullToRefreshable(const EmptyState(
             icon: Icons.inbox_rounded,
             iconColor: AppColors.accent,
             title: 'No pending requests',
             body: "When someone sends you a friend request, it'll show up here.",
-          );
+          ));
         }
         return ListView.separated(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),

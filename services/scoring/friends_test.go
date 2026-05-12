@@ -188,6 +188,11 @@ func TestSendFriendRequest_AutoAcceptsReversePending(t *testing.T) {
 	// Bob (the original sender) gets a notif.friend.request_accepted push
 	// so he learns about it without polling.
 	srv, _, _ := scoringTestEnv(t)
+	// Redis required: the auto-accept-reverse path TouchPresences the
+	// caller (Alice here) for the same reason the explicit accept path
+	// does — Bob's UI refresh after the push should see Alice as Online,
+	// not Offline.
+	attachRedis(t, srv)
 	seedFullUser(t, srv, "alice", "alice", "REFAA")
 	seedFullUser(t, srv, "bob", "bob", "REFBB")
 	ensureFriendIndexes(t, srv)
@@ -226,6 +231,17 @@ func TestSendFriendRequest_AutoAcceptsReversePending(t *testing.T) {
 	}
 	if accepted != 1 {
 		t.Errorf("notif.friend.request_accepted: got %d, want 1", accepted)
+	}
+
+	// Alice's presence must be hot after the auto-accept so Bob's UI
+	// refresh renders her as Online. Same guarantee as the explicit
+	// accept-path test.
+	online, err := keys.IsOnline(context.Background(), srv.rdb, "alice")
+	if err != nil {
+		t.Fatalf("IsOnline(alice): %v", err)
+	}
+	if !online {
+		t.Errorf("auto-accepter presence should be hot; got online=false")
 	}
 }
 
@@ -298,6 +314,10 @@ func TestRespondToFriendRequest_NotRecipient(t *testing.T) {
 
 func TestRespondToFriendRequest_Accept(t *testing.T) {
 	srv, _, _ := scoringTestEnv(t)
+	// Redis is required: the accept path TouchPresences the responder
+	// so the original sender's UI sees them as Online on the very next
+	// GetFriendsList — see the assertion at the bottom of this test.
+	attachRedis(t, srv)
 	seedFullUser(t, srv, "alice", "alice", "REFAA")
 	seedFullUser(t, srv, "bob", "bob", "REFBB")
 	seedFriendRequestRow(t, srv, "req-4", "alice", "bob", "pending")
@@ -328,6 +348,19 @@ func TestRespondToFriendRequest_Accept(t *testing.T) {
 	}
 	if accepted != 1 {
 		t.Errorf("notif.friend.request_accepted: got %d, want 1", accepted)
+	}
+
+	// Presence must be hot for the acceptor immediately after accept,
+	// so the original sender's friends-list refresh (triggered by the
+	// notif.friend.request_accepted FCM tap) renders the brand-new
+	// friend as Online rather than Offline. Without this guarantee the
+	// sender sees a fresh friend with a stale presence flag.
+	online, err := keys.IsOnline(context.Background(), srv.rdb, "bob")
+	if err != nil {
+		t.Fatalf("IsOnline(bob): %v", err)
+	}
+	if !online {
+		t.Errorf("acceptor presence should be hot after accept; got online=false")
 	}
 }
 
