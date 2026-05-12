@@ -487,9 +487,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ),
         // Settings gear → Profile tab.
+        // Index 5 after the May 2026 6-tab reshuffle (was 3 in the
+        // pre-revamp 4-tab nav). Carries the same semantic — "jump to
+        // the Profile tab" — only the integer changed.
         IconButton(
           tooltip: 'Profile',
-          onPressed: () => setState(() => _currentTab = 3),
+          onPressed: () => setState(() => _currentTab = 5),
           icon: Container(
             width: 40,
             height: 40,
@@ -706,6 +709,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       onSwitchToPlayTab: () => setState(() => _currentTab = 1),
       onOpenPayment: _openPaymentScreen,
       onShareInvite: () => _showShareDialog(gameState),
+      // Profile is hosted as a tab, not pushed as a route. Wire back
+      // to "switch the bottom-nav to Home" so the top-bar back arrow
+      // does the thing the user expects.
+      onBack: () => setState(() => _currentTab = 0),
       onLogout: () async {
         await auth.logout();
         if (mounted) {

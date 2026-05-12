@@ -139,6 +139,14 @@ class ProfileScreen extends ConsumerStatefulWidget {
   /// the actual RPC because it also has to clear local app state.
   final VoidCallback onDeleteAccountRequested;
 
+  /// Back-button callback. When provided, the top-bar back arrow fires
+  /// this instead of `Navigator.maybePop`. Use this when ProfileScreen
+  /// is rendered as a tab inside a host Scaffold (where there's no
+  /// route to pop) — typically wired to "switch the host's bottom-nav
+  /// back to Home". When null, the back arrow is hidden if there's no
+  /// navigator route to pop, so the user never sees an inert affordance.
+  final VoidCallback? onBack;
+
   const ProfileScreen({
     super.key,
     required this.homeData,
@@ -149,6 +157,7 @@ class ProfileScreen extends ConsumerStatefulWidget {
     this.onSwitchToPlayTab,
     this.onOpenPayment,
     this.onShareInvite,
+    this.onBack,
   });
 
   @override
@@ -303,18 +312,37 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   }
 
   Widget _buildTopBar() {
+    // Back-button visibility rules:
+    //   • If the host supplied [onBack] (tab-content case), show the
+    //     arrow and call onBack — the host switches its bottom-nav
+    //     back to Home.
+    //   • Else if there's a route to pop (standalone push case),
+    //     show the arrow and call Navigator.pop.
+    //   • Else (no host hook, no route): hide the arrow entirely.
+    //     The previous implementation called Navigator.maybePop which
+    //     silently does nothing — a visible button that doesn't
+    //     respond is worse than no button.
+    final canGoBack = widget.onBack != null || Navigator.canPop(context);
+    final onBackPressed = widget.onBack ?? () => Navigator.pop(context);
+
     return SafeArea(
       bottom: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(Spacing.xs, Spacing.xs, Spacing.xs, 0),
         child: Row(
           children: [
-            IconButton(
-              tooltip: 'Back',
-              icon: const Icon(Icons.arrow_back_ios_new, size: 20),
-              color: AppColors.text,
-              onPressed: () => Navigator.maybePop(context),
-            ),
+            if (canGoBack)
+              IconButton(
+                tooltip: 'Back',
+                icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+                color: AppColors.text,
+                onPressed: onBackPressed,
+              )
+            else
+              // Preserve the row's vertical metrics when the back
+              // button is hidden so the right-side icons don't jump
+              // up into the safe area.
+              const SizedBox(width: 48, height: 48),
             const Spacer(),
             IconButton(
               tooltip: 'Refresh profile',
@@ -474,6 +502,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     final winStreak = profile?.winStreak ?? 0;
 
     return ListView(
+      // AlwaysScrollableScrollPhysics so the parent RefreshIndicator
+      // fires even when the tab content fits within the viewport —
+      // standard NestedScrollView + RefreshIndicator pattern. Without
+      // this, pull-to-refresh only works once the list overflows.
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(
         Spacing.xl,
         Spacing.lg,
@@ -804,6 +837,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
         final matches = snapshot.data?.matches ?? <MatchHistoryEntry>[];
         if (matches.isEmpty) {
           return ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(Spacing.xl),
             children: [
               EmptyState(
@@ -818,6 +852,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
         }
         final myUserId = widget.auth.userId ?? '';
         return ListView.separated(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(
             Spacing.xl,
             Spacing.lg,
@@ -838,6 +873,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
 
   Widget _matchesSkeleton() {
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(Spacing.xl),
       itemCount: 3,
       itemBuilder: (_, _) => Padding(
@@ -1066,6 +1102,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     final coins = profile?.coins ?? 0;
 
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(
         Spacing.xl,
         Spacing.lg,
@@ -1254,6 +1291,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     _referralFuture ??= QuizService().getReferralDashboard();
 
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(
         Spacing.xl,
         Spacing.lg,
@@ -2135,32 +2173,42 @@ class _LegendaryGlowState extends State<_LegendaryGlow>
 
 class _Last30DaysCalendar extends StatelessWidget {
   final int current;
-  final String lastClaimedDate; // "yyyy-MM-dd" or ""
+  final String lastClaimedDate; // "yyyy-MM-dd" in IST per the proto, or ""
   const _Last30DaysCalendar({
     required this.current,
     required this.lastClaimedDate,
   });
 
-  bool _isToday(DateTime d) {
-    final now = DateTime.now();
-    return d.year == now.year && d.month == now.month && d.day == now.day;
+  // IST is UTC+5:30 — hardcoded because the proto's StreakInfo.last_claimed_date
+  // is explicitly "YYYY-MM-DD in IST" (no DST). Per-device local time would
+  // disagree at the day boundary for anyone outside IST.
+  static const _istOffset = Duration(hours: 5, minutes: 30);
+
+  /// "Today" in IST as a `DateTime` whose Y-M-D values represent the IST
+  /// calendar date. The time component is dropped — we compare dates only.
+  static DateTime _istToday() {
+    final ist = DateTime.now().toUtc().add(_istOffset);
+    return DateTime.utc(ist.year, ist.month, ist.day);
   }
+
+  bool _isToday(DateTime d, DateTime today) =>
+      d.year == today.year && d.month == today.month && d.day == today.day;
 
   String _ymd(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
-    // Build a 30-day window ending today (oldest at index 0).
+    final today = _istToday();
+    // Build a 30-day window ending today-in-IST (oldest at index 0).
     final days = List<DateTime>.generate(
       30,
-      (i) => DateTime(now.year, now.month, now.day - (29 - i)),
+      (i) => DateTime.utc(today.year, today.month, today.day - (29 - i)),
     );
 
-    // Without a per-day claim history we infer claimed days from
-    // `current` + `lastClaimedDate`: the last `current` consecutive
-    // days up to lastClaimedDate are treated as claimed.
+    // Parse the server's IST-formatted YYYY-MM-DD as a UTC-midnight
+    // DateTime so date arithmetic against `today` (also UTC-midnight)
+    // produces correct day differences regardless of device timezone.
     DateTime? lastClaim;
     if (lastClaimedDate.isNotEmpty) {
       final parts = lastClaimedDate.split('-');
@@ -2169,7 +2217,7 @@ class _Last30DaysCalendar extends StatelessWidget {
         final m = int.tryParse(parts[1]);
         final d = int.tryParse(parts[2]);
         if (y != null && m != null && d != null) {
-          lastClaim = DateTime(y, m, d);
+          lastClaim = DateTime.utc(y, m, d);
         }
       }
     }
@@ -2181,8 +2229,10 @@ class _Last30DaysCalendar extends StatelessWidget {
       return diff >= 0 && diff < current;
     }
 
+    // Today is unclaimed when either we have no claim record at all OR
+    // the latest claim is for a previous IST day.
     final todayUnclaimed =
-        lastClaim == null || _ymd(lastClaim) != _ymd(now);
+        lastClaim == null || _ymd(lastClaim) != _ymd(today);
 
     return GridView.count(
       crossAxisCount: 7,
@@ -2194,9 +2244,9 @@ class _Last30DaysCalendar extends StatelessWidget {
         for (final d in days)
           _Last30Cell(
             day: d.day,
-            isToday: _isToday(d),
+            isToday: _isToday(d, today),
             isClaimed: isClaimed(d),
-            todayUnclaimed: _isToday(d) && todayUnclaimed,
+            todayUnclaimed: _isToday(d, today) && todayUnclaimed,
           ),
       ],
     );
