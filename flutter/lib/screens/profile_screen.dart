@@ -64,6 +64,7 @@ class _Badge {
   final Color accent;
   final String unlockCondition;
   final bool legendary;
+  final bool comingSoon;
   const _Badge({
     required this.id,
     required this.name,
@@ -71,6 +72,7 @@ class _Badge {
     required this.accent,
     required this.unlockCondition,
     this.legendary = false,
+    this.comingSoon = false,
   });
 }
 
@@ -260,7 +262,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
               onRefresh: _handleRefresh,
               child: _buildLastMatchesTab(),
             ),
-            _buildBadgesTab(profile),
+            RefreshIndicator(
+              color: AppColors.primary,
+              backgroundColor: AppColors.surface,
+              onRefresh: _handleRefresh,
+              child: _buildBadgesTab(profile),
+            ),
             RefreshIndicator(
               color: AppColors.primary,
               backgroundColor: AppColors.surface,
@@ -931,7 +938,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
         name: 'Quick Thinker',
         icon: Icons.bolt,
         accent: AppColors.gold,
-        unlockCondition: '<3s avg in a match'),
+        unlockCondition: '<3s avg in a match',
+        comingSoon: true),
     _Badge(
         id: 'unstoppable',
         name: 'Unstoppable',
@@ -962,25 +970,28 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
         name: 'Dedicated',
         icon: Icons.calendar_today,
         accent: AppColors.primary,
-        unlockCondition: '7-day login streak'),
+        unlockCondition: '7-day reward streak'),
     _Badge(
         id: 'comeback_king',
         name: 'Comeback King',
         icon: Icons.trending_up,
         accent: AppColors.success,
-        unlockCondition: 'Win after trailing by 100+'),
+        unlockCondition: 'Win after trailing by 100+',
+        comingSoon: true),
     _Badge(
         id: 'sharpshooter',
         name: 'Sharpshooter',
         icon: Icons.gps_fixed,
         accent: AppColors.primary,
-        unlockCondition: '100% accuracy in a match'),
+        unlockCondition: '100% accuracy in a match',
+        comingSoon: true),
     _Badge(
         id: 'tournament_victor',
         name: 'Tournament Victor',
         icon: Icons.emoji_events,
         accent: AppColors.gold,
-        unlockCondition: 'Win a tournament'),
+        unlockCondition: 'Win a tournament',
+        comingSoon: true),
   ];
 
   bool _isUnlocked(_Badge b, UserProfile? profile) {
@@ -1016,6 +1027,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
 
   Widget _buildBadgesTab(UserProfile? profile) {
     return GridView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(
         Spacing.xl,
         Spacing.lg,
@@ -1082,7 +1094,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
             Text(b.name, style: AppText.h2),
             const SizedBox(height: Spacing.xs),
             Text(
-              unlocked ? 'Unlocked' : b.unlockCondition,
+              unlocked
+                  ? 'Unlocked'
+                  : (b.comingSoon ? 'Coming soon' : b.unlockCondition),
               style: AppText.body.copyWith(
                 color: unlocked ? AppColors.success : AppColors.textMuted,
               ),
@@ -2125,7 +2139,7 @@ class _BadgeTile extends StatelessWidget {
               )
             else
               Text(
-                badge.unlockCondition,
+                badge.comingSoon ? 'Coming soon' : badge.unlockCondition,
                 style: AppText.caption.copyWith(color: AppColors.textDim),
                 textAlign: TextAlign.center,
                 maxLines: 2,
