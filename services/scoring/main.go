@@ -32,6 +32,7 @@ import (
 	"quiz-battle/pkg/metrics"
 	"quiz-battle/pkg/models"
 	"quiz-battle/pkg/ratelimit"
+	"quiz-battle/pkg/validate"
 	pb "quiz-battle/proto"
 )
 
@@ -634,6 +635,16 @@ func (s *scoringServer) UpdateFCMToken(ctx context.Context, req *pb.UpdateFCMTok
 		return nil, status.Error(codes.Unauthenticated, "not authenticated")
 	}
 
+	// §4.7 PR-A1: bound the token size + reject empty. Real FCM tokens
+	// are ~163 ASCII chars; 512 is generous. Without this, a malicious
+	// client could $addToSet a 1MB blob into the user document.
+	if req.Token == "" {
+		return nil, status.Error(codes.InvalidArgument, "token: required")
+	}
+	if err := validate.MaxLen(req.Token, 512); err != nil {
+		return nil, status.Error(codes.InvalidArgument, "token: too long")
+	}
+
 	_, err = s.mongoDB.Collection("users").UpdateOne(ctx,
 		bson.M{"_id": userID},
 		bson.M{"$addToSet": bson.M{"fcmTokens": req.Token}},
@@ -680,6 +691,14 @@ func (s *scoringServer) ApplyReferralCode(ctx context.Context, req *pb.ApplyRefe
 	userID, err := auth.UserIDFromContext(ctx)
 	if err != nil {
 		return nil, status.Error(codes.Unauthenticated, "not authenticated")
+	}
+
+	// §4.7 PR-A1: validate the code format before it reaches the Redis
+	// lookup. Stops "${jndi:...}"-style payloads and bounds the input
+	// size at the same time. Matches the issuance format scoring's
+	// mint logic produces.
+	if err := validate.ReferralCode(req.Code); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "code: %v", err)
 	}
 
 	// §4.7 PR-B1: anti-abuse gate. Stops a script from probing every

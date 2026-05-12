@@ -131,3 +131,39 @@ func TestTopic(t *testing.T) {
 		t.Errorf("over-64 topic should fail: %v", err)
 	}
 }
+
+func TestReferralCode(t *testing.T) {
+	cases := map[string]bool{
+		"":                      false,
+		"ABC":                   false, // too short
+		"ABC123":                true,
+		"REFA3B91F2C":           true, // 11 chars — within 6-12
+		strings.Repeat("A", 32): false, // too long
+		"abc-123":               false, // wrong charset
+		"abc123":                false, // lowercase rejected
+	}
+	for in, ok := range cases {
+		err := ReferralCode(in)
+		if (err == nil) != ok {
+			t.Errorf("ReferralCode(%q) err=%v, want ok=%v", in, err, ok)
+		}
+	}
+}
+
+func TestTimeFilter(t *testing.T) {
+	cases := map[string]bool{
+		"":         true, // empty defaults to alltime on the server
+		"alltime":  true,
+		"daily":    true,
+		"weekly":   true,
+		"monthly":  true,
+		"lastweek": false,
+		"yearly":   false,
+	}
+	for in, ok := range cases {
+		err := TimeFilter(in)
+		if (err == nil) != ok {
+			t.Errorf("TimeFilter(%q) err=%v, want ok=%v", in, err, ok)
+		}
+	}
+}

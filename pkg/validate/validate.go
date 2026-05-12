@@ -22,12 +22,14 @@ import (
 // ErrInvalidUsername / ErrInvalidEmail / ErrInvalidPassword are the
 // sentinel errors callers compare against with errors.Is.
 var (
-	ErrInvalidUsername = errors.New("username must be 3-20 characters: letters, digits, or underscore")
-	ErrInvalidEmail    = errors.New("email format is invalid")
-	ErrInvalidPassword = errors.New("password must be at least 6 characters")
-	ErrInvalidUUID     = errors.New("identifier must be a valid UUID")
-	ErrInvalidTopic    = errors.New("topic must be a non-empty short string")
-	ErrTooLong         = errors.New("input exceeds maximum length")
+	ErrInvalidUsername     = errors.New("username must be 3-20 characters: letters, digits, or underscore")
+	ErrInvalidEmail        = errors.New("email format is invalid")
+	ErrInvalidPassword     = errors.New("password must be at least 6 characters")
+	ErrInvalidUUID         = errors.New("identifier must be a valid UUID")
+	ErrInvalidTopic        = errors.New("topic must be a non-empty short string")
+	ErrTooLong             = errors.New("input exceeds maximum length")
+	ErrInvalidReferralCode = errors.New("referral code must be 6-12 uppercase letters or digits")
+	ErrInvalidTimeFilter   = errors.New("time_filter must be one of: alltime, daily, weekly, monthly")
 )
 
 // usernameRE is the canonical username pattern. Matches what
@@ -109,6 +111,44 @@ func Topic(s string) error {
 	t := strings.TrimSpace(s)
 	if t == "" || len(t) > 64 {
 		return ErrInvalidTopic
+	}
+	return nil
+}
+
+// referralCodeRE matches the issuance format scoring's mint logic
+// produces today: uppercase alphanumeric, 6-12 chars. Tighter than the
+// 8 hex chars + "REF" prefix the auth service currently generates
+// (REFA3B91F2C = 11 chars) so a future scheme bump within that range
+// doesn't need a new validator.
+var referralCodeRE = regexp.MustCompile(`^[A-Z0-9]{6,12}$`)
+
+// ReferralCode validates a referral-code string at the handler edge
+// so a "${jndi:...}"-style or oversize payload never reaches the
+// Redis lookup that drives applyReferral.
+func ReferralCode(s string) error {
+	if !referralCodeRE.MatchString(s) {
+		return ErrInvalidReferralCode
+	}
+	return nil
+}
+
+// allowedTimeFilters is the closed set the global-leaderboard
+// handler understands. Empty string is allowed and treated as
+// "alltime" by the handler — any other unknown value is rejected
+// here rather than silently aliased to a default the user didn't ask
+// for.
+var allowedTimeFilters = map[string]struct{}{
+	"":        {},
+	"alltime": {},
+	"daily":   {},
+	"weekly":  {},
+	"monthly": {},
+}
+
+// TimeFilter validates a leaderboard time-filter string.
+func TimeFilter(s string) error {
+	if _, ok := allowedTimeFilters[s]; !ok {
+		return ErrInvalidTimeFilter
 	}
 	return nil
 }

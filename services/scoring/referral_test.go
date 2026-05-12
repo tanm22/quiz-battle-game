@@ -6,8 +6,11 @@ import (
 	"testing"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"quiz-battle/pkg/coins"
+	pb "quiz-battle/proto"
 )
 
 func seedReferralRow(t *testing.T, srv *scoringServer, refID, referrerID, refereeID string) {
@@ -208,5 +211,15 @@ func TestHandleReferralEvent_RoundTripsThroughEarnConsumer(t *testing.T) {
 	if rBal != referralReferrerCoins || eBal != referralRefereeCoins {
 		t.Errorf("end-to-end balances: referrer=%d (want %d) referee=%d (want %d)",
 			rBal, referralReferrerCoins, eBal, referralRefereeCoins)
+	}
+}
+
+// §4.7 PR-A1: codes that don't match the issuance format must be
+// rejected at the handler edge before any Redis lookup or limiter spin.
+func TestApplyReferralCode_RejectsInvalidFormat(t *testing.T) {
+	srv, _, _ := scoringTestEnv(t)
+	_, err := srv.ApplyReferralCode(authedCtx("u-invalidcode"), &pb.ApplyReferralCodeRequest{Code: "abc-123"})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("err=%v, want InvalidArgument", err)
 	}
 }
