@@ -2105,10 +2105,15 @@ func (x *VerifyEmailCodeRequest) GetCode() string {
 }
 
 type VerifyEmailCodeResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Verified      bool                   `protobuf:"varint,1,opt,name=verified,proto3" json:"verified,omitempty"`
-	Token         string                 `protobuf:"bytes,2,opt,name=token,proto3" json:"token,omitempty"` // JWT returned for login flow
-	UserId        string                 `protobuf:"bytes,3,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Verified bool                   `protobuf:"varint,1,opt,name=verified,proto3" json:"verified,omitempty"`
+	Token    string                 `protobuf:"bytes,2,opt,name=token,proto3" json:"token,omitempty"` // JWT returned for login flow
+	UserId   string                 `protobuf:"bytes,3,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	// §4.7 PR-A1: refresh-token rotation. Populated on login purpose
+	// alongside `token` so the client can use the new refresh-rotation
+	// flow.
+	RefreshToken  string `protobuf:"bytes,4,opt,name=refresh_token,json=refreshToken,proto3" json:"refresh_token,omitempty"`
+	ExpiresIn     int64  `protobuf:"varint,5,opt,name=expires_in,json=expiresIn,proto3" json:"expires_in,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2162,6 +2167,20 @@ func (x *VerifyEmailCodeResponse) GetUserId() string {
 		return x.UserId
 	}
 	return ""
+}
+
+func (x *VerifyEmailCodeResponse) GetRefreshToken() string {
+	if x != nil {
+		return x.RefreshToken
+	}
+	return ""
+}
+
+func (x *VerifyEmailCodeResponse) GetExpiresIn() int64 {
+	if x != nil {
+		return x.ExpiresIn
+	}
+	return 0
 }
 
 type LinkEmailRequest struct {
@@ -3275,11 +3294,14 @@ func (x *GoogleSignInRequest) GetReferralCode() string {
 
 type GoogleSignInResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"` // JWT
+	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"` // JWT (access)
 	UserProfile   *UserProfile           `protobuf:"bytes,2,opt,name=user_profile,json=userProfile,proto3" json:"user_profile,omitempty"`
 	IsNewUser     bool                   `protobuf:"varint,3,opt,name=is_new_user,json=isNewUser,proto3" json:"is_new_user,omitempty"`
 	StreakUpdated bool                   `protobuf:"varint,4,opt,name=streak_updated,json=streakUpdated,proto3" json:"streak_updated,omitempty"`
 	Reward        *RewardGrant           `protobuf:"bytes,5,opt,name=reward,proto3" json:"reward,omitempty"`
+	// §4.7 PR-A1: refresh-token rotation.
+	RefreshToken  string `protobuf:"bytes,6,opt,name=refresh_token,json=refreshToken,proto3" json:"refresh_token,omitempty"`
+	ExpiresIn     int64  `protobuf:"varint,7,opt,name=expires_in,json=expiresIn,proto3" json:"expires_in,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3347,6 +3369,20 @@ func (x *GoogleSignInResponse) GetReward() *RewardGrant {
 		return x.Reward
 	}
 	return nil
+}
+
+func (x *GoogleSignInResponse) GetRefreshToken() string {
+	if x != nil {
+		return x.RefreshToken
+	}
+	return ""
+}
+
+func (x *GoogleSignInResponse) GetExpiresIn() int64 {
+	if x != nil {
+		return x.ExpiresIn
+	}
+	return 0
 }
 
 type UserProfile struct {
@@ -8090,11 +8126,14 @@ const file_proto_quiz_proto_rawDesc = "" +
 	"\x04sent\x18\x01 \x01(\bR\x04sent\"B\n" +
 	"\x16VerifyEmailCodeRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x12\n" +
-	"\x04code\x18\x02 \x01(\tR\x04code\"d\n" +
+	"\x04code\x18\x02 \x01(\tR\x04code\"\xa8\x01\n" +
 	"\x17VerifyEmailCodeResponse\x12\x1a\n" +
 	"\bverified\x18\x01 \x01(\bR\bverified\x12\x14\n" +
 	"\x05token\x18\x02 \x01(\tR\x05token\x12\x17\n" +
-	"\auser_id\x18\x03 \x01(\tR\x06userId\"<\n" +
+	"\auser_id\x18\x03 \x01(\tR\x06userId\x12#\n" +
+	"\rrefresh_token\x18\x04 \x01(\tR\frefreshToken\x12\x1d\n" +
+	"\n" +
+	"expires_in\x18\x05 \x01(\x03R\texpiresIn\"<\n" +
 	"\x10LinkEmailRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\tR\x04code\"+\n" +
@@ -8165,13 +8204,16 @@ const file_proto_quiz_proto_rawDesc = "" +
 	"expires_at\x18\x02 \x01(\x03R\texpiresAt\"U\n" +
 	"\x13GoogleSignInRequest\x12\x19\n" +
 	"\bid_token\x18\x01 \x01(\tR\aidToken\x12#\n" +
-	"\rreferral_code\x18\x02 \x01(\tR\freferralCode\"\xd4\x01\n" +
+	"\rreferral_code\x18\x02 \x01(\tR\freferralCode\"\x98\x02\n" +
 	"\x14GoogleSignInResponse\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\x124\n" +
 	"\fuser_profile\x18\x02 \x01(\v2\x11.quiz.UserProfileR\vuserProfile\x12\x1e\n" +
 	"\vis_new_user\x18\x03 \x01(\bR\tisNewUser\x12%\n" +
 	"\x0estreak_updated\x18\x04 \x01(\bR\rstreakUpdated\x12)\n" +
-	"\x06reward\x18\x05 \x01(\v2\x11.quiz.RewardGrantR\x06reward\"\xa9\x04\n" +
+	"\x06reward\x18\x05 \x01(\v2\x11.quiz.RewardGrantR\x06reward\x12#\n" +
+	"\rrefresh_token\x18\x06 \x01(\tR\frefreshToken\x12\x1d\n" +
+	"\n" +
+	"expires_in\x18\a \x01(\x03R\texpiresIn\"\xa9\x04\n" +
 	"\vUserProfile\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1a\n" +
 	"\busername\x18\x02 \x01(\tR\busername\x12!\n" +

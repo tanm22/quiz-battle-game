@@ -372,6 +372,11 @@ message VerifyEmailCodeResponse {
   bool   verified = 1;
   string token    = 2; // JWT returned for login flow
   string user_id  = 3;
+  // §4.7 PR-A1: refresh-token rotation. Populated on login purpose
+  // alongside `token` so the client can use the new refresh-rotation
+  // flow.
+  string refresh_token = 4;
+  int64  expires_in    = 5;
 }
 
 message LinkEmailRequest {
@@ -490,11 +495,14 @@ message GoogleSignInRequest {
 }
 
 message GoogleSignInResponse {
-  string      token          = 1; // JWT
+  string      token          = 1; // JWT (access)
   UserProfile user_profile   = 2;
   bool        is_new_user    = 3;
   bool        streak_updated = 4;
   RewardGrant reward         = 5;
+  // §4.7 PR-A1: refresh-token rotation.
+  string      refresh_token  = 6;
+  int64       expires_in     = 7;
 }
 
 message UserProfile {
