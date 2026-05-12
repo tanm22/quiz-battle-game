@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"math"
 	"net"
+	"sort"
 	"sync"
 	"time"
 
@@ -1025,6 +1026,58 @@ func resolveRoundsForHistory(eventRounds, roundsPlayed int) int {
 	return eventRounds
 }
 
+// Elo tuning. Kept as named consts so persistMatch and any future
+// rating-related code path read from one source of truth.
+const (
+	eloK             = 32.0 // chess-club default; bigger swings on each game
+	eloDefaultRating = 1200 // starting rating for a freshly-seen user
+)
+
+// computeEloDelta returns the rating delta and the win flag for a
+// single participant in a finished match. winnerID == "" means the
+// match had no winner (both sides scored zero) — every participant
+// gets actual=0.5, the standard draw treatment, so the sum of deltas
+// stays at zero and rating isn't quietly drained from the pool.
+//
+// `applied` is false only for a solo room (one participant, no
+// opponents). The caller still bumps matchesPlayed in that case but
+// skips the rating math (delta would be 0 anyway).
+//
+// Pure function — no Redis, no Mongo. The persistMatch consumer is
+// hard to unit-test as a whole; isolating the Elo math here is the
+// cheapest way to pin the rating contract.
+func computeEloDelta(userID string, participants []string, ratings map[string]float64, winnerID string, k float64) (delta int32, isWinner bool, applied bool) {
+	ra := ratings[userID]
+	isWinner = userID == winnerID
+
+	var totalExpected float64
+	opponents := 0
+	for _, otherID := range participants {
+		if otherID == userID {
+			continue
+		}
+		rb := ratings[otherID]
+		expected := 1.0 / (1.0 + math.Pow(10, (rb-ra)/400.0))
+		totalExpected += expected
+		opponents++
+	}
+	if opponents == 0 {
+		return 0, isWinner, false
+	}
+	avgExpected := totalExpected / float64(opponents)
+
+	var actual float64
+	switch {
+	case winnerID == "":
+		actual = 0.5 // draw — both sides scored zero, treat as a tie
+	case isWinner:
+		actual = 1.0
+	default:
+		actual = 0.0
+	}
+	return int32(math.Round(k * (actual - avgExpected))), isWinner, true
+}
+
 func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 	var event matchFinishedEvent
 	if err := json.Unmarshal(msg.Body, &event); err != nil {
@@ -1245,61 +1298,56 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 	// idempotent (tournament standings $inc) gate on this flag.
 	firstInsert := historyRes.UpsertedID != nil
 
-	// Step 54: Update user stats and Elo ratings
-	// Elo formula: K=32, expected = 1/(1+10^((Rb-Ra)/400))
-	// Winner gets +K*(1-expected), loser gets -K*expected
+	// Step 54: Update user stats and Elo ratings.
+	//
+	// Iterate EVERY participant, not just the scored ones. The earlier
+	// version only walked the leaderboard ZSET (`entries`), so a
+	// participant who finished with score=0 (timed out every round, or
+	// disconnected without answering) had their matchesPlayed counter
+	// silently skipped and their rating left untouched. That made
+	// `users.matchesPlayed` drift out of sync with `match_history` and
+	// gave abandoners a free pass on rating loss. After this change
+	// every participant gets exactly one matchesPlayed bump per
+	// finished match and an Elo update that reflects the match outcome.
+	//
+	// No-winner (both sides scored 0) is handled as a draw inside
+	// computeEloDelta — actual=0.5 keeps rating conservation intact
+	// (sum of deltas = 0 instead of every player losing K/2).
 	usersColl := s.mongoDB.Collection("users")
 
-	// Look up current ratings for Elo calculation
-	ratings := make(map[string]float64)
-	for _, e := range entries {
-		userID := e.Member.(string)
+	// Stable participant order so a Mongo redelivery applies updates
+	// in the same sequence — keeps debug logs comparable across runs.
+	participants := make([]string, 0, len(allPlayers))
+	for uid := range allPlayers {
+		participants = append(participants, uid)
+	}
+	sort.Strings(participants)
+
+	// Pre-load current ratings for every participant.
+	ratings := make(map[string]float64, len(participants))
+	for _, userID := range participants {
 		var userDoc bson.M
 		if err := usersColl.FindOne(ctx, bson.M{"_id": userID}).Decode(&userDoc); err == nil {
 			if r, ok := userDoc["rating"].(int32); ok {
 				ratings[userID] = float64(r)
 			} else {
-				ratings[userID] = 1200
+				ratings[userID] = eloDefaultRating
 			}
 		} else {
-			ratings[userID] = 1200
+			ratings[userID] = eloDefaultRating
 		}
 	}
 
-	const K = 32.0
 	winnerID := ""
 	if len(entries) > 0 {
 		winnerID = entries[0].Member.(string)
 	}
 
-	for _, e := range entries {
-		userID := e.Member.(string)
-		ra := ratings[userID]
-		isWinner := userID == winnerID
-
-		// Compute average expected score against all other players
-		var totalExpected float64
-		opponents := 0
-		for _, other := range entries {
-			otherID := other.Member.(string)
-			if otherID == userID {
-				continue
-			}
-			rb := ratings[otherID]
-			expected := 1.0 / (1.0 + math.Pow(10, (rb-ra)/400.0))
-			totalExpected += expected
-			opponents++
-		}
-		if opponents == 0 {
-			continue
-		}
-		avgExpected := totalExpected / float64(opponents)
-
-		var actual float64
-		if isWinner {
-			actual = 1.0
-		}
-		delta := int32(math.Round(K * (actual - avgExpected)))
+	for _, userID := range participants {
+		// applied is false for a solo room (opponents == 0). delta is
+		// already 0 in that case, so the matchesPlayed increment below
+		// still fires while rating math is a no-op.
+		delta, isWinner, _ := computeEloDelta(userID, participants, ratings, winnerID, eloK)
 
 		// Read current win streak to compute new value
 		var curUser models.User
