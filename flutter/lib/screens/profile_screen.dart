@@ -195,11 +195,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     super.dispose();
   }
 
+  // Rebuild on every keystroke so the Apply button's `onPressed`
+  // gate re-evaluates when text crosses the 6-char threshold.
   void _onCodeCtrlChanged() {
     if (!mounted) return;
-    setState(() {
-      if (_applyError != null) _applyError = null;
-    });
+    setState(() => _applyError = null);
   }
 
   void _onTabChanged() {
@@ -1444,7 +1444,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                         ),
                         errorText: _applyError,
                       ),
-                      onChanged: (_) {},
                     ),
                   ),
                   const SizedBox(width: Spacing.md),
