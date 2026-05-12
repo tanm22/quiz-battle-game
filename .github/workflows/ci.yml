@@ -54,3 +54,75 @@ jobs:
       - run: cd flutter && flutter pub get
       - run: cd flutter && flutter analyze --no-fatal-warnings
       - run: cd flutter && flutter test
+
+  # §4.9 integration job. Boots the full docker-compose stack and runs the
+  # `//go:build integration` e2e suite against the real services. Kept in
+  # its own job so the fast unit/Flutter feedback loop above isn't held
+  # back by the ~3 min stack-up + tear-down cost.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.25' }
+
+      - name: Boot docker-compose stack
+        run: docker compose up -d --build
+        env:
+          # Required at startup by services that load config via
+          # config.MustRequired — pkg/config errors out on unset values
+          # with a clear "missing env" message, so we always provide a
+          # value, even a placeholder. Real keys aren't needed: the e2e
+          # suite never exercises Google sign-in or Razorpay capture.
+          JWT_SECRET: ci-e2e-jwt-secret-not-for-prod
+          GOOGLE_CLIENT_ID: 000000000000-placeholder.apps.googleusercontent.com
+
+      - name: Wait for gRPC ports
+        run: |
+          # Each Go service binds its gRPC port AFTER its dep checks
+          # (mongo / redis / rabbitmq) succeed, so a port-up is a
+          # stronger readiness signal than `docker compose ps`. Poll
+          # every 2s for up to 90s — locally cold-start is ~30s.
+          ports="50051 50052 50053 50054 50055"
+          ready=false
+          for i in $(seq 1 45); do
+            ok=true
+            for p in $ports; do
+              if ! nc -z localhost "$p" 2>/dev/null; then
+                ok=false; break
+              fi
+            done
+            if [ "$ok" = "true" ]; then ready=true; break; fi
+            sleep 2
+          done
+          if [ "$ready" != "true" ]; then
+            echo "::error::services never bound their gRPC ports"
+            docker compose ps
+            exit 1
+          fi
+          echo "all gRPC ports up"
+
+      - name: Run integration tests
+        run: go test -tags integration -v -timeout 5m ./test/e2e/...
+
+      - name: Capture logs on failure
+        if: failure()
+        run: |
+          mkdir -p logs
+          docker compose ps > logs/ps.txt || true
+          for svc in auth matchmaking quiz scoring payment notification mongo redis rabbitmq seed; do
+            docker compose logs --no-color --tail 500 "$svc" > "logs/$svc.log" 2>&1 || true
+          done
+
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-compose-logs
+          path: logs/
+          retention-days: 7
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v --remove-orphans

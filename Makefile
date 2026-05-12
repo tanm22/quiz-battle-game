@@ -1,4 +1,4 @@
-.PHONY: proto proto-go proto-dart test vet lint build clean status
+.PHONY: proto proto-go proto-dart test vet lint build clean status coverage
 
 PROTO_SRC := proto/quiz.proto
 
@@ -46,3 +46,9 @@ build:
 # invoked standalone outside `make`).
 status:
 	@bash scripts/status.sh
+
+# §4.9 — per-function coverage report on the five pure-logic pieces the
+# spec calls out (scoring formula, daily quota, streak, webhook
+# signature, referral). Exits non-zero if any drop below 70%.
+coverage:
+	@bash scripts/coverage.sh
