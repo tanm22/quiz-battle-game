@@ -137,7 +137,7 @@ func TestReferralCode(t *testing.T) {
 		"":                      false,
 		"ABC":                   false, // too short
 		"ABC123":                true,
-		"REFA3B91F2C":           true, // 11 chars — within 6-12
+		"REFA3B91F2C":           true,  // 11 chars — within 6-12
 		strings.Repeat("A", 32): false, // too long
 		"abc-123":               false, // wrong charset
 		"abc123":                false, // lowercase rejected
