@@ -266,6 +266,15 @@ service AuthService {
   rpc GetStreakInfo(GetStreakInfoRequest) returns (GetStreakInfoResponse);
   // Phase 3
   rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse);
+  // §4.7 PR-A1: refresh-token rotation. Client presents a refresh token
+  // (single-use); server rotates it (mints a new refresh, revokes the
+  // old in the same family) and issues a fresh access JWT. Replay of an
+  // already-rotated token revokes the whole family — standard refresh-
+  // reuse defense against a stolen token.
+  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse);
+  // Revokes the family the presented refresh token belongs to. Covers
+  // every device sharing the same login lineage. Idempotent.
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
 }
 
 // ---------------------------------------------------------------------------
@@ -312,6 +321,11 @@ message AuthResponse {
   bool   streak_updated = 13;
   RewardGrant reward    = 14;
   bool   onboarding_completed = 15;
+  // §4.7 PR-A1: refresh-token rotation. The client stores `refresh_token`
+  // in secure storage and uses it to mint a fresh access token via
+  // RefreshToken once `expires_in` seconds elapse.
+  string refresh_token  = 16;
+  int64  expires_in     = 17;
 }
 
 message GetProfileRequest {}
@@ -1032,4 +1046,26 @@ message GetMonthlyRecapResponse {
   // the client render an "you didn't play in this month" card
   // instead of empty stats.
   bool   has_data = 8;
+}
+
+// ---------------------------------------------------------------------------
+// Refresh-token rotation (§4.7 PR-A1)
+// ---------------------------------------------------------------------------
+
+message RefreshTokenRequest {
+  string refresh_token = 1;
+}
+
+message RefreshTokenResponse {
+  string access_token  = 1;
+  string refresh_token = 2;
+  int64  expires_in    = 3; // seconds until access_token expires
+}
+
+message LogoutRequest {
+  string refresh_token = 1;
+}
+
+message LogoutResponse {
+  bool success = 1;
 }
