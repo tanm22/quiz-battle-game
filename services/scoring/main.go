@@ -80,6 +80,12 @@ type scoringServer struct {
 	// level — shopTestEnv-built servers leave this as the zero value
 	// and the limiter passes through unchanged.
 	purchaseLimiter *ratelimit.Limiter
+	// §4.7 PR-A1: UpdateFCMToken spam gate. Legitimate clients update
+	// only on app install, OS-level reinstall, or after FCM rotates a
+	// token (rare). 10/hour/user is generous for those plus an
+	// occasional dev-tools push, and tight enough that a misbehaving
+	// client can't bloat the user's fcmTokens array with garbage.
+	fcmTokenLimiter *ratelimit.Limiter
 }
 
 // purchaseRateLimit caps shop-purchase calls per user per minute. Set
@@ -656,6 +662,13 @@ func (s *scoringServer) UpdateFCMToken(ctx context.Context, req *pb.UpdateFCMTok
 	}
 	if err := validate.MaxLen(req.Token, 512); err != nil {
 		return nil, status.Error(codes.InvalidArgument, "token: too long")
+	}
+
+	// §4.7 PR-A1: token-churn rate limit. Real clients update once per
+	// install; 10/h is generous for dev reinstalls and an accidental
+	// retry loop without letting a misbehaving client bloat fcmTokens.
+	if !s.fcmTokenLimiter.AllowWithLog(ctx, userID) {
+		return nil, status.Error(codes.ResourceExhausted, "too many token updates; please wait")
 	}
 
 	_, err = s.mongoDB.Collection("users").UpdateOne(ctx,
@@ -1992,6 +2005,10 @@ func main() {
 		jwtSecret:       jwtSecret,
 		referralLimiter: ratelimit.New(rdb, "referral_apply", 3, 10*time.Minute),
 		purchaseLimiter: ratelimit.New(rdb, "purchase_shop_item", purchaseRateLimit, time.Minute),
+		// §4.7 PR-A1: 10/hour caps the FCM-token churn vector. Real
+		// clients touch this RPC once per install; 10/h leaves room for
+		// dev-mode reinstalls and one accidental loop without blocking.
+		fcmTokenLimiter: ratelimit.New(rdb, "fcm_token", 10, time.Hour),
 	}
 
 	// gRPC server — CalculateScore is called internally by the scoring worker
