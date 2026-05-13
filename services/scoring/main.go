@@ -2296,18 +2296,33 @@ func main() {
 	)
 	pb.RegisterScoringServiceServer(grpcServer, srv)
 
-	// §4.7 PR-B/C7: bind to 127.0.0.1, not 0.0.0.0 (":50053"). The
-	// CalculateScore RPC is in skipMethods above — it bypasses JWT auth
-	// because the scoring worker calls it on itself via the self-client
-	// at line 2099. Any in-cluster network actor reaching ":50053" could
-	// call CalculateScore as an answer oracle (it returns isCorrect,
-	// effectively revealing the right answer for any roomID/round/option
-	// triple they can name). Restricting the bind to loopback keeps the
-	// self-client working (grpc.NewClient("localhost:50053") resolves to
-	// 127.0.0.1) and ensures only same-host processes can reach the
-	// server. The Listen address and the log line below both record the
-	// chosen bind for ops greppability.
-	const grpcAddr = "127.0.0.1:50053"
+	// Bind to all interfaces so the docker-compose port forward
+	// (50053:50053) actually delivers traffic to the listener — without
+	// this the Flutter client's calls to scoring (GetHomeScreenData,
+	// GetCoinBalance, GetMatchHistory, GetGlobalLeaderboard, the entire
+	// coins/shop/friends/profile surface) NAT through docker to a port
+	// nobody is listening on inside the container and surface to the
+	// client as HTTP/2 errorCode 10 ("connection forcibly terminated").
+	// Every other Go service in this repo binds the same way; scoring
+	// is no different in deployment topology — production puts an API
+	// gateway in front of the public RPCs and never exposes :50053
+	// directly.
+	//
+	// TODO(security): CalculateScore is in skipMethods above because
+	// the in-process selfClient calls it without a JWT. A prior
+	// hardening (§4.7 PR-B/C7) bound this listener to 127.0.0.1 to
+	// keep the answer-oracle attack surface off the container's eth0,
+	// but it did so by silently breaking the Flutter app's access to
+	// every other scoring RPC. The clean fix is to either (a) mint a
+	// service JWT at scoring startup and have selfClient inject it via
+	// a client interceptor so CalculateScore can drop out of
+	// skipMethods, or (b) split scoring into a public listener on
+	// :50053 (auth'd RPCs) and an internal Unix-socket / 127.0.0.1
+	// listener that only registers CalculateScore. Tracking as a
+	// follow-up — for now we trust the deployment to not expose 50053
+	// publicly, the same trust every other gRPC service in this repo
+	// already relies on.
+	const grpcAddr = ":50053"
 	lis, err := net.Listen("tcp", grpcAddr)
 	if err != nil {
 		log.Fatal(ctx, "listen failed", "addr", grpcAddr, "err", err)
