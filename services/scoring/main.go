@@ -891,6 +891,14 @@ func (s *scoringServer) consumeAnswers(ctx context.Context) {
 }
 
 func (s *scoringServer) processAnswer(ctx context.Context, msg amqp.Delivery) {
+	// Recover so an unexpected panic — nil-map deref, type-assertion
+	// failure inside Redis/Mongo response decoding, etc. — logs cleanly
+	// instead of killing the consumer goroutine and silently halting
+	// answer scoring for every room. The msg is left unacked on panic;
+	// RabbitMQ redelivers it, and the `x-death` count gates the DLQ
+	// after a few retries — so a poison message can't loop forever.
+	defer log.RecoverPanic(ctx, "processAnswer")
+
 	var answer answerMessage
 	if err := json.Unmarshal(msg.Body, &answer); err != nil {
 		log.FromContext(ctx).Warn("bad answer payload", "consumer", "scoring", "err", err)
@@ -928,19 +936,22 @@ func (s *scoringServer) processAnswer(ctx context.Context, msg amqp.Delivery) {
 	}
 
 	correct := calcResp.Correct
-	score := calcResp.Score
+	baseScore := calcResp.Score
+	score := baseScore
 
 	// Step 12/48: Atomic idempotency — HSETNX room:{id}:answers:{round} {userId}.
-	// The recencyBonus fields are populated AFTER this HSETNX succeeds
-	// (see below) so a duplicate submission can't double-INCR the streak
-	// or first-correct counters. They're left as zero for the marshal
-	// pre-image so the JSON shape is consistent with the post-write
-	// record we publish on the leaderboard event.
-	var streakBonus, firstCorrectBonus float64
-	answerJSON, err := json.Marshal(map[string]interface{}{
+	// The HSETNX is the canonical "first delivery wins" gate — recency
+	// bonus side-effects (BumpStreak, IncrCorrectOrder) only run if this
+	// goroutine wins it, so a duplicate replay of the same RabbitMQ
+	// message can't double-INCR the streak / first-correct counters.
+	// The placeholder record stores the base score; we OVERWRITE it
+	// below with the bonus-inclusive value so the per-answer record and
+	// the leaderboard ZSET never disagree on what the player scored
+	// (a future per-question breakdown UI relies on this).
+	placeholderJSON, err := json.Marshal(map[string]interface{}{
 		"optionIndex":     answer.OptionIndex,
 		"correct":         correct,
-		"score":           score,
+		"score":           baseScore,
 		"timestamp":       answer.ServerTimestamp,
 		"clientTimestamp": answer.ClientTimestamp,
 	})
@@ -954,7 +965,7 @@ func (s *scoringServer) processAnswer(ctx context.Context, msg amqp.Delivery) {
 		msg.Nack(false, true)
 		return
 	}
-	wasSet, err := keys.TrySetAnswer(ctx, s.rdb, answer.RoomID, answer.Round, answer.UserID, string(answerJSON))
+	wasSet, err := keys.TrySetAnswer(ctx, s.rdb, answer.RoomID, answer.Round, answer.UserID, string(placeholderJSON))
 	if err != nil {
 		log.FromContext(ctx).Error("TrySetAnswer failed",
 			"consumer", "scoring",
@@ -984,6 +995,7 @@ func (s *scoringServer) processAnswer(ctx context.Context, msg amqp.Delivery) {
 	// Counter failures are logged but non-fatal — the base score still
 	// applies, the answer record is durable, and at worst the player
 	// misses one round of bonus.
+	var streakBonus, firstCorrectBonus float64
 	if correct {
 		streakLevel, sErr := keys.BumpStreak(ctx, s.rdb, answer.RoomID, answer.UserID)
 		if sErr != nil {
@@ -1005,6 +1017,35 @@ func (s *scoringServer) processAnswer(ctx context.Context, msg amqp.Delivery) {
 			log.FromContext(ctx).Warn("ResetStreak failed; streak may carry over a wrong answer",
 				"consumer", "scoring", "user_id", answer.UserID, "room_id", answer.RoomID, "err", rErr)
 		}
+	}
+
+	// Overwrite the per-answer record with the bonus-inclusive score and
+	// the bonus breakdown. Reads of room:{id}:answers:{round} (used by
+	// finishMatch's tallyCorrect/tallyAvgMs and the persistence
+	// consumer's tallyStats) only look at `correct` and the two
+	// timestamps — the `score` field is for downstream tooling that
+	// wants the same number the leaderboard ZSET carries. HSET (not
+	// HSETNX) on an already-claimed field is safe; only the goroutine
+	// that won TrySetAnswer reaches this line.
+	finalJSON, mErr := json.Marshal(map[string]interface{}{
+		"optionIndex":       answer.OptionIndex,
+		"correct":           correct,
+		"score":             score,
+		"baseScore":         baseScore,
+		"streakBonus":       streakBonus,
+		"firstCorrectBonus": firstCorrectBonus,
+		"timestamp":         answer.ServerTimestamp,
+		"clientTimestamp":   answer.ClientTimestamp,
+	})
+	if mErr != nil {
+		log.FromContext(ctx).Warn("marshal final answer record failed; keeping placeholder",
+			"consumer", "scoring", "user_id", answer.UserID, "room_id", answer.RoomID,
+			"round", answer.Round, "err", mErr)
+	} else if hErr := s.rdb.HSet(ctx, keys.Answers(answer.RoomID, answer.Round),
+		answer.UserID, string(finalJSON)).Err(); hErr != nil {
+		log.FromContext(ctx).Warn("HSet final answer record failed; keeping placeholder",
+			"consumer", "scoring", "user_id", answer.UserID, "room_id", answer.RoomID,
+			"round", answer.Round, "err", hErr)
 	}
 
 	// Step 49: Update leaderboard via Lua script (atomic read-modify-write)
@@ -1184,6 +1225,12 @@ func computeEloDelta(userID string, participants []string, ratings map[string]fl
 }
 
 func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
+	// Recover so a panic during Mongo decode / FindOneAndUpdate path
+	// can't take down the persistence consumer goroutine. msg stays
+	// unacked on panic, so RabbitMQ will redeliver; the DLQ pattern via
+	// x-death count keeps a poisoned message from looping forever.
+	defer log.RecoverPanic(ctx, "persistMatch")
+
 	var event matchFinishedEvent
 	if err := json.Unmarshal(msg.Body, &event); err != nil {
 		log.FromContext(ctx).Warn("bad payload", "consumer", "persistence", "event", "match.finished", "body", string(msg.Body), "err", err)
@@ -1418,6 +1465,17 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 	// No-winner (both sides scored 0) is handled as a draw inside
 	// computeEloDelta — actual=0.5 keeps rating conservation intact
 	// (sum of deltas = 0 instead of every player losing K/2).
+	//
+	// Gated on `firstInsert` because the `$inc` on matchesPlayed / rating
+	// / wins / correctAnswers / totalAnswers is NOT idempotent. A
+	// RabbitMQ redelivery of match.finished (consumer crash before Ack,
+	// channel drop mid-flight, broker requeue, or the finishMatch
+	// concurrent-defer race the SETNX guard in services/quiz/main.go
+	// closes) would otherwise double every per-user counter and corrupt
+	// `users.rating` on the second pass. match_history's $setOnInsert
+	// is the canonical "fresh delivery vs redelivery" signal — the same
+	// gate already protects rating_history, answer_log, and the
+	// tournament-standings $inc further below.
 	usersColl := s.mongoDB.Collection("users")
 
 	// Stable participant order so a Mongo redelivery applies updates
@@ -1448,67 +1506,67 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 		winnerID = entries[0].Member.(string)
 	}
 
-	for _, userID := range participants {
-		// applied is false for a solo room (opponents == 0). delta is
-		// already 0 in that case, so the matchesPlayed increment below
-		// still fires while rating math is a no-op.
-		delta, isWinner, _ := computeEloDelta(userID, participants, ratings, winnerID, eloK)
+	if firstInsert {
+		for _, userID := range participants {
+			// applied is false for a solo room (opponents == 0). delta is
+			// already 0 in that case, so the matchesPlayed increment below
+			// still fires while rating math is a no-op.
+			delta, isWinner, _ := computeEloDelta(userID, participants, ratings, winnerID, eloK)
 
-		// Read current win streak to compute new value
-		var curUser models.User
-		_ = usersColl.FindOne(ctx, bson.M{"_id": userID}).Decode(&curUser)
+			// Read current win streak to compute new value
+			var curUser models.User
+			_ = usersColl.FindOne(ctx, bson.M{"_id": userID}).Decode(&curUser)
 
-		inc := bson.M{
-			"matchesPlayed":  int32(1),
-			"rating":         delta,
-			"correctAnswers": playerCorrect[userID],
-			"totalAnswers":   playerTotal[userID],
-		}
-		set := bson.M{}
-		if isWinner {
-			inc["wins"] = int32(1)
-			newWS := curUser.WinStreak + 1
-			set["winStreak"] = newWS
-			if newWS > curUser.LongestWinStreak {
-				set["longestWinStreak"] = newWS
+			inc := bson.M{
+				"matchesPlayed":  int32(1),
+				"rating":         delta,
+				"correctAnswers": playerCorrect[userID],
+				"totalAnswers":   playerTotal[userID],
 			}
-		} else {
-			set["winStreak"] = int32(0)
-		}
-		update := bson.M{"$inc": inc}
-		if len(set) > 0 {
-			update["$set"] = set
-		}
-		// §4.5: read the post-update rating back from the upsert so the
-		// snapshot is always consistent with users.rating — the prior
-		// `int32(ra) + delta` math broke on a brand-new upsert path
-		// where `$inc rating: delta` creates the doc with `rating=delta`,
-		// not `1200+delta`. Using FindOneAndUpdate(returnDocument=After)
-		// makes Mongo the single source of truth for the snapshot value.
-		var post struct {
-			Rating int32 `bson:"rating"`
-		}
-		err := usersColl.FindOneAndUpdate(ctx,
-			bson.M{"_id": userID},
-			update,
-			options.FindOneAndUpdate().
-				SetUpsert(true).
-				SetReturnDocument(options.After).
-				SetProjection(bson.M{"rating": 1}),
-		).Decode(&post)
-		if err != nil {
-			log.FromContext(ctx).Error("user update failed", "consumer", "persistence", "user_id", userID, "err", err)
-			continue
-		}
+			set := bson.M{}
+			if isWinner {
+				inc["wins"] = int32(1)
+				newWS := curUser.WinStreak + 1
+				set["winStreak"] = newWS
+				if newWS > curUser.LongestWinStreak {
+					set["longestWinStreak"] = newWS
+				}
+			} else {
+				set["winStreak"] = int32(0)
+			}
+			update := bson.M{"$inc": inc}
+			if len(set) > 0 {
+				update["$set"] = set
+			}
+			// §4.5: read the post-update rating back from the upsert so the
+			// snapshot is always consistent with users.rating — the prior
+			// `int32(ra) + delta` math broke on a brand-new upsert path
+			// where `$inc rating: delta` creates the doc with `rating=delta`,
+			// not `1200+delta`. Using FindOneAndUpdate(returnDocument=After)
+			// makes Mongo the single source of truth for the snapshot value.
+			var post struct {
+				Rating int32 `bson:"rating"`
+			}
+			err := usersColl.FindOneAndUpdate(ctx,
+				bson.M{"_id": userID},
+				update,
+				options.FindOneAndUpdate().
+					SetUpsert(true).
+					SetReturnDocument(options.After).
+					SetProjection(bson.M{"rating": 1}),
+			).Decode(&post)
+			if err != nil {
+				log.FromContext(ctx).Error("user update failed", "consumer", "persistence", "user_id", userID, "err", err)
+				continue
+			}
 
-		// §4.5: snapshot the post-Elo rating for the rating-graph series.
-		// One row per (user × match), gated on `firstInsert` so a
-		// RabbitMQ redelivery doesn't write duplicates for the same
-		// match. Without this gate any future query that doesn't
-		// bucket-by-day (analytics export, ML feature pull, ad-hoc
-		// admin lookup) would see two rows per match for redelivered
-		// events.
-		if firstInsert {
+			// §4.5: snapshot the post-Elo rating for the rating-graph series.
+			// One row per (user × match) — the surrounding firstInsert
+			// gate prevents a RabbitMQ redelivery from writing duplicates
+			// for the same match. Without this gate any future query that
+			// doesn't bucket-by-day (analytics export, ML feature pull,
+			// ad-hoc admin lookup) would see two rows per match for
+			// redelivered events.
 			if _, err := s.mongoDB.Collection("rating_history").InsertOne(ctx, bson.M{
 				"userId":      userID,
 				"matchId":     event.RoomID,
@@ -1519,6 +1577,9 @@ func (s *scoringServer) persistMatch(ctx context.Context, msg amqp.Delivery) {
 				log.FromContext(ctx).Error("rating_history insert failed", "consumer", "persistence", "user_id", userID, "err", err)
 			}
 		}
+	} else {
+		log.FromContext(ctx).Info("match redelivery skipped user-stats $inc",
+			"consumer", "persistence", "room_id", event.RoomID)
 	}
 
 	// §4.5: bulk-insert the answer_log rows accumulated during tallyStats,
@@ -2187,14 +2248,26 @@ func main() {
 	)
 	pb.RegisterScoringServiceServer(grpcServer, srv)
 
-	lis, err := net.Listen("tcp", ":50053")
+	// §4.7 PR-B/C7: bind to 127.0.0.1, not 0.0.0.0 (":50053"). The
+	// CalculateScore RPC is in skipMethods above — it bypasses JWT auth
+	// because the scoring worker calls it on itself via the self-client
+	// at line 2099. Any in-cluster network actor reaching ":50053" could
+	// call CalculateScore as an answer oracle (it returns isCorrect,
+	// effectively revealing the right answer for any roomID/round/option
+	// triple they can name). Restricting the bind to loopback keeps the
+	// self-client working (grpc.NewClient("localhost:50053") resolves to
+	// 127.0.0.1) and ensures only same-host processes can reach the
+	// server. The Listen address and the log line below both record the
+	// chosen bind for ops greppability.
+	const grpcAddr = "127.0.0.1:50053"
+	lis, err := net.Listen("tcp", grpcAddr)
 	if err != nil {
-		log.Fatal(ctx, "listen failed", "addr", ":50053", "err", err)
+		log.Fatal(ctx, "listen failed", "addr", grpcAddr, "err", err)
 	}
 
 	// Start gRPC server in background, then set up self-client for CalculateScore
 	go func() {
-		log.FromContext(ctx).Info("gRPC serving", "addr", ":50053")
+		log.FromContext(ctx).Info("gRPC serving", "addr", grpcAddr)
 		if err := grpcServer.Serve(lis); err != nil {
 			log.Fatal(ctx, "grpc serve failed", "err", err)
 		}

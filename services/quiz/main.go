@@ -413,6 +413,7 @@ func (s *quizServer) consumeMatchCreated(ctx context.Context) {
 			// Detach msgCtx so the goroutine carries the request_id but is
 			// not bound to the consumer's lifecycle (msg has been Acked).
 			go func(roomID string, parentCtx context.Context) {
+				defer log.RecoverPanic(parentCtx, "consumeMatchCreated.startRound")
 				time.Sleep(2 * time.Second)
 				s.startRound(parentCtx, roomID, 1)
 			}(event.RoomID, log.DetachContext(msgCtx))
@@ -477,36 +478,67 @@ func (s *quizServer) startRound(ctx context.Context, roomID string, round int) {
 	}
 	s.broadcastToRoom(roomID, event)
 
-	// Start 15s timer — fires closeRound regardless of how many answers arrived
+	// Start 15s timer — fires closeRound regardless of how many answers arrived.
+	// closeRound has its own defer log.RecoverPanic so the AfterFunc goroutine
+	// is already panic-safe.
 	timer := time.AfterFunc(15*time.Second, func() {
 		s.closeRound(ctx, roomID, round)
 	})
 	s.roomTimers.Store(roomID, timer)
 
-	// Periodic TimerSync — broadcast every 3 seconds until round ends
-	go func() {
+	// Periodic TimerSync — broadcast every 3 seconds until round ends.
+	//
+	// The goroutine captures its OWN deadline at spawn (`myDeadline`).
+	// Exit conditions, in order of likelihood:
+	//
+	//   1. The map entry was deleted (closeRound's winner branch or
+	//      finishMatch) — !ok ⇒ return.
+	//   2. The map entry was overwritten by a fresh startRound (next
+	//      round began) — `dl != myDeadline` ⇒ return. Without this
+	//      check a goroutine that slept past the round transition
+	//      would happily emit stray TimerSync events tagged with the
+	//      NEW round's deadline, racing the new round's goroutine.
+	//   3. The capture-time deadline has been reached — round naturally
+	//      ended ⇒ return.
+	//   4. The parent context is done (service shutdown) — return so
+	//      we don't keep the process alive past GracefulStop.
+	//
+	// Wrapped in panic recovery because broadcastToRoom walks a
+	// sync.Map with `value.(chan *pb.GameEvent)`; a misuse of
+	// gameStreams that stored anything else under a roomID prefix
+	// would panic inside Range and crash the whole quiz service.
+	go func(myDeadline int64) {
+		defer log.RecoverPanic(ctx, "TimerSync")
 		ticker := time.NewTicker(3 * time.Second)
 		defer ticker.Stop()
-		for range ticker.C {
-			dl, ok := s.roomDeadlines.Load(roomID)
-			if !ok {
+		for {
+			select {
+			case <-ctx.Done():
 				return
-			}
-			deadline := dl.(int64)
-			if time.Now().Unix() >= deadline {
-				return // round has ended
-			}
-			syncSeq := s.getSeqCounter(roomID).Add(1)
-			s.broadcastToRoom(roomID, &pb.GameEvent{
-				SequenceNumber: syncSeq,
-				Event: &pb.GameEvent_TimerSync{
-					TimerSync: &pb.TimerSync{
-						DeadlineUnix: deadline,
+			case <-ticker.C:
+				dl, ok := s.roomDeadlines.Load(roomID)
+				if !ok {
+					return
+				}
+				deadline := dl.(int64)
+				if deadline != myDeadline {
+					return // a new round overwrote the deadline; this goroutine is stale
+				}
+				if time.Now().Unix() >= deadline {
+					return // round has ended
+				}
+				syncSeq := s.getSeqCounter(roomID).Add(1)
+				s.broadcastToRoom(roomID, &pb.GameEvent{
+					SequenceNumber: syncSeq,
+					Event: &pb.GameEvent_TimerSync{
+						TimerSync: &pb.TimerSync{
+							DeadlineUnix: deadline,
+						},
 					},
-				},
-			})
+				})
+			}
 		}
-	}()
+	}(deadlineUnix)
 }
 
 // ---------------------------------------------------------------------------
@@ -514,6 +546,12 @@ func (s *quizServer) startRound(ctx context.Context, roomID string, round int) {
 // ---------------------------------------------------------------------------
 
 func (s *quizServer) closeRound(ctx context.Context, roomID string, round int) {
+	// closeRound runs in a goroutine (time.AfterFunc callback or explicit
+	// `go s.closeRound(...)` from maybeEarlyCloseRound). An unrecovered
+	// panic here — nil-map deref in broadcastToRoom, type assertion in
+	// the Range body, etc. — would crash the entire quiz service mid-match.
+	defer log.RecoverPanic(ctx, "closeRound")
+
 	// SETNX guard: only one goroutine closes the round
 	won, err := keys.TryCloseRound(ctx, s.rdb, roomID, round)
 	if err != nil || !won {
@@ -574,7 +612,43 @@ func (s *quizServer) closeRound(ctx context.Context, roomID string, round int) {
 // ---------------------------------------------------------------------------
 
 func (s *quizServer) finishMatch(ctx context.Context, roomID string, totalRounds int) {
+	// Recover from panics so a bug in tally/broadcast/marshal here can't
+	// take down the quiz service mid-match. The SETNX guard below means
+	// re-entry on retry isn't a concern.
+	defer log.RecoverPanic(ctx, "finishMatch")
+
+	// SETNX guard: when both players' StreamGameEvents defers race (they
+	// each read `remaining == 0` after their own gameStreams.Delete but
+	// before the other's), or when startRound's `round > len(questions)`
+	// branch fires in the same instant as the disconnect-driven defer,
+	// finishMatch can be entered twice for the same room. Without this
+	// guard the second call republishes match.finished (the persistence
+	// consumer's per-user $inc is not idempotent — see C1), broadcasts
+	// MatchEnd twice (clients see duplicate results screens), and
+	// republishes coins.earn.match_win. The ledger's (userId, refId,
+	// reason) unique index swallows the coin double-grant, but stats
+	// doubling and duplicate UX events are still visible.
+	won, err := keys.TryFinalizeMatch(ctx, s.rdb, roomID)
+	if err != nil {
+		log.FromContext(ctx).Warn("match-finalized guard failed; proceeding",
+			"room_id", roomID, "err", err)
+	} else if !won {
+		log.FromContext(ctx).Info("finishMatch already ran for room; skipping",
+			"room_id", roomID)
+		return
+	}
+
 	log.FromContext(ctx).Info("match finished", "room_id", roomID, "rounds", totalRounds)
+
+	// Drop the deadline entry so the TimerSync goroutine spawned by the
+	// final round's startRound exits on its next 3-second tick. closeRound
+	// already deletes this entry on its winner branch, but finishMatch can
+	// be reached without going through closeRound (e.g. zero-connected
+	// disconnect path on the final round, or `round > len(questions)` in
+	// startRound). Without this delete, the goroutine keeps emitting stray
+	// TimerSync events until the deadline naturally passes (up to 15s of
+	// no-op broadcasts) and refuses to exit promptly on shutdown.
+	s.roomDeadlines.Delete(roomID)
 
 	// Get leaderboard from Redis for final results
 	entries, _ := keys.GetLeaderboardEntries(ctx, s.rdb, roomID)
@@ -832,11 +906,31 @@ func (s *quizServer) broadcastToRoom(roomID string, event *pb.GameEvent) {
 		k := key.(string)
 		if len(k) > len(prefix) && k[:len(prefix)] == prefix {
 			ch := value.(chan *pb.GameEvent)
-			select {
-			case ch <- event:
-			default:
-				slog.Warn("stream buffer full", "stream_key", k)
-			}
+			// Recover here because StreamGameEvents' defer does
+			// gameStreams.Delete(k) and close(ch) as separate
+			// operations — Range can have already loaded the channel
+			// from its sync.Map snapshot when close() runs on another
+			// goroutine, and a send on a closed channel panics
+			// straight through the surrounding select/default (default
+			// only fires when the channel is FULL, not when it's
+			// closed). Without this recover a normal disconnect race
+			// could panic broadcastToRoom and tear down whichever
+			// goroutine called us (closeRound / TimerSync / finishMatch /
+			// the calling RPC). Logged at debug because this is an
+			// expected disconnect-time race, not an error.
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						slog.Debug("broadcast to closed stream channel; ignored",
+							"stream_key", k, "panic", r)
+					}
+				}()
+				select {
+				case ch <- event:
+				default:
+					slog.Warn("stream buffer full", "stream_key", k)
+				}
+			}()
 		}
 		return true
 	})
@@ -1245,6 +1339,28 @@ func (s *quizServer) SubmitAnswer(ctx context.Context, req *pb.SubmitAnswerReque
 	// the legitimate players would see a third "ghost" entry.
 	if err := s.requireRoomMember(ctx, req.RoomId, userID, "submit"); err != nil {
 		return nil, err
+	}
+
+	// §4.7 PR-B/C1: current-round gate. The per-round answer key
+	// (room:{id}:answers:{round}) is HSETNX-locked on first write, so
+	// without this check a member could pre-commit answers for rounds
+	// 1..N at t=0 — questions are pre-loaded into Redis at match-create,
+	// so the per-round key for round=2 already accepts writes during
+	// round=1. By rejecting anything that isn't the room's active round,
+	// pre-commit attacks (and lagging-client retries from a previous
+	// round) are turned into a clean InvalidArgument the client can
+	// surface or ignore.
+	//
+	// GetRoomRound returns redis.Nil (error, 0) when the round key has
+	// expired or never been set — treat that as "match not active" with
+	// FailedPrecondition so the client distinguishes it from a
+	// well-formed wrong-round submission.
+	currentRound, err := keys.GetRoomRound(ctx, s.rdb, req.RoomId)
+	if err != nil || currentRound < 1 {
+		return nil, status.Error(codes.FailedPrecondition, "match not active")
+	}
+	if int(req.Round) != currentRound {
+		return nil, status.Error(codes.InvalidArgument, "round is not the active round")
 	}
 
 	// Publish answer.submitted event to RabbitMQ — do not wait for scoring
@@ -1970,6 +2086,22 @@ func (s *quizServer) consumeRoundCompleted(ctx context.Context) {
 				continue
 			}
 
+			// §4.7 PR-B/I7: defensive bounds check. The existing branch
+			// below only guarded against Round >= len(questions); a
+			// malformed (or maliciously injected) payload with Round=0
+			// would slip through and advance startRound to round 1
+			// regardless of whether round 1 had already run. A negative
+			// Round would index questions[-1] inside startRound. Ack
+			// and log rather than requeue — a poisoned message would
+			// just loop forever.
+			if event.Round < 1 || event.Round > len(questions) {
+				log.FromContext(msgCtx).Warn("out-of-range round; dropping",
+					"room_id", event.RoomID, "round", event.Round, "total", len(questions))
+				msg.Ack(false)
+				s.recordConsume("round-complete-queue", metrics.StatusAck)
+				continue
+			}
+
 			msg.Ack(false)
 			s.recordConsume("round-complete-queue", metrics.StatusAck)
 
@@ -1977,6 +2109,7 @@ func (s *quizServer) consumeRoundCompleted(ctx context.Context) {
 				// Advance to next round after a 2s pause. Detach so the
 				// goroutine has its own lifecycle but keeps the rid.
 				go func(roomID string, nextRound int, parentCtx context.Context) {
+					defer log.RecoverPanic(parentCtx, "consumeRoundCompleted.startRound")
 					time.Sleep(2 * time.Second)
 					s.startRound(parentCtx, roomID, nextRound)
 				}(event.RoomID, event.Round+1, log.DetachContext(msgCtx))

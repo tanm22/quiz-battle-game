@@ -257,6 +257,23 @@ func TryCloseRound(ctx context.Context, rdb *redis.Client, roomID string, round 
 	return rdb.SetNX(ctx, RoundClosed(roomID, round), "1", RoundClosedTTL).Result()
 }
 
+// MatchFinalizedTTL is the safety expiry on the match-finalized SETNX.
+// Outlives the longest plausible match (10 rounds × 15s + buffer) plus
+// the persistence consumer's processing window, so a late RabbitMQ
+// redelivery of match.finished doesn't sneak past the guard. Matches the
+// RoomTTL pattern — the key is allowed to expire long after the match
+// is fully torn down because nothing checks it after finishMatch returns.
+const MatchFinalizedTTL = 30 * time.Minute
+
+// TryFinalizeMatch attempts to claim the per-room match-finalized guard
+// via SETNX. Returns true if this goroutine won the race (first to
+// finalize the match). All callers must early-return on false to avoid
+// double-broadcasting MatchEnd, republishing match.finished, or
+// re-publishing the coins.earn.match_win event.
+func TryFinalizeMatch(ctx context.Context, rdb *redis.Client, roomID string) (bool, error) {
+	return rdb.SetNX(ctx, MatchFinalized(roomID), "1", MatchFinalizedTTL).Result()
+}
+
 // --- Email verification codes ---
 
 const (
