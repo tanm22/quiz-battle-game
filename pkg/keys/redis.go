@@ -208,6 +208,43 @@ func TrySetAnswer(ctx context.Context, rdb *redis.Client, roomID string, round i
 	return set, nil
 }
 
+// --- Recency bonus counters ---
+
+// BumpStreak increments the per-user consecutive-correct counter for a
+// match and returns the post-INCR value (1 on the first correct answer,
+// 2 on the second, …). The caller maps the returned level to a bonus.
+// Refreshes TTL so the counter survives a long match.
+func BumpStreak(ctx context.Context, rdb *redis.Client, roomID, userID string) (int64, error) {
+	key := Streak(roomID, userID)
+	level, err := rdb.Incr(ctx, key).Result()
+	if err != nil {
+		return 0, err
+	}
+	rdb.Expire(ctx, key, RoomTTL)
+	return level, nil
+}
+
+// ResetStreak clears the per-user consecutive-correct counter — called
+// when a player answers wrong so the next correct answer starts a
+// fresh streak at 1.
+func ResetStreak(ctx context.Context, rdb *redis.Client, roomID, userID string) error {
+	return rdb.Del(ctx, Streak(roomID, userID)).Err()
+}
+
+// IncrCorrectOrder atomically increments the per-round correct-answer
+// counter and returns the caller's rank (1 = first correct in the
+// round, 2 = second, …). The caller maps the rank to a bonus.
+// Called only on a correct answer.
+func IncrCorrectOrder(ctx context.Context, rdb *redis.Client, roomID string, round int) (int64, error) {
+	key := CorrectOrder(roomID, round)
+	rank, err := rdb.Incr(ctx, key).Result()
+	if err != nil {
+		return 0, err
+	}
+	rdb.Expire(ctx, key, RoomTTL)
+	return rank, nil
+}
+
 // --- Round close guard ---
 
 // RoundClosedTTL is the safety expiry for the round-closed guard key.

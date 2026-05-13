@@ -67,3 +67,54 @@ func TestComputeRoundScore_NegativeAnswerTimeFalsIntoFastBracket(t *testing.T) {
 		t.Errorf("score for correct + negative time: want 150, got %v", score)
 	}
 }
+
+// TestComputeRecencyBonus covers the streak + first-correct math
+// applied on top of the base score after a correct answer is
+// idempotently recorded. The function is pure; the I/O around it
+// (BumpStreak / IncrCorrectOrder) is covered by the integration
+// tests in pkg/keys.
+func TestComputeRecencyBonus(t *testing.T) {
+	cases := []struct {
+		name             string
+		streakLevel      int64
+		correctRank      int64
+		wantStreakBonus  float64
+		wantFirstCorrect float64
+		wantTotal        float64
+	}{
+		// Streak level alone (correctRank=0 — the counter-failure path,
+		// e.g. IncrCorrectOrder errored and we degraded gracefully).
+		{"level 1, no rank", 1, 0, 0, 0, 0},
+		{"level 2, no rank", 2, 0, 10, 0, 10},
+		{"level 6, no rank — at cap", 6, 0, 50, 0, 50},
+		{"level 12, no rank — past cap, still 50", 12, 0, 50, 0, 50},
+
+		// First-correct alone (level=1 — first correct in a streak).
+		{"level 1, rank 1", 1, 1, 0, 25, 25},
+		{"level 1, rank 2", 1, 2, 0, 10, 10},
+		{"level 1, rank 3 — no bonus past length", 1, 3, 0, 0, 0},
+		{"level 1, rank 99 — no bonus", 1, 99, 0, 0, 0},
+
+		// Both stacking — the headline mechanic.
+		{"hot streak + first correct", 3, 1, 20, 25, 45},
+		{"capped streak + second correct", 7, 2, 50, 10, 60},
+
+		// Defensive edges.
+		{"level 0 — invariant violation, no bonus", 0, 1, 0, 25, 25},
+		{"negative rank — no bonus", 2, -1, 10, 0, 10},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotStreak, gotFirst, gotTotal := computeRecencyBonus(tc.streakLevel, tc.correctRank)
+			if gotStreak != tc.wantStreakBonus {
+				t.Errorf("streakBonus: want %v, got %v", tc.wantStreakBonus, gotStreak)
+			}
+			if gotFirst != tc.wantFirstCorrect {
+				t.Errorf("firstCorrectBonus: want %v, got %v", tc.wantFirstCorrect, gotFirst)
+			}
+			if gotTotal != tc.wantTotal {
+				t.Errorf("total: want %v, got %v", tc.wantTotal, gotTotal)
+			}
+		})
+	}
+}
