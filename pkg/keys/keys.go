@@ -136,10 +136,25 @@ func MatchInviteThrottle(fromUserID, toUserID string) string {
 	return fmt.Sprintf(MatchInviteThrottleKey, fromUserID, toUserID)
 }
 
-// ChallengeThrottle builds the Redis SETNX guard preventing rapid-fire
-// challenge spam from one user to the same friend.
+// ChallengeThrottle builds the Redis SETNX guard against duplicate
+// concurrent challenges between two users.
+//
+// Canonicalized — the SAME key is produced for Alice→Bob and Bob→Alice
+// so mutual challenges land on one room instead of two parallel ones.
+// Previously the key was directional (challenge:throttle:A:B vs B:A),
+// which let two users tapping "Challenge" on each other at the same
+// time spawn two solo rooms and miss each other entirely (the bug
+// surfaced in PR #55's emulator-pair test).
+//
+// The key VALUE stores the active challenge's roomID — TryClaimChallenge
+// returns it on collision so the second caller can join the existing
+// room rather than spawn a parallel one.
 func ChallengeThrottle(fromUserID, toUserID string) string {
-	return fmt.Sprintf(ChallengeThrottleKey, fromUserID, toUserID)
+	a, b := fromUserID, toUserID
+	if a > b {
+		a, b = b, a
+	}
+	return fmt.Sprintf(ChallengeThrottleKey, a, b)
 }
 
 // Presence builds the Redis TTL key whose existence indicates the user

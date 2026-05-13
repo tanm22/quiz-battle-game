@@ -463,12 +463,51 @@ func AreOnline(ctx context.Context, rdb *redis.Client, userIDs []string) (map[st
 // notification-arrives-late-and-user-clicks-again pattern.
 const ChallengeThrottleTTL = 30 * time.Second
 
-// TrySetChallengeThrottle returns true when this is the first
-// challenge from fromUserID → toUserID inside the throttle window.
-// Returns false if a challenge from this pair was sent recently —
-// the caller should surface a friendly "you just challenged them" hint.
-func TrySetChallengeThrottle(ctx context.Context, rdb *redis.Client, fromUserID, toUserID string) (bool, error) {
-	return rdb.SetNX(ctx, ChallengeThrottle(fromUserID, toUserID), "1", ChallengeThrottleTTL).Result()
+// TryClaimChallenge attempts an atomic SETNX on the canonical throttle
+// key for the (fromUserID, toUserID) pair, storing candidateRoomID as
+// the value.
+//
+// Returns:
+//   - (true, "", nil)        — claim succeeded; caller is the first
+//     challenger, should proceed to create candidateRoomID.
+//   - (false, existingID, nil) — someone (either direction) already
+//     claimed this pair; caller should join existingID instead of
+//     creating a parallel room.
+//   - (false, "", nil)       — collision but the existing key
+//     disappeared in the read race (extremely rare); treat as the
+//     happy path's "no active challenge."
+//   - (false, "", err)       — Redis error; surface to the caller.
+//
+// This is the bidirectional defense against the "both users tap
+// Challenge on each other simultaneously → two solo rooms" bug:
+// the canonical throttle key dedups the pair regardless of direction,
+// and storing the roomID as the value lets the second caller's
+// client land in the same gameplay session as the first.
+func TryClaimChallenge(
+	ctx context.Context,
+	rdb *redis.Client,
+	fromUserID, toUserID, candidateRoomID string,
+) (claimed bool, existingRoomID string, err error) {
+	key := ChallengeThrottle(fromUserID, toUserID)
+	ok, err := rdb.SetNX(ctx, key, candidateRoomID, ChallengeThrottleTTL).Result()
+	if err != nil {
+		return false, "", err
+	}
+	if ok {
+		return true, "", nil
+	}
+	// Lost the SETNX — read back the existing claim's room ID. A
+	// concurrent expiry would surface as nil; treat as no-room so
+	// the caller can fall through (we'd rather under-dedupe than
+	// fail a legitimate retry).
+	existing, getErr := rdb.Get(ctx, key).Result()
+	if getErr == redis.Nil {
+		return false, "", nil
+	}
+	if getErr != nil {
+		return false, "", nil
+	}
+	return false, existing, nil
 }
 
 // §4.6 Notification policy helpers ----------------------------------------
