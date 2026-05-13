@@ -32,8 +32,14 @@ const (
 	quizAddr        = "localhost:50052"
 	scoringAddr     = "localhost:50053"
 	authAddr        = "localhost:50054"
-	mongoURI        = "mongodb://localhost:27017"
-	dbName          = "quizbattle"
+	// directConnection=true bypasses replica-set discovery so the test
+	// client doesn't try to dial the discovered member name (mongo:27017,
+	// the docker-compose service alias) from the CI runner host, where
+	// that DNS name doesn't resolve. replicaSet=rs0 keeps transaction
+	// support available for any session-scoped reads. Matches the
+	// MONGO_URI env the `go` CI job already uses.
+	mongoURI = "mongodb://localhost:27017/?replicaSet=rs0&directConnection=true"
+	dbName   = "quizbattle"
 
 	totalRounds  = 5
 	matchTimeout = 30 * time.Second
