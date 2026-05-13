@@ -1,361 +1,282 @@
-# Quiz Battle System
+# Quiz Battle
 
-Real-time multiplayer quiz game with Go microservices, RabbitMQ event bus, Redis state, MongoDB persistence, and a Flutter client. Includes premium subscriptions (Razorpay), referral system, login streaks, daily rewards, push notifications (FCM), tournaments, a global leaderboard, and a server-authoritative coin economy with shop ([architecture](docs/architecture.md), [API](docs/api.md), [runbook](docs/runbook-coins.md)).
+A real-time, server-authoritative multiplayer quiz game. Two players are paired by skill rating, answer the same five questions on a synchronized timer, and the faster-correct player wins coins, rating, and a place on the leaderboard. The system also ships premium subscriptions (Razorpay), a referral program, daily streak rewards, push notifications (FCM), tournaments, friend challenges, and a coin economy with shop.
 
-## Architecture
+> **New reader, start here.** Skim this file end-to-end, then read [architecture.md](docs/architecture.md) for the "why" behind the design. The other docs answer narrower questions: [api.md](docs/api.md) for RPC/event reference, [runbook.md](docs/runbook.md) when something is broken, [demo-script.md](docs/demo-script.md) when presenting, [CONTRIBUTING.md](./CONTRIBUTING.md) before opening a PR, and the [docs/decisions/](docs/decisions/) ADRs when you need to know *why* a particular decision was made.
+
+---
+
+## Contents
+
+1. [What this is](#what-this-is)
+2. [Architecture at a glance](#architecture-at-a-glance)
+3. [Tech stack and why](#tech-stack-and-why)
+4. [Quick start (Docker)](#quick-start-docker)
+5. [Environment variables](#environment-variables)
+6. [Verifying it works](#verifying-it-works)
+7. [Demo checklist](#demo-checklist)
+8. [Running services locally (no Docker)](#running-services-locally-no-docker)
+9. [Regenerating proto stubs](#regenerating-proto-stubs)
+10. [Repository layout](#repository-layout)
+11. [Known limitations](#known-limitations)
+12. [Where to go next](#where-to-go-next)
+
+---
+
+## What this is
+
+Quiz Battle is a backend + Flutter app that simulates a "Kahoot-meets-chess-ladder" experience:
+
+- **Real-time matches** — two players, 5 rounds of multiple choice, 15-second timer per round, live leaderboard streamed over gRPC.
+- **Skill ladder** — every match updates an Elo rating (the same math chess.com uses) so matchmaking gradually pairs you with players near your level.
+- **Economy** — winning matches earns coins; coins buy cosmetics, a streak-freeze, or a 3-day premium trial in the shop.
+- **Premium subscription** — Razorpay-backed monthly/yearly plan that unlocks more daily quizzes, all question topics, and tournament entry.
+- **Social** — friends list, direct challenges, referral codes with rewards on both sides, and a global leaderboard with daily/weekly/all-time filters.
+
+The codebase is intentionally split into six independent Go services that talk over gRPC and a RabbitMQ event bus. The split lets each piece be scaled, restarted, or replaced without taking the whole game down. See [adr-0001](docs/decisions/0001-microservices-split.md) for why we chose this shape.
+
+> **Jargon glossary.** *gRPC* — a fast, type-safe way for services to talk via small binary messages, kind of like calling functions in another program. *Proto / Protobuf* — the IDL (interface definition language) you write to declare those messages and the RPCs that take them. *RabbitMQ* — a message broker that acts as a post office between services: senders drop letters in, the broker routes them, consumers pick them up. *Redis* — an in-memory key-value store; we use it for live game state and fast counters. *MongoDB* — the durable document database where everything that must survive a restart lives.
+
+---
+
+## Architecture at a glance
 
 ```
                               Flutter App (gRPC + Riverpod)
                               ============================
-                                        |
-            +-----------+----------+----+----+----------+-----------+
-            |           |          |         |          |           |
-       gRPC:50054  gRPC:50051 gRPC:50052 gRPC:50053 gRPC:50055 HTTP:8080
-            |           |          |         |          |           |
-       +----+----+ +----+-----+ +-+-------+ +----+----+ +----+----+----+
-       |  Auth   | |Matchmking| |  Quiz   | |Scoring  | |   Payment    |
-       | Service | | Service  | | Engine  | |/User Svc | |   Service    |
-       +---------+ +----------+ +---------+ +---------+ +--------------+
-            |           |          |    |         |          |
-            |           |          |    |         |          |
-            +-----+-----+----+----+----+---------+----------+
-                  |          |         |
-           +-----+---+ +----+----+ +--+------+
-           | MongoDB  | |  Redis  | |RabbitMQ |
-           | (persist)| | (state) | |(events) |
-           +----------+ +---------+ +---------+
-                                         |
-                                   +-----+--------+
-                                   | Notification  |
-                                   | Service (FCM) |
-                                   +--------------+
+                                          |
+        +--------+-----------+----------+------+----------+-----------+
+        |        |           |          |      |          |           |
+   gRPC:50054 gRPC:50051 gRPC:50052 gRPC:50053 gRPC:50055 HTTP:8080  HTTP:8090
+        |        |           |          |      |          |           |
+   +----+----+ +-+--------+ +-+------+ +-+----+ +-+-----+ +-+-----+ +-+-----+
+   | Auth    | |Matchmking| |  Quiz  | |Scoring | |Payment | |Webhook| | Admin |
+   | Service | | Service  | | Engine | |/User   | |Service | | HTTP  | | Dash  |
+   +---------+ +----------+ +--------+ +--------+ +--------+ +-------+ +-------+
+        \         |             |          |          |
+         \        |             |          |          |
+          +-------+-------+-----+----+-----+----------+
+                  |             |          |
+            +-----+----+ +------+--+ +-----+----+      +--------------+
+            | MongoDB  | |  Redis  | | RabbitMQ |----->| Notification |
+            | (durable)| | (live)  | | (events) |      | Service (FCM)|
+            +----------+ +---------+ +----------+      +--------------+
 ```
 
-### Data Flow: A Match Lifecycle
+**Nine containers in total:** Redis, RabbitMQ, MongoDB (replica set `rs0`), seed (runs once), and the six Go services — auth, matchmaking, quiz, scoring, payment, notification — plus a read-only admin dashboard. Everything is wired in `docker-compose.yml`.
+
+### A match, end-to-end
 
 ```
-1. Player taps "Play" in Flutter
-2. Flutter -> Matchmaking.JoinMatchmaking (gRPC)
-3. Matchmaking checks daily quota (Redis Lua script), adds to pool (Redis ZSET)
-4. Matchmaking poller pairs players, creates room, publishes "match.created" -> RabbitMQ
-5. Quiz Engine consumes "match.created", selects questions from MongoDB, stores in Redis
-6. Quiz Engine broadcasts QuestionBroadcast via gRPC server stream to Flutter
-7. Player answers -> Quiz.SubmitAnswer -> publishes "answer.submitted" -> RabbitMQ
-8. Scoring consumes "answer.submitted", calculates score, updates Redis leaderboard (Lua)
-9. Scoring publishes "leaderboard.updated" -> Quiz Engine broadcasts to streams
-10. After all rounds: Quiz publishes "match.finished" -> Scoring persists to MongoDB
-11. Scoring updates Elo ratings, win streaks, detects referral conversions
+1. Player taps Play in Flutter.
+2. Flutter --> Matchmaking.JoinMatchmaking (gRPC).
+3. Matchmaking checks daily quota (Redis Lua), adds player to Redis sorted set.
+4. Matchmaking poller pairs two nearest-rated players, creates a room.
+5. Matchmaking publishes match.created on RabbitMQ (exchange "sx").
+6. Quiz Engine consumes match.created, picks 5 questions from Mongo, caches in Redis.
+7. Quiz Engine opens a server-streamed gRPC channel to each player.
+8. Round 1 starts: Quiz broadcasts QuestionBroadcast with a deadline timestamp.
+9. Player taps an option --> Quiz.SubmitAnswer --> publish answer.submitted.
+10. Scoring consumes answer.submitted, runs the formula, updates the Redis leaderboard.
+11. Scoring publishes leaderboard.updated; Quiz streams it to both clients.
+12. Round closes (early if both answered, else at deadline). Repeat for rounds 2-5.
+13. Quiz publishes match.finished --> Scoring persists to Mongo, updates Elo + win streak.
+14. Quiz publishes coins.earn.match_win for the winner --> Scoring grants 100 coins.
 ```
 
-### Service Summary
+Every step is recoverable: rooms have a 30-minute TTL, the leaderboard is a sorted set with atomic Lua updates, and a SETNX guard makes finalization fire exactly once per room.
 
-| Service | Port | Key Responsibilities |
-|---------|------|---------------------|
-| **Auth** | 50054 | Google Sign-In, username/password, guest login, JWT, email verification, streak logic, daily rewards, notification crons |
-| **Matchmaking** | 50051 | Player pool (Redis ZSET), room creation, daily quota gate (Lua script), match subscription streams |
-| **Quiz Engine** | 50052 | Question selection, round orchestration, game event streaming, timer sync, tournaments |
-| **Scoring/User** | 50053 | Score calculation, leaderboard (Lua), match history, home screen data, referral rewards, FCM tokens, global leaderboard |
-| **Payment** | 50055 + 8080 | Razorpay order creation, webhook (HMAC verify + SETNX idempotency), plan management, expiry cron |
-| **Notification** | -- | RabbitMQ consumer only: dispatches FCM push for streaks, rewards, tournaments, premium events |
+> Deeper diagrams and the "why each piece exists" discussion are in [architecture.md](docs/architecture.md).
 
-Six Go services + infrastructure (Redis, RabbitMQ, MongoDB) = 9 containers total via Docker Compose.
+### Services in one line each
 
-## Tech Stack
+| Service | gRPC port | HTTP port | Job |
+|---|---|---|---|
+| **Auth** | 50054 | — | Sign up, log in (password / Google / passwordless email), JWT, streak, daily reward, refresh-token rotation, notification crons |
+| **Matchmaking** | 50051 | — | Player pool (Redis sorted set), pair players, create rooms, daily quota gate |
+| **Quiz** | 50052 | — | Round orchestration, gRPC server-stream of game events, timer sync, tournaments |
+| **Scoring** | 50053 | — | Scoring formula, leaderboard, match history, Elo updates, coin ledger, shop, friends, analytics |
+| **Payment** | 50055 | 8080 | Razorpay orders, webhook, signature verification, plan lifecycle, premium-trial outbox consumer |
+| **Notification** | — | — | Pure consumer: turns notification events into FCM pushes; runs the policy gate (quiet hours, dedup, daily cap) |
+| **Admin** | — | 8090 | Read-only operator dashboard that queries Mongo + Redis + RabbitMQ |
 
-| Layer | Technology | Justification |
-|-------|-----------|---------------|
-| **Backend** | Go 1.25 | Low-latency, strong concurrency (goroutines), single-binary deployment, ideal for real-time game servers |
-| **Client** | Flutter / Dart | Single codebase for Android + iOS + web, fast prototyping with hot reload, strong gRPC support via `grpc` package |
-| **Communication** | gRPC + Protobuf | Type-safe contracts via `.proto`, efficient binary serialization, native server streaming for real-time game events |
-| **Message Broker** | RabbitMQ | Reliable message delivery with acknowledgements, topic exchange for flexible routing patterns, built-in management UI for debugging. Chosen over Kafka because we need per-message routing (e.g., `match.created` vs `answer.submitted`) not high-throughput log streaming |
-| **In-Memory State** | Redis 7 | Sub-millisecond reads for live match state, atomic Lua scripts for leaderboard + quota, sorted sets for matchmaking pool, SETNX for distributed guards |
-| **Database** | MongoDB 6 | Flexible schema for evolving user profiles, native JSON-like documents match Go structs, sparse unique indexes for optional fields (email, googleId, referralCode) |
-| **Payments** | Razorpay | Indian payment gateway supporting UPI/cards/netbanking, webhook-based async capture, test mode for development |
-| **Push Notifications** | Firebase Cloud Messaging | Industry standard for Android/iOS push, multi-device token management, free tier sufficient for quiz app |
-| **State Management** | Riverpod 3 | Compile-safe dependency injection for Flutter, auto-disposal of providers, built-in async state handling for gRPC calls |
-| **Auth** | JWT (HS256) | Stateless authentication, gRPC metadata-compatible, `golang-jwt/v5` with algorithm validation to prevent `alg:none` attacks |
-| **Containerization** | Docker + multi-stage build | Single Dockerfile builds all 7 binaries (6 services + seed), Alpine runtime image (~20MB), health checks + dependency ordering in Compose |
+---
 
-## Quick Start
+## Tech stack and why
 
-### Prerequisites
+| Layer | Choice | One-line reason |
+|---|---|---|
+| Backend | Go 1.25 | Single binary per service, cheap goroutines for streaming, fast cold start |
+| Client | Flutter / Dart | One codebase for Android, iOS, web; great gRPC support |
+| Service-to-client RPC | gRPC + Protobuf | Type-safe contracts, native server streaming for live game events |
+| Message bus | RabbitMQ (topic exchange `sx`) | Per-message routing + ack-based delivery; better fit than Kafka for our event shape ([adr-0002](docs/decisions/0002-rabbitmq-over-kafka.md)) |
+| Live state | Redis 7 | Sub-ms reads, atomic Lua scripts for quota + leaderboard, TTLs for self-cleaning state ([adr-0003](docs/decisions/0003-redis-live-state.md)) |
+| Durable store | MongoDB 6 (single-node `rs0`) | Flexible documents match Go structs; replica set enables multi-doc transactions ([adr-0011](docs/decisions/0011-mongo-replica-set.md)) |
+| Payments | Razorpay (test mode by default) | Indian-market gateway with UPI + cards, webhook + client SDK ([adr-0009](docs/decisions/0009-razorpay-dual-path.md)) |
+| Push | Firebase Cloud Messaging | Free tier, multi-device tokens, Android + iOS in one API |
+| Auth tokens | JWT HS256 + refresh-rotation | Stateless, gRPC-metadata friendly, refresh family revoke on reuse ([adr-0008](docs/decisions/0008-jwt-refresh-rotation.md)) |
+| Containerization | Multi-stage Dockerfile + Compose | One image builds all 7 binaries; Alpine runtime stays small |
 
-- Docker and Docker Compose
-- (Optional) Go 1.25+, Flutter 3.7+, `protoc` for local development
+---
 
-### Run Everything
+## Quick start (Docker)
+
+This is the only path you need for a demo or first run. It boots all 9 containers and seeds the database.
+
+### 1. Prerequisites
+
+- Docker Desktop (or Docker Engine + Compose plugin)
+- ~3 GB free RAM
+- Free TCP ports: 6379, 27017, 5672, 15672, 50051-50055, 8080, 8090, 21251-21256
+
+### 2. Clone and configure
 
 ```bash
-# Clone and start all 9 containers
 git clone <repo-url>
 cd quiz-battle
-
-# Set environment variables (copy and fill in secrets)
-cp .env.example .env
-# Edit .env with your API keys (see Environment Variables below)
-source .env
-
-# Start all services
-docker-compose up --build
+cp .env.example .env   # if .env.example exists; otherwise create .env yourself
 ```
 
-The seed container runs first and creates:
-- MongoDB indexes (unique on username, email, googleId, referralCode, razorpayOrderId)
-- 50+ quiz questions across multiple topics and difficulties
-- 6 test users: `alice`, `bob`, `charlie`, `diana`, `eve`, `frank` (password: `testpass123`)
-- 2 sample tournaments (one premium-only, one open)
-
-### Verify Services
-
-| Endpoint | URL |
-|----------|-----|
-| RabbitMQ Management UI | http://localhost:15672 (guest / guest) |
-| Razorpay Webhook | http://localhost:8080/webhook/razorpay |
-| Auth gRPC | localhost:50054 |
-| Matchmaking gRPC | localhost:50051 |
-| Quiz gRPC | localhost:50052 |
-| Scoring gRPC | localhost:50053 |
-| Payment gRPC | localhost:50055 |
-
-## Environment Variables
-
-| Variable | Service | Required | Purpose |
-|----------|---------|----------|---------|
-| `JWT_SECRET` | All services | Yes | JWT signing key (HS256). Must be identical across all services for token validation |
-| `GOOGLE_CLIENT_ID` | Auth | For Google Sign-In | Google OAuth 2.0 client ID. Obtained from Google Cloud Console |
-| `RAZORPAY_KEY_ID` | Payment | For payments | Razorpay API key ID (starts with `rzp_test_` or `rzp_live_`) |
-| `RAZORPAY_KEY_SECRET` | Payment | For payments | Razorpay API key secret for server-side order creation |
-| `RAZORPAY_WEBHOOK_SECRET` | Payment | For payments | HMAC-SHA256 secret for webhook signature verification. Set in Razorpay Dashboard > Webhooks |
-| `RESEND_API_KEY` | Auth | For email OTP | Resend.com API key for sending email verification codes |
-| `FIREBASE_PROJECT_ID` | Notification | For FCM | Firebase project ID (default set in compose). Only needed if service-account JSON lacks `project_id` |
-| `MONGO_URI` | All services | Auto-set in Docker | MongoDB connection string (default: `mongodb://mongo:27017/quizbattle`) |
-| `REDIS_ADDR` | Auth, Matchmaking, Quiz, Scoring, Payment | Auto-set in Docker | Redis address (default: `redis:6379`) |
-| `RABBITMQ_URL` | All except Notification uses conn | Auto-set in Docker | AMQP URL (default: `amqp://guest:guest@rabbitmq:5672/`) |
-
-**Firebase push notifications:** Place a real service-account JSON at `secrets/firebase-admin.json` to enable FCM delivery. Without it, the notification service runs in stub mode (logs only). See [`secrets/README.md`](secrets/README.md).
-
-## API Documentation
-
-All service-to-client communication uses gRPC with Protobuf. The single proto definition is at [`proto/quiz.proto`](proto/quiz.proto).
-
-### AuthService (port 50054)
-
-| RPC | Request | Response | Auth | Description |
-|-----|---------|----------|------|-------------|
-| `Register` | `username`, `password`, `email?`, `referral_code?` | `AuthResponse` (user_id, token, profile fields, streak, reward) | No | Create account with optional referral code |
-| `Login` | `username`, `password` | `AuthResponse` | No | Login with credentials, auto-processes daily streak |
-| `GuestLogin` | -- | `AuthResponse` | No | Create anonymous account (plan = "free") |
-| `GoogleSignIn` | `id_token`, `referral_code?` | `GoogleSignInResponse` (token, UserProfile, is_new_user, streak_updated, reward) | No | Google OAuth sign-in/sign-up, creates user if new |
-| `GetProfile` | -- | `ProfileResponse` (profile fields + streak) | Yes | Get authenticated user's profile |
-| `SendEmailCode` | `email`, `purpose` ("login"/"reset"/"link") | `sent: bool` | No | Send 6-digit OTP via Resend. Rate limited: 1 per 60s per email |
-| `VerifyEmailCode` | `email`, `code` | `verified: bool`, `token?`, `user_id?` | No | Verify OTP. Returns JWT for login flow. Max 3 attempts |
-| `LoginWithEmail` | `email` | `sent: bool` | No | Passwordless email login (sends code) |
-| `LinkEmail` | `email`, `code` | `linked: bool` | Yes | Link email to authenticated account |
-| `ResetPassword` | `email`, `code`, `new_password` | `success: bool` | No | Reset password with verified OTP |
-| `CheckUsername` | `username` | `available: bool` | No | Check username availability |
-| `DeleteAccount` | -- | `deleted: bool` | Yes | Permanently delete account and referrals |
-| `ClaimDailyReward` | -- | `RewardGrant` (coins, badge, bonus_quizzes), `StreakInfo` | Yes | Claim daily streak reward. Atomic: prevents double-claim via `$ne` filter on rewardClaimedDate |
-| `GetStreakInfo` | -- | `StreakInfo` (current, longest, last_claimed_date) | Yes | Get current streak state |
-
-### MatchmakingService (port 50051)
-
-| RPC | Request | Response | Auth | Description |
-|-----|---------|----------|------|-------------|
-| `JoinMatchmaking` | `user_id`, `rating` | `status` (QUEUED / ALREADY_IN_QUEUE) | Yes | Enter matchmaking pool. Free users: daily quota checked via Lua script. Premium: unlimited |
-| `LeaveMatchmaking` | `user_id` | `removed: bool` | Yes | Leave pool. Refunds daily quota if removed before match |
-| `SubscribeToMatch` | `user_id`, `sequence_number` | **stream** `MatchEvent` (room_id, players, seq) | Yes | Server-sent stream. Fires when a match is found. Supports reconnection via sequence_number |
-
-### QuizService (port 50052)
-
-| RPC | Request | Response | Auth | Description |
-|-----|---------|----------|------|-------------|
-| `GetRoomQuestions` | `room_id` | `questions[]` (id, text, options, difficulty, topic) | Yes | Fetch questions for a room. Correct answers are NOT included |
-| `SubmitAnswer` | `room_id`, `user_id`, `round`, `option_index`, `client_timestamp` | `accepted: bool` | Yes | Submit answer. Published to RabbitMQ for async scoring |
-| `StreamGameEvents` | `room_id`, `user_id`, `sequence_number` | **stream** `GameEvent` (oneof: question, leaderboard, round_result, match_end, player_joined, timer_sync) | Yes | Real-time game stream. Reconnection-safe via sequence_number |
-| `GetTournamentList` | -- | `tournaments[]` (id, name, times, status, participant_count, required_plan, prize) | Yes | List all tournaments |
-| `JoinTournament` | `tournament_id` | `success: bool` | Yes | Join tournament. Validates plan requirement |
-
-### ScoringService (port 50053)
-
-| RPC | Request | Response | Auth | Description |
-|-----|---------|----------|------|-------------|
-| `CalculateScore` | `room_id`, `user_id`, `round`, `option_index`, `answer_time_ms` | `score`, `correct: bool`, `speed_multiplier` | Internal | Score a single answer (called internally via RabbitMQ, not directly by client) |
-| `GetLeaderboard` | `room_id` | `entries[]` (user_id, username, score, rank, plan) | Yes | Get live match leaderboard from Redis |
-| `GetMatchHistory` | `limit?`, `offset?` | `matches[]` (room_id, winner, players[], rounds, duration, created_at) | Yes | Paginated match history |
-| `GetHomeScreenData` | -- | `UserProfile`, `quota_remaining`, `quota_limit`, `leaderboard_preview[]` | Yes | Aggregated home screen: profile + quota + top players |
-| `GetReferralDashboard` | -- | `referral_code`, `total_invites`, `conversions`, `coins_earned` | Yes | Referral program stats |
-| `ApplyReferralCode` | `code` | `success: bool` | Yes | Apply a referral code (one-time per user) |
-| `UpdateFCMToken` | `token` | `success: bool` | Yes | Register FCM token for push notifications (deduped) |
-| `GetGlobalLeaderboard` | `time_filter` ("daily"/"weekly"/"alltime") | `entries[]` (user_id, username, score, rank, plan) | Yes | Global leaderboard with time filters |
-
-### PaymentService (port 50055 gRPC + port 8080 HTTP)
-
-| RPC | Request | Response | Auth | Description |
-|-----|---------|----------|------|-------------|
-| `CreateOrder` | `plan_duration` ("monthly"/"yearly") | `order_id`, `key_id`, `amount` (paise), `currency` | Yes | Create Razorpay order. Monthly: 14900 paise, Yearly: 149900 paise |
-| `GetPlanStatus` | -- | `plan` ("free"/"premium"), `expires_at` | Yes | Current subscription status |
-| `GetPaymentHistory` | `limit?`, `offset?` | `payments[]` (order_id, amount, currency, status, plan_duration, created_at) | Yes | Paginated payment records |
-
-**HTTP Endpoint:**
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| POST | `/webhook/razorpay` | HMAC-SHA256 signature in `X-Razorpay-Signature` header | Razorpay payment webhook. Reads full body before HMAC verify. SETNX idempotency with 72h TTL prevents duplicate processing. On success: updates order status, sets user plan, invalidates Redis plan cache, publishes `payment.captured` event |
-
-## RabbitMQ Event Flow
-
-All events flow through the `sx` topic exchange. Each service declares its own queues bound to specific routing keys.
-
-| Routing Key | Producer | Consumer | Payload | Purpose |
-|------------|----------|----------|---------|---------|
-| `match.created` | Matchmaking | Quiz Engine | `{roomId, players[]}` | Select questions, store in Redis, start round 1 |
-| `answer.submitted` | Quiz Engine | Scoring | `{roomId, userId, round, optionIndex, clientTimestamp, serverTimestamp}` | Score answer, update Redis leaderboard atomically |
-| `leaderboard.updated` | Scoring | Quiz Engine | `{roomId, entries[]}` | Broadcast leaderboard to game streams |
-| `round.completed` | Quiz Engine | Quiz Engine | `{roomId, round}` | Self-consume: advance to next round or finish match |
-| `match.finished` | Quiz Engine | Scoring | `{roomId, winner, players[], rounds, duration}` | Persist match to MongoDB, update Elo ratings, win streaks, detect referral conversions |
-| `payment.captured` | Payment (webhook) | Scoring | `{userId, plan, orderId}` | Upgrade user plan in MongoDB, invalidate Redis plan cache |
-| `referral.first_quiz_completed` | Scoring | Scoring | `{referrerId, refereeId}` | Grant referral coins to referrer, mark referral as converted |
-| `notif.streak.warning` | Auth (cron, 20:00 IST) | Notification | `{userId, event, currentStreak}` | FCM push: "Your X-day streak is at risk!" |
-| `notif.daily.reward` | Auth (cron, 09:00 IST) | Notification | `{userId, event}` | FCM push: "Claim your daily reward!" |
-| `notif.tournament.remind` | Quiz (ticker) | Notification | `{userId, event, tournamentName, minutesUntilStart}` | FCM push: "Tournament starting in N minutes" |
-| `notif.premium.activated` | Scoring | Notification | `{userId, event, plan}` | FCM push: "Welcome to Premium!" |
-| `notif.premium.expiry` | Payment (cron, daily) | Notification | `{userId, event, expiresAt}` | FCM push: 3-day warning before plan expiry |
-| `premium.expired` | Payment (cron, daily) | Notification | `{userId, event}` | FCM push: "Your premium plan has expired" |
-
-## Redis Key Schema
-
-All keys are defined in [`pkg/keys/keys.go`](pkg/keys/keys.go) as a single source of truth shared by all services.
-
-| Key Pattern | Type | TTL | Purpose |
-|-------------|------|-----|---------|
-| `matchmaking:pool` | Sorted Set | -- | Active matchmaking pool. Score = Elo rating |
-| `room:{id}:state` | String (JSON) | 30 min | Room state: playerIds, status, round, createdAt |
-| `room:{id}:players` | Hash | 30 min | userId -> PlayerInfo JSON (username, rating, plan) |
-| `room:{id}:round` | String (int) | 30 min | Current round index |
-| `room:{id}:questions` | List | 30 min | Ordered question IDs for the match |
-| `room:{id}:leaderboard` | Sorted Set | 30 min | Live scores. Updated atomically via Lua script |
-| `room:{id}:answers:{round}` | Hash | 30 min | userId -> answer JSON. Written via HSETNX for idempotency |
-| `room:{id}:round:{round}:closed` | String | 30 sec | SETNX guard preventing duplicate round advancement |
-| `room:lock:{id}` | String | 10 sec | Distributed lock for room creation (SETNX) |
-| `user:{id}:daily_quota` | String (int) | IST midnight | Free user quiz counter. INCR via Lua with EXPIREAT |
-| `user:{id}:plan` | String | 5 min | Cached plan. Write-invalidate (DEL on change), read-through from MongoDB |
-| `referral:code:{code}` | String | -- | Referral code -> userId mapping (persistent) |
-| `webhook:idempotency:{payId}` | String | 72 hours | Razorpay webhook duplicate prevention (SETNX) |
-| `emailcode:{email}:{purpose}` | String | 10 min | Email verification OTP code |
-| `emailrate:{email}` | String | 60 sec | Email send rate limiter (SETNX) |
-| `match_invite:{from}:{to}` | String | 30 min | Throttle duplicate match invite notifications |
-
-## MongoDB Collections
-
-| Collection | Key Fields | Indexes | Purpose |
-|-----------|-----------|---------|---------|
-| `users` | _id, username, email, googleId, plan, rating, coins, streak, referralCode, winStreak | unique(username), unique(email, sparse), unique(googleId, sparse), unique(referralCode, sparse), compound(plan, planExpiresAt) | User profiles and game stats |
-| `questions` | text, options, correctIndex, difficulty, topic | difficulty | Quiz question bank |
-| `match_history` | roomId, winner, players[], rounds, duration | unique(roomId), players.userId | Completed match records |
-| `payments` | userId, razorpayOrderId, amount, status, planDuration | unique(razorpayOrderId), userId | Payment transaction log |
-| `referrals` | referrerId, refereeId, referralCode, status, rewardGranted | unique(refereeId), referrerId | Referral tracking and reward state |
-| `tournaments` | name, startTime, endTime, status, requiredPlan, participants[] | compound(startTime, status) | Tournament definitions and participation |
-
-## Design Decisions
-
-### Why Redis for Matchmaking and Live Game State?
-
-Live match data (leaderboards, answers, room state) needs sub-millisecond reads and atomic updates. Redis sorted sets give O(log N) ranked access for the matchmaking pool, and Lua scripts provide atomic read-modify-write for leaderboards without distributed locks. All room keys auto-expire after 30 minutes, eliminating stale state cleanup.
-
-### Why RabbitMQ over Kafka?
-
-This system needs per-message routing (e.g., `match.created` goes to Quiz, `answer.submitted` goes to Scoring) with acknowledgement-based delivery. RabbitMQ's topic exchange maps directly to this pattern. Kafka's strength is high-throughput ordered log streaming, which we don't need -- our event volume is bounded by active matches, not a firehose. RabbitMQ also provides a management UI out of the box for debugging event flow.
-
-### Scoring Formula
-
-```
-base_points = correct ? 100 : 0
-speed_multiplier = max(0.5, 1.0 - (answer_time_ms / 15000))
-round_score = base_points * speed_multiplier
-```
-
-Faster answers earn up to 1.0x multiplier; the slowest valid answer still earns 0.5x. `answer_time_ms` is clamped to [0, 15000] server-side to prevent client timestamp manipulation.
-
-### Elo Rating System
-
-K=32 formula: `new_rating = old_rating + K * (actual - expected)` where `expected = 1 / (1 + 10^((opponent_rating - player_rating) / 400))`. Beating a higher-rated opponent yields more points than beating a lower-rated one.
-
-### Daily Quota (Free Users)
-
-Free users get 5 quizzes per day (IST timezone). Implemented as a Redis Lua script that atomically INCRs a counter and sets EXPIREAT to next IST midnight. The Lua script guarantees no race between checking and incrementing. Leaving matchmaking before a match refunds the quota (guarded against stale-counter edge case).
-
-### Atomic Streak and Reward Claiming
-
-MongoDB `UpdateOne` with `$ne: today` filter on `lastClaimedDate` / `rewardClaimedDate` ensures that concurrent login requests can't double-process streaks or farm daily reward coins. If `ModifiedCount == 0`, the streak/reward was already processed by another request.
-
-### Answer Idempotency
-
-Player answers use Redis `HSETNX` (hash set-if-not-exists) instead of separate EXISTS + SET. This single atomic operation prevents the TOCTOU race where two goroutines could both see "not answered" and both record the answer.
-
-### AMQP Thread Safety
-
-RabbitMQ channels are NOT thread-safe. All services that publish from multiple goroutines use a `sync.Mutex`-protected `publish()` helper method to serialize channel access.
-
-### Plan Cache Strategy
-
-Write-invalidate pattern: `DEL user:{id}:plan` on any plan change (payment, expiry), read-through from MongoDB with 5-minute TTL. This avoids stale cache reads after payment while keeping hot-path reads fast.
-
-### Webhook Security
-
-Razorpay webhook handler: (1) reads full request body with `io.ReadAll` before HMAC-SHA256 verification (streaming verification is fragile), (2) SETNX idempotency key with 72-hour TTL prevents duplicate processing, (3) HTTP client has 10-second timeout for Razorpay API calls.
-
-## Project Structure
-
-```
-quiz-battle/
-  proto/quiz.proto           # Single Protobuf definition for all services
-  pkg/
-    auth/                    # JWT middleware (interceptor + token creation)
-    keys/                    # Redis key names + helper functions (single source of truth)
-    models/                  # Shared Go structs (User, Payment, Tournament, etc.)
-  services/
-    auth/main.go             # Auth service (Google, email, streak, cron jobs)
-    matchmaking/main.go      # Matchmaking service (pool, room creation, quota)
-    quiz/main.go             # Quiz engine (rounds, streaming, tournaments)
-    scoring/main.go          # Scoring service (leaderboard, match history, referrals)
-    payment/main.go          # Payment service (Razorpay, webhook, plan management)
-    notification/main.go     # Notification service (FCM consumer)
-  seed/
-    main.go                  # Database seeder (indexes, questions, test users, tournaments)
-    questions.json           # Quiz question bank
-  secrets/
-    firebase-admin.json      # Firebase service account (gitignored)
-  flutter/
-    lib/
-      main.dart              # App entry point, theme, gRPC channel setup
-      proto/                 # Generated Dart protobuf/gRPC stubs
-      providers/             # Riverpod providers (auth, game, scoring, payment)
-      screens/               # 12 screens (home, gameplay, matchmaking, login, etc.)
-      widgets/               # Shared widgets (OTP input, animated toast, etc.)
-      theme/                 # AppColors, shared theme constants
-  docker-compose.yml         # 9-container orchestration
-  Dockerfile                 # Multi-stage: Go builder + Alpine runtime
-  .env                       # Environment variables (gitignored)
-```
-
-## Local Development
+At minimum, set `JWT_SECRET` in `.env`. The compose file refuses to start any service without it (deliberate — see [adr-0008](docs/decisions/0008-jwt-refresh-rotation.md)).
 
 ```bash
-# Run infrastructure only
-docker-compose up redis rabbitmq mongo
+echo "JWT_SECRET=$(openssl rand -hex 32)" >> .env
+```
 
-# Seed database
-cd /path/to/quiz-battle
+For Razorpay, Google sign-in, email OTP, or FCM, see [Environment variables](#environment-variables) below. None of them are required to boot the stack — the affected features just degrade gracefully (e.g., FCM logs in stub mode).
+
+### 3. Boot the stack
+
+```bash
+docker compose up --build
+```
+
+The boot sequence is intentional:
+
+1. `redis`, `rabbitmq`, `mongo` come up.
+2. The Mongo healthcheck idempotently runs `rs.initiate(...)` so multi-document transactions work.
+3. `seed` runs once: creates Mongo indexes, inserts 50+ questions, 6 test users, 2 tournaments, shop SKUs.
+4. The six service containers start once `seed` finishes.
+
+Healthy first boot takes 30-60 seconds. If `seed` exits 0 and all six services show "listening on :50051" etc., you're done.
+
+### 4. Test users
+
+The seeder creates these accounts (password `testpass123` for every account):
+
+| Username | Rating | Wins / Played | Notes |
+|---|---:|---:|---|
+| `alice` | 1400 | 15 / 20 | Solid mid-tier |
+| `bob` | 1250 | 8 / 18 | Used in default demo |
+| `charlie` | 1100 | 5 / 15 | Lower rated |
+| `diana` | 1350 | 12 / 22 | |
+| `eve` | 950 | 3 / 12 | Newest |
+| `frank` | 1500 | 20 / 25 | Top of the seeded list |
+
+---
+
+## Environment variables
+
+Everything is read once per service at startup via `os.Getenv`. The compose file passes a curated subset to each container.
+
+### Required for boot
+
+| Var | Used by | Purpose |
+|---|---|---|
+| `JWT_SECRET` | every service | HS256 signing key. Must be identical across services or tokens won't validate. |
+
+### Required for features
+
+| Var | Used by | Purpose |
+|---|---|---|
+| `GOOGLE_CLIENT_ID` | auth | OAuth 2.0 client ID for the **Sign in with Google** flow. Without it, `GoogleSignIn` returns an error and the button on the login screen is hidden. |
+| `RAZORPAY_KEY_ID` | payment | Razorpay public key (`rzp_test_...` for sandbox). |
+| `RAZORPAY_KEY_SECRET` | payment | Razorpay secret for server-side order creation + client-callback HMAC verification. |
+| `RAZORPAY_WEBHOOK_SECRET` | payment | Webhook HMAC-SHA256 secret. Backstop only — the client-side `VerifyPayment` path also works without it. |
+| `RESEND_API_KEY` | auth | Resend.com API key for sending the 6-digit email OTP. Without it, `SendEmailCode` returns an error. |
+| `FIREBASE_PROJECT_ID` | notification | Falls back to the value embedded in `secrets/firebase-admin.json` when set there; only needed if the service-account JSON omits `project_id`. |
+
+### Auto-set inside Compose
+
+These resolve to in-network addresses and don't need to be touched for the default Docker setup. Override them if you're running services on bare metal.
+
+| Var | Default | Notes |
+|---|---|---|
+| `REDIS_ADDR` | `redis:6379` | |
+| `RABBITMQ_URL` | `amqp://guest:guest@rabbitmq:5672/` | Change credentials in `docker-compose.yml` if you expose RabbitMQ outside Docker. |
+| `MONGO_URI` | `mongodb://mongo:27017/quizbattle?replicaSet=rs0` | The `replicaSet=rs0` suffix is **load-bearing** — it tells the driver to use replica-set semantics, which is what enables transactions. |
+| `GOOGLE_APPLICATION_CREDENTIALS` | `/run/secrets/firebase-admin.json` | Path inside the notification container; backed by `./secrets/` via a read-only bind mount. |
+
+### Secrets (file-based)
+
+| Path | Required for | What goes in it |
+|---|---|---|
+| `secrets/firebase-admin.json` | FCM push delivery | A Firebase service-account JSON downloaded from Firebase Console → Service accounts → Generate key. Without this file the notification service runs in stub mode (logs only, no pushes). |
+
+---
+
+## Verifying it works
+
+After `docker compose up` settles:
+
+```bash
+# 1. Containers are healthy
+docker compose ps
+
+# 2. Mongo replica set is initialized
+docker compose exec mongo mongosh --quiet --eval 'rs.status().myState'  # expect 1
+
+# 3. RabbitMQ exchange + queues exist
+open http://localhost:15672                # guest / guest
+# expect: exchange "sx" (topic), queues for coin-earn, notif, friends, etc.
+
+# 4. The admin dashboard reports live counts
+open http://localhost:8090
+
+# 5. Auth service answers an unauthenticated RPC
+grpcurl -plaintext -d '{"username":"alice"}' localhost:50054 quiz.AuthService/CheckUsername
+# {"available": false}
+```
+
+The `make status` target in the repo bundles many of these checks into one report; see [runbook.md](docs/runbook.md).
+
+---
+
+## Demo checklist
+
+The fastest sanity demo, on a fresh machine. ~5 minutes wall-clock. The full narrative + screenshots live in [demo-script.md](docs/demo-script.md).
+
+- [ ] `docker compose up --build` finishes with all services listening.
+- [ ] Open the Flutter app on two emulators (or two physical devices on the same Wi-Fi as the host).
+- [ ] Log in as `alice` on one, `bob` on the other (`testpass123`).
+- [ ] Both tap **Play** → matchmaking pairs them within ~3 s (poll interval is 1 s).
+- [ ] A 5-round game runs to completion; the leaderboard updates live; coins appear on the winner's home screen.
+- [ ] Open `http://localhost:8090` and confirm the match shows up in recent activity.
+- [ ] Tap **Premium → Upgrade Now** on alice. Pay with Razorpay test card `4111 1111 1111 1111` (any future expiry, any CVV). Plan flips to "premium" within ~2 s.
+- [ ] Tap **Shop**, buy a 50-coin avatar frame, equip it on the profile screen.
+- [ ] Tap **Daily Reward** the next IST day to demonstrate streak rollover. (Or fast-forward by editing the user's `lastClaimedDate` in Mongo — instructions in [runbook.md](docs/runbook.md).)
+
+---
+
+## Running services locally (no Docker)
+
+You almost never need this — Compose is faster. But if you want to attach a debugger or hot-reload one service, run the infra in Docker and the service on bare metal:
+
+```bash
+# Boot only the infrastructure
+docker compose up -d redis rabbitmq mongo
+
+# In another terminal, seed once
 go run ./seed
 
-# Run each service (separate terminals)
-go run ./services/auth
-go run ./services/matchmaking
-go run ./services/quiz
-go run ./services/scoring
-go run ./services/payment
-go run ./services/notification
+# Now run any individual service against the local infra
+JWT_SECRET=dev-secret REDIS_ADDR=localhost:6379 \
+RABBITMQ_URL=amqp://guest:guest@localhost:5672/ \
+MONGO_URI=mongodb://localhost:27017/quizbattle?replicaSet=rs0 \
+  go run ./services/auth
 ```
+
+You can run any subset; just point Flutter at `localhost` (`--dart-define=BACKEND_HOST=localhost`) and the services you didn't start will appear unreachable to the client.
 
 ### Flutter
 
@@ -363,51 +284,102 @@ go run ./services/notification
 cd flutter
 flutter pub get
 
-# Android emulator (default host: 10.0.2.2)
+# Android emulator (special host alias for the host machine)
 flutter run
 
-# Desktop or web
+# Desktop / web / iOS simulator
 flutter run --dart-define=BACKEND_HOST=localhost
 
-# Waydroid (Linux Android container)
-flutter run --dart-define=BACKEND_HOST=192.168.240.1
+# A physical Android phone on the same Wi-Fi
+flutter run --dart-define=BACKEND_HOST=<your-laptop-LAN-IP>
 ```
 
-### Regenerate Proto Stubs
+---
+
+## Regenerating proto stubs
+
+The single source of truth is `proto/quiz.proto`. Generated files are committed so a fresh clone works without `protoc`.
 
 ```bash
-# Go stubs
-protoc --go_out=. --go-grpc_out=. \
-  --go_opt=paths=source_relative --go-grpc_opt=paths=source_relative \
-  proto/quiz.proto
-
-# Dart stubs
-protoc --dart_out=grpc:flutter/lib/proto proto/quiz.proto
+make proto         # regenerates both Go and Dart stubs
+make proto-go      # Go only
+make proto-dart    # Dart only — requires `dart pub global activate protoc_plugin`
 ```
 
-## Production Deployment
+If `make proto-dart` fails with "plugin not found", install the Dart plugin: `dart pub global activate protoc_plugin` and make sure `~/.pub-cache/bin` is on your `PATH`.
 
-Local development runs over plaintext docker-compose. For internet-facing
-deployments, see [docs/deployment-tls.md](docs/deployment-tls.md) for the
-reverse-proxy + TLS-termination expectation, certificate provisioning
-options, and the Razorpay-webhook hardening checklist.
+---
 
-## Known Limitations
+## Repository layout
 
-- **No TLS on gRPC:** Services communicate over plaintext gRPC. Production deployment terminates TLS at a reverse proxy — see [docs/deployment-tls.md](docs/deployment-tls.md).
-- **Single Redis instance:** No Redis Cluster or Sentinel. Acceptable for demo scale but not production HA.
-- **No horizontal scaling:** Each service runs as a single instance. The matchmaking poller and RabbitMQ consumers would need coordination (e.g., consumer groups, leader election) for multi-instance deployment.
-- **AMQP channel recovery:** If the RabbitMQ connection drops, services don't auto-reconnect the AMQP channel. A restart is required.
-- **Tournament system:** Basic implementation -- join and list only. No bracket generation, scheduled match orchestration, or live tournament leaderboard.
-- **No rate limiting on gRPC:** Email codes are rate-limited, but gRPC endpoints lack general rate limiting.
-- **Notification stub mode:** Without a real Firebase service-account JSON, push notifications are logged but not delivered.
+```
+quiz-battle/
+  proto/quiz.proto              # The single .proto for every service
+  pkg/                          # Shared Go libraries
+    auth/                       # JWT middleware (interceptor + token mint)
+    coins/                      # Ledger, shop, outbox primitives
+    config/                     # Env-var loading helpers
+    keys/                       # Redis key names (single source of truth)
+    log/                        # Structured slog setup + context propagation
+    metrics/                    # Prometheus metric registries
+    models/                     # User, Payment, Tournament Go structs
+    notif/                      # Notification policy primitives
+    ratelimit/                  # Token-bucket limiters
+    validate/                   # Field-length + format validators
+  services/
+    auth/                       # Auth (50054)
+    matchmaking/                # Matchmaking (50051)
+    quiz/                       # Quiz engine (50052)
+    scoring/                    # Scoring / user / coins / shop / friends (50053)
+    payment/                    # Razorpay + webhook (50055, 8080)
+    notification/               # FCM consumer
+    admin/                      # Read-only dashboard (8090)
+  seed/
+    main.go                     # One-shot index + test data + shop catalog seeder
+    questions.json              # Quiz question bank
+    shop_items.json             # Shop SKUs
+  secrets/                      # firebase-admin.json (gitignored)
+  flutter/                      # Flutter client
+    lib/
+      main.dart                 # App entry, theme, gRPC channel setup
+      proto/                    # Generated Dart proto/gRPC stubs
+      providers/                # Riverpod state (auth, game, scoring, payment, coins)
+      services/                 # Typed gRPC wrappers
+      screens/                  # 20+ screens (home, gameplay, login, shop, friends, ...)
+      widgets/                  # Shared widgets
+      theme/                    # Colors, typography
+  scripts/
+    coverage.sh                 # Per-function coverage gate (>=70% on key code)
+    status.sh                   # `make status` — health probe across services
+  docker-compose.yml            # 9-container orchestration
+  Dockerfile                    # Multi-stage Go builder + Alpine runtime
+  Makefile                      # proto / test / vet / lint / build / status / coverage
+  .env                          # Local environment (gitignored)
+```
 
-## Future Improvements
+---
 
-- WebSocket gateway for browser clients alongside gRPC
-- Redis Sentinel / Cluster for high availability
-- OpenTelemetry tracing across services
-- Tournament bracket system with automated scheduling
-- Friend system and direct challenge invitations
-- Question contribution and moderation pipeline
-- Admin dashboard for content and user management
+## Known limitations
+
+These are deliberate scope cuts. If you're sizing the gap between "demo-ready" and "production-ready," start here.
+
+- **No TLS on gRPC inside the cluster.** Plaintext is acceptable for a single host; production should terminate TLS at a reverse proxy. See `docs/deployment-tls.md` in the repo for a worked example.
+- **Single Redis, single Mongo node.** No Sentinel, no shard. Fine for demo scale; not HA.
+- **Each service is a single instance.** The matchmaking poller, RabbitMQ consumers, and the premium-trial outbox worker assume a single instance per service. Running two replicas of the payment service today would let both consumers race on outbox rows. See [adr-0007](docs/decisions/0007-premium-trial-outbox.md).
+- **AMQP channel does not auto-reconnect.** If RabbitMQ restarts, restart the affected services.
+- **Tournaments are minimal.** Listing + joining + a finalization worker that pays out the prize pool. There's no bracket UI or scheduled match-orchestration layer.
+- **No general gRPC rate limit.** Per-RPC limits exist where they matter (email OTP send, SubmitAnswer); the rest is unbounded.
+- **FCM stub mode when secret missing.** Without `secrets/firebase-admin.json`, the notification service logs deliveries instead of sending them.
+
+A full gap analysis lives in the Downloads folder under `2026-05-12-production-hardening-gaps.md`.
+
+---
+
+## Where to go next
+
+- **Understand the design** — [architecture.md](docs/architecture.md)
+- **Call an RPC or subscribe to an event** — [api.md](docs/api.md)
+- **Operate the system** — [runbook.md](docs/runbook.md)
+- **Demo it** — [demo-script.md](docs/demo-script.md)
+- **Open a PR** — [CONTRIBUTING.md](./CONTRIBUTING.md)
+- **Argue with a design choice** — read the relevant `docs/decisions/NNNN-*.md` ADR first; it probably anticipated your objection.
