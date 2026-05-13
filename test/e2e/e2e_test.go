@@ -97,16 +97,22 @@ func recvGameEvent(t *testing.T, stream pb.QuizService_StreamGameEventsClient, t
 	}
 }
 
-// recvFirstQuestion pulls events from the stream until a QuestionBroadcast
-// arrives, skipping past the PlayerJoined event(s) the server emits at
-// round-1 start when each player's stream subscribes. Without this skip
-// the round-1 read races against the join-notification fanout and
-// flakes with "expected QuestionBroadcast, got PlayerJoined".
+// recvFirstQuestion pulls events from the stream until a
+// QuestionBroadcast arrives, skipping past:
 //
-// Any event type other than PlayerJoined or QuestionBroadcast is a hard
-// fail — the caller is asking specifically for the round's question
-// frame and seeing e.g. a RoundResult here would mean something earlier
-// in the flow is wrong.
+//   - PlayerJoined: the server emits one per subscriber at round-1
+//     subscribe time. Without skipping, round-1 races against the
+//     join-notification fanout and flakes.
+//   - Leaderboard: scoring runs asynchronously over RabbitMQ, so a
+//     "leaderboard.updated" event for round N can land on the stream
+//     AFTER round N's RoundResult (the boundary collectUntilRoundEnd
+//     stops on). On a fast CI runner the trailing leaderboard event
+//     arrives just before round N+1's Question and the assertion
+//     fires before it would have on a slower box.
+//
+// Any other event type (RoundResult, MatchEnd, TimerSync) is a hard
+// fail — seeing one of those before the question frame would mean
+// something genuinely wrong in the flow, not stream-ordering jitter.
 func recvFirstQuestion(t *testing.T, stream pb.QuizService_StreamGameEventsClient, timeout time.Duration) *pb.GameEvent {
 	t.Helper()
 	deadline := time.Now().Add(timeout)
@@ -119,10 +125,10 @@ func recvFirstQuestion(t *testing.T, stream pb.QuizService_StreamGameEventsClien
 		if ev.GetQuestion() != nil {
 			return ev
 		}
-		if ev.GetPlayerJoined() != nil {
+		if ev.GetPlayerJoined() != nil || ev.GetLeaderboard() != nil {
 			continue
 		}
-		t.Fatalf("expected QuestionBroadcast or PlayerJoined, got %T", ev.Event)
+		t.Fatalf("expected QuestionBroadcast (or trailing PlayerJoined/Leaderboard), got %T", ev.Event)
 	}
 }
 
