@@ -27,6 +27,7 @@ import (
 	"quiz-battle/pkg/log"
 	"quiz-battle/pkg/metrics"
 	"quiz-battle/pkg/models"
+	"quiz-battle/pkg/tlsutil"
 	pb "quiz-battle/proto"
 )
 
@@ -551,7 +552,9 @@ func main() {
 	metricsSrv := m.Serve(ctx, ":2112")
 	srv.metrics = m
 
-	grpcServer := grpc.NewServer(
+	// TLS opt-in via pkg/tlsutil — see docs/deployment-tls.md.
+	grpcOpts := tlsutil.GRPCServerOptions(ctx)
+	grpcOpts = append(grpcOpts,
 		grpc.ChainUnaryInterceptor(
 			log.UnaryServerInterceptor(),
 			m.UnaryServerInterceptor(),
@@ -563,6 +566,7 @@ func main() {
 			auth.StreamInterceptor(jwtSecret, nil),
 		),
 	)
+	grpcServer := grpc.NewServer(grpcOpts...)
 	pb.RegisterMatchmakingServiceServer(grpcServer, srv)
 
 	lis, err := net.Listen("tcp", ":50051")

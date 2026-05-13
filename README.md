@@ -392,9 +392,16 @@ deployments, see [docs/deployment-tls.md](docs/deployment-tls.md) for the
 reverse-proxy + TLS-termination expectation, certificate provisioning
 options, and the Razorpay-webhook hardening checklist.
 
+**Opt-in in-process TLS** is available via `pkg/tlsutil` for deployments
+without a proxy. Set `TLS_ENABLED=true`, `TLS_CERT_FILE`, and
+`TLS_KEY_FILE` on the service containers — every gRPC server and the
+payment webhook server will upgrade to TLS automatically. A missing or
+unreadable cert with `TLS_ENABLED=true` crashes the service at startup
+(intentional — silent fallback to plaintext is the wrong failure mode).
+
 ## Known Limitations
 
-- **No TLS on gRPC:** Services communicate over plaintext gRPC. Production deployment terminates TLS at a reverse proxy — see [docs/deployment-tls.md](docs/deployment-tls.md).
+- **No TLS on gRPC (by default):** Services communicate over plaintext gRPC in dev. Production must either terminate TLS at a reverse proxy or set `TLS_ENABLED=true` on the services to enable in-process TLS — see [docs/deployment-tls.md](docs/deployment-tls.md).
 - **Single Redis instance:** No Redis Cluster or Sentinel. Acceptable for demo scale but not production HA.
 - **No horizontal scaling:** Each service runs as a single instance. The matchmaking poller and RabbitMQ consumers would need coordination (e.g., consumer groups, leader election) for multi-instance deployment.
 - **AMQP channel recovery:** If the RabbitMQ connection drops, services don't auto-reconnect the AMQP channel. A restart is required.

@@ -45,7 +45,7 @@ func TestGetTournamentList_ReturnsTimeMillisAndStringID(t *testing.T) {
 		t.Fatalf("seed: %v", err)
 	}
 
-	resp, err := srv.GetTournamentList(context.Background(), &pb.GetTournamentListRequest{})
+	resp, err := srv.GetTournamentList(authedCtx("alice"), &pb.GetTournamentListRequest{})
 	if err != nil {
 		t.Fatalf("GetTournamentList: %v", err)
 	}
@@ -130,7 +130,7 @@ func TestGetTournamentList_FiltersByStatus(t *testing.T) {
 		t.Fatalf("seed: %v", err)
 	}
 
-	resp, err := srv.GetTournamentList(context.Background(), &pb.GetTournamentListRequest{})
+	resp, err := srv.GetTournamentList(authedCtx("alice"), &pb.GetTournamentListRequest{})
 	if err != nil {
 		t.Fatalf("GetTournamentList: %v", err)
 	}

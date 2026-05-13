@@ -33,6 +33,7 @@ import (
 	"quiz-battle/pkg/metrics"
 	"quiz-battle/pkg/models"
 	"quiz-battle/pkg/ratelimit"
+	"quiz-battle/pkg/tlsutil"
 	"quiz-battle/pkg/validate"
 	pb "quiz-battle/proto"
 )
@@ -287,6 +288,15 @@ func (s *scoringServer) isCorrect(ctx context.Context, roomID string, round, opt
 // ---------------------------------------------------------------------------
 
 func (s *scoringServer) GetLeaderboard(ctx context.Context, req *pb.GetLeaderboardRequest) (*pb.GetLeaderboardResponse, error) {
+	// Defense in depth: the unary interceptor already rejects
+	// unauthenticated calls, but a refactor that accidentally moves
+	// GetLeaderboard onto the interceptor's skip list would silently
+	// expose live match leaderboards. Calling UserIDFromContext here
+	// makes the auth requirement visible at the call site and ensures
+	// the security contract is local to this handler.
+	if _, err := auth.UserIDFromContext(ctx); err != nil {
+		return nil, status.Error(codes.Unauthenticated, "not authenticated")
+	}
 	// §4.7 PR-A1: bound the room-id string so a malicious client can't
 	// pad it to a giant Redis key and blow the per-keylength memory
 	// budget on the server.
@@ -337,7 +347,7 @@ func (s *scoringServer) GetLeaderboard(ctx context.Context, req *pb.GetLeaderboa
 func (s *scoringServer) GetMatchHistory(ctx context.Context, req *pb.GetMatchHistoryRequest) (*pb.GetMatchHistoryResponse, error) {
 	userID, err := auth.UserIDFromContext(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("auth: %w", err)
+		return nil, status.Error(codes.Unauthenticated, "not authenticated")
 	}
 
 	// Feature gating: free users see last 3, premium sees full history
@@ -2282,7 +2292,9 @@ func main() {
 	metricsSrv := m.Serve(ctx, ":2112")
 	srv.metrics = m
 
-	grpcServer := grpc.NewServer(
+	// TLS opt-in via pkg/tlsutil — see docs/deployment-tls.md.
+	grpcOpts := tlsutil.GRPCServerOptions(ctx)
+	grpcOpts = append(grpcOpts,
 		grpc.ChainUnaryInterceptor(
 			log.UnaryServerInterceptor(),
 			m.UnaryServerInterceptor(),
@@ -2294,6 +2306,7 @@ func main() {
 			auth.StreamInterceptor(jwtSecret, skipMethods),
 		),
 	)
+	grpcServer := grpc.NewServer(grpcOpts...)
 	pb.RegisterScoringServiceServer(grpcServer, srv)
 
 	// Bind to all interfaces so the docker-compose port forward

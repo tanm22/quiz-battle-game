@@ -36,6 +36,7 @@ import (
 	"quiz-battle/pkg/metrics"
 	"quiz-battle/pkg/models"
 	"quiz-battle/pkg/ratelimit"
+	"quiz-battle/pkg/tlsutil"
 	"quiz-battle/pkg/validate"
 	pb "quiz-battle/proto"
 )
@@ -621,10 +622,17 @@ func (s *authServer) UpdateProfile(ctx context.Context, req *pb.UpdateProfileReq
 
 	set := bson.M{}
 	if req.DisplayName != "" {
-		if len(req.DisplayName) > 40 {
-			return nil, status.Error(codes.InvalidArgument, "display name too long")
+		// Two-step: sanitize first (trim, collapse whitespace, drop
+		// control chars), then validate (HTML punctuation, length).
+		// The validation step is the safety gate — a name with `<` or `"`
+		// is rejected with InvalidArgument rather than silently rewritten
+		// because that makes downstream rendering surfaces (push pushes,
+		// future web UI, log lines) trust-by-construction.
+		clean := validate.SanitizeDisplayName(req.DisplayName)
+		if err := validate.DisplayName(clean); err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "display_name: %v", err)
 		}
-		set["displayName"] = sanitizeText(req.DisplayName)
+		set["displayName"] = clean
 	}
 	if req.AvatarUrl != "" {
 		if len(req.AvatarUrl) > 500 {
@@ -699,19 +707,6 @@ func (s *authServer) UpdateProfile(ctx context.Context, req *pb.UpdateProfileReq
 		return nil, status.Errorf(codes.Internal, "update failed: %v", err)
 	}
 	return &pb.UpdateProfileResponse{Success: true}, nil
-}
-
-// sanitizeText trims whitespace and strips ASCII control characters.
-// UTF-8 letters/digits/punctuation/emoji pass through.
-func sanitizeText(s string) string {
-	s = strings.TrimSpace(s)
-	out := make([]rune, 0, len(s))
-	for _, r := range s {
-		if r >= 0x20 || r == '\n' {
-			out = append(out, r)
-		}
-	}
-	return string(out)
 }
 
 // ---------------------------------------------------------------------------
@@ -1410,7 +1405,9 @@ func main() {
 	m := metrics.New("auth")
 	metricsSrv := m.Serve(ctx, ":2112")
 
-	grpcServer := grpc.NewServer(
+	// TLS opt-in via pkg/tlsutil — see docs/deployment-tls.md.
+	grpcOpts := tlsutil.GRPCServerOptions(ctx)
+	grpcOpts = append(grpcOpts,
 		grpc.ChainUnaryInterceptor(
 			log.UnaryServerInterceptor(),
 			m.UnaryServerInterceptor(),
@@ -1422,6 +1419,7 @@ func main() {
 			auth.StreamInterceptor(jwtSecret, nil),
 		),
 	)
+	grpcServer := grpc.NewServer(grpcOpts...)
 	pb.RegisterAuthServiceServer(grpcServer, srv)
 
 	lis, err := net.Listen("tcp", ":50054")

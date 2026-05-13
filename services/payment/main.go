@@ -33,6 +33,7 @@ import (
 	"quiz-battle/pkg/log"
 	"quiz-battle/pkg/metrics"
 	"quiz-battle/pkg/ratelimit"
+	"quiz-battle/pkg/tlsutil"
 	pb "quiz-battle/proto"
 )
 
@@ -812,7 +813,12 @@ func main() {
 	// so the first tick can publish; see docs/runbook-coins.md.
 	srv.startOutboxWatcher(ctx, "premium_trial")
 
-	grpcServer := grpc.NewServer(
+	// TLS opt-in: tlsutil.GRPCServerOptions returns nil when TLS_ENABLED
+	// is unset (current default — plaintext behind a reverse proxy per
+	// docs/deployment-tls.md), and a credentials.NewTLS option when the
+	// cert/key env vars are set. See pkg/tlsutil for the contract.
+	grpcOpts := tlsutil.GRPCServerOptions(ctx)
+	grpcOpts = append(grpcOpts,
 		grpc.ChainUnaryInterceptor(
 			log.UnaryServerInterceptor(),
 			m.UnaryServerInterceptor(),
@@ -824,6 +830,7 @@ func main() {
 			auth.StreamInterceptor(jwtSecret, nil),
 		),
 	)
+	grpcServer := grpc.NewServer(grpcOpts...)
 	pb.RegisterPaymentServiceServer(grpcServer, srv)
 
 	grpcLis, err := net.Listen("tcp", ":50055")
@@ -851,8 +858,11 @@ func main() {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	go func() {
-		log.FromContext(ctx).Info("HTTP serving", "addr", ":8080")
-		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.FromContext(ctx).Info("HTTP serving", "addr", ":8080", "tls_enabled", tlsutil.Enabled())
+		// tlsutil.ServeHTTP transparently switches to ListenAndServeTLS
+		// when TLS_ENABLED is set. Plaintext is the default for the
+		// "reverse proxy terminates TLS" deployment posture.
+		if err := tlsutil.ServeHTTP(ctx, httpSrv); err != nil && err != http.ErrServerClosed {
 			log.FromContext(ctx).Error("HTTP serve exited", "err", err)
 		}
 	}()

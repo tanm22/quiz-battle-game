@@ -30,6 +30,7 @@ import (
 	"quiz-battle/pkg/metrics"
 	"quiz-battle/pkg/models"
 	"quiz-battle/pkg/ratelimit"
+	"quiz-battle/pkg/tlsutil"
 	"quiz-battle/pkg/validate"
 	pb "quiz-battle/proto"
 )
@@ -1188,6 +1189,14 @@ func (s *quizServer) GetRoomQuestions(ctx context.Context, req *pb.GetRoomQuesti
 // serialised as 0, and binary _id values stringified to ObjectID("…")
 // wrappers that JoinTournament's _id lookup couldn't match.
 func (s *quizServer) GetTournamentList(ctx context.Context, _ *pb.GetTournamentListRequest) (*pb.GetTournamentListResponse, error) {
+	// Defense in depth: the unary interceptor already enforces auth on
+	// this RPC (no skip-method entry), but a refactor that accidentally
+	// excludes it would leak the tournament catalog (including
+	// premium-only events) to anonymous callers. Re-check here so the
+	// security contract is visible alongside the handler logic.
+	if _, err := auth.UserIDFromContext(ctx); err != nil {
+		return nil, status.Error(codes.Unauthenticated, "not authenticated")
+	}
 	cursor, err := s.mongoDB.Collection("tournaments").Find(ctx, bson.M{
 		"status": bson.M{"$in": []string{"upcoming", "active"}},
 	})
@@ -2287,7 +2296,9 @@ func main() {
 	metricsSrv := m.Serve(ctx, ":2112")
 	srv.metrics = m
 
-	grpcServer := grpc.NewServer(
+	// TLS opt-in via pkg/tlsutil — see docs/deployment-tls.md.
+	grpcOpts := tlsutil.GRPCServerOptions(ctx)
+	grpcOpts = append(grpcOpts,
 		grpc.ChainUnaryInterceptor(
 			log.UnaryServerInterceptor(),
 			m.UnaryServerInterceptor(),
@@ -2299,6 +2310,7 @@ func main() {
 			auth.StreamInterceptor(jwtSecret, nil),
 		),
 	)
+	grpcServer := grpc.NewServer(grpcOpts...)
 	pb.RegisterQuizServiceServer(grpcServer, srv)
 
 	lis, err := net.Listen("tcp", ":50052")
