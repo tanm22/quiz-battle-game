@@ -248,6 +248,13 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
       );
     }
     final preset = kPresetAvatars[i - (_hasGooglePhoto ? 1 : 0)];
-    return LocalAvatar(glyph: preset.glyph, background: preset.color);
+    // Pass the typed display name so the picker tiles preview the
+    // user's actual monogram. While the field is empty we fall back
+    // to "?" — the gradient still distinguishes the six themes by
+    // color so the tiles remain visually distinct pre-typing.
+    return LocalAvatar(
+      name: _displayNameCtl.text,
+      background: preset.color,
+    );
   }
 }

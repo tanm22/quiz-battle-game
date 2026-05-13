@@ -339,7 +339,15 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       );
     }
     final preset = kPresetAvatars[i - (_hasCustomAvatar ? 1 : 0)];
-    return LocalAvatar(glyph: preset.glyph, background: preset.color);
+    // Picker tiles preview the user's monogram on each color theme —
+    // mirrors the home-card render so users see the exact glyph they'll
+    // get before they commit. Empty name falls back to "?" until typing.
+    return LocalAvatar(
+      name: _displayNameCtl.text.isNotEmpty
+          ? _displayNameCtl.text
+          : widget.displayName,
+      background: preset.color,
+    );
   }
 }
 

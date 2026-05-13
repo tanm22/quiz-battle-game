@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import 'local_avatar.dart';
 
 /// GoogleStyleAvatar — drop-in replacement for the bare
 /// `Image.network` + `Text(initial)` pattern used across the app.
@@ -130,10 +131,50 @@ class GoogleStyleAvatar extends StatelessWidget {
       );
     }
 
-    // Build the base avatar (image or fallback).
+    // Build the base avatar — three resolution paths:
+    //   1. URL matches an onboarding preset → LocalAvatar paints the
+    //      user's monogram on the preset's gradient. Critical fix for
+    //      the profile hero and friend-list avatars, which used to
+    //      render "FO" / "PA" — UI Avatars' interpretation of the
+    //      legacy `name=Fox|Panda|…` query string saved during
+    //      onboarding before the monogram redesign.
+    //   2. Non-preset URL (Google sign-in photo, future bucket
+    //      upload) → Image.network with the colored-initial fallback
+    //      while loading or on error.
+    //   3. Empty / null URL → deterministic colored-initial circle
+    //      (the Gmail / Calendar / GitHub / Slack convention).
     Widget base;
     final url = imageUrl;
-    if (url == null || url.isEmpty) {
+    final preset = (url != null && url.isNotEmpty)
+        ? presetFromAvatarUrl(url)
+        : null;
+    if (preset != null) {
+      // The wrapping container reproduces the same border shape the
+      // image/fallback paths use so border / glow / online overlays
+      // below behave identically regardless of which base we picked.
+      final inner = LocalAvatar(
+        name: name,
+        background: preset.color,
+        size: size,
+      );
+      base = effectiveBorder != null
+          ? Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                shape: shape,
+                borderRadius: borderRadius,
+                border: effectiveBorder,
+              ),
+              child: shape == BoxShape.circle
+                  ? ClipOval(child: inner)
+                  : ClipRRect(
+                      borderRadius: borderRadius ?? BorderRadius.zero,
+                      child: inner,
+                    ),
+            )
+          : inner;
+    } else if (url == null || url.isEmpty) {
       base = fallback();
     } else {
       final clipper = borderRadius != null

@@ -1239,7 +1239,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
             // Three render paths, in priority order:
-            //   1. Onboarding-preset emoji glyph → LocalAvatar
+            //   1. Onboarding-preset color theme → LocalAvatar renders
+            //      the user's initial on the preset's gradient (Slack /
+            //      Linear style monogram, no cartoon emoji).
             //   2. Network photo (Google sign-in, future bucket
             //      uploads) — GoogleStyleAvatar shows the photo when
             //      it loads, and an initial-on-color fallback while
@@ -1250,7 +1252,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             //      photo-less users.
             child: preset != null
                 ? LocalAvatar(
-                    glyph: preset.glyph,
+                    name: name,
                     background: preset.color,
                     size: 56,
                   )
