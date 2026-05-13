@@ -205,6 +205,12 @@ func TestSubmitAnswer_EarlyCloseEndToEnd(t *testing.T) {
 		playerB = "u-bob-rpc"
 	)
 	seedRoom(t, rdb, roomID, playerA, playerB)
+	// SubmitAnswer's current-round gate (§4.7 PR-B/C1) demands the room
+	// round key be present and match req.Round; seed it so the RPC
+	// reaches the early-close path instead of bailing FailedPrecondition.
+	if err := keys.SetRoomRound(context.Background(), rdb, roomID, round); err != nil {
+		t.Fatalf("seed round: %v", err)
+	}
 
 	mkCtx := func(uid string) context.Context {
 		return auth.ContextWithClaims(context.Background(),

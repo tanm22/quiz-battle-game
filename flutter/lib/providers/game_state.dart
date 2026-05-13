@@ -268,12 +268,19 @@ class GameStateNotifier extends Notifier<GameState> {
           scores: _pendingScores.isNotEmpty ? Map.of(_pendingScores) : null,
           leaderboard: _pendingLeaderboard.isNotEmpty ? _pendingLeaderboard : null,
         );
-        // Auto-reset answer highlight after 1.5s (cancellable on dispose)
+        // Auto-reset answer highlight after 1.5s (cancellable on dispose).
+        // Capture the round at scheduling time so we only clear if we're
+        // still showing the same round. The next round's QuestionBroadcast
+        // currently arrives ~2s after RoundResult (consumeRoundCompleted
+        // sleeps 2s on the server), so the 1.5s timer fires inside the
+        // gap today — but if that delay is ever tuned down below 1.5s,
+        // a stale clear would wipe the user's tap on round N+1's question.
         _highlightResetTimer?.cancel();
+        final clearForRound = state.round;
         _highlightResetTimer = Timer(const Duration(milliseconds: 1500), () {
-          if (!_disposed) {
-            state = state.copyWith(clearSelectedIndex: true, clearCorrectIndex: true);
-          }
+          if (_disposed) return;
+          if (state.round != clearForRound) return;
+          state = state.copyWith(clearSelectedIndex: true, clearCorrectIndex: true);
         });
       case GameEvent_Event.matchEnd:
         state = state.copyWith(
@@ -393,11 +400,20 @@ class GameStateNotifier extends Notifier<GameState> {
     _gameSub?.cancel();
     _pendingScores = {};
     if (state.userId != null) {
-      await _service.leaveMatchmaking(state.userId!);
+      try {
+        await _service.leaveMatchmaking(state.userId!);
+      } catch (_) {
+        // Best-effort cleanup; server-side TTL will reap the pool entry
+        // even if this call fails. Don't strand the user on results.
+      }
     }
-    // Refresh profile to get updated rating/stats from server
+    // Refresh profile to pick up updated rating/stats from server. Swallow
+    // failures — the home screen re-fetches on next render, so a transient
+    // network error here must not block the navigation back to home.
     final auth = AuthService();
-    await auth.refreshProfile();
+    try {
+      await auth.refreshProfile();
+    } catch (_) {}
     state = GameState(
       currentScreen: GameScreen.home,
       userId: state.userId,
@@ -451,11 +467,18 @@ class GameStateNotifier extends Notifier<GameState> {
     _matchSub?.cancel();
     _gameSub?.cancel();
     if (state.userId != null) {
-      await _service.leaveMatchmaking(state.userId!);
+      try {
+        await _service.leaveMatchmaking(state.userId!);
+      } catch (_) {
+        // Best-effort; same justification as leaveMatch above.
+      }
     }
-    // Refresh profile to get updated rating/stats from server
+    // Refresh profile to pick up updated rating/stats from server. Swallow
+    // failures — the home screen re-fetches on next render.
     final auth = AuthService();
-    await auth.refreshProfile();
+    try {
+      await auth.refreshProfile();
+    } catch (_) {}
     state = GameState(
       currentScreen: GameScreen.home,
       userId: state.userId,

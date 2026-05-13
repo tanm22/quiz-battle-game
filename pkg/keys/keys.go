@@ -22,6 +22,17 @@ const (
 	RoomAnswered    = "room:%s:answered:%d"
 	RoomLock        = "room:lock:%s"
 	RoomRoundClosed = "room:%s:round:%d:closed"
+	// RoomMatchFinalized is the SETNX guard that ensures finishMatch runs
+	// exactly once per room. Two players' StreamGameEvents defer paths can
+	// race when both clients drop in the same instant — each reads
+	// `connectedPlayersInRoom == 0` after its own Delete but before the
+	// other's, and both call finishMatch. Without this guard the second
+	// call republishes match.finished, double-broadcasts MatchEnd, and
+	// double-publishes coins.earn.match_win (the earn pipeline's ledger
+	// (userId, refId, reason) unique index swallows the coin double-grant,
+	// but match.finished redelivery to persistence still mutates
+	// users.matchesPlayed / rating / wins twice).
+	RoomMatchFinalized = "room:%s:match_finalized"
 	// RoomStreak is the per-user consecutive-correct counter inside a
 	// single match. INCR'd by scoring's processAnswer when an answer is
 	// correct, DEL'd when wrong. The streak bonus reads the post-INCR
@@ -124,6 +135,12 @@ func CorrectOrder(roomID string, round int) string {
 
 func RoundClosed(roomID string, round int) string {
 	return fmt.Sprintf(RoomRoundClosed, roomID, round)
+}
+
+// MatchFinalized builds the SETNX key whose presence means finishMatch
+// has already run for this room.
+func MatchFinalized(roomID string) string {
+	return fmt.Sprintf(RoomMatchFinalized, roomID)
 }
 
 func EmailCodeKey(email, purpose string) string {
