@@ -105,6 +105,10 @@ func (l *Ledger) Grant(ctx context.Context, userID string, delta int64, reason, 
 	if existing, err := l.findExisting(ctx, userID, refID, reason); err != nil {
 		return nil, err
 	} else if existing != nil {
+		if existing.Delta != delta {
+			return nil, fmt.Errorf("%w: existing=%d requested=%d refId=%s reason=%s",
+				ErrIdempotencyConflict, existing.Delta, delta, refID, reason)
+		}
 		return existing, nil
 	}
 
@@ -119,9 +123,15 @@ func (l *Ledger) Grant(ctx context.Context, userID string, delta int64, reason, 
 	})
 	if err != nil {
 		// Concurrent identical grant: the unique index rejected our insert.
-		// The winning grant's row is now visible — fetch and return it.
+		// The winning grant's row is now visible — fetch and return it
+		// (after the same delta-mismatch check the fast path runs, so a
+		// racer with a different delta sees ErrIdempotencyConflict too).
 		if mongo.IsDuplicateKeyError(err) {
 			if existing, ferr := l.findExisting(ctx, userID, refID, reason); ferr == nil && existing != nil {
+				if existing.Delta != delta {
+					return nil, fmt.Errorf("%w: existing=%d requested=%d refId=%s reason=%s",
+						ErrIdempotencyConflict, existing.Delta, delta, refID, reason)
+				}
 				return existing, nil
 			}
 		}

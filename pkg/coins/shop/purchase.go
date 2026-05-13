@@ -138,12 +138,20 @@ func (p *Purchase) applyEffect(sc context.Context, item *Item, entry *coins.Ledg
 
 	switch item.Kind {
 	case KindAvatarFrame, KindNameColor:
-		// ErrAlreadyOwned on a retry is benign: the original txn added
-		// the cosmetic, and the replay fast-path already returned. The
-		// only way we'd hit this branch with the same refId is if the
-		// fast-path missed (concurrent first commit), in which case the
-		// duplicate-key path above handles it.
-		if err := inventory.AddCosmetic(sc, userID, item.ID); err != nil && !errors.Is(err, ErrAlreadyOwned) {
+		// Propagate ErrAlreadyOwned so the txn aborts and rolls back the
+		// debit. Two callers reach this branch with the item already
+		// owned: (a) a fresh idempotency key for a cosmetic the user
+		// already has (client bug, retry-after-success, or just impatient
+		// double-tap), and (b) the loser of a race between two distinct-
+		// refId purchases for the same cosmetic. In both cases the
+		// rollback is the only correct outcome — the user must not be
+		// debited for an asset they can't receive. The same-refId retry
+		// case never reaches here because findExistingPurchase's fast
+		// path returned the original receipt before the txn started.
+		if err := inventory.AddCosmetic(sc, userID, item.ID); err != nil {
+			if errors.Is(err, ErrAlreadyOwned) {
+				return err
+			}
 			return fmt.Errorf("add cosmetic: %w", err)
 		}
 		return nil

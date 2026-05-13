@@ -11,9 +11,12 @@ import (
 )
 
 // ErrAlreadyOwned signals that a cosmetic AddCosmetic was a no-op because
-// the user already had the item. Purchase.Buy treats this as success on a
-// retry: the original transaction already added the cosmetic and any later
-// retry sees the same state.
+// the user already had the item. Purchase.Buy propagates this error so the
+// transaction aborts and the debit rolls back — debiting coins for an
+// asset the user already owns is a silent money-leak. Same-key retries
+// never reach this branch (the replay fast-path returns the original
+// receipt before the txn starts); fresh-key re-purchases and concurrent
+// distinct-key races both correctly fail here.
 var ErrAlreadyOwned = errors.New("shop: cosmetic already owned")
 
 // ErrStreakFreezeAlreadyHeldThisWeek is returned by ClaimStreakFreezeForWeek

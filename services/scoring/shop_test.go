@@ -258,11 +258,12 @@ func TestPurchaseShopItem_RateLimitedAfterBurst(t *testing.T) {
 	seedScoringUser(t, srv.mongoClient, db, "alice", 100000)
 	srv.purchaseLimiter = ratelimit.New(rdb, "purchase_shop_item", 3, time.Minute)
 
-	// Use frame.gold with distinct idempotency keys: each key is a fresh
-	// refId so the ledger debits each call. AddCosmetic returns
-	// ErrAlreadyOwned on the 2nd+ purchase, but applyEffect silently
-	// ignores it — coins debit, transaction commits, the rate-limit
-	// path is exercised cleanly.
+	// Use frame.gold with distinct idempotency keys. The first call
+	// succeeds and debits 500 coins; the 2nd and 3rd see ALREADY_OWNED
+	// (the txn aborts cleanly, balance unchanged) and return as a
+	// successful gRPC response with ErrorCode set — not a transport
+	// error. Either way the limiter counter advances per call, so 3
+	// calls in any business outcome exhaust the per-minute budget.
 	for i := 0; i < 3; i++ {
 		_, err := srv.PurchaseShopItem(authedCtx("alice"),
 			&pb.PurchaseShopItemRequest{

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -146,6 +147,60 @@ func TestApplyPremiumTrialRow_DrainWorkerNeverDoubleGrants(t *testing.T) {
 	want := 3 * 24 * time.Hour
 	if delta < want-time.Minute || delta > want+time.Minute {
 		t.Errorf("3 drain passes produced delta=%v, want ~%v (single 3-day grant)", delta, want)
+	}
+}
+
+func TestApplyPremiumTrialRow_ConcurrentReplicasGrantOnce(t *testing.T) {
+	// Multi-replica fragility: DequeueDue has no claim/lease, so a second
+	// `payment` replica processing the same row would re-extend planExpiresAt
+	// after the first commits — on Mongo WriteConflict retry, the renewal-
+	// aware base reads the winner's committed expiry and stacks another
+	// days*24h. Today this is single-replica safe (one goroutine, serial
+	// loop), but the moment payment scales to >=2 replicas the bug fires.
+	//
+	// We simulate the race by invoking applyPremiumTrialRow concurrently
+	// for the same row. Without the in-session processedAt:nil claim guard,
+	// at least one loser will re-grant. With the guard, exactly one wins
+	// and the rest exit cleanly with no further days added.
+	srv, _, _ := newTestPaymentServer(t)
+	seedPaymentTestUser(t, srv.mongoDB, "user-race", nil)
+	enqueueTestOutbox(t, srv.mongoDB, "outbox-race", "user-race", "3")
+
+	rows, _ := shop.DequeueDue(context.Background(), srv.mongoDB, "premium_trial", 32)
+	if len(rows) != 1 {
+		t.Fatalf("setup: %d rows", len(rows))
+	}
+	row := rows[0]
+
+	var wg sync.WaitGroup
+	const replicas = 8
+	for i := 0; i < replicas; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			srv.applyPremiumTrialRow(context.Background(), srv.mongoDB, row)
+		}()
+	}
+	wg.Wait()
+
+	var u struct {
+		PlanExpiresAt *time.Time `bson:"planExpiresAt"`
+	}
+	if err := srv.mongoDB.Collection("users").
+		FindOne(context.Background(), bson.M{"_id": "user-race"}).
+		Decode(&u); err != nil {
+		t.Fatalf("read user: %v", err)
+	}
+	if u.PlanExpiresAt == nil {
+		t.Fatalf("planExpiresAt nil — no replica processed the row")
+	}
+	delta := time.Until(*u.PlanExpiresAt)
+	want := 3 * 24 * time.Hour
+	// Allow a generous floor (clock skew, scheduling jitter) but a strict
+	// ceiling: more than 3 days means a replica double-granted.
+	if delta < want-time.Minute || delta > want+time.Minute {
+		t.Errorf("%d concurrent replicas produced delta=%v, want ~%v (single 3-day grant)",
+			replicas, delta, want)
 	}
 }
 

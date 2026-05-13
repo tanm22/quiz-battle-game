@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"go.mongodb.org/mongo-driver/v2/mongo"
+
 	"quiz-battle/pkg/coins"
 	"quiz-battle/pkg/log"
 	"quiz-battle/pkg/metrics"
@@ -37,9 +39,37 @@ func (s *scoringServer) handleEarnEvent(ctx context.Context, body []byte) error 
 	if ev.Amount <= 0 {
 		return fmt.Errorf("%w: amount must be positive (got %d)", errBadEarnPayload, ev.Amount)
 	}
+	// Reject spend-side reasons (shop.purchase, shop.refund, admin.adjustment).
+	// Those only flow through the synchronous Purchase RPC and admin tooling;
+	// allowing them here would let any sx-publisher credit arbitrary
+	// balances under a spend-side reason. See coins.EarnSideReasons for the
+	// allowlist rationale.
+	if _, ok := coins.EarnSideReasons[ev.Reason]; !ok {
+		return fmt.Errorf("%w: reason %q is not an earn-side reason", errBadEarnPayload, ev.Reason)
+	}
+	// Bound the per-event amount. The largest legitimate earn is the
+	// 200-coin streak reward; the cap is defense in depth against a
+	// compromised producer publishing a billion-coin grant.
+	if ev.Amount > coins.MaxEarnAmount {
+		return fmt.Errorf("%w: amount %d exceeds cap %d", errBadEarnPayload, ev.Amount, coins.MaxEarnAmount)
+	}
 
 	entry, err := s.ledger.Grant(ctx, ev.UserID, ev.Amount, ev.Reason, ev.RefID, ev.Metadata)
 	if err != nil {
+		// Definitively-broken errors get DLQ'd instead of requeued.
+		// coin-earn-queue is a classic queue without x-delivery-limit, so
+		// a transient-classified error loops forever and stalls healthy
+		// traffic once prefetch fills with poison messages.
+		//
+		//   - mongo.ErrNoDocuments: the target user doesn't exist (deleted
+		//     between the producer's emit and our consume). Cannot recover
+		//     on retry.
+		//   - ErrIdempotencyConflict: a buggy producer reused a refId with
+		//     a different amount. Retrying with the same payload yields
+		//     the same conflict — DLQ for human review.
+		if errors.Is(err, mongo.ErrNoDocuments) || errors.Is(err, coins.ErrIdempotencyConflict) {
+			return fmt.Errorf("%w: grant: %w", errBadEarnPayload, err)
+		}
 		return fmt.Errorf("grant: %w", err)
 	}
 	log.FromContext(ctx).Info("earn granted",

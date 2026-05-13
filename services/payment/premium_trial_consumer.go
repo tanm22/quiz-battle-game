@@ -97,6 +97,8 @@ func (s *paymentServer) drainPremiumTrialOutbox(ctx context.Context) {
 // Concurrency note: rs0 supports read-snapshot inside transactions, so
 // the read-then-update against `users` is consistent with `MarkProcessed`
 // against `coin_effect_outbox` even though they're different collections.
+// The first operation inside the txn body is a re-fetch of the outbox row
+// with `processedAt: nil` — see the claim-guard rationale below.
 func (s *paymentServer) applyPremiumTrialRow(ctx context.Context, db *mongo.Database, r shop.OutboxRow) {
 	days, _ := strconv.Atoi(r.Payload["days"])
 	if days <= 0 {
@@ -112,10 +114,37 @@ func (s *paymentServer) applyPremiumTrialRow(ctx context.Context, db *mongo.Data
 
 	now := time.Now().UTC()
 	res, err := session.WithTransaction(ctx, func(sc context.Context) (any, error) {
-		// Re-read inside the session so the renewal-aware base is the
-		// snapshot the txn commits against. A non-existent user here is
-		// not a transient error — log it, mark the row processed in the
-		// SAME txn so we don't spin retrying, and ack with a sentinel.
+		// Multi-replica claim guard. DequeueDue is unlocked: a second
+		// `payment` replica processing this row would arrive here in
+		// parallel. Without a re-fetch inside the session, both replicas
+		// observe planExpiresAt=nil in their snapshots, both compute
+		// expiry=now+days, both UpdateOne users — Mongo aborts one on
+		// WriteConflict, WithTransaction retries, and on retry the
+		// loser's renewal-aware branch reads the winner's committed
+		// expiry and stacks ANOTHER days*24h on top. Result: the user
+		// gets N*days for one purchase.
+		//
+		// Re-reading the outbox row with `{_id, processedAt: nil}`
+		// inside the session closes this gap on EVERY retry: after the
+		// winner commits and sets processedAt, the retrying callback's
+		// re-read returns mongo.ErrNoDocuments and we exit cleanly
+		// without touching users again. The first-attempt overlap is
+		// resolved by Mongo's WriteConflict retry — the retry's
+		// fresh snapshot is what the guard catches.
+		var claim shop.OutboxRow
+		if err := db.Collection(shop.EffectOutboxCollection).
+			FindOne(sc, bson.M{"_id": r.ID, "processedAt": nil}).
+			Decode(&claim); err != nil {
+			if errors.Is(err, mongo.ErrNoDocuments) {
+				return alreadyProcessedSentinel{}, nil
+			}
+			return nil, fmt.Errorf("claim outbox row: %w", err)
+		}
+
+		// Re-read user inside the session so the renewal-aware base is
+		// the snapshot the txn commits against. A non-existent user here
+		// is not a transient error — log it, mark the row processed in
+		// the SAME txn so we don't spin retrying, and ack with a sentinel.
 		var existing struct {
 			PlanExpiresAt *time.Time `bson:"planExpiresAt"`
 		}
@@ -162,6 +191,11 @@ func (s *paymentServer) applyPremiumTrialRow(ctx context.Context, db *mongo.Data
 		log.FromContext(ctx).Info("premium-trial user gone; row marked processed", "user_id", r.UserID, "row_id", r.ID)
 		return
 	}
+	if _, dup := res.(alreadyProcessedSentinel); dup {
+		log.FromContext(ctx).Info("premium-trial row already processed by another replica; skipped",
+			"row_id", r.ID, "user_id", r.UserID)
+		return
+	}
 	log.FromContext(ctx).Info("premium-trial granted",
 		"user_id", r.UserID,
 		"days", days,
@@ -175,6 +209,12 @@ func (s *paymentServer) applyPremiumTrialRow(ctx context.Context, db *mongo.Data
 // "trial granted" from "row marked processed because nothing to grant"
 // without a magic time.Time value.
 type userGoneSentinel struct{}
+
+// alreadyProcessedSentinel is the WithTransaction return value used when
+// the in-session claim guard finds the outbox row already processed by
+// another replica. Distinguishes "no work to do" from "trial granted"
+// without conflating the two log lines.
+type alreadyProcessedSentinel struct{}
 
 // markProcessedInSession is the session-aware variant of
 // shop.MarkProcessed. Inlined here rather than added to the shop package

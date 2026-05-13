@@ -124,6 +124,8 @@ func (s *scoringServer) PurchaseShopItem(ctx context.Context, req *pb.PurchaseSh
 			return &pb.PurchaseShopItemResponse{ErrorCode: "UNKNOWN"}, nil
 		case errors.Is(err, shop.ErrStreakFreezeAlreadyHeldThisWeek):
 			return &pb.PurchaseShopItemResponse{ErrorCode: "WEEKLY_CAP"}, nil
+		case errors.Is(err, shop.ErrAlreadyOwned):
+			return &pb.PurchaseShopItemResponse{ErrorCode: "ALREADY_OWNED"}, nil
 		}
 		return nil, status.Errorf(codes.Internal, "purchase: %v", err)
 	}
