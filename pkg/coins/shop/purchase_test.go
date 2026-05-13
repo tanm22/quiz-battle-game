@@ -261,6 +261,45 @@ func TestPurchase_PremiumTrial_EnqueuesOutbox(t *testing.T) {
 	}
 }
 
+func TestPurchase_AlreadyOwnedCosmetic_RollsBackDebit(t *testing.T) {
+	// A user who already owns a cosmetic must NOT be debited when they
+	// (or a buggy client / racing tab) submit a second Buy with a FRESH
+	// idempotency key. Without the rollback, applyEffect silently
+	// swallows ErrAlreadyOwned and the txn commits with a debit but no
+	// new asset — a silent money-leak class of bug.
+	c, db := mongoForTest(t)
+	uid := seedUser(t, c, db, "u1", 1000)
+	d := c.Database(db)
+	if err := shop.Upsert(context.Background(), d, []shop.Item{
+		{ID: "frame.gold", Kind: shop.KindAvatarFrame, PriceCoins: 500, Active: true, Name: "Gold"},
+	}); err != nil {
+		t.Fatalf("upsert catalog: %v", err)
+	}
+	p := shop.NewPurchase(c, d, coins.NewLedger(c, db))
+
+	if _, err := p.Buy(context.Background(), uid, "frame.gold", "idem-first"); err != nil {
+		t.Fatalf("first buy: %v", err)
+	}
+	// Different idempotency key bypasses the fast-path replay, so the
+	// txn body runs end-to-end — including AddCosmetic, which must
+	// fail (already owned) and abort the debit.
+	_, err := p.Buy(context.Background(), uid, "frame.gold", "idem-second")
+	if !errors.Is(err, shop.ErrAlreadyOwned) {
+		t.Fatalf("second buy err=%v, want ErrAlreadyOwned", err)
+	}
+
+	bal, _ := coins.NewLedger(c, db).GetBalance(context.Background(), uid)
+	if bal != 500 {
+		t.Errorf("balance after rejected re-purchase: got %d, want 500 (one debit only)", bal)
+	}
+	// Exactly one ledger row — the original successful purchase. The
+	// rolled-back second attempt must not have committed an entry.
+	cnt, _ := d.Collection("coin_ledger").CountDocuments(context.Background(), bson.M{"userId": uid})
+	if cnt != 1 {
+		t.Errorf("ledger row count after rejected re-purchase: got %d, want 1", cnt)
+	}
+}
+
 func TestPurchase_RejectsEmptyIdempotencyKey(t *testing.T) {
 	c, db := mongoForTest(t)
 	uid := seedUser(t, c, db, "u1", 1000)
