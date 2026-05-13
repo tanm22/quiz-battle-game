@@ -31,8 +31,8 @@ const (
 	// so far. INCR returns the caller's rank (1 = first correct in the
 	// round), which scoring uses to award the first-correct bonus.
 	RoomCorrectOrder = "room:%s:correctorder:%d" // roomID, round
-	EmailCode       = "emailcode:%s:%s" // email, purpose
-	EmailRateLimit  = "emailrate:%s"    // email
+	EmailCode        = "emailcode:%s:%s"         // email, purpose
+	EmailRateLimit   = "emailrate:%s"            // email
 	// Phase 2
 	UserDailyQuota     = "user:%s:daily_quota"
 	UserPlan           = "user:%s:plan"

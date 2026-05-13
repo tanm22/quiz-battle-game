@@ -75,12 +75,12 @@ func TestComputeRoundScore_NegativeAnswerTimeFalsIntoFastBracket(t *testing.T) {
 // tests in pkg/keys.
 func TestComputeRecencyBonus(t *testing.T) {
 	cases := []struct {
-		name              string
-		streakLevel       int64
-		correctRank       int64
-		wantStreakBonus   float64
-		wantFirstCorrect  float64
-		wantTotal         float64
+		name             string
+		streakLevel      int64
+		correctRank      int64
+		wantStreakBonus  float64
+		wantFirstCorrect float64
+		wantTotal        float64
 	}{
 		// Streak level alone (correctRank=0 — the counter-failure path,
 		// e.g. IncrCorrectOrder errored and we degraded gracefully).
