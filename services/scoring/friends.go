@@ -499,11 +499,26 @@ func (s *scoringServer) ChallengeFriend(ctx context.Context, req *pb.ChallengeFr
 	// THROTTLED, but compensated (DEL) on every error return below — a
 	// failed challenge mustn't lock the user out for 30 seconds when no
 	// room ever existed. We only keep the throttle on the happy path.
-	ok, err := keys.TrySetChallengeThrottle(ctx, s.rdb, fromID, req.FriendUserId)
+	//
+	// Bidirectional defense: TryClaimChallenge stores the candidate roomID
+	// as the throttle value on a canonical (a,b) pair key, so when both
+	// users simultaneously tap Challenge on each other the second caller
+	// gets the FIRST caller's room back instead of spawning a parallel
+	// solo room. Without this, the two clients ended up in separate rooms
+	// (each rendering "VICTORY rank #1, opponent score 0") — see PR #55.
+	candidateRoomID := uuid.New().String()
+	claimed, existingRoomID, err := keys.TryClaimChallenge(ctx, s.rdb, fromID, req.FriendUserId, candidateRoomID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "throttle: %v", err)
 	}
-	if !ok {
+	if !claimed {
+		// Pair already has an active challenge in flight. If we can read
+		// back the first caller's roomID, join them there; otherwise the
+		// claim races with TTL expiry and we surface THROTTLED so the
+		// client can retry the next tick.
+		if existingRoomID != "" {
+			return &pb.ChallengeFriendResponse{Success: true, RoomId: existingRoomID}, nil
+		}
 		return &pb.ChallengeFriendResponse{ErrorCode: "THROTTLED"}, nil
 	}
 	throttleHeld := true
@@ -567,7 +582,7 @@ func (s *scoringServer) ChallengeFriend(ctx context.Context, req *pb.ChallengeFr
 	// regardless and they can accept whenever they next open the app.
 	friendOnline, _ := keys.IsOnline(ctx, s.rdb, req.FriendUserId)
 
-	roomID := uuid.New().String()
+	roomID := candidateRoomID
 	now := time.Now().Unix()
 	playerIDs := []string{fromID, req.FriendUserId}
 

@@ -622,21 +622,75 @@ func TestChallengeFriend_OfflineHint(t *testing.T) {
 	}
 }
 
-func TestChallengeFriend_Throttled(t *testing.T) {
+func TestChallengeFriend_DoubleClickReturnsSameRoom(t *testing.T) {
+	// A rapid same-direction retry (double-tap on the Challenge button)
+	// must NOT spawn a second room. The throttle key holds the first
+	// caller's roomID; the second call reads it back and returns it so
+	// the client lands in the same gameplay session.
 	srv, _, _ := scoringTestEnv(t)
 	attachRedis(t, srv)
 	seedFullUser(t, srv, "alice", "alice", "REFAA")
 	seedFullUser(t, srv, "bob", "bob", "REFBB")
 	seedFriendRequestRow(t, srv, "fr-3", "alice", "bob", "accepted")
 
-	if _, err := srv.ChallengeFriend(authedCtx("alice"),
-		&pb.ChallengeFriendRequest{FriendUserId: "bob"}); err != nil {
+	first, err := srv.ChallengeFriend(authedCtx("alice"),
+		&pb.ChallengeFriendRequest{FriendUserId: "bob"})
+	if err != nil {
 		t.Fatalf("first challenge: %v", err)
 	}
-	resp, _ := srv.ChallengeFriend(authedCtx("alice"),
+	if !first.Success || first.RoomId == "" {
+		t.Fatalf("first challenge: want success + roomID, got %+v", first)
+	}
+	second, err := srv.ChallengeFriend(authedCtx("alice"),
 		&pb.ChallengeFriendRequest{FriendUserId: "bob"})
-	if resp.ErrorCode != "THROTTLED" {
-		t.Errorf("got %q, want THROTTLED", resp.ErrorCode)
+	if err != nil {
+		t.Fatalf("second challenge: %v", err)
+	}
+	if !second.Success {
+		t.Errorf("second challenge: want success (joining existing room), got %+v", second)
+	}
+	if second.RoomId != first.RoomId {
+		t.Errorf("second challenge roomId=%q, want %q (same room)", second.RoomId, first.RoomId)
+	}
+}
+
+func TestChallengeFriend_BidirectionalMerge(t *testing.T) {
+	// The bug: when Alice and Bob each tap "Challenge" on the other at
+	// the same time, the directional throttle key (challenge:throttle:A:B
+	// vs B:A) let both calls pass, creating two solo rooms with score 0
+	// for the missing player in each. Both emulators showed "VICTORY
+	// rank #1" against an opponent who scored 0 — the screenshot in the
+	// PR #55 thread.
+	//
+	// Fix: canonical (a,b) pair key + storing the first caller's roomID
+	// as the SETNX value, so the second caller reads it back and joins
+	// the same room.
+	srv, _, _ := scoringTestEnv(t)
+	attachRedis(t, srv)
+	seedFullUser(t, srv, "alice", "alice", "REFAA")
+	seedFullUser(t, srv, "bob", "bob", "REFBB")
+	seedFriendRequestRow(t, srv, "fr-bd", "alice", "bob", "accepted")
+
+	aliceResp, err := srv.ChallengeFriend(authedCtx("alice"),
+		&pb.ChallengeFriendRequest{FriendUserId: "bob"})
+	if err != nil {
+		t.Fatalf("alice→bob: %v", err)
+	}
+	if !aliceResp.Success || aliceResp.RoomId == "" {
+		t.Fatalf("alice→bob: want success + roomID, got %+v", aliceResp)
+	}
+
+	bobResp, err := srv.ChallengeFriend(authedCtx("bob"),
+		&pb.ChallengeFriendRequest{FriendUserId: "alice"})
+	if err != nil {
+		t.Fatalf("bob→alice: %v", err)
+	}
+	if !bobResp.Success {
+		t.Errorf("bob→alice: want success (joining alice's room), got %+v", bobResp)
+	}
+	if bobResp.RoomId != aliceResp.RoomId {
+		t.Errorf("bob→alice roomId=%q, want %q (same room as alice→bob)",
+			bobResp.RoomId, aliceResp.RoomId)
 	}
 }
 
