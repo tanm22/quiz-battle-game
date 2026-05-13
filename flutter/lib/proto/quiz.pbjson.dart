@@ -305,6 +305,13 @@ const QuestionBroadcast$json = {
     {'1': 'options', '3': 3, '4': 3, '5': 9, '10': 'options'},
     {'1': 'deadline_unix', '3': 4, '4': 1, '5': 3, '10': 'deadlineUnix'},
     {'1': 'round', '3': 5, '4': 1, '5': 5, '10': 'round'},
+    {
+      '1': 'server_now_unix_ms',
+      '3': 6,
+      '4': 1,
+      '5': 3,
+      '10': 'serverNowUnixMs'
+    },
   ],
 };
 
@@ -312,7 +319,8 @@ const QuestionBroadcast$json = {
 final $typed_data.Uint8List questionBroadcastDescriptor = $convert.base64Decode(
     'ChFRdWVzdGlvbkJyb2FkY2FzdBIfCgtxdWVzdGlvbl9pZBgBIAEoCVIKcXVlc3Rpb25JZBISCg'
     'R0ZXh0GAIgASgJUgR0ZXh0EhgKB29wdGlvbnMYAyADKAlSB29wdGlvbnMSIwoNZGVhZGxpbmVf'
-    'dW5peBgEIAEoA1IMZGVhZGxpbmVVbml4EhQKBXJvdW5kGAUgASgFUgVyb3VuZA==');
+    'dW5peBgEIAEoA1IMZGVhZGxpbmVVbml4EhQKBXJvdW5kGAUgASgFUgVyb3VuZBIrChJzZXJ2ZX'
+    'Jfbm93X3VuaXhfbXMYBiABKANSD3NlcnZlck5vd1VuaXhNcw==');
 
 @$core.Deprecated('Use leaderboardUpdateDescriptor instead')
 const LeaderboardUpdate$json = {
@@ -440,12 +448,20 @@ const TimerSync$json = {
   '1': 'TimerSync',
   '2': [
     {'1': 'deadline_unix', '3': 1, '4': 1, '5': 3, '10': 'deadlineUnix'},
+    {
+      '1': 'server_now_unix_ms',
+      '3': 2,
+      '4': 1,
+      '5': 3,
+      '10': 'serverNowUnixMs'
+    },
   ],
 };
 
 /// Descriptor for `TimerSync`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List timerSyncDescriptor = $convert.base64Decode(
-    'CglUaW1lclN5bmMSIwoNZGVhZGxpbmVfdW5peBgBIAEoA1IMZGVhZGxpbmVVbml4');
+    'CglUaW1lclN5bmMSIwoNZGVhZGxpbmVfdW5peBgBIAEoA1IMZGVhZGxpbmVVbml4EisKEnNlcn'
+    'Zlcl9ub3dfdW5peF9tcxgCIAEoA1IPc2VydmVyTm93VW5peE1z');
 
 @$core.Deprecated('Use registerRequestDescriptor instead')
 const RegisterRequest$json = {

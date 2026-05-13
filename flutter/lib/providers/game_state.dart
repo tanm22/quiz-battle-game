@@ -43,6 +43,14 @@ class GameState {
   final String? email;
   final String? errorMessage;
   final int totalRounds;
+  // serverNow - clientLocalNow at the moment of the last QuestionBroadcast
+  // or TimerSync that carried `server_now_unix_ms`. Added to every later
+  // wall-clock read for the remaining-time calculation so two clients
+  // with skewed device clocks (or different network arrival jitter)
+  // display the same countdown. Zero when the server didn't include the
+  // field — older server build — and the timer falls back to raw local
+  // clock.
+  final int clockOffsetMs;
 
   const GameState({
     this.currentScreen = GameScreen.login,
@@ -64,6 +72,7 @@ class GameState {
     this.isGuest = false,
     this.email,
     this.errorMessage,
+    this.clockOffsetMs = 0,
   });
 
   GameState copyWith({
@@ -86,6 +95,7 @@ class GameState {
     bool? isGuest,
     String? email,
     String? errorMessage,
+    int? clockOffsetMs,
     bool clearSelectedIndex = false,
     bool clearCorrectIndex = false,
     bool clearError = false,
@@ -110,6 +120,7 @@ class GameState {
       isGuest: isGuest ?? this.isGuest,
       email: email ?? this.email,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      clockOffsetMs: clockOffsetMs ?? this.clockOffsetMs,
     );
   }
 }
@@ -138,6 +149,17 @@ class GameStateNotifier extends Notifier<GameState> {
       _highlightResetTimer?.cancel();
     });
     return const GameState();
+  }
+
+  // Compute the offset to apply to every wall-clock read while this round
+  // is live. Returns the existing offset when the server didn't include a
+  // timestamp (older server build) so we preserve back-compat. Otherwise
+  // returns serverNow - clientNow in millis — a positive value means the
+  // server clock is AHEAD of the device, so we add it to DateTime.now()
+  // to get a server-anchored "now".
+  int _resolveOffset(int serverNowUnixMs) {
+    if (serverNowUnixMs <= 0) return state.clockOffsetMs;
+    return serverNowUnixMs - DateTime.now().millisecondsSinceEpoch;
   }
 
   void setUserId(String userId) {
@@ -251,6 +273,7 @@ class GameStateNotifier extends Notifier<GameState> {
           currentQuestion: q,
           round: q.round,
           deadlineUnix: q.deadlineUnix.toInt(),
+          clockOffsetMs: _resolveOffset(q.serverNowUnixMs.toInt()),
           currentScreen: GameScreen.gameplay,
           clearSelectedIndex: true,
           clearCorrectIndex: true,
@@ -290,7 +313,14 @@ class GameStateNotifier extends Notifier<GameState> {
       case GameEvent_Event.playerJoined:
         break; // handled by UI toast
       case GameEvent_Event.timerSync:
-        state = state.copyWith(deadlineUnix: event.timerSync.deadlineUnix.toInt());
+        // TimerSync's job: re-anchor the clock offset every ~3s so
+        // mid-round NTP drift doesn't accumulate. The deadline value
+        // doesn't change within a round — the offset is the actual
+        // payload the listener cares about now.
+        state = state.copyWith(
+          deadlineUnix: event.timerSync.deadlineUnix.toInt(),
+          clockOffsetMs: _resolveOffset(event.timerSync.serverNowUnixMs.toInt()),
+        );
       case GameEvent_Event.notSet:
         break;
     }
