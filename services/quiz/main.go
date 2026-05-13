@@ -462,17 +462,21 @@ func (s *quizServer) startRound(ctx context.Context, roomID string, round int) {
 	// Update round in Redis
 	keys.SetRoomRound(ctx, s.rdb, roomID, round)
 
-	// Broadcast QuestionBroadcast GameEvent to all clients
+	// Broadcast QuestionBroadcast GameEvent to all clients. server_now_unix_ms
+	// rides along so each client can compute a clock-offset against its own
+	// device clock and display the same countdown as its opponent regardless
+	// of NTP drift between the two phones.
 	seq := s.getSeqCounter(roomID).Add(1)
 	event := &pb.GameEvent{
 		SequenceNumber: seq,
 		Event: &pb.GameEvent_Question{
 			Question: &pb.QuestionBroadcast{
-				QuestionId:   q.ID,
-				Text:         q.Text,
-				Options:      q.Options,
-				DeadlineUnix: deadlineUnix,
-				Round:        int32(round),
+				QuestionId:      q.ID,
+				Text:            q.Text,
+				Options:         q.Options,
+				DeadlineUnix:    deadlineUnix,
+				Round:           int32(round),
+				ServerNowUnixMs: time.Now().UnixMilli(),
 			},
 		},
 	}
@@ -532,7 +536,8 @@ func (s *quizServer) startRound(ctx context.Context, roomID string, round int) {
 					SequenceNumber: syncSeq,
 					Event: &pb.GameEvent_TimerSync{
 						TimerSync: &pb.TimerSync{
-							DeadlineUnix: deadline,
+							DeadlineUnix:    deadline,
+							ServerNowUnixMs: time.Now().UnixMilli(),
 						},
 					},
 				})
@@ -1004,11 +1009,12 @@ func (s *quizServer) sendStateSnapshot(ctx context.Context, roomID string, strea
 				SequenceNumber: 0,
 				Event: &pb.GameEvent_Question{
 					Question: &pb.QuestionBroadcast{
-						QuestionId:   q.ID,
-						Text:         q.Text,
-						Options:      q.Options,
-						DeadlineUnix: deadlineUnix,
-						Round:        int32(round),
+						QuestionId:      q.ID,
+						Text:            q.Text,
+						Options:         q.Options,
+						DeadlineUnix:    deadlineUnix,
+						Round:           int32(round),
+						ServerNowUnixMs: time.Now().UnixMilli(),
 					},
 				},
 			})

@@ -57,11 +57,15 @@ class _GameplayScreenState extends ConsumerState<GameplayScreen>
     super.dispose();
   }
 
-  void _resetTimer(int deadlineUnix) {
-    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    final remaining = deadlineUnix - now;
-    if (remaining <= 0) return;
-    _timerController.duration = Duration(seconds: remaining);
+  void _resetTimer(int deadlineUnix, int clockOffsetMs) {
+    // serverNowMs = client wall-clock + offset captured at the last
+    // QuestionBroadcast / TimerSync. Using it (not raw DateTime.now())
+    // ensures two clients with skewed device clocks size the controller
+    // to the same remaining duration — same countdown on both phones.
+    final serverNowMs = DateTime.now().millisecondsSinceEpoch + clockOffsetMs;
+    final remainingMs = (deadlineUnix * 1000) - serverNowMs;
+    if (remainingMs <= 0) return;
+    _timerController.duration = Duration(milliseconds: remainingMs);
     _timerController.forward(from: 0.0);
   }
 
@@ -99,9 +103,19 @@ class _GameplayScreenState extends ConsumerState<GameplayScreen>
     final question = gs.currentQuestion;
 
     // ── Listeners ──
-    ref.listen(gameStateProvider.select((s) => s.deadlineUnix), (prev, next) {
-      if (next > 0 && next != prev) _resetTimer(next);
-    });
+    // Re-anchor on either deadline change (new round) OR offset change
+    // (TimerSync mid-round). The latter is how we self-correct if either
+    // client's clock drifts during a round.
+    ref.listen(
+      gameStateProvider.select((s) => (s.deadlineUnix, s.clockOffsetMs)),
+      (prev, next) {
+        final deadline = next.$1;
+        final offset = next.$2;
+        if (deadline <= 0) return;
+        if (prev != null && prev.$1 == deadline && prev.$2 == offset) return;
+        _resetTimer(deadline, offset);
+      },
+    );
     ref.listen(gameStateProvider.select((s) => s.round), (prev, next) {
       _onRoundChanged(prev, next);
     });
@@ -620,24 +634,35 @@ class _QuestionCard extends StatelessWidget {
 // Compact timer ring
 // ═════════════════════════════════════════════════════════════════════════════
 
-class _CompactTimer extends StatelessWidget {
+class _CompactTimer extends ConsumerWidget {
   final AnimationController controller;
   const _CompactTimer({required this.controller});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Pull the absolute deadline + the server-time offset out of game
+    // state on every rebuild and compute remaining seconds from wall
+    // clock — NOT from controller.value. The controller still drives
+    // the ring's smooth sweep, but the displayed number tracks real
+    // server-anchored time so a clock-skewed device or a frame-
+    // throttled animation can't disagree with the opponent's display.
+    final deadlineUnix = ref.watch(gameStateProvider.select((s) => s.deadlineUnix));
+    final clockOffsetMs = ref.watch(gameStateProvider.select((s) => s.clockOffsetMs));
+
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
-        final remaining = (1.0 - controller.value) * (controller.duration?.inSeconds ?? 15);
-        final isUrgent = remaining <= 3;
+        final serverNowMs = DateTime.now().millisecondsSinceEpoch + clockOffsetMs;
+        final remainingMs = (deadlineUnix * 1000) - serverNowMs;
+        final remainingSeconds = (remainingMs / 1000).clamp(0.0, 15.0);
+        final isUrgent = remainingSeconds <= 3;
         return SizedBox(
           width: 38, height: 38,
           child: CustomPaint(
             painter: _RingPainter(progress: 1.0 - controller.value, isUrgent: isUrgent),
             child: Center(
               child: Text(
-                '${remaining.ceil()}',
+                '${remainingSeconds.ceil()}',
                 style: TextStyle(color: isUrgent ? AppColors.danger : AppColors.text, fontSize: 14, fontWeight: FontWeight.w900),
               ),
             ),

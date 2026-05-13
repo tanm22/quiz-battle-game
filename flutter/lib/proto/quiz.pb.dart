@@ -1012,6 +1012,7 @@ class QuestionBroadcast extends $pb.GeneratedMessage {
     $core.Iterable<$core.String>? options,
     $fixnum.Int64? deadlineUnix,
     $core.int? round,
+    $fixnum.Int64? serverNowUnixMs,
   }) {
     final result = create();
     if (questionId != null) result.questionId = questionId;
@@ -1019,6 +1020,7 @@ class QuestionBroadcast extends $pb.GeneratedMessage {
     if (options != null) result.options.addAll(options);
     if (deadlineUnix != null) result.deadlineUnix = deadlineUnix;
     if (round != null) result.round = round;
+    if (serverNowUnixMs != null) result.serverNowUnixMs = serverNowUnixMs;
     return result;
   }
 
@@ -1040,6 +1042,7 @@ class QuestionBroadcast extends $pb.GeneratedMessage {
     ..pPS(3, _omitFieldNames ? '' : 'options')
     ..aInt64(4, _omitFieldNames ? '' : 'deadlineUnix')
     ..aI(5, _omitFieldNames ? '' : 'round')
+    ..aInt64(6, _omitFieldNames ? '' : 'serverNowUnixMs')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1099,6 +1102,22 @@ class QuestionBroadcast extends $pb.GeneratedMessage {
   $core.bool hasRound() => $_has(4);
   @$pb.TagNumber(5)
   void clearRound() => $_clearField(5);
+
+  /// Server's wall-clock at broadcast time (Unix millis). Clients compute
+  /// an offset = serverNowUnixMs - clientLocalNowMs at receive time and
+  /// apply it to every later wall-clock read for the remaining-time
+  /// calculation, so two clients with skewed device clocks still display
+  /// the same countdown. Zero / unset on an older server build — clients
+  /// must treat it as "no correction available" and fall back to local
+  /// clock to preserve back-compat.
+  @$pb.TagNumber(6)
+  $fixnum.Int64 get serverNowUnixMs => $_getI64(5);
+  @$pb.TagNumber(6)
+  set serverNowUnixMs($fixnum.Int64 value) => $_setInt64(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasServerNowUnixMs() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearServerNowUnixMs() => $_clearField(6);
 }
 
 class LeaderboardUpdate extends $pb.GeneratedMessage {
@@ -1633,9 +1652,11 @@ class PlayerJoined extends $pb.GeneratedMessage {
 class TimerSync extends $pb.GeneratedMessage {
   factory TimerSync({
     $fixnum.Int64? deadlineUnix,
+    $fixnum.Int64? serverNowUnixMs,
   }) {
     final result = create();
     if (deadlineUnix != null) result.deadlineUnix = deadlineUnix;
+    if (serverNowUnixMs != null) result.serverNowUnixMs = serverNowUnixMs;
     return result;
   }
 
@@ -1653,6 +1674,7 @@ class TimerSync extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'quiz'),
       createEmptyInstance: create)
     ..aInt64(1, _omitFieldNames ? '' : 'deadlineUnix')
+    ..aInt64(2, _omitFieldNames ? '' : 'serverNowUnixMs')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1681,6 +1703,20 @@ class TimerSync extends $pb.GeneratedMessage {
   $core.bool hasDeadlineUnix() => $_has(0);
   @$pb.TagNumber(1)
   void clearDeadlineUnix() => $_clearField(1);
+
+  /// Server's wall-clock at broadcast time (Unix millis). Lets clients
+  /// refresh the clock-offset every 3 seconds — without this, TimerSync
+  /// is a no-op for drift correction because the deadline never changes
+  /// within a round and the client never re-anchors. Same back-compat
+  /// semantics as QuestionBroadcast.server_now_unix_ms.
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get serverNowUnixMs => $_getI64(1);
+  @$pb.TagNumber(2)
+  set serverNowUnixMs($fixnum.Int64 value) => $_setInt64(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasServerNowUnixMs() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearServerNowUnixMs() => $_clearField(2);
 }
 
 class RegisterRequest extends $pb.GeneratedMessage {

@@ -862,14 +862,22 @@ func (*GameEvent_PlayerJoined) isGameEvent_Event() {}
 func (*GameEvent_TimerSync) isGameEvent_Event() {}
 
 type QuestionBroadcast struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	QuestionId    string                 `protobuf:"bytes,1,opt,name=question_id,json=questionId,proto3" json:"question_id,omitempty"`
-	Text          string                 `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
-	Options       []string               `protobuf:"bytes,3,rep,name=options,proto3" json:"options,omitempty"`
-	DeadlineUnix  int64                  `protobuf:"varint,4,opt,name=deadline_unix,json=deadlineUnix,proto3" json:"deadline_unix,omitempty"`
-	Round         int32                  `protobuf:"varint,5,opt,name=round,proto3" json:"round,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	QuestionId   string                 `protobuf:"bytes,1,opt,name=question_id,json=questionId,proto3" json:"question_id,omitempty"`
+	Text         string                 `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
+	Options      []string               `protobuf:"bytes,3,rep,name=options,proto3" json:"options,omitempty"`
+	DeadlineUnix int64                  `protobuf:"varint,4,opt,name=deadline_unix,json=deadlineUnix,proto3" json:"deadline_unix,omitempty"`
+	Round        int32                  `protobuf:"varint,5,opt,name=round,proto3" json:"round,omitempty"`
+	// Server's wall-clock at broadcast time (Unix millis). Clients compute
+	// an offset = serverNowUnixMs - clientLocalNowMs at receive time and
+	// apply it to every later wall-clock read for the remaining-time
+	// calculation, so two clients with skewed device clocks still display
+	// the same countdown. Zero / unset on an older server build — clients
+	// must treat it as "no correction available" and fall back to local
+	// clock to preserve back-compat.
+	ServerNowUnixMs int64 `protobuf:"varint,6,opt,name=server_now_unix_ms,json=serverNowUnixMs,proto3" json:"server_now_unix_ms,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *QuestionBroadcast) Reset() {
@@ -933,6 +941,13 @@ func (x *QuestionBroadcast) GetDeadlineUnix() int64 {
 func (x *QuestionBroadcast) GetRound() int32 {
 	if x != nil {
 		return x.Round
+	}
+	return 0
+}
+
+func (x *QuestionBroadcast) GetServerNowUnixMs() int64 {
+	if x != nil {
+		return x.ServerNowUnixMs
 	}
 	return 0
 }
@@ -1346,10 +1361,16 @@ func (x *PlayerJoined) GetPlan() string {
 }
 
 type TimerSync struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	DeadlineUnix  int64                  `protobuf:"varint,1,opt,name=deadline_unix,json=deadlineUnix,proto3" json:"deadline_unix,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	DeadlineUnix int64                  `protobuf:"varint,1,opt,name=deadline_unix,json=deadlineUnix,proto3" json:"deadline_unix,omitempty"`
+	// Server's wall-clock at broadcast time (Unix millis). Lets clients
+	// refresh the clock-offset every 3 seconds — without this, TimerSync
+	// is a no-op for drift correction because the deadline never changes
+	// within a round and the client never re-anchors. Same back-compat
+	// semantics as QuestionBroadcast.server_now_unix_ms.
+	ServerNowUnixMs int64 `protobuf:"varint,2,opt,name=server_now_unix_ms,json=serverNowUnixMs,proto3" json:"server_now_unix_ms,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *TimerSync) Reset() {
@@ -1385,6 +1406,13 @@ func (*TimerSync) Descriptor() ([]byte, []int) {
 func (x *TimerSync) GetDeadlineUnix() int64 {
 	if x != nil {
 		return x.DeadlineUnix
+	}
+	return 0
+}
+
+func (x *TimerSync) GetServerNowUnixMs() int64 {
+	if x != nil {
+		return x.ServerNowUnixMs
 	}
 	return 0
 }
@@ -8042,14 +8070,15 @@ const file_proto_quiz_proto_rawDesc = "" +
 	"\rplayer_joined\x18\x05 \x01(\v2\x12.quiz.PlayerJoinedH\x00R\fplayerJoined\x120\n" +
 	"\n" +
 	"timer_sync\x18\x06 \x01(\v2\x0f.quiz.TimerSyncH\x00R\ttimerSyncB\a\n" +
-	"\x05event\"\x9d\x01\n" +
+	"\x05event\"\xca\x01\n" +
 	"\x11QuestionBroadcast\x12\x1f\n" +
 	"\vquestion_id\x18\x01 \x01(\tR\n" +
 	"questionId\x12\x12\n" +
 	"\x04text\x18\x02 \x01(\tR\x04text\x12\x18\n" +
 	"\aoptions\x18\x03 \x03(\tR\aoptions\x12#\n" +
 	"\rdeadline_unix\x18\x04 \x01(\x03R\fdeadlineUnix\x12\x14\n" +
-	"\x05round\x18\x05 \x01(\x05R\x05round\"E\n" +
+	"\x05round\x18\x05 \x01(\x05R\x05round\x12+\n" +
+	"\x12server_now_unix_ms\x18\x06 \x01(\x03R\x0fserverNowUnixMs\"E\n" +
 	"\x11LeaderboardUpdate\x120\n" +
 	"\aentries\x18\x01 \x03(\v2\x16.quiz.LeaderboardEntryR\aentries\"\x85\x01\n" +
 	"\x10LeaderboardEntry\x12\x17\n" +
@@ -8080,9 +8109,10 @@ const file_proto_quiz_proto_rawDesc = "" +
 	"\fPlayerJoined\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1a\n" +
 	"\busername\x18\x02 \x01(\tR\busername\x12\x12\n" +
-	"\x04plan\x18\x03 \x01(\tR\x04plan\"0\n" +
+	"\x04plan\x18\x03 \x01(\tR\x04plan\"]\n" +
 	"\tTimerSync\x12#\n" +
-	"\rdeadline_unix\x18\x01 \x01(\x03R\fdeadlineUnix\"\x84\x01\n" +
+	"\rdeadline_unix\x18\x01 \x01(\x03R\fdeadlineUnix\x12+\n" +
+	"\x12server_now_unix_ms\x18\x02 \x01(\x03R\x0fserverNowUnixMs\"\x84\x01\n" +
 	"\x0fRegisterRequest\x12\x1a\n" +
 	"\busername\x18\x01 \x01(\tR\busername\x12\x1a\n" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\x12\x14\n" +

@@ -121,6 +121,14 @@ message QuestionBroadcast {
   repeated string options       = 3;
   int64           deadline_unix = 4;
   int32           round         = 5;
+  // Server's wall-clock at broadcast time (Unix millis). Clients compute
+  // an offset = serverNowUnixMs - clientLocalNowMs at receive time and
+  // apply it to every later wall-clock read for the remaining-time
+  // calculation, so two clients with skewed device clocks still display
+  // the same countdown. Zero / unset on an older server build — clients
+  // must treat it as "no correction available" and fall back to local
+  // clock to preserve back-compat.
+  int64           server_now_unix_ms = 6;
 }
 
 message LeaderboardUpdate {
@@ -167,6 +175,12 @@ message PlayerJoined {
 
 message TimerSync {
   int64 deadline_unix = 1;
+  // Server's wall-clock at broadcast time (Unix millis). Lets clients
+  // refresh the clock-offset every 3 seconds — without this, TimerSync
+  // is a no-op for drift correction because the deadline never changes
+  // within a round and the client never re-anchors. Same back-compat
+  // semantics as QuestionBroadcast.server_now_unix_ms.
+  int64 server_now_unix_ms = 2;
 }
 
 // ---------------------------------------------------------------------------
