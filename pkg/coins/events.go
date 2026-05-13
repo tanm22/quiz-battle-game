@@ -35,6 +35,34 @@ func EarnRoutingKey(source string) string {
 	return EarnRoutingPrefix + "." + source
 }
 
+// EarnSideReasons is the allowlist of Reason* values the coins.earn.*
+// consumer accepts. Spend-side reasons (ReasonShopPurchase, ReasonShopRefund,
+// ReasonAdminAdjustment) are deliberately excluded — those belong to the
+// synchronous Purchase RPC and admin tooling, and must not be reachable from
+// the multi-producer earn pipeline.
+//
+// Why this matters: every service in the cluster has publish credentials to
+// the `sx` exchange. Without an allowlist, a single compromised service could
+// publish {reason: "admin.adjustment", amount: 1e9, userId: <victim>} and the
+// consumer would credit arbitrary balances. The consumer DLQs any payload
+// whose Reason is not in this map.
+var EarnSideReasons = map[string]struct{}{
+	ReasonDailyReward:      {},
+	ReasonStreakBonus:      {},
+	ReasonMatchWin:         {},
+	ReasonReferralReferrer: {},
+	ReasonReferralReferee:  {},
+	ReasonTournamentPrize:  {},
+	ReasonWelcomeBonus:     {},
+}
+
+// MaxEarnAmount is the per-event upper bound for coins.earn.* deliveries.
+// The largest legitimate single earn is ~200 coins (the two-week-streak
+// reward in services/auth/main.go::rewardForDay); the 100k ceiling here
+// is a defense-in-depth safety net, not a product-shaped value. Any
+// payload above this is treated as a bad payload and routed to the DLQ.
+const MaxEarnAmount = 100_000
+
 // EarnEvent is the JSON payload every coins.earn.* message carries. The
 // consumer hands (UserID, Amount, Reason, RefID, Metadata) straight to
 // Ledger.Grant — RefID is therefore the natural idempotency key, scoped
