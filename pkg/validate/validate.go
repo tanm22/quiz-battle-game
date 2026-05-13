@@ -30,6 +30,7 @@ var (
 	ErrTooLong             = errors.New("input exceeds maximum length")
 	ErrInvalidReferralCode = errors.New("referral code must be 6-12 uppercase letters or digits")
 	ErrInvalidTimeFilter   = errors.New("time_filter must be one of: alltime, daily, weekly, monthly")
+	ErrInvalidDisplayName  = errors.New("display name must be 1-40 chars and free of HTML or control characters")
 )
 
 // usernameRE is the canonical username pattern. Matches what
@@ -100,6 +101,77 @@ func MaxLen(s string, max int) error {
 		return ErrTooLong
 	}
 	return nil
+}
+
+// displayNameForbidden is the set of characters DisplayName explicitly
+// rejects so a username with `<script>` or `"` can never reach a future
+// HTML/web surface, an email template, or a log line that gets piped
+// through a tool that interprets the punctuation. Flutter Text widgets
+// are safe today, but downstream surfaces (admin dashboards, future web
+// app, marketing emails, push notifications rendered through HTML
+// templates) may not be — the cheapest place to defend XSS is at the
+// input boundary.
+const displayNameForbidden = "<>\"'&`"
+
+// DisplayName validates a profile display name. Allowed: any printable
+// rune (incl. Unicode letters, digits, emoji, accented characters)
+// EXCEPT the HTML/JS punctuation in displayNameForbidden, and EXCEPT
+// any control character (rune < 0x20 including newline / tab / null).
+// Length cap: 40 bytes (matches storage budget already enforced via
+// MaxLen at the auth handler).
+//
+// Rejects empty string after trim. Trimming is the caller's job — this
+// function is the "is this safe to store and render" gate, not a
+// trim/normalize utility (see SanitizeDisplayName for that).
+func DisplayName(s string) error {
+	if s == "" {
+		return ErrInvalidDisplayName
+	}
+	if len(s) > 40 {
+		return ErrTooLong
+	}
+	for _, r := range s {
+		if r < 0x20 || r == 0x7f { // C0 control chars + DEL
+			return ErrInvalidDisplayName
+		}
+		if strings.ContainsRune(displayNameForbidden, r) {
+			return ErrInvalidDisplayName
+		}
+	}
+	return nil
+}
+
+// SanitizeDisplayName is the "best-effort cleanup" pre-validator: trims
+// surrounding whitespace and collapses runs of internal whitespace to a
+// single space. Returns the cleaned string; callers should run
+// DisplayName(out) afterward to reject still-illegal input. Kept
+// separate from DisplayName so the validation layer never silently
+// rewrites user input — sanitize is opt-in.
+func SanitizeDisplayName(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	out := make([]rune, 0, len(s))
+	prevSpace := false
+	for _, r := range s {
+		if r == ' ' || r == '\t' {
+			if !prevSpace {
+				out = append(out, ' ')
+			}
+			prevSpace = true
+			continue
+		}
+		if r < 0x20 || r == 0x7f {
+			// Drop control chars silently — they would have failed
+			// DisplayName anyway, but sanitizing them here lets a paste
+			// from a rich-text source succeed instead of erroring out.
+			continue
+		}
+		out = append(out, r)
+		prevSpace = false
+	}
+	return strings.TrimRight(string(out), " ")
 }
 
 // Topic validates a quiz topic identifier — non-empty after trim and

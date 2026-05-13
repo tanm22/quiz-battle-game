@@ -89,21 +89,36 @@ the renewal job.
 
 ## Optional: terminate TLS at the gRPC server
 
-If your deployment can't add a proxy, gRPC services can be configured
-to terminate TLS directly. Add to each `services/*/main.go` before
-`grpc.NewServer(...)`:
+If your deployment can't add a proxy, every gRPC service AND the
+payment webhook server already have opt-in TLS support via the shared
+`pkg/tlsutil` helper. Three env vars drive it:
 
-```go
-creds, err := credentials.NewServerTLSFromFile(certFile, keyFile)
-if err != nil { log.Fatal(ctx, "load tls", "err", err) }
-grpcServer := grpc.NewServer(grpc.Creds(creds), ...)
+```
+TLS_ENABLED=true           # any of "true" / "1" / "yes" enables TLS
+TLS_CERT_FILE=/path/to/server-fullchain.pem
+TLS_KEY_FILE=/path/to/server.key
 ```
 
-Drive `certFile` / `keyFile` from env vars and update the
-`pkg/config.MustCommon` loader to require them when `TLS_ENABLED=true`.
-Plumb the same change into the Dart gRPC client
-(`flutter/lib/services/quiz_service.dart` + `auth_service.dart`) by
-swapping `ChannelCredentials.insecure()` for a TLS credential.
+When `TLS_ENABLED` is unset (current default for `docker-compose`),
+every service starts plaintext — same as before, no behavioural
+change. When set, `pkg/tlsutil.GRPCServerOptions` returns a
+`grpc.Creds(credentials.NewTLS(...))` option that's prepended to each
+service's `grpc.NewServer` call site (auth, scoring, quiz,
+matchmaking, payment). The webhook HTTP server in `services/payment`
+similarly upgrades via `tlsutil.ServeHTTP` which switches to
+`ListenAndServeTLS` automatically.
+
+**Misconfiguration is fatal**: `TLS_ENABLED=true` with missing or
+unreadable cert/key files crashes the service at startup. This is
+intentional — silently falling back to plaintext on a server that
+was supposed to be encrypted is the worst-of-all-worlds outcome.
+
+**Client side**: the Dart gRPC client must be updated to match by
+swapping `ChannelCredentials.insecure()` for a TLS credential in
+`flutter/lib/services/{auth_service,quiz_service}.dart`. The reverse-
+proxy deployment posture (the recommended path) doesn't need this —
+the proxy presents a public cert, the client talks plaintext gRPC to
+the proxy's TLS-terminating frontend.
 
 ## Why not just enable TLS in the docker-compose now
 

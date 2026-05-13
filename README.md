@@ -325,6 +325,7 @@ quiz-battle/
     models/                     # User, Payment, Tournament Go structs
     notif/                      # Notification policy primitives
     ratelimit/                  # Token-bucket limiters
+    tlsutil/                    # Opt-in in-process TLS (TLS_ENABLED env)
     validate/                   # Field-length + format validators
   services/
     auth/                       # Auth (50054)
@@ -363,7 +364,7 @@ quiz-battle/
 
 These are deliberate scope cuts. If you're sizing the gap between "demo-ready" and "production-ready," start here.
 
-- **No TLS on gRPC inside the cluster.** Plaintext is acceptable for a single host; production should terminate TLS at a reverse proxy. See `docs/deployment-tls.md` in the repo for a worked example.
+- **No TLS on gRPC inside the cluster (by default).** Plaintext is acceptable for a single host; production should terminate TLS at a reverse proxy. For deployments without a proxy, set `TLS_ENABLED=true` plus `TLS_CERT_FILE` and `TLS_KEY_FILE` on the service containers — every gRPC server and the payment webhook will upgrade to TLS via `pkg/tlsutil` (a missing cert with `TLS_ENABLED=true` crashes startup, so the silent-plaintext failure mode can't happen). See `docs/deployment-tls.md` for a worked example.
 - **Single Redis, single Mongo node.** No Sentinel, no shard. Fine for demo scale; not HA.
 - **Each service is a single instance.** The matchmaking poller, RabbitMQ consumers, and the premium-trial outbox worker assume a single instance per service. Running two replicas of the payment service today would let both consumers race on outbox rows. See [adr-0007](docs/decisions/0007-premium-trial-outbox.md).
 - **AMQP channel does not auto-reconnect.** If RabbitMQ restarts, restart the affected services.

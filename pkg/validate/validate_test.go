@@ -167,3 +167,62 @@ func TestTimeFilter(t *testing.T) {
 		}
 	}
 }
+
+// TestDisplayName covers the post-Tanishq-review XSS gate: HTML
+// punctuation, control characters, and newlines must all be rejected
+// at the input boundary so downstream surfaces (push notifications,
+// future web UI, log lines) can render the value without escaping.
+func TestDisplayName(t *testing.T) {
+	cases := map[string]bool{
+		"Alice":                       true,
+		"Alice Wonderland":            true, // spaces allowed
+		"José María":                  true, // accented Unicode allowed
+		"プレイヤー 1":                  true, // CJK allowed
+		"🎮 Gamer":                    true, // emoji allowed
+		"a":                           true, // single char ok
+		strings.Repeat("A", 40):       true, // 40-byte limit ok
+		strings.Repeat("A", 41):       false, // over 40 bytes
+		"":                            false, // empty rejected
+		"<script>alert(1)</script>":   false, // HTML script tag
+		"Alice<Bob":                   false, // lone <
+		"Alice>Bob":                   false, // lone >
+		`Alice"Bob`:                   false, // double quote
+		"Alice'Bob":                   false, // single quote
+		"Alice&Bob":                   false, // ampersand (HTML entity)
+		"Alice`Bob":                   false, // backtick (template injection)
+		"Alice\nBob":                  false, // newline
+		"Alice\tBob":                  false, // tab (control char)
+		"Alice\x00Bob":                false, // null byte
+		"Alice\x7fBob":                false, // DEL char
+		"Alice\rBob":                  false, // carriage return
+	}
+	for in, ok := range cases {
+		err := DisplayName(in)
+		if (err == nil) != ok {
+			t.Errorf("DisplayName(%q) err=%v, want ok=%v", in, err, ok)
+		}
+	}
+}
+
+// TestSanitizeDisplayName documents the cleanup contract — trims
+// surrounding whitespace, collapses internal runs, drops control
+// chars. The result must still pass DisplayName() to be stored.
+func TestSanitizeDisplayName(t *testing.T) {
+	cases := map[string]string{
+		"":                  "",
+		"   ":               "",
+		"  Alice  ":         "Alice",
+		"Alice   Bob":       "Alice Bob",            // collapse internal runs
+		"Alice\tBob":        "Alice Bob",            // tab → single space
+		"Alice  \t  Bob":    "Alice Bob",            // mixed whitespace collapses
+		"\x00Alice\x00":     "Alice",                // null bytes dropped
+		"\nAlice\n":         "Alice",                // newlines dropped
+		"  José María  ":    "José María",           // Unicode preserved
+	}
+	for in, want := range cases {
+		got := SanitizeDisplayName(in)
+		if got != want {
+			t.Errorf("SanitizeDisplayName(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
