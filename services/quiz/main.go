@@ -520,6 +520,17 @@ func (s *quizServer) closeRound(ctx context.Context, roomID string, round int) {
 		return // another goroutine already closed this round
 	}
 
+	// Invariant: the round's TimerSync goroutine (spawned in startRound)
+	// exits on its next 3-second tick once roomDeadlines.Load returns
+	// !ok. With maybeEarlyCloseRound shortcutting the 15s timer, the
+	// deadline stored in startRound is still in the future when this
+	// SETNX wins, so without the Delete the goroutine keeps emitting
+	// stray TimerSync events that leak into the next round's stream.
+	// Placed inside the SETNX winner branch so only one closer mutates
+	// the entry; the next startRound re-Stores it before its own
+	// goroutine spawns.
+	s.roomDeadlines.Delete(roomID)
+
 	questions, ok := s.getRoomQuestions(roomID)
 	if !ok || round > len(questions) {
 		return
