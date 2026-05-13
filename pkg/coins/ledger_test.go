@@ -133,6 +133,32 @@ func TestGrant_IdempotentOnDuplicateRef(t *testing.T) {
 	}
 }
 
+func TestGrant_IdempotencyConflictOnDeltaMismatch(t *testing.T) {
+	// A second Grant with the SAME refID+reason but a DIFFERENT delta must
+	// surface ErrIdempotencyConflict so a buggy caller (e.g. a backfill
+	// script copy-pasting an old refID) can't silently re-book at the
+	// originally-recorded amount. Today's callers all use natural refIDs
+	// so this is defense-in-depth, but the failure mode here is silent
+	// and money-shaped, so we make it loud.
+	c, db := mongoForTest(t)
+	seedUser(t, c, db, "u1", 0)
+	l := coins.NewLedger(c, db)
+
+	if _, err := l.Grant(context.Background(), "u1", 50, coins.ReasonMatchWin, "match:m1", nil); err != nil {
+		t.Fatalf("first Grant: %v", err)
+	}
+	_, err := l.Grant(context.Background(), "u1", 100, coins.ReasonMatchWin, "match:m1", nil)
+	if !errors.Is(err, coins.ErrIdempotencyConflict) {
+		t.Fatalf("got %v, want ErrIdempotencyConflict on delta mismatch", err)
+	}
+
+	// Balance must not double-credit on the mismatched second attempt.
+	bal, _ := l.GetBalance(context.Background(), "u1")
+	if bal != 50 {
+		t.Errorf("balance after rejected mismatched grant: got %d, want 50", bal)
+	}
+}
+
 func TestGrant_InsufficientBalance(t *testing.T) {
 	c, db := mongoForTest(t)
 	seedUser(t, c, db, "u1", 30)

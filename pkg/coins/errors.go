@@ -24,4 +24,12 @@ var (
 	// ErrMissingRefID is returned when refID == "". Every grant needs a
 	// natural idempotency key; without one, retries would double-credit.
 	ErrMissingRefID = errors.New("coins: refId required for idempotency")
+
+	// ErrIdempotencyConflict is returned when a Grant retry's (userId,
+	// refId, reason) matches an existing row but the caller's delta
+	// disagrees with the row's stored delta. Surfaces silent misuse of
+	// the idempotency key (e.g. a backfill script reusing an old refId
+	// with a different amount) instead of returning the original row
+	// and pretending the retry succeeded.
+	ErrIdempotencyConflict = errors.New("coins: idempotency conflict: existing entry has a different delta")
 )
