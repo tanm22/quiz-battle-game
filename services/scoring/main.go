@@ -2066,6 +2066,54 @@ func setupRabbitMQ(ch *amqp.Channel) error {
 		return fmt.Errorf("exchange declare: %w", err)
 	}
 
+	// ----- Queues scoring consumes from that ALSO live in quiz's setup -----
+	//
+	// answer-processing-queue, match-finished-queue, and match-analytics-queue
+	// are declared by the quiz service too (services/quiz/main.go:setupRabbitMQ).
+	// Docker-compose starts quiz and scoring in parallel — neither waits for
+	// the other — so scoring's consumeAnswers / consumeMatchFinished /
+	// consumeAnalytics raced quiz's declares and hit NOT_FOUND when scoring
+	// won the start ordering. The consume's log.Fatal then killed the entire
+	// scoring process (no restart policy in compose), silently breaking the
+	// match flow for the whole CI run.
+	//
+	// QueueDeclare is idempotent across services as long as args match
+	// EXACTLY, so we mirror quiz's declarations here. Either service can win
+	// the race; whichever loses gets a no-op declare. The args MUST stay in
+	// lockstep with services/quiz/main.go — any drift would surface as
+	// PRECONDITION_FAILED instead of NOT_FOUND.
+
+	// answer-processing-queue + its DLQ (scoring consumes via consumeAnswers).
+	if _, err := ch.QueueDeclare("answer-processing-dlq", true, false, false, false, nil); err != nil {
+		return fmt.Errorf("answer-processing DLQ declare: %w", err)
+	}
+	if _, err := ch.QueueDeclare("answer-processing-queue", true, false, false, false, amqp.Table{
+		"x-dead-letter-exchange":    "",
+		"x-dead-letter-routing-key": "answer-processing-dlq",
+		"x-max-delivery-count":      3,
+	}); err != nil {
+		return fmt.Errorf("answer-processing queue declare: %w", err)
+	}
+	if err := ch.QueueBind("answer-processing-queue", "answer.submitted", "sx", false, nil); err != nil {
+		return fmt.Errorf("answer-processing queue bind: %w", err)
+	}
+
+	// match-finished-queue (scoring consumes via consumeMatchFinished).
+	if _, err := ch.QueueDeclare("match-finished-queue", true, false, false, false, nil); err != nil {
+		return fmt.Errorf("match-finished queue declare: %w", err)
+	}
+	if err := ch.QueueBind("match-finished-queue", "match.finished", "sx", false, nil); err != nil {
+		return fmt.Errorf("match-finished queue bind: %w", err)
+	}
+
+	// match-analytics-queue (scoring consumes via consumeAnalytics).
+	if _, err := ch.QueueDeclare("match-analytics-queue", true, false, false, false, nil); err != nil {
+		return fmt.Errorf("match-analytics queue declare: %w", err)
+	}
+	if err := ch.QueueBind("match-analytics-queue", "match.finished", "sx", false, nil); err != nil {
+		return fmt.Errorf("match-analytics queue bind: %w", err)
+	}
+
 	// Bind leaderboard.updated for broadcasting (consumed by quiz service or directly)
 	_, err := ch.QueueDeclare("leaderboard-updated-queue", true, false, false, false, nil)
 	if err != nil {
