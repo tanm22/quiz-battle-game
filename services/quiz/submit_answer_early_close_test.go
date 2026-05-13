@@ -228,3 +228,90 @@ func TestSubmitAnswer_EarlyCloseEndToEnd(t *testing.T) {
 		t.Fatalf("RoundClosed guard not set within 1s after second SubmitAnswer")
 	}
 }
+
+// TestCloseRound_ClearsRoomDeadline guards the TimerSync goroutine's exit
+// condition. startRound stores the round's deadline in roomDeadlines so
+// the per-room TimerSync ticker can read it on every 3-second tick and
+// exit when the deadline passes. Before this regression test landed,
+// closeRound did not clear the entry, so when maybeEarlyCloseRound
+// shortcut the 15-second timer the TimerSync goroutine kept seeing a
+// future deadline and kept emitting stray TimerSync events past the
+// round's actual close — which then leaked into the next round's stream
+// (the e2e TestFullMatchE2E Round-3 flake).
+//
+// The contract closeRound has to honor: once the SETNX guard wins, the
+// roomDeadlines entry for that room must be removed before any side
+// effect that could allow another round to start observes it.
+func TestCloseRound_ClearsRoomDeadline(t *testing.T) {
+	rdb := attachRedisForMembership(t)
+	srv := &quizServer{rdb: rdb}
+	const (
+		roomID = "r-close-clears-deadline"
+		round  = 1
+	)
+
+	// closeRound bails early unless questions are cached for the room
+	// (it indexes questions[round-1] for the RoundResult broadcast),
+	// so seed a minimal one-question slice.
+	srv.roomQuestions.Store(roomID, []Question{{
+		ID:           "q1",
+		Text:         "test",
+		Options:      []string{"a", "b", "c", "d"},
+		CorrectIndex: 0,
+	}})
+
+	// Stand in for startRound's roomDeadlines.Store — 15 seconds in
+	// the future, matching the real startRound's offset.
+	srv.roomDeadlines.Store(roomID, time.Now().Add(15*time.Second).Unix())
+
+	srv.closeRound(context.Background(), roomID, round)
+
+	if _, ok := srv.roomDeadlines.Load(roomID); ok {
+		t.Fatalf("closeRound left a stale roomDeadlines entry; TimerSync goroutine would keep firing")
+	}
+}
+
+// TestCloseRound_LosingSETNXLeavesOtherCloserAlone covers the race
+// between time.AfterFunc and maybeEarlyCloseRound: both can call
+// closeRound concurrently for the same (roomID, round), and only the
+// SETNX winner should mutate shared state. The loser must return
+// before touching roomDeadlines, so a stale-but-still-being-cleared-by
+// -the-winner entry isn't double-deleted (harmless today but a hazard
+// if other delete-once invariants are added next to this one).
+//
+// We simulate "winner already fired" by pre-setting the RoundClosed
+// guard, then call closeRound and confirm the deadline entry survives
+// — the call must short-circuit on the SETNX miss before reaching the
+// Delete.
+func TestCloseRound_LosingSETNXLeavesOtherCloserAlone(t *testing.T) {
+	rdb := attachRedisForMembership(t)
+	srv := &quizServer{rdb: rdb}
+	const (
+		roomID = "r-close-loser-noop"
+		round  = 1
+	)
+
+	srv.roomQuestions.Store(roomID, []Question{{
+		ID:           "q1",
+		Text:         "test",
+		Options:      []string{"a", "b", "c", "d"},
+		CorrectIndex: 0,
+	}})
+	deadline := time.Now().Add(15 * time.Second).Unix()
+	srv.roomDeadlines.Store(roomID, deadline)
+
+	// Pre-claim the SETNX guard so the upcoming closeRound is the loser.
+	if _, err := keys.TryCloseRound(context.Background(), rdb, roomID, round); err != nil {
+		t.Fatalf("pre-claim RoundClosed: %v", err)
+	}
+
+	srv.closeRound(context.Background(), roomID, round)
+
+	v, ok := srv.roomDeadlines.Load(roomID)
+	if !ok {
+		t.Fatalf("losing closeRound deleted roomDeadlines; only the winner should")
+	}
+	if v.(int64) != deadline {
+		t.Fatalf("roomDeadlines entry mutated by losing closeRound: got %d want %d", v.(int64), deadline)
+	}
+}

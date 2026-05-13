@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:grpc/grpc.dart';
 import 'package:share_plus/share_plus.dart';
+import '../providers/coins_state.dart';
 import '../providers/game_state.dart';
 import '../services/auth_service.dart';
 import '../services/quiz_service.dart';
@@ -85,6 +86,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
       if (mounted) {
         setState(() { _homeData = resp; _loading = false; });
+        // _homeData.profile.coins is the freshest balance we have. Force
+        // coinBalanceProvider to refetch so CoinBalanceChip (here and on
+        // every other screen that watches the provider) doesn't keep
+        // rendering its stale cache after a server-side grant —
+        // match win, daily reward, welcome bonus, tournament prize,
+        // referral conversion — that doesn't go through
+        // invalidateCoinState on its own.
+        invalidateCoinState(ref);
         _maybeShowStreakReward(resp);
       }
     } catch (e) {

@@ -32,8 +32,14 @@ const (
 	quizAddr        = "localhost:50052"
 	scoringAddr     = "localhost:50053"
 	authAddr        = "localhost:50054"
-	mongoURI        = "mongodb://localhost:27017"
-	dbName          = "quizbattle"
+	// directConnection=true bypasses replica-set discovery so the test
+	// client doesn't try to dial the discovered member name (mongo:27017,
+	// the docker-compose service alias) from the CI runner host, where
+	// that DNS name doesn't resolve. replicaSet=rs0 keeps transaction
+	// support available for any session-scoped reads. Matches the
+	// MONGO_URI env the `go` CI job already uses.
+	mongoURI = "mongodb://localhost:27017/?replicaSet=rs0&directConnection=true"
+	dbName   = "quizbattle"
 
 	totalRounds  = 5
 	matchTimeout = 30 * time.Second
@@ -447,30 +453,58 @@ func TestFullMatchE2E(t *testing.T) {
 	}
 
 	// =====================================================================
-	// CHECKLIST 3 (aggregate): LeaderboardUpdate broadcast check
-	// =====================================================================
-	if leaderboardUpdatesReceived > 0 {
-		t.Logf("PASS: Received %d total LeaderboardUpdate events across all rounds", leaderboardUpdatesReceived)
-	} else {
-		t.Error("FAIL: No LeaderboardUpdate events received — quiz service likely missing leaderboard.updated RabbitMQ consumer")
-	}
-
-	// =====================================================================
 	// CHECKLIST 5: MatchEnd received after 5 rounds
+	//
+	// Drain any trailing Leaderboard events on the way to MatchEnd. Scoring
+	// runs asynchronously over RabbitMQ, so leaderboard.updated for the
+	// final round commonly arrives after round-5 RoundResult and just
+	// before MatchEnd. Same ordering race PR #58 commit 65f5d4e3 patched
+	// for recvFirstQuestion, but on the trailing edge of the match.
+	// Drained events count toward the aggregate leaderboard check below.
 	// =====================================================================
 	t.Log("--- Checklist 5: MatchEnd ---")
 
+	recvMatchEndDrainingLB := func(stream pb.QuizService_StreamGameEventsClient) (*pb.GameEvent, int) {
+		drainedLB := 0
+		for {
+			ev := recvGameEvent(t, stream, eventTimeout)
+			if ev.GetMatchEnd() != nil {
+				return ev, drainedLB
+			}
+			if ev.GetLeaderboard() != nil {
+				drainedLB++
+				continue
+			}
+			t.Fatalf("expected MatchEnd (or trailing Leaderboard), got %T", ev.Event)
+			return nil, drainedLB
+		}
+	}
+
 	var end1, end2 *pb.GameEvent
+	var drained1, drained2 int
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		end1 = recvGameEvent(t, gameStream1, eventTimeout)
+		end1, drained1 = recvMatchEndDrainingLB(gameStream1)
 	}()
 	go func() {
 		defer wg.Done()
-		end2 = recvGameEvent(t, gameStream2, eventTimeout)
+		end2, drained2 = recvMatchEndDrainingLB(gameStream2)
 	}()
 	wg.Wait()
+	leaderboardUpdatesReceived += drained1 + drained2
+
+	// =====================================================================
+	// CHECKLIST 3 (aggregate): LeaderboardUpdate broadcast check
+	// Verified after MatchEnd drain so trailing events for the final round
+	// — which are otherwise impossible to observe in the round loop — also
+	// count.
+	// =====================================================================
+	if leaderboardUpdatesReceived > 0 {
+		t.Logf("PASS: Received %d total LeaderboardUpdate events", leaderboardUpdatesReceived)
+	} else {
+		t.Error("FAIL: No LeaderboardUpdate events received — quiz service likely missing leaderboard.updated RabbitMQ consumer")
+	}
 
 	me1End := end1.GetMatchEnd()
 	me2End := end2.GetMatchEnd()
