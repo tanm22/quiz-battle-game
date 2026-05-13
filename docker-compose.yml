@@ -206,6 +206,28 @@ services:
     volumes:
       - ./secrets:/run/secrets:ro
 
+  # §4.10 admin dashboard. Operator-facing HTTP service that surfaces
+  # live state from Mongo + Redis + RabbitMQ on a single page. Read-
+  # only — never publishes events, never writes Mongo. Kept on its own
+  # binary so a stuck probe doesn't affect any user-facing service.
+  admin:
+    build: .
+    command: admin
+    ports:
+      - "8090:8090" # dashboard + /api/stats
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      - REDIS_ADDR=redis:6379
+      - MONGO_URI=mongodb://mongo:27017/quizbattle?replicaSet=rs0
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASSWORD=guest
+
 volumes:
   redis_data:
   rabbitmq_data:

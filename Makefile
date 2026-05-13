@@ -1,4 +1,4 @@
-.PHONY: proto proto-go proto-dart test vet lint build clean
+.PHONY: proto proto-go proto-dart test vet lint build clean status coverage
 
 PROTO_SRC := proto/quiz.proto
 
@@ -39,3 +39,16 @@ lint:
 
 build:
 	go build ./...
+
+# §4.10 — one-command live snapshot of the running stack. Read-only;
+# wraps scripts/status.sh so the actual probe logic stays in shell
+# (easier to iterate than embedded recipe lines, plus the file can be
+# invoked standalone outside `make`).
+status:
+	@bash scripts/status.sh
+
+# §4.9 — per-function coverage report on the five pure-logic pieces the
+# spec calls out (scoring formula, daily quota, streak, webhook
+# signature, referral). Exits non-zero if any drop below 70%.
+coverage:
+	@bash scripts/coverage.sh

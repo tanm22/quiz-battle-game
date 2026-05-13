@@ -8,6 +8,8 @@
 /auth
 /payment
 /notification
+/admin
+/seed
 
 # Flutter
 flutter/.dart_tool/

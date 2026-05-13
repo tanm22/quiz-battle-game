@@ -11,8 +11,8 @@ package e2e
 
 import (
 	"context"
-	"fmt"
 	"math/rand"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -45,7 +45,14 @@ const (
 // ---------------------------------------------------------------------------
 
 func uniqueID() string {
-	return fmt.Sprintf("e2e_%d_%d", time.Now().UnixMilli(), rand.Intn(100000))
+	// pkg/validate caps usernames at 20 chars and restricts to letters,
+	// digits, underscore. Decimal "e2e_<unixMillis>_<rand>" was 22+ chars
+	// and tripped the validator. Base36 of the timestamp is ~8 chars and
+	// of a 24-bit random int is ~5 chars; with the "e2e" prefix the
+	// total lands at ~16, well under the cap, and stays alphanumeric.
+	ts := strconv.FormatInt(time.Now().UnixMilli(), 36)
+	tail := strconv.FormatInt(int64(rand.Intn(1<<24)), 36)
+	return "e2e" + ts + tail
 }
 
 // registerUser creates a new user via the auth service and returns token + userId.
@@ -87,6 +94,41 @@ func recvGameEvent(t *testing.T, stream pb.QuizService_StreamGameEventsClient, t
 	case <-time.After(timeout):
 		t.Fatalf("timeout (%v) waiting for game event", timeout)
 		return nil
+	}
+}
+
+// recvFirstQuestion pulls events from the stream until a
+// QuestionBroadcast arrives, skipping past:
+//
+//   - PlayerJoined: the server emits one per subscriber at round-1
+//     subscribe time. Without skipping, round-1 races against the
+//     join-notification fanout and flakes.
+//   - Leaderboard: scoring runs asynchronously over RabbitMQ, so a
+//     "leaderboard.updated" event for round N can land on the stream
+//     AFTER round N's RoundResult (the boundary collectUntilRoundEnd
+//     stops on). On a fast CI runner the trailing leaderboard event
+//     arrives just before round N+1's Question and the assertion
+//     fires before it would have on a slower box.
+//
+// Any other event type (RoundResult, MatchEnd, TimerSync) is a hard
+// fail — seeing one of those before the question frame would mean
+// something genuinely wrong in the flow, not stream-ordering jitter.
+func recvFirstQuestion(t *testing.T, stream pb.QuizService_StreamGameEventsClient, timeout time.Duration) *pb.GameEvent {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			t.Fatalf("timeout (%v) waiting for QuestionBroadcast", timeout)
+		}
+		ev := recvGameEvent(t, stream, remaining)
+		if ev.GetQuestion() != nil {
+			return ev
+		}
+		if ev.GetPlayerJoined() != nil || ev.GetLeaderboard() != nil {
+			continue
+		}
+		t.Fatalf("expected QuestionBroadcast (or trailing PlayerJoined/Leaderboard), got %T", ev.Event)
 	}
 }
 
@@ -305,27 +347,24 @@ func TestFullMatchE2E(t *testing.T) {
 	for round := 1; round <= totalRounds; round++ {
 		t.Logf("--- Round %d ---", round)
 
-		// Receive QuestionBroadcast on both streams
+		// Receive QuestionBroadcast on both streams. recvFirstQuestion
+		// skips over the PlayerJoined event the server emits at round-1
+		// stream-subscribe time; for round 2+ there's no PlayerJoined
+		// queued so it behaves like a plain recv.
 		var q1, q2 *pb.GameEvent
 		wg.Add(2)
 		go func() {
 			defer wg.Done()
-			q1 = recvGameEvent(t, gameStream1, eventTimeout)
+			q1 = recvFirstQuestion(t, gameStream1, eventTimeout)
 		}()
 		go func() {
 			defer wg.Done()
-			q2 = recvGameEvent(t, gameStream2, eventTimeout)
+			q2 = recvFirstQuestion(t, gameStream2, eventTimeout)
 		}()
 		wg.Wait()
 
 		qb1 := q1.GetQuestion()
 		qb2 := q2.GetQuestion()
-		if qb1 == nil {
-			t.Fatalf("round %d: player1 expected QuestionBroadcast, got %T", round, q1.Event)
-		}
-		if qb2 == nil {
-			t.Fatalf("round %d: player2 expected QuestionBroadcast, got %T", round, q2.Event)
-		}
 
 		// CHECKLIST 2: Identical deadline timestamp, absolute Unix time
 		if qb1.DeadlineUnix != qb2.DeadlineUnix {
@@ -596,12 +635,10 @@ func TestDisconnectReconnect(t *testing.T) {
 		t.Fatalf("stream player2: %v", err)
 	}
 
-	// Wait for round 1 QuestionBroadcast
-	q1 := recvGameEvent(t, gs1, eventTimeout)
-	recvGameEvent(t, gs2, eventTimeout)
-	if q1.GetQuestion() == nil {
-		t.Fatalf("expected QuestionBroadcast, got %T", q1.Event)
-	}
+	// Wait for round 1 QuestionBroadcast on both streams. Same race
+	// guard as TestFullMatchE2E — skip past the PlayerJoined fanout.
+	q1 := recvFirstQuestion(t, gs1, eventTimeout)
+	recvFirstQuestion(t, gs2, eventTimeout)
 	lastSeq := q1.SequenceNumber
 	t.Logf("Round 1 started, sequence_number=%d", lastSeq)
 

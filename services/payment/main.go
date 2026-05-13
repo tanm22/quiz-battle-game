@@ -50,6 +50,11 @@ type paymentServer struct {
 	razorpaySecret string
 	webhookSecret  string
 	metrics        *metrics.Metrics // nil in tests; non-nil in main()
+	// publishHook, when non-nil, captures every publish call instead of
+	// sending to amqpCh. Mirrors the scoringServer test seam so the
+	// webhook integration tests can assert what was published without
+	// standing up RabbitMQ. Nil in production.
+	publishHook func(routingKey string, body []byte)
 	// §4.7 PR-B1: limit on CreateOrder to soak up retry storms (a flaky
 	// payment dialog or a misbehaving client can fire many CreateOrder
 	// calls per minute). 10/min is generous for legitimate retry-after-
@@ -65,9 +70,23 @@ func (s *paymentServer) users() *mongo.Collection {
 }
 
 // publish sends a message to the topic exchange with mutex protection.
+// In tests, publishHook captures (routingKey, body) so the webhook +
+// VerifyPayment paths can be exercised end-to-end without RabbitMQ.
+// A nil amqpCh with no hook is treated as a silent no-op so test
+// harnesses that don't care about the wire shape don't need any setup.
 func (s *paymentServer) publish(ctx context.Context, routingKey string, body []byte) error {
 	s.amqpMu.Lock()
 	defer s.amqpMu.Unlock()
+	if s.publishHook != nil {
+		s.publishHook(routingKey, body)
+		if s.metrics != nil {
+			s.metrics.RecordPublish(routingKey, nil)
+		}
+		return nil
+	}
+	if s.amqpCh == nil {
+		return nil
+	}
 	err := log.PublishWithContext(ctx, s.amqpCh, "sx", routingKey, false, false, amqp.Publishing{
 		ContentType: "application/json",
 		Body:        body,
