@@ -179,6 +179,12 @@ func (s *scoringServer) CalculateScore(ctx context.Context, req *pb.CalculateSco
 // Boundaries are strict: exactly 5000ms is medium (not fast), exactly
 // 13000ms is medium (not slow). A wrong answer scores 0 regardless of
 // speed (the multiplier is still reported back for telemetry).
+//
+// Recency bonuses (streak + first-correct) are NOT computed here —
+// they require room+round+user state that lives in Redis and would
+// make this gRPC handler non-idempotent under retries. They are
+// applied in processAnswer after TrySetAnswer confirms the answer
+// is being recorded for the first time. See computeRecencyBonus.
 func computeRoundScore(correct bool, answerTimeMs int64) (basePoints, speedMultiplier, score float64) {
 	if correct {
 		basePoints = 100
@@ -190,6 +196,61 @@ func computeRoundScore(correct bool, answerTimeMs int64) (basePoints, speedMulti
 		speedMultiplier = 0.8
 	}
 	score = basePoints * speedMultiplier
+	return
+}
+
+// Recency bonus tuning. Kept as package-level constants so the values
+// are visible in tests and easy to tune without re-reading the math.
+const (
+	// streakBonusUnit is the points added per stacked correct answer
+	// beyond the first. Streak level 1 (first correct in a row) earns
+	// nothing; level 2 earns one unit; level 3 earns two; etc.
+	streakBonusUnit = 10
+	// streakBonusCap caps the multiplier so a long match can't make
+	// the streak bonus dwarf the base score — at the cap a single
+	// correct answer is worth speedMultiplier*100 + streakCap*unit
+	// (so 150 + 50 = 200 on a fast correct in a hot streak).
+	streakBonusCap = 5
+)
+
+// firstCorrectBonusByRank maps a correct answer's arrival rank within
+// the round to its first-correct bonus. Index 0 = rank 1 (first
+// correct), index 1 = rank 2 (second correct), etc. Anything past the
+// slice length earns 0 — the bonus is a small nudge for being early,
+// not a runaway lead.
+var firstCorrectBonusByRank = []float64{25, 10}
+
+// computeRecencyBonus maps the post-bump streak level and the correct-
+// answer rank within the round to a points bonus added on top of the
+// base (speed × correct) score. Streak level / rank are produced by
+// BumpStreak / IncrCorrectOrder in pkg/keys.
+//
+//	streakLevel = 1  → streakBonus = 0   (first correct establishes the streak)
+//	streakLevel = 2  → streakBonus = 10
+//	streakLevel = 3  → streakBonus = 20
+//	...
+//	streakLevel ≥ 6  → streakBonus = 50  (capped at streakBonusCap*streakBonusUnit)
+//
+//	correctRank = 1  → firstCorrectBonus = 25
+//	correctRank = 2  → firstCorrectBonus = 10
+//	correctRank ≥ 3  → firstCorrectBonus = 0
+//
+// Called only after the answer has been confirmed correct AND
+// idempotently recorded — a wrong answer or a duplicate submission
+// produces no bonus and (for wrong) resets the streak via
+// ResetStreak so the next correct answer starts at level 1.
+func computeRecencyBonus(streakLevel, correctRank int64) (streakBonus, firstCorrectBonus, total float64) {
+	if streakLevel > 1 {
+		stack := streakLevel - 1
+		if stack > streakBonusCap {
+			stack = streakBonusCap
+		}
+		streakBonus = float64(stack) * streakBonusUnit
+	}
+	if correctRank >= 1 && int(correctRank) <= len(firstCorrectBonusByRank) {
+		firstCorrectBonus = firstCorrectBonusByRank[correctRank-1]
+	}
+	total = streakBonus + firstCorrectBonus
 	return
 }
 
@@ -869,7 +930,13 @@ func (s *scoringServer) processAnswer(ctx context.Context, msg amqp.Delivery) {
 	correct := calcResp.Correct
 	score := calcResp.Score
 
-	// Step 12/48: Atomic idempotency — HSETNX room:{id}:answers:{round} {userId}
+	// Step 12/48: Atomic idempotency — HSETNX room:{id}:answers:{round} {userId}.
+	// The recencyBonus fields are populated AFTER this HSETNX succeeds
+	// (see below) so a duplicate submission can't double-INCR the streak
+	// or first-correct counters. They're left as zero for the marshal
+	// pre-image so the JSON shape is consistent with the post-write
+	// record we publish on the leaderboard event.
+	var streakBonus, firstCorrectBonus float64
 	answerJSON, err := json.Marshal(map[string]interface{}{
 		"optionIndex":     answer.OptionIndex,
 		"correct":         correct,
@@ -904,6 +971,42 @@ func (s *scoringServer) processAnswer(ctx context.Context, msg amqp.Delivery) {
 		return
 	}
 
+	// Recency bonuses are applied AFTER TrySetAnswer commits the first
+	// submission, so a duplicate replay of the same RabbitMQ message can't
+	// re-INCR the streak / first-correct counters and inflate the score.
+	//
+	// - Correct: bump per-user streak (level 1 on first correct in a row,
+	//   higher when stacking) AND atomically claim a rank for being the
+	//   N'th correct answer in this round.
+	// - Wrong: reset the streak so the next correct answer starts fresh
+	//   at level 1. No first-correct counter increment.
+	//
+	// Counter failures are logged but non-fatal — the base score still
+	// applies, the answer record is durable, and at worst the player
+	// misses one round of bonus.
+	if correct {
+		streakLevel, sErr := keys.BumpStreak(ctx, s.rdb, answer.RoomID, answer.UserID)
+		if sErr != nil {
+			log.FromContext(ctx).Warn("BumpStreak failed; skipping streak bonus",
+				"consumer", "scoring", "user_id", answer.UserID, "room_id", answer.RoomID, "err", sErr)
+			streakLevel = 1
+		}
+		correctRank, oErr := keys.IncrCorrectOrder(ctx, s.rdb, answer.RoomID, answer.Round)
+		if oErr != nil {
+			log.FromContext(ctx).Warn("IncrCorrectOrder failed; skipping first-correct bonus",
+				"consumer", "scoring", "user_id", answer.UserID, "room_id", answer.RoomID, "round", answer.Round, "err", oErr)
+			correctRank = 0
+		}
+		var bonus float64
+		streakBonus, firstCorrectBonus, bonus = computeRecencyBonus(streakLevel, correctRank)
+		score += bonus
+	} else {
+		if rErr := keys.ResetStreak(ctx, s.rdb, answer.RoomID, answer.UserID); rErr != nil {
+			log.FromContext(ctx).Warn("ResetStreak failed; streak may carry over a wrong answer",
+				"consumer", "scoring", "user_id", answer.UserID, "room_id", answer.RoomID, "err", rErr)
+		}
+	}
+
 	// Step 49: Update leaderboard via Lua script (atomic read-modify-write)
 	entries, err := keys.UpdateLeaderboard(ctx, s.rdb, answer.RoomID, answer.UserID, score)
 	if err != nil {
@@ -924,7 +1027,9 @@ func (s *scoringServer) processAnswer(ctx context.Context, msg amqp.Delivery) {
 		"room_id", answer.RoomID,
 		"round", answer.Round,
 		"correct", correct,
-		"speed_multiplier", calcResp.SpeedMultiplier)
+		"speed_multiplier", calcResp.SpeedMultiplier,
+		"streak_bonus", streakBonus,
+		"first_correct_bonus", firstCorrectBonus)
 
 	// Publish leaderboard.updated to RabbitMQ for real-time broadcast
 	leaderboardEvent, _ := json.Marshal(map[string]interface{}{

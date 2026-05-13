@@ -22,6 +22,15 @@ const (
 	RoomAnswered    = "room:%s:answered:%d"
 	RoomLock        = "room:lock:%s"
 	RoomRoundClosed = "room:%s:round:%d:closed"
+	// RoomStreak is the per-user consecutive-correct counter inside a
+	// single match. INCR'd by scoring's processAnswer when an answer is
+	// correct, DEL'd when wrong. The streak bonus reads the post-INCR
+	// value and rewards stacking correct answers.
+	RoomStreak = "room:%s:streak:%s" // roomID, userID
+	// RoomCorrectOrder is the per-round counter of correct answers seen
+	// so far. INCR returns the caller's rank (1 = first correct in the
+	// round), which scoring uses to award the first-correct bonus.
+	RoomCorrectOrder = "room:%s:correctorder:%d" // roomID, round
 	EmailCode       = "emailcode:%s:%s" // email, purpose
 	EmailRateLimit  = "emailrate:%s"    // email
 	// Phase 2
@@ -100,6 +109,17 @@ func Answered(roomID string, round int) string {
 
 func Lock(roomID string) string {
 	return fmt.Sprintf(RoomLock, roomID)
+}
+
+// Streak builds the per-user consecutive-correct-counter key for a match.
+func Streak(roomID, userID string) string {
+	return fmt.Sprintf(RoomStreak, roomID, userID)
+}
+
+// CorrectOrder builds the per-round counter key that tracks the rank
+// (arrival order) of each correct answer within a single round.
+func CorrectOrder(roomID string, round int) string {
+	return fmt.Sprintf(RoomCorrectOrder, roomID, round)
 }
 
 func RoundClosed(roomID string, round int) string {
